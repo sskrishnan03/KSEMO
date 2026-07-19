@@ -2,22 +2,22 @@ import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   Plus, MessageSquare, Wand2, Search, Settings, Star, File,
-  Archive, Trash2, Pin, Bell, Shield,
-  MoreHorizontal, PanelLeftClose,
+  Archive, Trash2, Pin, Shield,
+  MoreHorizontal, PanelLeftClose, PanelLeftOpen, History, LogOut, Mic,
 } from 'lucide-react';
-import { cn, groupByDate, truncate } from '../lib/utils';
+import { cn, groupByDate, truncate, initials } from '../lib/utils';
 import { listChats, createChat, updateChat, deleteChat } from '../lib/data';
 import { useAuthContext } from './AuthProvider';
 import { Button, Modal } from './ui';
 import type { Chat } from '../lib/types';
 
 interface Props {
-  open: boolean;
-  onClose: () => void;
+  collapsed: boolean;
+  onToggleCollapse: () => void;
 }
 
-export function Sidebar({ open, onClose }: Props) {
-  const { profile } = useAuthContext();
+export function Sidebar({ collapsed, onToggleCollapse }: Props) {
+  const { profile, signOut } = useAuthContext();
   const loc = useLocation();
   const nav = useNavigate();
   const [chats, setChats] = useState<Chat[]>([]);
@@ -41,11 +41,13 @@ export function Sidebar({ open, onClose }: Props) {
   const grouped = groupByDate(filtered, 'updated_at');
 
   const newChat = async () => {
-    const c = await createChat();
-    if (c) {
-      nav(`/app/chat/${c.id}`);
-      onClose();
+    if (loc.pathname.startsWith('/app/chat/')) {
+      const currentId = loc.pathname.split('/app/chat/')[1];
+      const current = chats.find((c) => c.id === currentId);
+      if (current && current.title === 'New chat') return;
     }
+    const c = await createChat();
+    if (c) nav(`/app/chat/${c.id}`);
   };
 
   const togglePin = async (c: Chat) => {
@@ -71,19 +73,106 @@ export function Sidebar({ open, onClose }: Props) {
     { to: '/app/search', icon: Search, label: 'Search', active: loc.pathname.startsWith('/app/search') },
     { to: '/app/favorites', icon: Star, label: 'Favorites', active: loc.pathname.startsWith('/app/favorites') },
     { to: '/app/files', icon: File, label: 'Files', active: loc.pathname.startsWith('/app/files') },
-    { to: '/app/history', icon: Archive, label: 'History', active: loc.pathname.startsWith('/app/history') },
+    { to: '/app/history', icon: History, label: 'History', active: loc.pathname.startsWith('/app/history') },
   ];
 
   const isAdmin = profile?.role === 'admin';
+  const isCollapsed = collapsed;
 
   return (
     <>
-      {/* Mobile backdrop */}
-      {open && <div className="fixed inset-0 z-30 bg-black/60 md:hidden" onClick={onClose} />}
+      {/* Collapsed icon rail */}
+      {isCollapsed && (
+        <aside className="sticky top-0 z-40 h-screen w-[60px] shrink-0 bg-ink-950 border-r border-white/8 flex flex-col items-center py-3 gap-1 transition-all duration-300">
+          {/* Expand toggle */}
+          <button
+            onClick={onToggleCollapse}
+            className="h-9 w-9 rounded-xl flex items-center justify-center text-ink-300 hover:text-white hover:bg-white/8 transition-all duration-200 mb-1"
+            title="Expand sidebar"
+          >
+            <PanelLeftOpen size={17} />
+          </button>
 
+          {/* New chat icon */}
+          <button
+            onClick={newChat}
+            className="h-9 w-9 rounded-xl flex items-center justify-center text-ink-300 hover:text-white hover:bg-white/8 transition-all duration-200"
+            title="New chat"
+          >
+            <Plus size={18} />
+          </button>
+
+          {/* Voice chat icon */}
+          <Link
+            to="/app/voice-chat"
+            className={cn(
+              'h-9 w-9 rounded-xl flex items-center justify-center transition-all duration-200',
+              loc.pathname === '/app/voice-chat' ? 'text-white bg-white/10' : 'text-ink-300 hover:text-white hover:bg-white/8',
+            )}
+            title="Voice Chat"
+          >
+            <Mic size={17} />
+          </Link>
+
+          <div className="w-7 h-px bg-white/8 my-1" />
+
+          {/* Nav icons */}
+          {navItems.map((n) => (
+            <Link
+              key={n.to}
+              to={n.to}
+              className={cn(
+                'h-9 w-9 rounded-xl flex items-center justify-center transition-all duration-200',
+                n.active ? 'text-white bg-white/10' : 'text-ink-300 hover:text-white hover:bg-white/8',
+              )}
+              title={n.label}
+            >
+              <n.icon size={17} />
+            </Link>
+          ))}
+          {isAdmin && (
+            <Link
+              to="/app/admin"
+              className={cn(
+                'h-9 w-9 rounded-xl flex items-center justify-center transition-all duration-200',
+                loc.pathname.startsWith('/app/admin') ? 'text-white bg-white/10' : 'text-ink-300 hover:text-white hover:bg-white/8',
+              )}
+              title="Admin"
+            >
+              <Shield size={17} />
+            </Link>
+          )}
+
+          <div className="flex-1" />
+
+          {/* Footer icons */}
+          <div className="w-7 h-px bg-white/8 my-1" />
+          <Link
+            to="/app/settings"
+            className={cn(
+              'h-9 w-9 rounded-xl flex items-center justify-center transition-all duration-200',
+              loc.pathname.startsWith('/app/settings') ? 'text-white bg-white/10' : 'text-ink-300 hover:text-white hover:bg-white/8',
+            )}
+            title="Settings"
+          >
+            <Settings size={17} />
+          </Link>
+          <button
+            onClick={() => { signOut(); nav('/login', { replace: true }); }}
+            className="h-9 w-9 rounded-xl flex items-center justify-center text-ink-300 hover:text-white hover:bg-white/8 transition-all duration-200"
+            title="Sign out"
+          >
+            <div className="h-7 w-7 rounded-full bg-ink-700 border border-white/10 flex items-center justify-center text-[10px] font-semibold text-white">
+              {initials((profile?.full_name || profile?.username) ?? '')}
+            </div>
+          </button>
+        </aside>
+      )}
+
+      {/* Full sidebar */}
       <aside className={cn(
-        'fixed md:sticky top-0 z-40 h-screen w-[280px] shrink-0 bg-ink-950 border-r border-white/8 flex flex-col transition-transform duration-300',
-        open ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
+        'sticky top-0 z-40 h-screen w-[280px] shrink-0 bg-ink-950 border-r border-white/8 flex flex-col transition-all duration-300',
+        isCollapsed && 'hidden',
       )}>
         {/* Header */}
         <div className="h-14 px-3 flex items-center justify-between border-b border-white/8">
@@ -91,16 +180,31 @@ export function Sidebar({ open, onClose }: Props) {
             <div className="h-7 w-7 rounded-lg bg-ink-800 border border-white/10 flex items-center justify-center font-bold text-white text-[13px]">K</div>
             <span className="text-[15px] font-semibold tracking-tight">Ksemo</span>
           </Link>
-          <button onClick={onClose} className="md:hidden h-8 w-8 rounded-lg flex items-center justify-center text-ink-300 hover:bg-white/5">
+          <button onClick={onToggleCollapse} className="h-8 w-8 rounded-lg flex items-center justify-center text-ink-300 hover:bg-white/5 hover:text-white transition" title="Collapse sidebar">
             <PanelLeftClose size={16} />
           </button>
         </div>
 
         {/* New chat */}
-        <div className="p-3">
+        <div className="p-3 space-y-1.5">
           <Button onClick={newChat} className="w-full justify-start">
             <Plus size={16} /> New chat
           </Button>
+          <button
+            onClick={() => nav('/app/voice-chat')}
+            className={cn(
+              'w-full flex items-center gap-2 px-3 h-9 rounded-lg text-[13px] font-medium transition-all duration-200',
+              loc.pathname === '/app/voice-chat'
+                ? 'bg-white/8 text-white'
+                : 'text-ink-200 hover:bg-white/5 hover:text-white',
+            )}
+          >
+            <span className="relative flex items-center justify-center">
+              <Mic size={15} />
+              <span className="absolute -top-0.5 -right-0.5 h-1.5 w-1.5 rounded-full bg-white/40 animate-pulse-soft" />
+            </span>
+            Voice Chat
+          </button>
         </div>
 
         {/* Nav */}
@@ -109,7 +213,6 @@ export function Sidebar({ open, onClose }: Props) {
             <Link
               key={n.to}
               to={n.to}
-              onClick={onClose}
               className={cn(
                 'flex items-center gap-3 px-3 h-9 rounded-lg text-[13px] transition-colors',
                 n.active ? 'bg-white/8 text-white' : 'text-ink-200 hover:bg-white/5 hover:text-white',
@@ -122,7 +225,6 @@ export function Sidebar({ open, onClose }: Props) {
           {isAdmin && (
             <Link
               to="/app/admin"
-              onClick={onClose}
               className={cn(
                 'flex items-center gap-3 px-3 h-9 rounded-lg text-[13px] transition-colors',
                 loc.pathname.startsWith('/app/admin') ? 'bg-white/8 text-white' : 'text-ink-200 hover:bg-white/5 hover:text-white',
@@ -161,13 +263,13 @@ export function Sidebar({ open, onClose }: Props) {
                   <div key={c.id} className="group relative">
                     <Link
                       to={`/app/chat/${c.id}`}
-                      onClick={onClose}
                       className={cn(
                         'flex items-center gap-2 px-3 h-9 rounded-lg text-[13px] transition-colors pr-8',
                         active ? 'bg-white/8 text-white' : 'text-ink-200 hover:bg-white/5 hover:text-white',
                       )}
                     >
                       {c.pinned && <Pin size={11} className="text-white shrink-0" />}
+                      {c.type === 'voice' && <Mic size={12} className="text-ink-300 shrink-0" />}
                       <span className="truncate">{truncate(c.title, 28)}</span>
                     </Link>
                     <button
@@ -184,19 +286,26 @@ export function Sidebar({ open, onClose }: Props) {
         </div>
 
         {/* Footer */}
-        <div className="border-t border-white/8 p-2">
-          <Link to="/app/settings" onClick={onClose} className={cn(
+        <div className="border-t border-white/8 p-2 space-y-0.5">
+          <Link to="/app/settings" className={cn(
             'flex items-center gap-3 px-3 h-10 rounded-lg text-[13px] transition-colors',
             loc.pathname.startsWith('/app/settings') ? 'bg-white/8 text-white' : 'text-ink-200 hover:bg-white/5 hover:text-white',
           )}>
             <Settings size={16} /> Settings
           </Link>
-          <Link to="/app/notifications" onClick={onClose} className={cn(
-            'flex items-center gap-3 px-3 h-10 rounded-lg text-[13px] transition-colors',
-            loc.pathname.startsWith('/app/notifications') ? 'bg-white/8 text-white' : 'text-ink-200 hover:bg-white/5 hover:text-white',
-          )}>
-            <Bell size={16} /> Notifications
-          </Link>
+          <div className="flex items-center gap-3 px-3 h-10 rounded-lg text-[13px] text-ink-200">
+            <div className="h-6 w-6 rounded-full bg-ink-700 border border-white/10 flex items-center justify-center text-[10px] font-semibold text-white shrink-0">
+              {initials(profile?.full_name || profile?.username || '')}
+            </div>
+            <span className="truncate flex-1">{profile?.full_name || profile?.username}</span>
+            <button
+              onClick={() => { signOut(); nav('/login', { replace: true }); }}
+              className="h-7 w-7 rounded-md flex items-center justify-center text-ink-400 hover:text-white hover:bg-white/5 transition shrink-0"
+              title="Sign out"
+            >
+              <LogOut size={14} />
+            </button>
+          </div>
         </div>
       </aside>
 
@@ -216,7 +325,6 @@ export function Sidebar({ open, onClose }: Props) {
           </div>
         )}
       </Modal>
-
     </>
   );
 }

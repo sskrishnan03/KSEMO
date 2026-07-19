@@ -21,6 +21,7 @@ export interface Chat {
   pinned: boolean;
   archived: boolean;
   category: string | null;
+  type: string | null;
   created_at: string;
   updated_at: string;
 }

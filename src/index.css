@@ -267,3 +267,529 @@
   border-top: 1px solid rgba(255,255,255,0.1);
   margin: 1.5rem 0;
 }
+
+/* ─── Premium Composer ─── */
+
+/* Floating glass panel — matches project glass treatment */
+.composer-shell {
+  position: relative;
+  border-radius: 16px;
+  background: rgba(18, 18, 18, 0.72);
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  border: 1px solid rgba(255,255,255,0.10);
+  box-shadow:
+    0 1px 2px 0 rgba(0,0,0,0.4),
+    0 1px 3px 0 rgba(0,0,0,0.3),
+    inset 0 1px 0 rgba(255,255,255,0.04);
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+.composer-shell:hover {
+  border-color: rgba(255,255,255,0.14);
+}
+.composer-shell:focus-within {
+  border-color: rgba(255,255,255,0.18);
+  box-shadow:
+    0 1px 2px 0 rgba(0,0,0,0.4),
+    0 4px 12px -2px rgba(0,0,0,0.5),
+    inset 0 1px 0 rgba(255,255,255,0.06);
+}
+
+/* Animated gradient border on focus */
+.composer-glow {
+  position: absolute;
+  inset: -1px;
+  border-radius: 17px;
+  padding: 1px;
+  background: conic-gradient(
+    from var(--composer-angle, 0deg),
+    rgba(255,255,255,0.0) 0%,
+    rgba(255,255,255,0.18) 25%,
+    rgba(200,200,200,0.10) 50%,
+    rgba(255,255,255,0.18) 75%,
+    rgba(255,255,255,0.0) 100%
+  );
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+  z-index: 1;
+}
+.composer-shell:focus-within .composer-glow {
+  opacity: 1;
+  animation: composerRotate 3s linear infinite;
+}
+@keyframes composerRotate {
+  to { --composer-angle: 360deg; }
+}
+@property --composer-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+/* Rotating placeholder */
+.composer-placeholder {
+  position: absolute;
+  left: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  z-index: 2;
+  overflow: hidden;
+  height: 1.4em;
+}
+.composer-placeholder-item {
+  display: block;
+  height: 1.4em;
+  line-height: 1.4em;
+  animation: placeholderCycle 12s ease-in-out infinite;
+  opacity: 0;
+  white-space: nowrap;
+}
+.composer-placeholder-item:nth-child(1) { animation-delay: 0s; }
+.composer-placeholder-item:nth-child(2) { animation-delay: 2s; }
+.composer-placeholder-item:nth-child(3) { animation-delay: 4s; }
+.composer-placeholder-item:nth-child(4) { animation-delay: 6s; }
+.composer-placeholder-item:nth-child(5) { animation-delay: 8s; }
+.composer-placeholder-item:nth-child(6) { animation-delay: 10s; }
+
+@keyframes placeholderCycle {
+  0%, 2%   { opacity: 0; transform: translateY(8px); }
+  3%, 14%  { opacity: 1; transform: translateY(0); }
+  16%, 100%{ opacity: 0; transform: translateY(-8px); }
+}
+
+/* Modern circular icon buttons — project palette */
+.c-btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  background: transparent;
+  color: #737373;
+  transition: all 0.2s cubic-bezier(0.16,1,0.3,1);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.c-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.05);
+  opacity: 0;
+  transform: scale(0.6);
+  transition: opacity 0.2s ease, transform 0.2s cubic-bezier(0.16,1,0.3,1);
+}
+.c-btn:hover::before {
+  opacity: 1;
+  transform: scale(1);
+}
+.c-btn:hover {
+  color: #ffffff;
+}
+.c-btn:active {
+  transform: scale(0.90);
+}
+.c-btn:active::before {
+  opacity: 0;
+  transition: 0.08s;
+}
+.c-btn svg {
+  position: relative;
+  z-index: 1;
+}
+
+/* Ripple on click */
+.c-btn .c-ripple {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.15);
+  transform: scale(0);
+  animation: cRipple 0.45s ease-out forwards;
+  pointer-events: none;
+  z-index: 0;
+}
+@keyframes cRipple {
+  to {
+    transform: scale(3);
+    opacity: 0;
+  }
+}
+
+/* Gradient send button — project white style */
+.c-send {
+  background: #ffffff;
+  color: #0a0a0a;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.4);
+}
+.c-send:hover {
+  box-shadow: 0 2px 8px rgba(255,255,255,0.1);
+}
+.c-send:active {
+  transform: scale(0.90);
+  box-shadow: none;
+}
+.c-send:disabled {
+  background: rgba(255,255,255,0.06);
+  color: #404040;
+  box-shadow: none;
+  transform: none;
+  cursor: not-allowed;
+}
+.c-send:disabled:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+/* Stop button — subtle red matching project palette */
+.c-stop {
+  background: rgba(239,68,68,0.12);
+  color: #ef4444;
+  animation: cStopPulse 1.5s ease-in-out infinite;
+}
+.c-stop:hover {
+  background: rgba(239,68,68,0.2);
+}
+@keyframes cStopPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.15); }
+  50% { box-shadow: 0 0 0 5px rgba(239,68,68,0); }
+}
+
+/* Voice recording active — white pulse */
+.c-voice-active {
+  background: rgba(255,255,255,0.10);
+  color: #ffffff;
+  animation: cVoicePulse 1.2s ease-in-out infinite;
+}
+@keyframes cVoicePulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255,255,255,0.12); }
+  50% { box-shadow: 0 0 0 4px rgba(255,255,255,0); }
+}
+
+/* Voice wave bars */
+.c-voice-waves {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 16px;
+}
+.c-voice-wave {
+  width: 2px;
+  border-radius: 999px;
+  background: currentColor;
+  animation: cWave 0.6s ease-in-out infinite alternate;
+}
+.c-voice-wave:nth-child(1) { height: 6px; animation-delay: 0s; }
+.c-voice-wave:nth-child(2) { height: 12px; animation-delay: 0.1s; }
+.c-voice-wave:nth-child(3) { height: 8px; animation-delay: 0.2s; }
+.c-voice-wave:nth-child(4) { height: 14px; animation-delay: 0.15s; }
+.c-voice-wave:nth-child(5) { height: 5px; animation-delay: 0.25s; }
+@keyframes cWave {
+  0% { transform: scaleY(0.4); }
+  100% { transform: scaleY(1); }
+}
+
+/* Composer button tooltip — matches project msg-tooltip */
+.c-tip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: rgba(30,30,30,0.95);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: #d4d4d4;
+  font-size: 11px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease, transform 0.2s cubic-bezier(0.16,1,0.3,1);
+  z-index: 50;
+}
+.c-tip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 4px solid transparent;
+  border-top-color: rgba(30,30,30,0.95);
+}
+.c-btn:hover .c-tip {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* ============================================
+   Voice Chat — Premium Orb Interface
+   ============================================ */
+
+.vc-bg {
+  background: #050505;
+}
+
+.vc-radial {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 60% 50% at 50% 45%, rgba(255,255,255,0.03) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.vc-gradient {
+  position: absolute;
+  inset: 0;
+  background: conic-gradient(from 180deg at 50% 50%, rgba(255,255,255,0.015) 0deg, transparent 60deg, rgba(255,255,255,0.01) 120deg, transparent 180deg, rgba(255,255,255,0.02) 240deg, transparent 300deg, rgba(255,255,255,0.015) 360deg);
+  animation: vcSpin 30s linear infinite;
+  pointer-events: none;
+}
+@keyframes vcSpin {
+  to { transform: rotate(360deg); }
+}
+
+/* Particles */
+.vc-particles {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.vc-particle {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.35);
+  animation: vcFloat linear infinite;
+}
+@keyframes vcFloat {
+  0%, 100% { transform: translateY(0) translateX(0); opacity: 0; }
+  10% { opacity: 0.6; }
+  50% { transform: translateY(-30vh) translateX(15px); opacity: 0.3; }
+  90% { opacity: 0; }
+}
+
+/* Ripple rings */
+.vc-ripple {
+  position: absolute;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.12);
+  animation: vcRipple 3s ease-out infinite;
+  pointer-events: none;
+}
+.vc-ripple-1 { width: 140px; height: 140px; animation-delay: 0s; }
+.vc-ripple-2 { width: 140px; height: 140px; animation-delay: 0.8s; }
+.vc-ripple-3 { width: 140px; height: 140px; animation-delay: 1.6s; }
+@keyframes vcRipple {
+  0% { transform: scale(1); opacity: 0.6; }
+  100% { transform: scale(2.8); opacity: 0; }
+}
+
+/* Thinking ring */
+.vc-think-ring {
+  position: absolute;
+  width: 160px;
+  height: 160px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  border-top-color: rgba(255,255,255,0.5);
+  border-right-color: rgba(255,255,255,0.15);
+  animation: vcSpinRing 1.2s linear infinite;
+  pointer-events: none;
+}
+@keyframes vcSpinRing {
+  to { transform: rotate(360deg); }
+}
+
+/* Error ring */
+.vc-error-ring {
+  position: absolute;
+  width: 160px;
+  height: 160px;
+  border-radius: 50%;
+  border: 2px solid rgba(239,68,68,0.5);
+  animation: vcPulseError 1s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes vcPulseError {
+  0%, 100% { transform: scale(1); opacity: 0.6; }
+  50% { transform: scale(1.1); opacity: 1; }
+}
+
+/* Orb error state */
+.vc-orb-error .vc-orb-glow {
+  background: radial-gradient(circle, rgba(239,68,68,0.2) 0%, transparent 70%);
+  opacity: 0.5;
+}
+
+/* Waveform SVG ring */
+.vc-waveform {
+  position: absolute;
+  width: 200px;
+  height: 200px;
+  pointer-events: none;
+  animation: vcWaveSpin 20s linear infinite;
+}
+@keyframes vcWaveSpin {
+  to { transform: rotate(360deg); }
+}
+
+/* Main orb */
+.vc-orb {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.6s ease;
+  z-index: 10;
+}
+.vc-orb-inner {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, #2a2a2a, #111111 60%, #0a0a0a);
+  border: 1px solid rgba(255,255,255,0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.04), 0 4px 24px rgba(0,0,0,0.6);
+}
+.vc-orb-glow {
+  position: absolute;
+  inset: -20px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,255,255,0.12) 0%, transparent 70%);
+  opacity: 0.2;
+  transition: opacity 0.6s ease;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Orb states */
+.vc-orb-listening {
+  animation: vcOrbBreathe 2.5s ease-in-out infinite;
+}
+.vc-orb-listening .vc-orb-glow {
+  opacity: 0.5;
+}
+.vc-orb-thinking {
+  animation: vcOrbPulse 1.5s ease-in-out infinite;
+}
+.vc-orb-thinking .vc-orb-glow {
+  opacity: 0.4;
+  background: radial-gradient(circle, rgba(255,255,255,0.18) 0%, transparent 70%);
+}
+.vc-orb-speaking {
+  animation: vcOrbSpeak 0.8s ease-in-out infinite;
+}
+.vc-orb-speaking .vc-orb-glow {
+  opacity: 0.6;
+}
+@keyframes vcOrbBreathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.06); }
+}
+@keyframes vcOrbPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.03); }
+}
+@keyframes vcOrbSpeak {
+  0%, 100% { transform: scale(1); }
+  30% { transform: scale(1.05); }
+  60% { transform: scale(0.98); }
+}
+
+/* Controls */
+.vc-mic {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255,255,255,0.1);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255,255,255,0.15);
+  color: #ffffff;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.4);
+}
+.vc-mic:hover {
+  background: rgba(255,255,255,0.16);
+  transform: scale(1.05);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+}
+.vc-mic:active {
+  transform: scale(0.96);
+}
+.vc-mic-active {
+  background: rgba(255,255,255,0.2);
+  border-color: rgba(255,255,255,0.25);
+  box-shadow: 0 0 24px rgba(255,255,255,0.12), 0 4px 20px rgba(0,0,0,0.5);
+}
+
+.vc-ctrl {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255,255,255,0.06);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.6);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.vc-ctrl:hover {
+  background: rgba(255,255,255,0.12);
+  color: #fff;
+  transform: scale(1.06);
+}
+.vc-ctrl:active {
+  transform: scale(0.95);
+}
+.vc-ctrl-active {
+  background: rgba(255,255,255,0.1);
+  color: rgba(255,255,255,0.4);
+}
+
+.vc-end {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #ef4444;
+  border: none;
+  color: #ffffff;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 12px rgba(239,68,68,0.3);
+}
+.vc-end:hover {
+  background: #dc2626;
+  transform: scale(1.08);
+  box-shadow: 0 4px 20px rgba(239,68,68,0.4);
+}
+.vc-end:active {
+  transform: scale(0.94);
+}

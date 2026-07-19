@@ -103,6 +103,7 @@ export async function createChat(patch?: Partial<Chat>): Promise<Chat | null> {
     pinned: false,
     archived: false,
     category: null,
+    type: null,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
     ...patch

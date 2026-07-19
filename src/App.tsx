@@ -17,6 +17,7 @@ import Files from './pages/Files';
 import History from './pages/History';
 import Notifications from './pages/Notifications';
 import Settings from './pages/Settings';
+import VoiceChat from './pages/VoiceChat';
 import Admin from './pages/Admin';
 
 export default function App() {
@@ -41,6 +42,7 @@ export default function App() {
             <Route path="/app/files" element={<ProtectedRoute><AppLayout><Files /></AppLayout></ProtectedRoute>} />
             <Route path="/app/history" element={<ProtectedRoute><AppLayout><History /></AppLayout></ProtectedRoute>} />
             <Route path="/app/notifications" element={<ProtectedRoute><AppLayout><Notifications /></AppLayout></ProtectedRoute>} />
+            <Route path="/app/voice-chat" element={<ProtectedRoute><AppLayout><VoiceChat /></AppLayout></ProtectedRoute>} />
             <Route path="/app/settings" element={<ProtectedRoute><AppLayout><Settings /></AppLayout></ProtectedRoute>} />
             <Route path="/app/admin" element={<AdminRoute><Admin /></AdminRoute>} />
             <Route path="*" element={<Navigate to="/" replace />} />
