@@ -1,0 +1,569 @@
+import { useEffect, useRef, useState, useCallback } from 'react';
+import { useParams } from 'react-router-dom';
+import {
+  Send, Square, Sparkles, Copy, Check,
+  Pencil, Share2, Download, FileText, MessageSquare,
+  Volume2, RotateCw, Star, MoreHorizontal, Trash2, Mic,
+} from 'lucide-react';
+import { Button, Modal, Textarea, EmptyState } from '../components/ui';
+import { Markdown } from '../components/Markdown';
+import type { Chat, Message } from '../lib/types';
+import { listMessages, insertMessage, updateMessage, deleteMessage, updateChat, logUsage, addFavorite, removeFavorite, isFavorite } from '../lib/data';
+import { supabase } from '../lib/supabase';
+import { streamChat, type ChatMessage } from '../lib/ai';
+import { downloadFile, estimateTokens, cn } from '../lib/utils';
+
+export default function ChatWorkspace() {
+  const { chatId } = useParams();
+  const [chat, setChat] = useState<Chat | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [input, setInput] = useState('');
+  const [streaming, setStreaming] = useState(false);
+  const [streamText, setStreamText] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editText, setEditText] = useState('');
+  const [renameOpen, setRenameOpen] = useState(false);
+  const [renameText, setRenameText] = useState('');
+  const [recording, setRecording] = useState(false);
+  const recognitionRef = useRef<any>(null);
+
+  const abortRef = useRef<AbortController | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  const loadChat = useCallback(async () => {
+    if (!chatId) return;
+    setLoading(true);
+    const msgs = await listMessages(chatId);
+    setMessages(msgs);
+    const { data } = await supabase.from('chats').select('*').eq('id', chatId).maybeSingle();
+    if (data) {
+      setChat(data as Chat);
+      setRenameText(data.title);
+    }
+    setLoading(false);
+  }, [chatId]);
+
+  useEffect(() => { loadChat(); }, [loadChat]);
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
+    }
+  }, [messages, streamText]);
+
+  useEffect(() => {
+    const el = inputRef.current;
+    if (el) {
+      el.style.height = 'auto';
+      el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
+    }
+  }, [input]);
+
+  const send = async () => {
+    if (!input.trim() || !chatId || streaming) return;
+    const content = input.trim();
+    setInput('');
+
+    const userMsg = await insertMessage({ chat_id: chatId, role: 'user', content });
+    if (userMsg) setMessages((m) => [...m, userMsg]);
+
+    if (chat?.title === 'New chat') {
+      const title = content.slice(0, 48) + (content.length > 48 ? '…' : '');
+      await updateChat(chatId, { title });
+      setChat((c) => c ? { ...c, title } : c);
+      setRenameText(title);
+    }
+
+    setStreaming(true);
+    setStreamText('');
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    const history: ChatMessage[] = [...messages, { role: 'user', content }].map((m) => ({ role: m.role as 'user' | 'assistant' | 'system', content: m.content }));
+
+    try {
+      const result = await streamChat({
+        model: 'ksemo-pro', messages: history,
+        signal: controller.signal,
+        onToken: (t) => setStreamText((s) => s + t),
+      });
+      const assistantMsg = await insertMessage({ chat_id: chatId, role: 'assistant', content: result.content, model: 'ksemo-pro', tokens: result.tokens, meta: { latency_ms: result.latencyMs, from_edge: result.fromEdge } });
+      if (assistantMsg) setMessages((m) => [...m, assistantMsg]);
+      setStreamText('');
+      await logUsage('ksemo-pro', estimateTokens(content), result.tokens, result.latencyMs);
+    } catch (err) {
+      if ((err as Error).name !== 'AbortError') {
+        const errMsg = await insertMessage({ chat_id: chatId, role: 'assistant', content: `*Something went wrong while generating a response.*\n\nError: ${((err as Error).message)}`, model: 'ksemo-pro' });
+        if (errMsg) setMessages((m) => [...m, errMsg]);
+      }
+    } finally {
+      setStreaming(false);
+      setStreamText('');
+      abortRef.current = null;
+    }
+  };
+
+  const stop = () => {
+    abortRef.current?.abort();
+    setStreaming(false);
+  };
+
+  const toggleRecording = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert('Speech recognition is not supported in this browser.');
+      return;
+    }
+
+    if (recording) {
+      recognitionRef.current?.stop();
+      setRecording(false);
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = 'en-US';
+
+    let baseText = input;
+    let finalTranscript = '';
+
+    recognition.onresult = (event: any) => {
+      let interim = '';
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        if (event.results[i].isFinal) {
+          finalTranscript += event.results[i][0].transcript;
+        } else {
+          interim += event.results[i][0].transcript;
+        }
+      }
+      setInput(baseText + finalTranscript + interim);
+    };
+
+    recognition.onstart = () => {
+      recognitionRef.current = recognition;
+      setRecording(true);
+    };
+
+    recognition.onend = () => {
+      setRecording(false);
+      recognitionRef.current = null;
+    };
+
+    recognition.onerror = () => {
+      setRecording(false);
+      recognitionRef.current = null;
+    };
+
+    recognition.start();
+  };
+
+  const regenerate = async (assistantMsgId: string) => {
+    if (streaming) return;
+    const idx = messages.findIndex((m) => m.id === assistantMsgId);
+    if (idx === -1) return;
+    const prevUserMsg = [...messages.slice(0, idx)].reverse().find((m) => m.role === 'user');
+    if (!prevUserMsg || !chatId) return;
+
+    await deleteMessage(assistantMsgId);
+    setMessages((m) => m.filter((x) => x.id !== assistantMsgId));
+
+    setStreaming(true);
+    setStreamText('');
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    const msgsUpToUser = messages.slice(0, idx).filter((m) => m.role === 'user' || m.role === 'assistant');
+    const history: ChatMessage[] = msgsUpToUser.map((m) => ({ role: m.role as 'user' | 'assistant' | 'system', content: m.content }));
+
+    try {
+      const result = await streamChat({
+        model: chat?.model || 'ksemo-pro',
+        messages: history,
+        signal: controller.signal,
+        onToken: (t) => setStreamText((s) => s + t),
+      });
+      const assistantMsg = await insertMessage({ chat_id: chatId, role: 'assistant', content: result.content, model: chat?.model || 'ksemo-pro', tokens: result.tokens, meta: { latency_ms: result.latencyMs, from_edge: result.fromEdge, regenerated: true } });
+      if (assistantMsg) setMessages((m) => [...m, assistantMsg]);
+      setStreamText('');
+      await logUsage(chat?.model || 'ksemo-pro', estimateTokens(prevUserMsg.content), result.tokens, result.latencyMs);
+    } catch (err) {
+      if ((err as Error).name !== 'AbortError') {
+        const errMsg = await insertMessage({ chat_id: chatId, role: 'assistant', content: `*Failed to regenerate response.*\n\nError: ${((err as Error).message)}`, model: chat?.model || 'ksemo-pro' });
+        if (errMsg) setMessages((m) => [...m, errMsg]);
+      }
+    } finally {
+      setStreaming(false);
+      setStreamText('');
+      abortRef.current = null;
+    }
+  };
+
+  const saveEdit = async (id: string) => {
+    await updateMessage(id, { content: editText });
+    setMessages((m) => m.map((x) => x.id === id ? { ...x, content: editText } : x));
+    setEditingId(null);
+
+    const idx = messages.findIndex((m) => m.id === id);
+    if (idx === -1) return;
+    const editedMsg = messages[idx];
+    if (editedMsg.role !== 'user') return;
+
+    const nextAssistant = messages.slice(idx + 1).find((m) => m.role === 'assistant');
+    if (nextAssistant) {
+      regenerate(nextAssistant.id);
+    } else {
+      setInput(editText);
+    }
+  };
+
+  const copyMsg = (content: string) => {
+    navigator.clipboard.writeText(content);
+  };
+
+  const shareMsg = async (content: string) => {
+    if (navigator.share) {
+      try { await navigator.share({ text: content }); } catch { /* cancelled */ }
+    } else {
+      await navigator.clipboard.writeText(content);
+    }
+  };
+
+  const exportChat = (format: 'md' | 'txt' | 'pdf') => {
+    const name = (chat?.title || 'chat').replace(/[^a-z0-9]+/gi, '-').toLowerCase();
+    if (format === 'md') {
+      const md = messages.map((m) => `## ${m.role === 'user' ? 'You' : 'Assistant'}\n\n${m.content}`).join('\n\n---\n\n');
+      downloadFile(`${name}.md`, md, 'text/markdown');
+    } else if (format === 'txt') {
+      const txt = messages.map((m) => `${m.role === 'user' ? 'You' : 'Assistant'}:\n${m.content}`).join('\n\n');
+      downloadFile(`${name}.txt`, txt);
+    } else {
+      const win = window.open('', '_blank');
+      if (win) {
+        win.document.write(`<html><head><title>${chat?.title}</title><style>body{font-family:Inter,sans-serif;max-width:720px;margin:40px auto;padding:0 20px;color:#111}h3{margin-top:24px}pre{background:#f4f4f4;padding:12px;border-radius:8px;overflow-x:auto}code{font-family:monospace}</style></head><body><h1>${chat?.title}</h1>${messages.map((m) => `<h3>${m.role === 'user' ? 'You' : 'Assistant'}</h3><div>${m.content.replace(/\n/g, '<br>')}</div>`).join('')}</body></html>`);
+        win.document.close();
+        win.print();
+      }
+    }
+  };
+
+  const saveRename = async () => {
+    if (chatId && renameText.trim()) {
+      await updateChat(chatId, { title: renameText.trim() });
+      setChat((c) => c ? { ...c, title: renameText.trim() } : c);
+    }
+    setRenameOpen(false);
+  };
+
+  if (loading) {
+    return <div className="h-full flex items-center justify-center"><div className="h-5 w-5 border-2 border-white/20 border-t-white rounded-full animate-spin" /></div>;
+  }
+
+  return (
+    <div className="h-[calc(100vh-3.5rem)] flex flex-col">
+      {/* Chat header */}
+      <div className="h-14 px-4 border-b border-white/8 flex items-center gap-3 glass">
+        <button onClick={() => setRenameOpen(true)} className="flex items-center gap-2 min-w-0 group">
+          <span className="text-[14px] font-medium text-white truncate max-w-[200px] md:max-w-xs">{chat?.title || 'Chat'}</span>
+          <Pencil size={12} className="text-ink-300 opacity-0 group-hover:opacity-100 transition" />
+        </button>
+
+        <div className="flex items-center gap-1.5 ml-auto">
+          <div className="relative group">
+            <button className="h-8 w-8 rounded-lg flex items-center justify-center text-ink-200 hover:bg-white/5 hover:text-white transition">
+              <Download size={15} />
+            </button>
+            <div className="absolute right-0 top-full mt-1 z-20 w-[140px] rounded-xl glass-strong border border-white/10 shadow-lift p-1.5 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all">
+              <button onClick={() => exportChat('md')} className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-[12px] text-ink-100 hover:bg-white/5 hover:text-white transition"><FileText size={13} /> Markdown</button>
+              <button onClick={() => exportChat('txt')} className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-[12px] text-ink-100 hover:bg-white/5 hover:text-white transition"><FileText size={13} /> Text</button>
+              <button onClick={() => exportChat('pdf')} className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-[12px] text-ink-100 hover:bg-white/5 hover:text-white transition"><FileText size={13} /> PDF (print)</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Messages */}
+      <div className="flex-1 min-h-0 flex">
+        <div ref={scrollRef} className="flex-1 overflow-y-auto overflow-x-hidden">
+          {messages.length === 0 && !streaming && (
+            <div className="h-full flex items-center justify-center p-6">
+              <EmptyState
+                icon={<MessageSquare size={22} />}
+                title="Start a conversation"
+                description="Ask Ksemo anything. Write, analyze, code, or brainstorm."
+                action={<Button onClick={() => inputRef.current?.focus()}><Sparkles size={15} /> Start typing</Button>}
+              />
+            </div>
+          )}
+
+          <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
+            {messages.map((m) => (
+              <MessageBubble
+                key={m.id}
+                m={m}
+                isUser={m.role === 'user'}
+                editing={editingId === m.id}
+                editText={editText}
+                onEditStart={() => { setEditingId(m.id); setEditText(m.content); }}
+                onEditCancel={() => setEditingId(null)}
+                onEditSave={() => saveEdit(m.id)}
+                onEditText={setEditText}
+                onCopy={() => copyMsg(m.content)}
+                onShare={() => shareMsg(m.content)}
+                onDelete={async () => {
+                  await deleteMessage(m.id);
+                  setMessages((msgs) => msgs.filter((x) => x.id !== m.id));
+                }}
+                onRegenerate={() => regenerate(m.id)}
+                onToggleFavorite={async () => {
+                  const fav = await isFavorite(m.id);
+                  if (fav) { await removeFavorite(m.id); } else { await addFavorite(m.id); }
+                }}
+                checkFavorite={isFavorite}
+              />
+            ))}
+
+            {streaming && streamText && (
+              <div className="flex gap-3 animate-fade-in">
+                <Avatar />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-[12px] font-medium text-white">Ksemo</span>
+                    <span className="text-[11px] text-ink-300 flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse-soft" /> generating</span>
+                  </div>
+                  <Markdown content={streamText} className="typing-caret" />
+                </div>
+              </div>
+            )}
+            {streaming && !streamText && (
+              <div className="flex gap-3 animate-fade-in">
+                <Avatar />
+                <div className="flex items-center gap-1.5 h-8">
+                  <span className="h-2 w-2 rounded-full bg-white/60 animate-pulse-soft" />
+                  <span className="h-2 w-2 rounded-full bg-white/60 animate-pulse-soft" style={{ animationDelay: '150ms' }} />
+                  <span className="h-2 w-2 rounded-full bg-white/60 animate-pulse-soft" style={{ animationDelay: '300ms' }} />
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Composer */}
+      <div className="border-t border-white/8 glass">
+        <div className="max-w-3xl mx-auto p-3 md:p-4">
+          <div className="relative rounded-2xl bg-ink-850 border border-white/10 focus-within:border-white/20 transition">
+            <textarea
+              ref={inputRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+              }}
+              placeholder="Message Ksemo…"
+              rows={1}
+              className="w-full bg-transparent px-4 py-3.5 pr-32 text-[14px] text-white placeholder:text-ink-300 resize-none focus:outline-none max-h-[200px]"
+            />
+            <div className="absolute right-2 bottom-2 flex items-center gap-1.5">
+              <button
+                onClick={toggleRecording}
+                className={cn(
+                  'h-8 w-8 rounded-lg flex items-center justify-center transition-all duration-200',
+                  recording ? 'text-red-400 bg-red-500/15 animate-pulse' : 'text-ink-300 hover:text-white hover:bg-white/8',
+                )}
+                aria-label={recording ? 'Stop recording' : 'Start voice input'}
+              >
+                <Mic size={15} />
+              </button>
+              {streaming ? (
+                <Button size="sm" variant="danger" onClick={stop}><Square size={13} /> Stop</Button>
+              ) : (
+                <Button size="sm" onClick={send} disabled={!input.trim()}><Send size={14} /> Send</Button>
+              )}
+            </div>
+          </div>
+          <p className="mt-2 text-center text-[11px] text-ink-300">
+            Ksemo can make mistakes. Check important info.
+          </p>
+        </div>
+      </div>
+
+      {/* Rename modal */}
+      <Modal open={renameOpen} onClose={() => setRenameOpen(false)} title="Rename chat" size="sm"
+        footer={<><Button variant="ghost" size="sm" onClick={() => setRenameOpen(false)}>Cancel</Button><Button size="sm" onClick={saveRename}>Save</Button></>}>
+        <Textarea value={renameText} onChange={(e) => setRenameText(e.target.value)} rows={2} onKeyDown={(e) => { if (e.key === 'Enter') saveRename(); }} />
+      </Modal>
+    </div>
+  );
+}
+
+function Avatar() {
+  return (
+    <div className="h-8 w-8 rounded-xl bg-ink-800 border border-white/10 flex items-center justify-center shrink-0">
+      <Sparkles size={15} className="text-white" />
+    </div>
+  );
+}
+
+function ActionBarBtn({ icon, tooltip, onClick, active }: {
+  icon: React.ReactNode;
+  tooltip: string;
+  onClick?: () => void;
+  active?: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        'msg-action-btn h-7 w-7 rounded-lg flex items-center justify-center transition-all duration-200',
+        active ? 'text-white bg-white/10' : 'text-ink-300 hover:text-white hover:bg-white/8',
+      )}
+      aria-label={tooltip}
+    >
+      {icon}
+      <span className="msg-tooltip">{tooltip}</span>
+    </button>
+  );
+}
+
+function MessageBubble({ m, isUser, editing, editText, onEditStart, onEditCancel, onEditSave, onEditText, onCopy, onShare, onDelete, onRegenerate, onToggleFavorite, checkFavorite }: {
+  m: Message; isUser: boolean; editing: boolean; editText: string;
+  onEditStart: () => void; onEditCancel: () => void; onEditSave: () => void; onEditText: (v: string) => void;
+  onCopy: () => void; onShare: () => void; onDelete: () => void; onRegenerate: () => void;
+  onToggleFavorite: () => void; checkFavorite: (messageId: string) => Promise<boolean>;
+}) {
+  const [copied, setCopied] = useState(false);
+  const [shared, setShared] = useState(false);
+  const [favorited, setFavorited] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [reading, setReading] = useState(false);
+  const moreRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isUser) {
+      checkFavorite(m.id).then(setFavorited).catch(() => {});
+    }
+  }, [m.id, isUser, checkFavorite]);
+
+  const toggleFavorite = async () => {
+    await onToggleFavorite();
+    setFavorited((f) => !f);
+  };
+
+  const copy = () => { onCopy(); setCopied(true); setTimeout(() => setCopied(false), 2000); };
+  const share = () => { onShare(); setShared(true); setTimeout(() => setShared(false), 2000); };
+
+  const readAloud = () => {
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(m.content);
+      u.rate = 0.95;
+      u.pitch = 0.85;
+      const voices = window.speechSynthesis.getVoices();
+      const preferred = voices.find(v => /daniel|alex|james|matthew|thomas|google.*male|google.*gb|en-gb.*male/i.test(v.name) && v.lang.startsWith('en'))
+        || voices.find(v => /david|mark|richard|daniel|google.*english|samantha|en-us/i.test(v.name) && v.lang.startsWith('en'))
+        || voices.find(v => v.lang.startsWith('en') && /male|man|guy/i.test(v.name))
+        || voices.find(v => v.lang.startsWith('en'));
+      if (preferred) u.voice = preferred;
+      u.onstart = () => setReading(true);
+      u.onend = () => setReading(false);
+      u.onerror = () => setReading(false);
+      window.speechSynthesis.speak(u);
+    }
+  };
+  const stopReading = () => { window.speechSynthesis?.cancel(); setReading(false); };
+
+  useEffect(() => {
+    if (!moreOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (moreRef.current && !moreRef.current.contains(e.target as Node)) setMoreOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [moreOpen]);
+
+  return (
+    <div className={cn('group flex gap-3 animate-fade-in', isUser && 'flex-row-reverse')}>
+      {!isUser && <Avatar />}
+      <div className={cn('flex-1 min-w-0', isUser ? 'max-w-[50%] flex flex-col items-end' : 'max-w-[90%]')}>
+        {!isUser && <div className="mb-1"><span className="text-[12px] font-medium text-white">Ksemo</span></div>}
+        {editing ? (
+          <div className="space-y-2">
+            <Textarea value={editText} onChange={(e) => onEditText(e.target.value)} rows={4} autoFocus />
+            <div className="flex gap-2">
+              <Button size="sm" onClick={onEditSave}>Save</Button>
+              <Button size="sm" variant="ghost" onClick={onEditCancel}>Cancel</Button>
+            </div>
+          </div>
+        ) : (
+          isUser ? (
+            <div className="rounded-2xl px-4 py-3 bg-white/10 border border-white/8 break-words overflow-hidden">
+              <Markdown content={m.content} />
+            </div>
+          ) : (
+            <div className="break-words overflow-hidden">
+              <Markdown content={m.content} />
+            </div>
+          )
+        )}
+
+        {!editing && isUser && (
+          <div className="mt-1.5 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex-row-reverse">
+            <ActionBarBtn icon={<Pencil size={14} />} tooltip="Edit" onClick={onEditStart} />
+            <ActionBarBtn
+              icon={copied ? <Check size={14} /> : <Copy size={14} />}
+              tooltip={copied ? 'Copied' : 'Copy'}
+              onClick={copy} active={copied}
+            />
+            <ActionBarBtn
+              icon={shared ? <Check size={14} /> : <Share2 size={14} />}
+              tooltip={shared ? 'Copied for sharing' : 'Share'}
+              onClick={share} active={shared}
+            />
+          </div>
+        )}
+
+        {!editing && !isUser && (
+          <div className="mt-1.5 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+            <ActionBarBtn
+              icon={copied ? <Check size={14} /> : <Copy size={14} />}
+              tooltip={copied ? 'Copied' : 'Copy'}
+              onClick={copy} active={copied}
+            />
+            <ActionBarBtn
+              icon={shared ? <Check size={14} /> : <Share2 size={14} />}
+              tooltip={shared ? 'Copied for sharing' : 'Share'}
+              onClick={share} active={shared}
+            />
+            <ActionBarBtn
+              icon={<Star size={14} className={favorited ? 'fill-white' : ''} />}
+              tooltip={favorited ? 'Unfavorite' : 'Favorite'}
+              onClick={toggleFavorite} active={favorited}
+            />
+            <ActionBarBtn icon={<RotateCw size={14} />} tooltip="Regenerate" onClick={onRegenerate} />
+            <div className="relative" ref={moreRef}>
+              <ActionBarBtn
+                icon={<MoreHorizontal size={14} />}
+                tooltip="More"
+                onClick={() => setMoreOpen(!moreOpen)}
+              />
+              {moreOpen && (
+                <div className="msg-more-menu open">
+                  <button onClick={() => { reading ? stopReading() : readAloud(); setMoreOpen(false); }}>
+                    <Volume2 size={14} /> {reading ? 'Stop reading' : 'Read aloud'}
+                  </button>
+                  <button className="danger" onClick={() => { onDelete(); setMoreOpen(false); }}>
+                    <Trash2 size={14} /> Delete
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
