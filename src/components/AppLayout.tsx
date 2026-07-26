@@ -1,14 +1,34 @@
 import { type ReactNode, useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { Mail, X } from 'lucide-react';
 import { Sidebar } from './Sidebar';
 import { useAuthContext } from './AuthProvider';
-import { Spinner } from './ui';
+import { Spinner, Modal, Button } from './ui';
 
 export function AppLayout({ children }: { children: ReactNode }) {
   const { profile, loading } = useAuthContext();
   const loc = useLocation();
   const nav = useNavigate();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => window.innerWidth < 768);
+  const [activeEmail, setActiveEmail] = useState<any>(null);
+  const [modalOpen, setModalOpen] = useState(false);
+
+  useEffect(() => {
+    const onEmailSent = (e: Event) => {
+      const emailData = (e as CustomEvent).detail;
+      setActiveEmail(emailData);
+    };
+    window.addEventListener('ksemo-email-sent', onEmailSent);
+    return () => window.removeEventListener('ksemo-email-sent', onEmailSent);
+  }, []);
+
+  useEffect(() => {
+    if (!activeEmail || modalOpen) return;
+    const timer = setTimeout(() => {
+      setActiveEmail(null);
+    }, 7000);
+    return () => clearTimeout(timer);
+  }, [activeEmail, modalOpen]);
 
   useEffect(() => {
     if (!profile && !loading) {
@@ -41,6 +61,64 @@ export function AppLayout({ children }: { children: ReactNode }) {
         onToggleCollapse={() => setSidebarCollapsed((c) => !c)}
       />
       <main className="flex-1 min-h-0 overflow-hidden">{children}</main>
+
+      {/* Floating System Email Dispatch Toast */}
+      {activeEmail && (
+        <div 
+          onClick={() => setModalOpen(true)}
+          className="fixed bottom-6 right-6 z-50 max-w-sm w-full bg-ink-950/95 border border-white/10 rounded-2xl p-4 shadow-lift animate-slide-up flex gap-3 items-start cursor-pointer hover:border-white/20 transition-all duration-300"
+        >
+          <div className="h-10 w-10 rounded-xl bg-white/5 border border-white/10 text-white flex items-center justify-center shrink-0">
+            <Mail size={18} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[10px] font-semibold tracking-wider uppercase text-ink-300">System Dispatch</span>
+              <button 
+                onClick={(e) => { e.stopPropagation(); setActiveEmail(null); }}
+                className="text-ink-300 hover:text-white transition"
+              >
+                <X size={14} />
+              </button>
+            </div>
+            <h4 className="text-[13px] font-semibold text-white mt-1 truncate">
+              {activeEmail.subject}
+            </h4>
+            <p className="text-[11px] text-ink-200 mt-0.5 leading-relaxed">
+              Transactional email successfully dispatched to <span className="text-white font-medium">{activeEmail.email}</span>. Click to inspect message.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Email Inspector Modal */}
+      {activeEmail && (
+        <Modal
+          open={modalOpen}
+          onClose={() => { setModalOpen(false); setActiveEmail(null); }}
+          title={activeEmail.subject}
+          size="md"
+          footer={
+            <Button size="sm" onClick={() => { setModalOpen(false); setActiveEmail(null); }}>
+              Acknowledge
+            </Button>
+          }
+        >
+          <div className="space-y-4">
+            <div className="flex flex-col gap-1 text-[11px] pb-3 border-b border-white/8 text-ink-300">
+              <div><span className="font-medium text-ink-400">From:</span> <span className="text-white">Ksemo Security & Onboarding &lt;no-reply@ksemo.com&gt;</span></div>
+              <div><span className="font-medium text-ink-400">To:</span> <span className="text-white">{activeEmail.fullName} &lt;{activeEmail.email}&gt;</span></div>
+              <div><span className="font-medium text-ink-400">Date:</span> <span className="text-white">{new Date(activeEmail.timestamp).toLocaleString()}</span></div>
+            </div>
+            <div className="p-4 rounded-xl bg-ink-950 border border-white/5 text-[12px] text-ink-100 leading-relaxed whitespace-pre-line font-mono">
+              {activeEmail.body}
+            </div>
+            <div className="text-[10px] text-ink-400 italic">
+              * Note: In production, this transactional email is automatically dispatched directly to the user's personal inbox.
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

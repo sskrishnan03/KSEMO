@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import {
   Square, Copy, Check,
-  Pencil, Share2, Download, FileText,
+  Pencil, Share2,
   Volume2, RotateCw, Star, MoreHorizontal, Trash2, Mic, ArrowUp,
   Paperclip,
 } from 'lucide-react';
@@ -13,21 +13,19 @@ import type { Chat, Message } from '../lib/types';
 import { listMessages, insertMessage, updateMessage, deleteMessage, updateChat, logUsage, addFavorite, removeFavorite, isFavorite } from '../lib/data';
 import { supabase } from '../lib/supabase';
 import { streamChat, type ChatMessage } from '../lib/ai';
-import { downloadFile, estimateTokens, cn } from '../lib/utils';
+import { estimateTokens, cn } from '../lib/utils';
+import { ShareModal } from '../components/ShareModal';
 
-const dailyGreetings = [
-  { line: 'What can I help you build today?', sub: 'From ideas to execution — I\'m ready.' },
-  { line: 'Anything on your mind?', sub: 'Let\'s turn thoughts into something great.' },
-  { line: 'Ready when you are.', sub: 'Ask me anything — no question is too small.' },
-  { line: 'Let\'s make today productive.', sub: 'What should we tackle first?' },
-  { line: 'How can I assist you?', sub: 'Brainstorm, write, code — you name it.' },
-  { line: 'What are we working on?', sub: 'Big or small, I\'m here for it.' },
-  { line: 'Let\'s create something amazing.', sub: 'Your next idea starts here.' },
-];
+function getTimeOfDayGreeting(name: string): string {
+  const hr = new Date().getHours();
+  let timeGreeting = 'Hello';
+  if (hr < 12) timeGreeting = 'Good morning';
+  else if (hr < 17) timeGreeting = 'Good afternoon';
+  else if (hr < 22) timeGreeting = 'Good evening';
+  else timeGreeting = 'Good night';
 
-function getDailyGreeting() {
-  const day = new Date().getDay();
-  return dailyGreetings[day];
+  const displayName = name ? `, ${name}` : '';
+  return `${timeGreeting}${displayName}. How can I help you today?`;
 }
 
 function getFirstName(profile: { full_name?: string | null; username?: string | null } | null): string {
@@ -38,6 +36,8 @@ function getFirstName(profile: { full_name?: string | null; username?: string | 
 
 export default function ChatWorkspace() {
   const { chatId } = useParams();
+  const loc = useLocation();
+  const nav = useNavigate();
   const { profile } = useAuthContext();
   const [chat, setChat] = useState<Chat | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -50,10 +50,11 @@ export default function ChatWorkspace() {
   const [renameOpen, setRenameOpen] = useState(false);
   const [renameText, setRenameText] = useState('');
   const [recording, setRecording] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [confirmDeleteMessageId, setConfirmDeleteMessageId] = useState<string | null>(null);
   const recognitionRef = useRef<any>(null);
 
   const isEmpty = messages.length === 0 && !streaming;
-  const greeting = useMemo(() => getDailyGreeting(), []);
   const firstName = useMemo(() => getFirstName(profile), [profile]);
 
   const abortRef = useRef<AbortController | null>(null);
@@ -121,6 +122,14 @@ export default function ChatWorkspace() {
       el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
     }
   }, [input]);
+
+  useEffect(() => {
+    if (loc.state?.prefillInput) {
+      setInput(loc.state.prefillInput);
+      // Safely clear location state without corrupting react-router session history
+      nav(loc.pathname, { replace: true, state: {} });
+    }
+  }, [chatId, loc.state, nav]);
 
   const addRipple = (e: React.MouseEvent<HTMLButtonElement>) => {
     const btn = e.currentTarget;
@@ -319,24 +328,6 @@ export default function ChatWorkspace() {
     }
   };
 
-  const exportChat = (format: 'md' | 'txt' | 'pdf') => {
-    const name = (chat?.title || 'chat').replace(/[^a-z0-9]+/gi, '-').toLowerCase();
-    if (format === 'md') {
-      const md = messages.map((m) => `## ${m.role === 'user' ? 'You' : 'Assistant'}\n\n${m.content}`).join('\n\n---\n\n');
-      downloadFile(`${name}.md`, md, 'text/markdown');
-    } else if (format === 'txt') {
-      const txt = messages.map((m) => `${m.role === 'user' ? 'You' : 'Assistant'}:\n${m.content}`).join('\n\n');
-      downloadFile(`${name}.txt`, txt);
-    } else {
-      const win = window.open('', '_blank');
-      if (win) {
-        win.document.write(`<html><head><title>${chat?.title}</title><style>body{font-family:Inter,sans-serif;max-width:720px;margin:40px auto;padding:0 20px;color:#111}h3{margin-top:24px}pre{background:#f4f4f4;padding:12px;border-radius:8px;overflow-x:auto}code{font-family:monospace}</style></head><body><h1>${chat?.title}</h1>${messages.map((m) => `<h3>${m.role === 'user' ? 'You' : 'Assistant'}</h3><div>${m.content.replace(/\n/g, '<br>')}</div>`).join('')}</body></html>`);
-        win.document.close();
-        win.print();
-      }
-    }
-  };
-
   const saveRename = async () => {
     if (chatId && renameText.trim()) {
       await updateChat(chatId, { title: renameText.trim() });
@@ -454,16 +445,13 @@ export default function ChatWorkspace() {
           </button>
 
           <div className="flex items-center gap-1.5 ml-auto">
-            <div className="relative group">
-              <button className="h-8 w-8 rounded-lg flex items-center justify-center text-ink-200 hover:bg-white/5 hover:text-white transition">
-                <Download size={15} />
-              </button>
-              <div className="absolute right-0 top-full mt-1 z-20 w-[140px] rounded-xl glass-strong border border-white/10 shadow-lift p-1.5 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all">
-                <button onClick={() => exportChat('md')} className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-[12px] text-ink-100 hover:bg-white/5 hover:text-white transition"><FileText size={13} /> Markdown</button>
-                <button onClick={() => exportChat('txt')} className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-[12px] text-ink-100 hover:bg-white/5 hover:text-white transition"><FileText size={13} /> Text</button>
-                <button onClick={() => exportChat('pdf')} className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-[12px] text-ink-100 hover:bg-white/5 hover:text-white transition"><FileText size={13} /> PDF (print)</button>
-              </div>
-            </div>
+            <button 
+              onClick={() => setShareOpen(true)}
+              className="h-8 w-8 rounded-lg flex items-center justify-center text-ink-200 hover:bg-white/5 hover:text-white transition"
+              title="Share chat"
+            >
+              <Share2 size={15} />
+            </button>
           </div>
         </div>
       )}
@@ -475,11 +463,9 @@ export default function ChatWorkspace() {
             <div className="h-12 w-12 rounded-2xl bg-ink-800 border border-white/10 flex items-center justify-center mb-6">
               <span className="font-bold text-white text-[22px]">K</span>
             </div>
-            <h1 className="text-[28px] md:text-[34px] font-bold text-white tracking-tight leading-tight mb-2">
-              {firstName ? `Hi ${firstName}` : 'Hello'}<span className="text-ink-300">,</span><br />
-              {greeting.line}
+            <h1 className="text-[20px] md:text-[24px] font-semibold text-white tracking-tight leading-tight mb-8">
+              {getTimeOfDayGreeting(firstName)}
             </h1>
-            <p className="text-ink-400 text-[14px] md:text-[15px] mb-6">{greeting.sub}</p>
 
             <div className="w-full">
               <div className="composer-shell">
@@ -548,9 +534,8 @@ export default function ChatWorkspace() {
                   onEditText={setEditText}
                   onCopy={() => copyMsg(m.content)}
                   onShare={() => shareMsg(m.content)}
-                  onDelete={async () => {
-                    await deleteMessage(m.id);
-                    setMessages((msgs) => msgs.filter((x) => x.id !== m.id));
+                  onDelete={() => {
+                    setConfirmDeleteMessageId(m.id);
                   }}
                   onRegenerate={() => regenerate(m.id)}
                   onToggleFavorite={async () => {
@@ -602,6 +587,48 @@ export default function ChatWorkspace() {
         footer={<><Button variant="ghost" size="sm" onClick={() => setRenameOpen(false)}>Cancel</Button><Button size="sm" onClick={saveRename}>Save</Button></>}>
         <Textarea value={renameText} onChange={(e) => setRenameText(e.target.value)} rows={2} onKeyDown={(e) => { if (e.key === 'Enter') saveRename(); }} />
       </Modal>
+
+      {/* Delete confirmation modal */}
+      {confirmDeleteMessageId && (
+        <Modal
+          open={!!confirmDeleteMessageId}
+          onClose={() => setConfirmDeleteMessageId(null)}
+          title="Delete Message"
+          size="sm"
+          footer={
+            <>
+              <Button variant="ghost" size="sm" onClick={() => setConfirmDeleteMessageId(null)}>
+                Cancel
+              </Button>
+              <Button 
+                variant="danger" 
+                size="sm" 
+                onClick={async () => {
+                  if (confirmDeleteMessageId) {
+                    await deleteMessage(confirmDeleteMessageId);
+                    setMessages((msgs) => msgs.filter((x) => x.id !== confirmDeleteMessageId));
+                  }
+                  setConfirmDeleteMessageId(null);
+                }}
+              >
+                Delete
+              </Button>
+            </>
+          }
+        >
+          <div className="text-[13px] text-ink-200 leading-relaxed">
+            Are you sure you want to permanently delete this message? This action cannot be undone.
+          </div>
+        </Modal>
+      )}
+
+      {chat && (
+        <ShareModal
+          open={shareOpen}
+          onClose={() => setShareOpen(false)}
+          chat={chat}
+        />
+      )}
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from './supabase';
 import type { Profile } from './types';
+import { dispatchSimulatedEmail } from './data';
 
 export interface AuthState {
   session: Session | null;
@@ -94,14 +95,28 @@ export function useAuth(): AuthState & {
       }
     });
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, sess) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, sess) => {
       if (!active) return;
       setSession(sess);
       if (sess?.user) {
         setLoading(true);
         loadProfile(sess.user.id, sess.user.email, sess.user.user_metadata)
           .finally(() => {
-            if (active) setLoading(false);
+            if (active) {
+              setLoading(false);
+              if (event === 'SIGNED_IN') {
+                const sessionKey = `ksemo_session_alert_${sess.user.id}_${sess.expires_at || ''}`;
+                if (!sessionStorage.getItem(sessionKey)) {
+                  sessionStorage.setItem(sessionKey, 'triggered');
+                  const email = sess.user.email || '';
+                  const fullName = sess.user.user_metadata?.full_name || email.split('@')[0];
+                  const createdAt = new Date(sess.user.created_at).getTime();
+                  const now = new Date().getTime();
+                  const isNewUser = now - createdAt < 15000;
+                  dispatchSimulatedEmail(email, fullName, isNewUser ? 'signup' : 'signin');
+                }
+              }
+            }
           });
       } else {
         setProfile(null);

@@ -109,7 +109,7 @@ export default function Login() {
             </label>
           </div>
 
-          <Button type="submit" className="w-full h-11 justify-center rounded-xl bg-white text-ink-900 font-semibold hover:bg-ink-100 transition" loading={loading}>
+          <Button type="submit" className="w-full h-11 justify-center rounded-xl font-semibold" loading={loading}>
             Sign in
           </Button>
 

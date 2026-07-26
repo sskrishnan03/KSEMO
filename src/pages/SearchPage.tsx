@@ -55,8 +55,11 @@ export default function SearchPage() {
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="max-w-3xl mx-auto px-6 py-10">
-        <h1 className="text-2xl font-semibold tracking-tight text-white mb-6">Search</h1>
+      <div className="max-w-5xl mx-auto px-6 py-10">
+        <div className="mb-8">
+          <h1 className="text-2xl font-semibold tracking-tight text-white">Search</h1>
+          <p className="mt-2 text-ink-300">Search chats, messages, and files across your workspace.</p>
+        </div>
 
         <div className="relative mb-6">
           <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-ink-300" />

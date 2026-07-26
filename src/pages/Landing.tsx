@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { Button } from '../components/ui';
 import { cn } from '../lib/utils';
+import { useAuthContext } from '../components/AuthProvider';
 
 
 
@@ -74,8 +75,9 @@ function TypingDemo() {
 
 
 export default function Landing() {
-  const [scrolled, setScrolled] = useState(false);
+  const { profile } = useAuthContext();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const heroRef = useRef<HTMLDivElement>(null);
 
@@ -99,8 +101,17 @@ export default function Landing() {
             <a href="#faq" className="hover:text-white transition">FAQ</a>
           </div>
           <div className="hidden md:flex items-center gap-2">
-            <Link to="/login"><Button variant="ghost" size="sm">Sign in</Button></Link>
-            <Link to="/signup"><Button size="sm">Get started <ArrowRight size={14} /></Button></Link>
+            {profile ? (
+              <div className="flex items-center gap-4">
+                <span className="text-[13px] text-ink-300 font-medium">Hello, {profile.full_name || profile.username}</span>
+                <Link to="/app"><Button size="sm">Go to Workspace <ArrowRight size={14} /></Button></Link>
+              </div>
+            ) : (
+              <>
+                <Link to="/login"><Button variant="ghost" size="sm">Sign in</Button></Link>
+                <Link to="/signup"><Button size="sm">Get started <ArrowRight size={14} /></Button></Link>
+              </>
+            )}
           </div>
           <button className="md:hidden h-9 w-9 rounded-lg flex items-center justify-center hover:bg-white/5" onClick={() => setMenuOpen((v) => !v)}>
             {menuOpen ? <X size={18} /> : <Menu size={18} />}
@@ -110,10 +121,17 @@ export default function Landing() {
           <div className="md:hidden glass-strong border-t border-white/8 px-6 py-4 flex flex-col gap-3 animate-slide-down">
             <a href="#features" onClick={() => setMenuOpen(false)} className="text-sm text-ink-100 py-1">Features</a>
             <a href="#faq" onClick={() => setMenuOpen(false)} className="text-sm text-ink-100 py-1">FAQ</a>
-            <div className="flex gap-2 pt-2">
-              <Link to="/login" className="flex-1"><Button variant="outline" size="sm" className="w-full">Sign in</Button></Link>
-              <Link to="/signup" className="flex-1"><Button size="sm" className="w-full">Get started</Button></Link>
-            </div>
+            {profile ? (
+              <div className="flex flex-col gap-2 pt-2">
+                <span className="text-[13px] text-ink-300 font-medium text-center mb-1">Hello, {profile.full_name || profile.username}</span>
+                <Link to="/app" className="w-full" onClick={() => setMenuOpen(false)}><Button size="sm" className="w-full">Go to Workspace</Button></Link>
+              </div>
+            ) : (
+              <div className="flex gap-2 pt-2">
+                <Link to="/login" className="flex-1" onClick={() => setMenuOpen(false)}><Button variant="outline" size="sm" className="w-full">Sign in</Button></Link>
+                <Link to="/signup" className="flex-1" onClick={() => setMenuOpen(false)}><Button size="sm" className="w-full">Get started</Button></Link>
+              </div>
+            )}
           </div>
         )}
       </header>
@@ -135,7 +153,11 @@ export default function Landing() {
             calm, focused charcoal workspace designed for thinking.
           </p>
           <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3 animate-slide-up" style={{ animationDelay: '120ms' }}>
-            <Link to="/signup"><Button size="lg">Start free <ArrowRight size={16} /></Button></Link>
+            {profile ? (
+              <Link to="/app"><Button size="lg">Go to Workspace <ArrowRight size={16} /></Button></Link>
+            ) : (
+              <Link to="/signup"><Button size="lg">Start free <ArrowRight size={16} /></Button></Link>
+            )}
             <a href="#features"><Button variant="outline" size="lg">See features</Button></a>
           </div>
           <p className="mt-4 text-[12px] text-ink-300 animate-fade-in">No credit card required · 50 messages a day on Free</p>
@@ -228,8 +250,14 @@ export default function Landing() {
           <h2 className="text-3xl md:text-4xl font-semibold tracking-tight text-balance">Start thinking with AI today</h2>
           <p className="mt-4 text-ink-200 max-w-lg mx-auto">Join thousands of professionals using Ksemo as their primary AI workspace.</p>
           <div className="mt-8 flex flex-col sm:flex-row justify-center gap-3">
-            <Link to="/signup"><Button size="lg">Create your workspace <ArrowRight size={16} /></Button></Link>
-            <Link to="/login"><Button variant="outline" size="lg">Sign in</Button></Link>
+            {profile ? (
+              <Link to="/app"><Button size="lg">Go to Workspace <ArrowRight size={16} /></Button></Link>
+            ) : (
+              <>
+                <Link to="/signup"><Button size="lg">Create your workspace <ArrowRight size={16} /></Button></Link>
+                <Link to="/login"><Button variant="outline" size="lg">Sign in</Button></Link>
+              </>
+            )}
           </div>
         </div>
       </section>

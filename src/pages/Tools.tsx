@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
-  Wand2, ArrowLeft, Square, Copy, Check, Download, Sparkles,
+  ArrowLeft, Square, Copy, Check, Download, Sparkles, Volume2, Languages,
 } from 'lucide-react';
 import { TOOLS, runTool } from '../lib/tools';
 import { Button, Textarea, Input, EmptyState, Badge } from '../components/ui';
 import { Markdown } from '../components/Markdown';
 import { downloadFile } from '../lib/utils';
+import { ToolIcon, renderCustomOutput } from '../components/ToolCustomUI';
 
 export default function Tools() {
   const { toolId } = useParams();
@@ -72,7 +73,7 @@ export default function Tools() {
                 className="group rounded-2xl bg-ink-850 border border-white/8 p-5 hover:border-white/15 hover:shadow-lift transition-all"
               >
                 <div className="h-10 w-10 rounded-xl bg-ink-800 border border-white/10 flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
-                  <Wand2 size={18} className="text-white" />
+                  <ToolIcon name={t.icon} size={18} className="text-white" />
                 </div>
                 <h3 className="text-[14px] font-semibold text-white">{t.name}</h3>
                 <p className="mt-1 text-[12px] text-ink-300 leading-relaxed">{t.description}</p>
@@ -84,6 +85,108 @@ export default function Tools() {
     );
   }
 
+  // 1. STUNNING CUSTOM TRANSLATOR SCREEN OVERRIDE
+  if (tool.id === 'translator') {
+    return (
+      <div className="h-full flex flex-col">
+        <div className="h-14 px-4 border-b border-white/8 flex items-center gap-3 glass">
+          <Link to="/app/tools" className="flex items-center gap-1.5 text-[13px] text-ink-200 hover:text-white transition">
+            <ArrowLeft size={15} /> Tools
+          </Link>
+          <div className="h-4 w-px bg-white/10" />
+          <div className="flex items-center gap-2">
+            <ToolIcon name={tool.icon} size={16} className="text-white" />
+            <span className="text-[14px] font-medium text-white">{tool.name}</span>
+            <Badge>AI tool</Badge>
+          </div>
+        </div>
+
+        <div className="flex-1 min-h-0 flex flex-col p-6 space-y-4 overflow-y-auto">
+          {/* Header configuration info */}
+          <div className="flex flex-wrap items-center gap-3 bg-ink-850 border border-white/5 p-3 rounded-2xl max-w-xl">
+            <div className="text-xs text-ink-300 font-medium px-2">Source: Auto Detect</div>
+            <div className="h-4 w-px bg-white/10" />
+            <div className="flex items-center gap-2 flex-1 max-w-[200px]">
+              <Languages size={14} className="text-ink-400" />
+              <input
+                type="text"
+                placeholder="Target e.g. Spanish"
+                value={inputs.to ?? ''}
+                onChange={(e) => setInputs((s) => ({ ...s, to: e.target.value }))}
+                className="w-full bg-ink-900 border border-white/8 rounded-xl h-9 px-3 text-xs text-white placeholder:text-ink-400 focus:outline-none focus:border-white/20 transition"
+              />
+            </div>
+          </div>
+
+          {/* Side by side translator boxes */}
+          <div className="grid lg:grid-cols-2 gap-4 flex-1 min-h-0">
+            {/* Input card */}
+            <div className="bg-ink-850 border border-white/5 rounded-2xl p-5 flex flex-col min-h-[220px]">
+              <div className="flex items-center justify-between mb-3 border-b border-white/5 pb-2">
+                <span className="text-xs font-semibold text-white uppercase tracking-wider">Source Text</span>
+                <span className="text-[10px] text-ink-400">{(inputs.text ?? '').length} characters</span>
+              </div>
+              <textarea
+                placeholder="Type or paste text to translate..."
+                value={inputs.text ?? ''}
+                onChange={(e) => setInputs((s) => ({ ...s, text: e.target.value }))}
+                className="flex-1 bg-transparent border-0 text-white placeholder:text-ink-500 focus:outline-none focus:ring-0 text-sm resize-none scrollbar-hide min-h-[120px]"
+              />
+              <div className="flex gap-2 mt-4 pt-3 border-t border-white/5">
+                {streaming ? (
+                  <Button variant="danger" size="sm" onClick={stop}><Square size={13} /> Stop</Button>
+                ) : (
+                  <Button size="sm" onClick={run} disabled={streaming || !inputs.text || !inputs.to}><Sparkles size={13} /> Translate</Button>
+                )}
+                {inputs.text && <Button variant="outline" size="sm" onClick={() => { setInputs({}); setOutput(''); }}>Clear</Button>}
+              </div>
+            </div>
+
+            {/* Translation Output Card */}
+            <div className="bg-ink-850 border border-white/5 rounded-2xl p-5 flex flex-col min-h-[220px]">
+              <div className="flex items-center justify-between mb-3 border-b border-white/5 pb-2">
+                <span className="text-xs font-semibold text-white uppercase tracking-wider">Translation Output</span>
+                {output && (
+                  <div className="flex gap-1.5">
+                    <button
+                      onClick={() => {
+                        if ('speechSynthesis' in window) {
+                          window.speechSynthesis.cancel();
+                          const utterance = new SpeechSynthesisUtterance(output);
+                          // Try to set language code if matches target input
+                          window.speechSynthesis.speak(utterance);
+                        }
+                      }}
+                      className="h-7 px-2.5 rounded-lg text-[11px] text-ink-200 hover:text-white bg-white/5 border border-white/8 hover:bg-white/10 transition flex items-center gap-1.5"
+                      title="Speak translated text"
+                    >
+                      <Volume2 size={12} /> Speak
+                    </button>
+                    <button
+                      onClick={copy}
+                      className="h-7 px-2.5 rounded-lg text-[11px] text-ink-200 hover:text-white bg-white/5 border border-white/8 hover:bg-white/10 transition flex items-center gap-1.5"
+                    >
+                      {copied ? <Check size={12} /> : <Copy size={12} />} {copied ? 'Copied' : 'Copy'}
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex-1 text-sm text-white overflow-y-auto leading-relaxed select-text font-sans min-h-[120px]">
+                {streaming && !output ? (
+                  <div className="flex items-center gap-2 text-ink-300 italic"><span className="h-2 w-2 rounded-full bg-indigo-500 animate-pulse" /> Translating...</div>
+                ) : (
+                  output || <span className="text-ink-400 italic">Translated text will appear here...</span>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 2. STANDARD DESIGN UI WITH PREMIUM INTERACTIVE COMPONENTS
   return (
     <div className="h-full flex flex-col">
       <div className="h-14 px-4 border-b border-white/8 flex items-center gap-3 glass">
@@ -92,7 +195,7 @@ export default function Tools() {
         </Link>
         <div className="h-4 w-px bg-white/10" />
         <div className="flex items-center gap-2">
-          <Wand2 size={16} className="text-white" />
+          <ToolIcon name={tool.icon} size={16} className="text-white" />
           <span className="text-[14px] font-medium text-white">{tool.name}</span>
           <Badge>AI tool</Badge>
         </div>
@@ -147,11 +250,16 @@ export default function Tools() {
             )}
           </div>
           {!output && !streaming && (
-            <EmptyState icon={<Wand2 size={20} />} title="No output yet" description="Fill in the inputs and hit Generate." />
+            <EmptyState icon={<ToolIcon name={tool.icon} size={20} />} title="No output yet" description="Fill in the inputs and hit Generate." />
           )}
-          {output && <Markdown content={output} className={streaming ? 'typing-caret' : ''} />}
+          {output && (
+            renderCustomOutput(tool.id, output, inputs.text || '') || (
+              <Markdown content={output} className={streaming ? 'typing-caret' : ''} />
+            )
+          )}
         </div>
       </div>
     </div>
   );
 }
+

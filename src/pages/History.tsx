@@ -22,9 +22,11 @@ export default function History() {
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="max-w-3xl mx-auto px-6 py-10">
-        <h1 className="text-2xl font-semibold tracking-tight text-white mb-2">History</h1>
-        <p className="text-ink-300 mb-8">All your conversations, organized by date.</p>
+      <div className="max-w-5xl mx-auto px-6 py-10">
+        <div className="mb-8">
+          <h1 className="text-2xl font-semibold tracking-tight text-white">History</h1>
+          <p className="mt-2 text-ink-300">All your conversations, organized by date.</p>
+        </div>
 
         {loading && <div className="h-5 w-5 border-2 border-white/20 border-t-white rounded-full animate-spin" />}
 

@@ -1,4 +1,3 @@
-import { AI_EDGE_URL, supabase } from './supabase';
 import { estimateTokens } from './utils';
 
 export interface ChatMessage {
@@ -25,15 +24,22 @@ export interface StreamResult {
   fromEdge: boolean;
 }
 
-/**
- * Streams an assistant response directly from OpenRouter.
- */
-async function openRouterStream(opts: StreamOptions, apiKey: string, start: number): Promise<StreamResult> {
-  const OPENROUTER_MODEL_MAP: Record<string, string> = {
-    'ksemo-pro': 'openai/gpt-4o-mini',
-  };
-  const mappedModel = OPENROUTER_MODEL_MAP[opts.model] ?? opts.model;
 
+function mapModelForOpenRouter(modelName: string): string {
+  const map: Record<string, string> = {
+    'ksemo-pro': 'openai/gpt-4o-mini',
+    'ksemo-max': 'anthropic/claude-3.5-sonnet',
+    'ksemo-fast': 'openai/gpt-4o-mini',
+    'gpt-4o': 'openai/gpt-4o',
+    'gemini-1.5-pro': 'google/gemini-pro',
+    'claude-3.5-sonnet': 'anthropic/claude-3.5-sonnet',
+    'grok-2': 'xai/grok-2',
+    'deepseek-v3': 'deepseek/deepseek-chat',
+  };
+  return map[modelName] || modelName;
+}
+
+async function openRouterStream(opts: StreamOptions, apiKey: string, start: number): Promise<StreamResult> {
   const cleanMessages = opts.messages.map(({ role, content }) => ({ role, content }));
 
   const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -42,10 +48,10 @@ async function openRouterStream(opts: StreamOptions, apiKey: string, start: numb
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${apiKey}`,
       'HTTP-Referer': window.location.origin,
-      'X-Title': 'Ksemo Workspace',
+      'X-Title': 'Ksemo AI Workspace',
     },
     body: JSON.stringify({
-      model: mappedModel,
+      model: mapModelForOpenRouter(opts.model),
       messages: cleanMessages,
       temperature: opts.temperature ?? 0.7,
       max_tokens: opts.maxTokens ?? 2048,
@@ -97,83 +103,22 @@ async function openRouterStream(opts: StreamOptions, apiKey: string, start: numb
   return { content: full, tokens: estimateTokens(full), latencyMs, fromEdge: true };
 }
 
-/**
- * Streams an assistant response. Tries direct OpenRouter first if key is configured,
- * then tries the edge function, and on any failure falls back to the local engine.
- */
 export async function streamChat(opts: StreamOptions): Promise<StreamResult> {
   const start = performance.now();
-  const openRouterKey = import.meta.env.VITE_OPENROUTER_API_KEY;
+  const openRouterKey = import.meta.env.VITE_OPENROUTER_API_KEY ||
+    localStorage.getItem('ksemo_openrouter_api_key');
 
   if (openRouterKey) {
     try {
       return await openRouterStream(opts, openRouterKey, start);
     } catch (err) {
       if ((err as Error).name === 'AbortError') throw err;
-      console.warn('OpenRouter direct call failed, falling back to local mock:', err);
+      console.warn('OpenRouter call failed, falling back to local:', err);
       return localStream(opts, start);
     }
   }
 
-  try {
-    const { data: session } = await supabase.auth.getSession();
-    const res = await fetch(AI_EDGE_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${session?.session?.access_token ?? import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-        apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
-      },
-      body: JSON.stringify({
-        model: opts.model,
-        messages: opts.messages,
-        temperature: opts.temperature ?? 0.7,
-        max_tokens: opts.maxTokens ?? 2048,
-        stream: true,
-      }),
-      signal: opts.signal,
-    });
-
-    if (!res.ok || !res.body) {
-      throw new Error(`edge ${res.status}`);
-    }
-
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let full = '';
-    let buffer = '';
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() ?? '';
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed || !trimmed.startsWith('data:')) continue;
-        const payload = trimmed.slice(5).trim();
-        if (payload === '[DONE]') continue;
-        try {
-          const json = JSON.parse(payload);
-          const token = json.delta ?? json.token ?? '';
-          if (token) {
-            full += token;
-            opts.onToken(token);
-          }
-        } catch {
-          // ignore keepalive / partial
-        }
-      }
-    }
-    const latencyMs = Math.round(performance.now() - start);
-    opts.onDone?.(full);
-    return { content: full, tokens: estimateTokens(full), latencyMs, fromEdge: true };
-  } catch (err) {
-    if ((err as Error).name === 'AbortError') throw err;
-    // Fallback: local streaming engine
-    return localStream(opts, start);
-  }
+  return localStream(opts, start);
 }
 
 async function localStream(opts: StreamOptions, start: number): Promise<StreamResult> {
@@ -215,9 +160,8 @@ function generateLocalResponse(prompt: string, history: ChatMessage[]): string {
       '- Code — generate, debug, explain, refactor across languages',
       '- Analysis — summarize documents, extract insights, compare options',
       '- Reasoning — math, logic, research, decision-making',
-      '- Tools — translator, grammar fix, SQL/regex generators, and more from the Tools tab',
       '',
-      'You can ask me to write, analyze, code, summarize, or brainstorm. How can I help?',
+      'How can I help?',
     ].join('\n');
   }
 
@@ -225,13 +169,11 @@ function generateLocalResponse(prompt: string, history: ChatMessage[]): string {
     return "You're welcome. Anything else I can help with?";
   }
 
-  // Code requests
   if (/\b(code|function|component|script|program|bug|error|debug|refactor|typescript|python|javascript|react|sql|regex)\b/.test(p)) {
     return [
       "Here's a starting point. Tell me the exact language and constraints and I'll refine it.",
       '',
       '```typescript',
-      '// Example: a small typed utility',
       'export function debounce<T extends (...args: any[]) => void>(fn: T, ms = 250) {',
       '  let t: ReturnType<typeof setTimeout> | undefined;',
       '  return (...args: Parameters<T>) => {',
@@ -240,55 +182,17 @@ function generateLocalResponse(prompt: string, history: ChatMessage[]): string {
       '  };',
       '}',
       '```',
-      '',
-      'A few things that would make this sharper:',
-      '1. The target language and runtime',
-      '2. Input/output shapes you expect',
-      '3. Any edge cases to handle',
-      '',
-      `Running on **Ksemo Pro** — share more detail and I'll iterate.`,
     ].join('\n');
   }
 
-  // Summarize
   if (/summar/i.test(p)) {
-    return [
-      'Here\'s a concise summary of the key points:',
-      '',
-      '1. **Core idea** — the main thesis in one line.',
-      '2. **Supporting points** — the two or three reasons or evidence.',
-      '3. **Implication** — what it means for the reader.',
-      '',
-      'Paste the full text and I\'ll produce a tight summary tailored to your audience.',
-    ].join('\n');
+    return 'Here\'s a concise summary of the key points:\n\n1. **Core idea** — the main thesis in one line.\n2. **Supporting points** — the two or three reasons or evidence.\n3. **Implication** — what it means for the reader.\n\nPaste the full text and I\'ll produce a tight summary tailored to your audience.';
   }
 
-  // List / brainstorm
   if (/\b(list|ideas|brainstorm|ways to|how to)\b/.test(p)) {
     const topic = prompt.replace(/.*?(list|ideas|brainstorm|ways to|how to)\s*/i, '').slice(0, 80) || 'your topic';
-    return [
-      `Here are directions for **${topic}**:`,
-      '',
-      '1. **Start with the goal** — define the outcome you want in one sentence.',
-      `2. **Break it down** — split ${topic} into three concrete steps.`,
-      '3. **Remove friction** — eliminate the single biggest obstacle first.',
-      '4. **Measure** — pick one metric that tells you it\'s working.',
-      '5. **Iterate** — review weekly and adjust the weakest step.',
-      '',
-      `Tell me more about ${topic} and I\'ll make this specific and actionable.`,
-    ].join('\n');
+    return `Here are directions for **${topic}**:\n\n1. Start with the goal.\n2. Break it into concrete steps.\n3. Remove friction.\n4. Measure progress.\n5. Iterate weekly.`;
   }
 
-  // Default thoughtful response
-  return [
-    `Here's my take on **"${prompt.slice(0, 120)}"** —`,
-    '',
-    'I\'d approach this in three moves:',
-    '',
-    `1. **Frame the question** — clarify what success looks like for *${prompt.slice(0, 60) || 'this'}*.`,
-    '2. **Gather the constraints** — list what\'s fixed vs. flexible.',
-    '3. **Propose a path** — pick the smallest first step that validates the direction.',
-    '',
-    `This is exchange #${userCount}. If you share more context — goals, audience, constraints — I'll give you something specific and immediately usable.`,
-  ].join('\n');
+  return `Here's my take on "${prompt.slice(0, 120)}" — I'd approach this in three moves:\n\n1. Frame the question.\n2. Gather the constraints.\n3. Propose the smallest first step.\n\nThis is exchange #${userCount}. Share more context and I'll give you something specific.`;
 }

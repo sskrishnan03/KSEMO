@@ -71,8 +71,10 @@ export async function listChats(filter?: { archived?: boolean }): Promise<Chat[]
       if (filter?.archived !== undefined) q = q.eq('archived', filter.archived);
       const { data, error } = await q;
       if (!error) return (data ?? []) as Chat[];
+      console.error("Supabase listChats error:", error);
       dbFailed = true;
-    } catch {
+    } catch (e) {
+      console.error("Supabase listChats exception:", e);
       dbFailed = true;
     }
   }
@@ -88,9 +90,16 @@ export async function listChats(filter?: { archived?: boolean }): Promise<Chat[]
 export async function createChat(patch?: Partial<Chat>): Promise<Chat | null> {
   if (!dbFailed) {
     try {
-      const { data, error } = await supabase.from('chats').insert(patch ?? {}).select().maybeSingle();
+      const dbPatch = { ...patch };
+      delete dbPatch.type;
+      const { data, error } = await supabase.from('chats').insert(dbPatch).select().maybeSingle();
       if (!error) return data as Chat | null;
-    } catch {}
+      console.error("Supabase createChat error:", error);
+      dbFailed = true;
+    } catch (e) {
+      console.error("Supabase createChat exception:", e);
+      dbFailed = true;
+    }
   }
   const chats = getLocal<Chat[]>('chats', []);
   const newChat: Chat = {
@@ -116,9 +125,16 @@ export async function createChat(patch?: Partial<Chat>): Promise<Chat | null> {
 export async function updateChat(id: string, patch: Partial<Chat>): Promise<void> {
   if (!dbFailed) {
     try {
-      const { error } = await supabase.from('chats').update(patch).eq('id', id);
+      const dbPatch = { ...patch };
+      delete dbPatch.type;
+      const { error } = await supabase.from('chats').update(dbPatch).eq('id', id);
       if (!error) return;
-    } catch {}
+      console.error("Supabase updateChat error:", error);
+      dbFailed = true;
+    } catch (e) {
+      console.error("Supabase updateChat exception:", e);
+      dbFailed = true;
+    }
   }
   const chats = getLocal<Chat[]>('chats', []);
   const idx = chats.findIndex(c => c.id === id);
@@ -133,7 +149,12 @@ export async function deleteChat(id: string): Promise<void> {
     try {
       const { error } = await supabase.from('chats').delete().eq('id', id);
       if (!error) return;
-    } catch {}
+      console.error("Supabase deleteChat error:", error);
+      dbFailed = true;
+    } catch (e) {
+      console.error("Supabase deleteChat exception:", e);
+      dbFailed = true;
+    }
   }
   const chats = getLocal<Chat[]>('chats', []);
   setLocal('chats', chats.filter(c => c.id !== id));
@@ -153,8 +174,10 @@ export async function listMessages(chatId: string): Promise<Message[]> {
         .eq('chat_id', chatId)
         .order('created_at', { ascending: true });
       if (!error) return (data ?? []) as Message[];
+      console.error("Supabase listMessages error:", error);
       dbFailed = true;
-    } catch {
+    } catch (e) {
+      console.error("Supabase listMessages exception:", e);
       dbFailed = true;
     }
   }
@@ -171,7 +194,12 @@ export async function insertMessage(msg: { chat_id: string; role: Message['role'
         .select()
         .maybeSingle();
       if (!error) return data as Message | null;
-    } catch {}
+      console.error("Supabase insertMessage error:", error);
+      dbFailed = true;
+    } catch (e) {
+      console.error("Supabase insertMessage exception:", e);
+      dbFailed = true;
+    }
   }
   const msgs = getLocal<Message[]>('messages', []);
   const newMsg: Message = {
@@ -192,7 +220,10 @@ export async function updateMessage(id: string, patch: Partial<Message>): Promis
     try {
       const { error } = await supabase.from('messages').update(patch).eq('id', id);
       if (!error) return;
-    } catch {}
+      dbFailed = true;
+    } catch {
+      dbFailed = true;
+    }
   }
   const msgs = getLocal<Message[]>('messages', []);
   const idx = msgs.findIndex(m => m.id === id);
@@ -207,7 +238,10 @@ export async function deleteMessage(id: string): Promise<void> {
     try {
       const { error } = await supabase.from('messages').delete().eq('id', id);
       if (!error) return;
-    } catch {}
+      dbFailed = true;
+    } catch {
+      dbFailed = true;
+    }
   }
   const msgs = getLocal<Message[]>('messages', []);
   setLocal('messages', msgs.filter(m => m.id !== id));
@@ -386,10 +420,61 @@ export async function deleteUpload(id: string): Promise<void> {
     try {
       const { error } = await supabase.from('uploads').delete().eq('id', id);
       if (!error) return;
-    } catch {}
+      dbFailed = true;
+    } catch {
+      dbFailed = true;
+    }
   }
   const uploads = getLocal<Upload[]>('uploads', []);
   setLocal('uploads', uploads.filter(u => u.id !== id));
+}
+
+export async function createUpload(patch: Partial<Upload>): Promise<Upload> {
+  if (!dbFailed) {
+    try {
+      const { id, user_id, ...dbPayload } = patch;
+      const { data, error } = await supabase.from('uploads').insert(dbPayload).select().maybeSingle();
+      if (!error && data) return data as Upload;
+      dbFailed = true;
+    } catch {
+      dbFailed = true;
+    }
+  }
+
+  const uploads = getLocal<Upload[]>('uploads', []);
+  const newUpload: Upload = {
+    id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2),
+    user_id: 'local',
+    chat_id: patch.chat_id || null,
+    name: patch.name || 'Untitled File',
+    size: patch.size || 0,
+    type: patch.type || 'application/octet-stream',
+    storage_path: patch.storage_path || '',
+    url: patch.url || null,
+    created_at: new Date().toISOString(),
+    ...patch
+  };
+  uploads.unshift(newUpload);
+  setLocal('uploads', uploads);
+  return newUpload;
+}
+
+export async function updateUpload(id: string, patch: Partial<Upload>): Promise<void> {
+  if (!dbFailed) {
+    try {
+      const { error } = await supabase.from('uploads').update(patch).eq('id', id);
+      if (!error) return;
+      dbFailed = true;
+    } catch {
+      dbFailed = true;
+    }
+  }
+  const uploads = getLocal<Upload[]>('uploads', []);
+  const idx = uploads.findIndex(u => u.id === id);
+  if (idx !== -1) {
+    uploads[idx] = { ...uploads[idx], ...patch };
+    setLocal('uploads', uploads);
+  }
 }
 
 // ---------- Feedback ----------
@@ -463,4 +548,30 @@ export async function logUsage(model: string, promptTokens: number, completionTo
     } catch {}
   }
   console.log('Usage logged locally:', { model, promptTokens, completionTokens, latencyMs });
+}
+
+// ---------- Simulated Email Notifications ----------
+export function dispatchSimulatedEmail(email: string, fullName: string, type: 'signup' | 'signin') {
+  const key = 'ksemo_sent_emails';
+  const existing = JSON.parse(localStorage.getItem(key) || '[]');
+  const newEmail = {
+    id: Math.random().toString(36).substring(2, 9),
+    email,
+    fullName,
+    type,
+    subject: `Welcome to Ksemo! 🚀 Your creative AI workspace is ready.`,
+    body: `Hello ${fullName || 'User'},\n\nThank you for choosing Ksemo, your ultimate workspace for AI chat, smart search, and file intelligence. We are dedicated to providing you with a seamless and highly productive environment to build your ideas.\n\nLet's explore your workspace, start a chat, or upload files to begin.\n\nBest regards,\nThe Ksemo Team`,
+    timestamp: new Date().toISOString()
+  };
+  localStorage.setItem(key, JSON.stringify([newEmail, ...existing]));
+
+  // Log in console with nice colors
+  console.log(
+    `%c[EMAIL DISPATCHED] To: ${email} | Subject: ${newEmail.subject}`,
+    "background: #10b981; color: white; padding: 4px 8px; border-radius: 4px; font-weight: bold;"
+  );
+  console.log(newEmail.body);
+
+  // Dispatch global window event
+  window.dispatchEvent(new CustomEvent('ksemo-email-sent', { detail: newEmail }));
 }

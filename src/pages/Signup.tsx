@@ -151,7 +151,7 @@ export default function Signup() {
             <span>I agree to the <a href="#" className="text-white hover:underline">Terms</a> and <a href="#" className="text-white hover:underline">Privacy Policy</a>.</span>
           </label>
 
-          <Button type="submit" className="w-full h-11 justify-center rounded-xl bg-white text-ink-900 font-semibold hover:bg-ink-100 transition" loading={loading}>
+          <Button type="submit" className="w-full h-11 justify-center rounded-xl font-semibold" loading={loading}>
             Create account
           </Button>
         </form>
