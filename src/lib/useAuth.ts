@@ -131,9 +131,14 @@ export function useAuth(): AuthState & {
   }, [loadProfile]);
 
   const signOut = useCallback(async () => {
+    if (session?.user) {
+      const email = session.user.email || '';
+      const fullName = profile?.full_name || email.split('@')[0];
+      dispatchSimulatedEmail(email, fullName, 'signout');
+    }
     await supabase.auth.signOut();
     setProfile(null);
-  }, []);
+  }, [session, profile]);
 
   const refresh = useCallback(async () => {
     if (session?.user) {

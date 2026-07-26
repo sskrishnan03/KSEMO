@@ -550,17 +550,43 @@ export async function logUsage(model: string, promptTokens: number, completionTo
   console.log('Usage logged locally:', { model, promptTokens, completionTokens, latencyMs });
 }
 
-// ---------- Simulated Email Notifications ----------
-export function dispatchSimulatedEmail(email: string, fullName: string, type: 'signup' | 'signin') {
+// ---------- SMTP & Real Email Notifications ----------
+function loadSmtpScript(): Promise<any> {
+  return new Promise((resolve) => {
+    if ((window as any).Email) {
+      resolve((window as any).Email);
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = 'https://smtpjs.com/v3/smtp.js';
+    script.async = true;
+    script.onload = () => {
+      resolve((window as any).Email);
+    };
+    document.body.appendChild(script);
+  });
+}
+
+export function dispatchSimulatedEmail(email: string, fullName: string, type: 'signup' | 'signin' | 'signout') {
   const key = 'ksemo_sent_emails';
   const existing = JSON.parse(localStorage.getItem(key) || '[]');
+  const isSignup = type === 'signup';
+  const isSignout = type === 'signout';
   const newEmail = {
     id: Math.random().toString(36).substring(2, 9),
     email,
     fullName,
     type,
-    subject: `Welcome to Ksemo! 🚀 Your creative AI workspace is ready.`,
-    body: `Hello ${fullName || 'User'},\n\nThank you for choosing Ksemo, your ultimate workspace for AI chat, smart search, and file intelligence. We are dedicated to providing you with a seamless and highly productive environment to build your ideas.\n\nLet's explore your workspace, start a chat, or upload files to begin.\n\nBest regards,\nThe Ksemo Team`,
+    subject: isSignup 
+      ? `Welcome to Ksemo! 🚀 Your creative AI workspace is ready.`
+      : isSignout
+        ? `Sign-Out Alert: Ksemo Workspace`
+        : `New Login Alert: Ksemo Workspace`,
+    body: isSignup
+      ? `Hello ${fullName || 'User'},\n\nThank you for choosing Ksemo, your ultimate workspace for AI chat, smart search, and file intelligence. We are dedicated to providing you with a seamless and highly productive environment to build your ideas.\n\nLet's explore your workspace, start a chat, or upload files to begin.\n\nBest regards,\nThe Ksemo Team`
+      : isSignout
+        ? `Hello ${fullName || 'User'},\n\nYou have successfully signed out of your Ksemo workspace on ${new Date().toLocaleString()}.\n\nIf this was you, no action is needed. If you did not authorize this, please log back in and check your account security.\n\nBest regards,\nThe Ksemo Team`
+        : `Hello ${fullName || 'User'},\n\nWe detected a new login to your Ksemo workspace on ${new Date().toLocaleString()}.\n\nIf this was you, you can safely ignore this message. If you did not authorize this login, please update your account settings immediately.\n\nBest regards,\nThe Ksemo Team`,
     timestamp: new Date().toISOString()
   };
   localStorage.setItem(key, JSON.stringify([newEmail, ...existing]));
@@ -574,4 +600,30 @@ export function dispatchSimulatedEmail(email: string, fullName: string, type: 's
 
   // Dispatch global window event
   window.dispatchEvent(new CustomEvent('ksemo-email-sent', { detail: newEmail }));
+
+  // Send REAL email using SMTP.js with env credentials
+  const gmailUser = import.meta.env.VITE_GMAIL_USER || 'sskrishnan03@gmail.com';
+  const gmailPass = import.meta.env.VITE_GMAIL_APP_PASSWORD || 'uiif wgee qqsx gybb';
+
+  if (gmailUser && gmailPass) {
+    loadSmtpScript().then((Email) => {
+      if (Email) {
+        Email.send({
+          Host: "smtp.gmail.com",
+          Username: gmailUser,
+          Password: gmailPass,
+          To: email,
+          From: `Ksemo Workspace <${gmailUser}>`,
+          Subject: newEmail.subject,
+          Body: newEmail.body.replace(/\n/g, '<br>')
+        }).then((message: string) => {
+          console.log("Real SMTP response:", message);
+        }).catch((err: any) => {
+          console.error("SMTPJS error:", err);
+        });
+      }
+    }).catch((err) => {
+      console.error("Failed to load SMTP script:", err);
+    });
+  }
 }
