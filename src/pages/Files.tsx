@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { EmptyState, Button, Input, Modal } from '../components/ui';
 import { listUploads, deleteUpload, createUpload, listChats, createChat, updateUpload } from '../lib/data';
+import { readFileAsDataUrl, parseFile, buildFileMessage } from '../lib/fileParser';
 import { formatBytes, formatRelativeTime } from '../lib/utils';
 import type { Upload, Chat } from '../lib/types';
 
@@ -92,14 +93,13 @@ export default function Files() {
       });
     }, 120);
 
-    const mockUrl = URL.createObjectURL(file);
-
     try {
+      const dataUrl = await readFileAsDataUrl(file);
       await createUpload({
         name: file.name,
         size: file.size,
         type: file.type || 'application/octet-stream',
-        url: mockUrl,
+        url: dataUrl,
         storage_path: `uploads/${file.name}`
       });
       clearInterval(interval);
@@ -115,18 +115,45 @@ export default function Files() {
   };
 
   const handleAskAI = async (file: Upload) => {
-    // Create new chat with prompt attached
     const c = await createChat({
       title: `Doc: ${file.name.slice(0, 24)}`
     });
-    if (c) {
-      await updateUpload(file.id, { chat_id: c.id });
-      nav(`/app/chat/${c.id}`, {
-        state: {
-          prefillInput: `[Attached: ${file.name}]\n\nI have loaded this file into the chat. Please summarize the key aspects of this document and list the core takeaways.`
+    if (!c) return;
+
+    await updateUpload(file.id, { chat_id: c.id });
+
+    const prompt = 'Please analyze this file and provide a comprehensive summary with key takeaways.';
+
+    if (file.url && file.url.startsWith('data:')) {
+      try {
+        const mimeFromDataUrl = file.url.split(';')[0].split(':')[1] || file.type;
+        const fakeFile = new File([new Blob()], file.name, { type: mimeFromDataUrl });
+        const parsed = await parseFile(fakeFile, file.url);
+        const msg = buildFileMessage(parsed, prompt);
+
+        if (parsed.imageDataUrl) {
+          nav(`/app/chat/${c.id}`, {
+            state: {
+              prefillInput: msg.text,
+              prefillImage: parsed.imageDataUrl,
+            }
+          });
+        } else {
+          nav(`/app/chat/${c.id}`, {
+            state: { prefillInput: msg.text }
+          });
         }
-      });
+        return;
+      } catch (err) {
+        console.warn('File parsing failed, falling back to basic prompt:', err);
+      }
     }
+
+    nav(`/app/chat/${c.id}`, {
+      state: {
+        prefillInput: `I've uploaded a file named "${file.name}" (${file.type}, ${(file.size / 1024).toFixed(1)} KB).\n\nPlease analyze this file and provide a comprehensive summary with key takeaways.\n\nNote: The file content could not be extracted automatically. Please describe what you'd like to know about this file and I'll help guide the analysis.`
+      }
+    });
   };
 
   // Categorize files

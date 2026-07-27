@@ -1,8 +1,12 @@
 import { estimateTokens } from './utils';
 
+export interface TextPart { type: 'text'; text: string }
+export interface ImagePart { type: 'image_url'; image_url: { url: string } }
+export type ContentPart = TextPart | ImagePart;
+
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
-  content: string;
+  content: string | ContentPart[];
   model?: string;
 }
 
@@ -123,7 +127,12 @@ export async function streamChat(opts: StreamOptions): Promise<StreamResult> {
 
 async function localStream(opts: StreamOptions, start: number): Promise<StreamResult> {
   const lastUser = [...opts.messages].reverse().find((m) => m.role === 'user');
-  const full = generateLocalResponse(lastUser?.content ?? '', opts.messages);
+  const promptText = typeof lastUser?.content === 'string'
+    ? lastUser.content
+    : Array.isArray(lastUser?.content)
+      ? (lastUser!.content as ContentPart[]).filter((p): p is TextPart => p.type === 'text').map(p => p.text).join('\n')
+      : '';
+  const full = generateLocalResponse(promptText, opts.messages as ChatMessage[]);
   const tokens = full.split(/\s+/);
   let acc = '';
   for (let i = 0; i < tokens.length; i++) {
@@ -167,6 +176,19 @@ function generateLocalResponse(prompt: string, history: ChatMessage[]): string {
 
   if (p.includes('thank')) {
     return "You're welcome. Anything else I can help with?";
+  }
+
+  const hasFileContent = p.includes('--- file:') || p.includes('```') || p.includes('[page');
+  if (hasFileContent) {
+    return [
+      "I've received the file content. Here's my analysis:",
+      '',
+      '1. **Document Type** — I can see this is a structured document with extractable content.',
+      '2. **Key Observations** — The file contains text-based content that has been successfully parsed and loaded into context.',
+      '3. **Recommendations** — Ask me specific questions about this file: summarize sections, extract data, find patterns, or rewrite content.',
+      '',
+      'What would you like me to do with this file?',
+    ].join('\n');
   }
 
   if (/\b(code|function|component|script|program|bug|error|debug|refactor|typescript|python|javascript|react|sql|regex)\b/.test(p)) {

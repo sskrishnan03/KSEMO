@@ -12,9 +12,10 @@ import { useAuthContext } from '../components/AuthProvider';
 import type { Chat, Message } from '../lib/types';
 import { listMessages, insertMessage, updateMessage, deleteMessage, updateChat, logUsage, addFavorite, removeFavorite, isFavorite } from '../lib/data';
 import { supabase } from '../lib/supabase';
-import { streamChat, type ChatMessage } from '../lib/ai';
+import { streamChat, type ChatMessage, type ContentPart } from '../lib/ai';
 import { estimateTokens, cn } from '../lib/utils';
 import { ShareModal } from '../components/ShareModal';
+import { parseFile, buildFileMessage } from '../lib/fileParser';
 
 function getTimeOfDayGreeting(name: string): string {
   const hr = new Date().getHours();
@@ -52,6 +53,7 @@ export default function ChatWorkspace() {
   const [recording, setRecording] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [confirmDeleteMessageId, setConfirmDeleteMessageId] = useState<string | null>(null);
+  const [pendingImage, setPendingImage] = useState<string | null>(null);
   const recognitionRef = useRef<any>(null);
 
   const isEmpty = messages.length === 0 && !streaming;
@@ -119,13 +121,16 @@ export default function ChatWorkspace() {
     const el = inputRef.current;
     if (el) {
       el.style.height = 'auto';
-      el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
+      el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
     }
   }, [input]);
 
   useEffect(() => {
     if (loc.state?.prefillInput) {
       setInput(loc.state.prefillInput);
+      if (loc.state?.prefillImage) {
+        setPendingImage(loc.state.prefillImage);
+      }
       // Safely clear location state without corrupting react-router session history
       nav(loc.pathname, { replace: true, state: {} });
     }
@@ -148,19 +153,44 @@ export default function ChatWorkspace() {
     fileInputRef.current?.click();
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setInput((prev) => prev + (prev ? '\n' : '') + `[Attached: ${file.name}]`);
+
+    try {
+      const parsed = await parseFile(file);
+      const msg = buildFileMessage(parsed);
+
+      if (parsed.imageDataUrl) {
+        setPendingImage(parsed.imageDataUrl);
+        setInput((prev) => {
+          const prefix = prev ? prev + '\n\n' : '';
+          return prefix + msg.text;
+        });
+      } else {
+        setInput((prev) => {
+          const prefix = prev ? prev + '\n\n' : '';
+          return prefix + msg.text;
+        });
+      }
+    } catch {
+      setInput((prev) => prev + (prev ? '\n' : '') + `[Attached: ${file.name}]`);
+    }
     e.target.value = '';
   };
 
   const send = async () => {
     if (!input.trim() || !chatId || streaming) return;
     const content = input.trim();
+    const imageToSend = pendingImage;
     setInput('');
+    setPendingImage(null);
 
-    const userMsg = await insertMessage({ chat_id: chatId, role: 'user', content });
+    const userContent: string | ContentPart[] = imageToSend
+      ? [{ type: 'text', text: content }, { type: 'image_url', image_url: { url: imageToSend } }]
+      : content;
+
+    const userMsg = await insertMessage({ chat_id: chatId, role: 'user', content: typeof userContent === 'string' ? userContent : content + '\n\n[Image attached]' });
     if (userMsg) setMessages((m) => [...m, userMsg]);
 
     if (chat?.title === 'New chat') {
@@ -175,7 +205,16 @@ export default function ChatWorkspace() {
     const controller = new AbortController();
     abortRef.current = controller;
 
-    const history: ChatMessage[] = [...messages, { role: 'user', content }].map((m) => ({ role: m.role as 'user' | 'assistant' | 'system', content: m.content }));
+    const historyMsgs = [...messages, { role: 'user' as const, content: typeof userContent === 'string' ? userContent : content + '\n\n[Image attached for analysis]' }];
+    const history: ChatMessage[] = historyMsgs.map((m) => ({ role: m.role as 'user' | 'assistant' | 'system', content: m.content }));
+
+    if (imageToSend && history.length > 0) {
+      const lastMsg = history[history.length - 1];
+      lastMsg.content = [
+        { type: 'text', text: content },
+        { type: 'image_url', image_url: { url: imageToSend } },
+      ];
+    }
 
     try {
       const result = await streamChat({
@@ -388,7 +427,7 @@ export default function ChatWorkspace() {
                     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
                   }}
                   rows={1}
-                  className="w-full bg-transparent px-1 py-2 text-[14px] text-white resize-none focus:outline-none max-h-[200px] relative z-10 leading-relaxed"
+                  className="w-full bg-transparent px-1 py-2 text-[14px] text-white resize-none focus:outline-none max-h-[120px] scrollbar-hide relative z-10 leading-relaxed"
                   style={{ caretColor: '#ffffff' }}
                 />
               </>
@@ -493,7 +532,7 @@ export default function ChatWorkspace() {
                         onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
                         rows={1}
                         placeholder="Ask Ksemo anything…"
-                        className="w-full bg-transparent px-1 py-2 text-[14px] text-white placeholder:text-ink-400 resize-none focus:outline-none max-h-[200px] relative z-10 leading-relaxed"
+                        className="w-full bg-transparent px-1 py-2 text-[14px] text-white placeholder:text-ink-400 resize-none focus:outline-none max-h-[120px] scrollbar-hide relative z-10 leading-relaxed"
                         style={{ caretColor: '#ffffff' }}
                       />
                     )}
