@@ -550,21 +550,34 @@ export async function logUsage(model: string, promptTokens: number, completionTo
   console.log('Usage logged locally:', { model, promptTokens, completionTokens, latencyMs });
 }
 
-// ---------- SMTP & Real Email Notifications ----------
-function loadSmtpScript(): Promise<any> {
-  return new Promise((resolve) => {
-    if ((window as any).Email) {
-      resolve((window as any).Email);
-      return;
-    }
-    const script = document.createElement('script');
-    script.src = 'https://smtpjs.com/v3/smtp.js';
-    script.async = true;
-    script.onload = () => {
-      resolve((window as any).Email);
-    };
-    document.body.appendChild(script);
-  });
+// ---------- SMTP for Real Email Notifications ----------
+async function sendEmailViaProxy(to: string, subject: string, body: string): Promise<boolean> {
+  try {
+    const response = await fetch('/send-email', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        to,
+        subject,
+        body,
+        from: `Ksemo Workspace <sskrishnan03@gmail.com>`
+      })
+    });
+    
+    const data = await response.json();
+    console.log('Email proxy response:', data);
+    return data.success;
+  } catch (error) {
+    console.error('Email proxy error:', error);
+    return false;
+  }
+}
+
+function openMailtoLink(to: string, subject: string, body: string): void {
+  const mailtoLink = `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  window.open(mailtoLink, '_blank');
 }
 
 export function dispatchSimulatedEmail(email: string, fullName: string, type: 'signup' | 'signin' | 'signout') {
@@ -601,29 +614,13 @@ export function dispatchSimulatedEmail(email: string, fullName: string, type: 's
   // Dispatch global window event
   window.dispatchEvent(new CustomEvent('ksemo-email-sent', { detail: newEmail }));
 
-  // Send REAL email using SMTP.js with env credentials
-  const gmailUser = import.meta.env.VITE_GMAIL_USER || 'sskrishnan03@gmail.com';
-  const gmailPass = import.meta.env.VITE_GMAIL_APP_PASSWORD || 'uiif wgee qqsx gybb';
-
-  if (gmailUser && gmailPass) {
-    loadSmtpScript().then((Email) => {
-      if (Email) {
-        Email.send({
-          Host: "smtp.gmail.com",
-          Username: gmailUser,
-          Password: gmailPass,
-          To: email,
-          From: `Ksemo Workspace <${gmailUser}>`,
-          Subject: newEmail.subject,
-          Body: newEmail.body.replace(/\n/g, '<br>')
-        }).then((message: string) => {
-          console.log("Real SMTP response:", message);
-        }).catch((err: any) => {
-          console.error("SMTPJS error:", err);
-        });
-      }
-    }).catch((err) => {
-      console.error("Failed to load SMTP script:", err);
-    });
-  }
+  // Send REAL email using SMTP proxy with mailto fallback
+  sendEmailViaProxy(email, newEmail.subject, newEmail.body).then((success) => {
+    if (success) {
+      console.log("Email sent successfully via SMTP proxy");
+    } else {
+      console.log("SMTP proxy not available, opening mail client as fallback");
+      openMailtoLink(email, newEmail.subject, newEmail.body);
+    }
+  });
 }

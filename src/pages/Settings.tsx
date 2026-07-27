@@ -171,7 +171,7 @@ export default function Settings() {
                 <div className="rounded-2xl bg-ink-850 border border-white/8 p-5">
                   <h3 className="text-[14px] font-semibold text-white mb-1">Password</h3>
                   <p className="text-[12px] text-ink-300 mb-4">Change your account password.</p>
-                  <Button variant="outline" size="sm" onClick={() => nav('/reset')}>Change password</Button>
+                  <Badge className="text-ink-300">Manage from your email provider</Badge>
                 </div>
                 <div className="rounded-2xl bg-ink-850 border border-white/8 p-5">
                   <h3 className="text-[14px] font-semibold text-white mb-1">Two-factor authentication</h3>
