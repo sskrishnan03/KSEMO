@@ -1,9 +1,12 @@
-import { type ReactNode, useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useState, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Mail, X } from 'lucide-react';
 import { Sidebar } from './Sidebar';
 import { useAuthContext } from './AuthProvider';
 import { Spinner, Modal, Button } from './ui';
+import { getSettings } from '../lib/data';
+import type { AppPreferences } from '../lib/types';
+import { useTheme } from './ThemeProvider';
 
 export function AppLayout({ children }: { children: ReactNode }) {
   const { profile, loading } = useAuthContext();
@@ -12,6 +15,60 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => window.innerWidth < 768);
   const [activeEmail, setActiveEmail] = useState<any>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const { setTheme: setAppTheme, setFontSize: setAppFontSize } = useTheme();
+  const [prefs, setPrefs] = useState<AppPreferences>({});
+
+  useEffect(() => {
+    if (profile?.id) getSettings(profile.id).then((s) => {
+      const p = s?.preferences ?? {};
+      setPrefs(p);
+      if (p.theme) { setAppTheme(p.theme); localStorage.setItem('ksemo_theme_mode', JSON.stringify(p.theme)); }
+      if (p.font_size) { setAppFontSize(p.font_size); localStorage.setItem('ksemo_font_size', JSON.stringify(p.font_size)); }
+    }).catch(() => {});
+  }, [profile?.id]);
+
+  const handleKeyboard = useCallback((e: KeyboardEvent) => {
+    const isMeta = e.metaKey || e.ctrlKey;
+    const isInInput = (e.target as HTMLElement)?.tagName === 'INPUT' || (e.target as HTMLElement)?.tagName === 'TEXTAREA' || (e.target as HTMLElement)?.tagName === 'SELECT';
+
+    if (isMeta && e.key === 'n' && (prefs.shortcut_new_chat ?? true) && !isInInput) {
+      e.preventDefault();
+      nav('/app');
+    }
+    if (isMeta && e.key === 'k' && (prefs.shortcut_search ?? true) && !isInInput) {
+      e.preventDefault();
+      nav('/app/search');
+    }
+    if (isMeta && e.key === ',' && (prefs.shortcut_settings ?? true) && !isInInput) {
+      e.preventDefault();
+      nav('/app/settings');
+    }
+    if (isMeta && e.key === 'b' && (prefs.shortcut_toggle_sidebar ?? true) && !isInInput) {
+      e.preventDefault();
+      setSidebarCollapsed((c) => !c);
+    }
+    if (isMeta && e.shiftKey && e.key === 'V' && (prefs.shortcut_voice_chat ?? true) && !isInInput) {
+      e.preventDefault();
+      nav('/app/voice-chat');
+    }
+
+    if (isMeta && e.shiftKey && e.key === 'F' && (prefs.shortcut_files ?? true) && !isInInput) {
+      e.preventDefault();
+      nav('/app/files');
+    }
+    if (isMeta && e.shiftKey && e.key === 'H' && (prefs.shortcut_history ?? true) && !isInInput) {
+      e.preventDefault();
+      nav('/app/history');
+    }
+    if (e.key === 'Escape' && (prefs.shortcut_stop_generation ?? true)) {
+      window.dispatchEvent(new CustomEvent('ksemo-stop-generation'));
+    }
+  }, [prefs, nav]);
+
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyboard);
+    return () => window.removeEventListener('keydown', handleKeyboard);
+  }, [handleKeyboard]);
 
   useEffect(() => {
     const onEmailSent = (e: Event) => {
@@ -55,7 +112,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
   if (!profile) return null;
 
   return (
-    <div className="flex min-h-screen bg-ink-900 text-white">
+    <div className="flex h-screen bg-ink-900 text-white">
       <Sidebar
         collapsed={sidebarCollapsed}
         onToggleCollapse={() => setSidebarCollapsed((c) => !c)}

@@ -1,6 +1,6 @@
 import { type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Sparkles, Wand2, Shield } from 'lucide-react';
+import { ArrowLeft, Sparkles, Shield } from 'lucide-react';
 
 export function AuthLayout({ children, title, subtitle, footer }: { children: ReactNode; title: string; subtitle: string; footer?: ReactNode }) {
   return (
@@ -32,12 +32,6 @@ export function AuthLayout({ children, title, subtitle, footer }: { children: Re
                 <Sparkles size={15} />
               </div>
               <span>AI-powered chat and writing assistant</span>
-            </li>
-            <li className="flex items-center gap-3">
-              <div className="h-9 w-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white shrink-0">
-                <Wand2 size={15} />
-              </div>
-              <span>20+ purpose-built utility tools</span>
             </li>
             <li className="flex items-center gap-3">
               <div className="h-9 w-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white shrink-0">

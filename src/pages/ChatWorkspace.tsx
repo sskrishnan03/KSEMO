@@ -4,18 +4,19 @@ import {
   Square, Copy, Check,
   Pencil, Share2,
   Volume2, RotateCw, Star, MoreHorizontal, Trash2, Mic, ArrowUp,
-  Paperclip,
+  Plus, FileText, Image, Globe, Search,
 } from 'lucide-react';
 import { Button, Modal, Textarea } from '../components/ui';
 import { Markdown } from '../components/Markdown';
 import { useAuthContext } from '../components/AuthProvider';
-import type { Chat, Message } from '../lib/types';
-import { listMessages, insertMessage, updateMessage, deleteMessage, updateChat, logUsage, addFavorite, removeFavorite, isFavorite } from '../lib/data';
+import type { Chat, Message, AppPreferences } from '../lib/types';
+import { listMessages, insertMessage, updateMessage, deleteMessage, updateChat, logUsage, addFavorite, removeFavorite, isFavorite, getSettings } from '../lib/data';
 import { supabase } from '../lib/supabase';
 import { streamChat, type ChatMessage, type ContentPart } from '../lib/ai';
 import { estimateTokens, cn } from '../lib/utils';
 import { ShareModal } from '../components/ShareModal';
 import { parseFile, buildFileMessage } from '../lib/fileParser';
+import { setLastActiveChatId } from '../lib/data';
 
 function getTimeOfDayGreeting(name: string): string {
   const hr = new Date().getHours();
@@ -39,7 +40,7 @@ export default function ChatWorkspace() {
   const { chatId } = useParams();
   const loc = useLocation();
   const nav = useNavigate();
-  const { profile } = useAuthContext();
+  const { profile, user } = useAuthContext();
   const [chat, setChat] = useState<Chat | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -54,6 +55,12 @@ export default function ChatWorkspace() {
   const [shareOpen, setShareOpen] = useState(false);
   const [confirmDeleteMessageId, setConfirmDeleteMessageId] = useState<string | null>(null);
   const [pendingImage, setPendingImage] = useState<string | null>(null);
+  const [prefs, setPrefs] = useState<AppPreferences>({});
+  const [featureMenuOpen, setFeatureMenuOpen] = useState(false);
+  const [featureMenuUp, setFeatureMenuUp] = useState(false);
+  const [deepResearch, setDeepResearch] = useState(false);
+  const [webSearch, setWebSearch] = useState(false);
+  const featureMenuRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
 
   const isEmpty = messages.length === 0 && !streaming;
@@ -64,14 +71,6 @@ export default function ChatWorkspace() {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const placeholderSuggestions = [
-    'Ask Ksemo anything…',
-    'Generate creative ideas…',
-    'Explain complex code…',
-    'Analyze and summarize…',
-    'Write compelling content…',
-    'Brainstorm solutions…',
-  ];
 
   const playChime = (start: boolean) => {
     try {
@@ -99,6 +98,7 @@ export default function ChatWorkspace() {
   const loadChat = useCallback(async () => {
     if (!chatId) return;
     setLoading(true);
+    setLastActiveChatId(chatId);
     const msgs = await listMessages(chatId);
     setMessages(msgs);
     const { data } = await supabase.from('chats').select('*').eq('id', chatId).maybeSingle();
@@ -131,10 +131,28 @@ export default function ChatWorkspace() {
       if (loc.state?.prefillImage) {
         setPendingImage(loc.state.prefillImage);
       }
-      // Safely clear location state without corrupting react-router session history
       nav(loc.pathname, { replace: true, state: {} });
     }
   }, [chatId, loc.state, nav]);
+
+  useEffect(() => {
+    if (user) getSettings(user.id).then((s) => setPrefs(s?.preferences ?? {})).catch(() => {});
+  }, [user]);
+
+  useEffect(() => {
+    const handler = () => { if (streaming) stop(); };
+    window.addEventListener('ksemo-stop-generation', handler);
+    return () => window.removeEventListener('ksemo-stop-generation', handler);
+  }, [streaming]);
+
+  useEffect(() => {
+    if (!featureMenuOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (featureMenuRef.current && !featureMenuRef.current.contains(e.target as Node)) setFeatureMenuOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [featureMenuOpen]);
 
   const addRipple = (e: React.MouseEvent<HTMLButtonElement>) => {
     const btn = e.currentTarget;
@@ -149,8 +167,12 @@ export default function ChatWorkspace() {
     setTimeout(() => ripple.remove(), 500);
   };
 
-  const handleFileAttach = () => {
-    fileInputRef.current?.click();
+  const handleFileAttach = (accept?: string) => {
+    if (fileInputRef.current) {
+      if (accept) fileInputRef.current.setAttribute('accept', accept);
+      else fileInputRef.current.removeAttribute('accept');
+      fileInputRef.current.click();
+    }
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -181,10 +203,19 @@ export default function ChatWorkspace() {
 
   const send = async () => {
     if (!input.trim() || !chatId || streaming) return;
-    const content = input.trim();
+    let content = input.trim();
     const imageToSend = pendingImage;
     setInput('');
     setPendingImage(null);
+
+    if (deepResearch) {
+      content = '[Deep Research mode enabled] Conduct thorough research and provide a comprehensive, in-depth analysis. ' + content;
+      setDeepResearch(false);
+    }
+    if (webSearch) {
+      content = '[Web Search mode enabled] Search the web for the latest information and provide up-to-date results. ' + content;
+      setWebSearch(false);
+    }
 
     const userContent: string | ContentPart[] = imageToSend
       ? [{ type: 'text', text: content }, { type: 'image_url', image_url: { url: imageToSend } }]
@@ -193,8 +224,8 @@ export default function ChatWorkspace() {
     const userMsg = await insertMessage({ chat_id: chatId, role: 'user', content: typeof userContent === 'string' ? userContent : content + '\n\n[Image attached]' });
     if (userMsg) setMessages((m) => [...m, userMsg]);
 
-    if (chat?.title === 'New chat') {
-      const title = content.slice(0, 48) + (content.length > 48 ? '…' : '');
+    if (chat?.title === 'New chat' && (prefs.auto_rename_chats ?? true)) {
+      const title = content.slice(0, 48) + (content.length > 48 ? '...' : '');
       await updateChat(chatId, { title });
       setChat((c) => c ? { ...c, title } : c);
       setRenameText(title);
@@ -388,14 +419,46 @@ export default function ChatWorkspace() {
         onChange={handleFileChange}
         accept="*/*"
       />
+      {(deepResearch || webSearch) && (
+        <div className="relative z-10 flex items-center gap-2 px-3 pt-1.5 pb-0">
+          {deepResearch && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-ink-700 text-ink-100 border border-white/10">
+              <Search size={10} /> Deep Research
+            </span>
+          )}
+          {webSearch && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-ink-700 text-ink-100 border border-white/10">
+              <Globe size={10} /> Web Search
+            </span>
+          )}
+        </div>
+      )}
       <div className="composer-shell">
         <div className="composer-glow" />
         <div className="relative z-10 flex items-end gap-1 px-2 py-2 md:px-3 md:py-2.5">
-          <div className="flex items-center gap-0.5 shrink-0 pb-0.5">
-            <button className="c-btn" onClick={(e) => { addRipple(e); handleFileAttach(); }} aria-label="Attach file">
-              <Paperclip size={17} strokeWidth={1.8} />
-              <span className="c-tip">Attach file</span>
+          <div className="flex items-center gap-0.5 shrink-0 pb-0.5 relative" ref={featureMenuRef}>
+            <button className="c-btn" onClick={(e) => { addRipple(e); setFeatureMenuOpen((o) => { if (!o) { const btn = (e.target as HTMLElement).closest('button'); if (btn) { const rect = btn.getBoundingClientRect(); const spaceBelow = window.innerHeight - rect.bottom; setFeatureMenuUp(spaceBelow < 200); } } return !o; }); }} aria-label="More features">
+              <Plus size={17} strokeWidth={2.2} className="text-white/70" />
+              <span className="c-tip">Features</span>
             </button>
+            {featureMenuOpen && (
+              <div className={`absolute ${featureMenuUp ? 'bottom-full mb-1 slide-in-from-bottom-1' : 'top-full mt-1 slide-in-from-top-1'} left-1/2 -translate-x-1/2 w-44 bg-ink-800 border border-white/10 rounded-xl shadow-2xl overflow-hidden z-50 animate-in fade-in`}>
+                <button onClick={() => { setFeatureMenuOpen(false); handleFileAttach('image/*'); }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] text-white hover:bg-white/5 transition">
+                  <Image size={16} /> Photos
+                </button>
+                <button onClick={() => { setFeatureMenuOpen(false); handleFileAttach('*/*'); }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] text-white hover:bg-white/5 transition">
+                  <FileText size={16} /> Files
+                </button>
+                <button onClick={() => { setFeatureMenuOpen(false); setDeepResearch((v) => !v); }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] text-white hover:bg-white/5 transition">
+                  <Search size={16} /> Deep Research
+                  {deepResearch && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-white" />}
+                </button>
+                <button onClick={() => { setFeatureMenuOpen(false); setWebSearch((v) => !v); }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] text-white hover:bg-white/5 transition">
+                  <Globe size={16} /> Web Search
+                  {webSearch && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-white" />}
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="flex-1 relative min-h-[44px] flex items-center">
@@ -413,10 +476,8 @@ export default function ChatWorkspace() {
             ) : (
               <>
                 {!input && (
-                  <div className="composer-placeholder text-ink-400 text-[14px]">
-                    {placeholderSuggestions.map((s, i) => (
-                      <span key={i} className="composer-placeholder-item">{s}</span>
-                    ))}
+                  <div className="absolute left-1 top-1/2 -translate-y-1/2 pointer-events-none z-2 text-[14px] text-ink-400">
+                    Ask Ksemo anything…
                   </div>
                 )}
                 <textarea
@@ -424,25 +485,27 @@ export default function ChatWorkspace() {
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+                    if (e.key === 'Enter' && !e.shiftKey && (prefs.send_on_enter ?? true)) { e.preventDefault(); send(); }
                   }}
                   rows={1}
                   className="w-full bg-transparent px-1 py-2 text-[14px] text-white resize-none focus:outline-none max-h-[120px] scrollbar-hide relative z-10 leading-relaxed"
-                  style={{ caretColor: '#ffffff' }}
+                  style={{ caretColor: 'var(--color-white)' }}
                 />
               </>
             )}
           </div>
 
           <div className="flex items-center gap-0.5 shrink-0 pb-0.5">
-            <button
-              className={cn('c-btn', recording && 'c-voice-active')}
-              onClick={(e) => { addRipple(e); toggleRecording(); }}
-              aria-label={recording ? 'Stop recording' : 'Voice input'}
-            >
-              <Mic size={17} strokeWidth={1.8} />
-              <span className="c-tip">{recording ? 'Stop' : 'Voice input'}</span>
-            </button>
+            {(prefs.voice_input_enabled ?? true) && (
+              <button
+                className={cn('c-btn', recording && 'c-voice-active')}
+                onClick={(e) => { addRipple(e); toggleRecording(); }}
+                aria-label={recording ? 'Stop recording' : 'Voice input'}
+              >
+                <Mic size={17} strokeWidth={1.8} />
+                <span className="c-tip">{recording ? 'Stop' : 'Voice input'}</span>
+              </button>
+            )}
 
             {streaming ? (
               <button
@@ -474,7 +537,7 @@ export default function ChatWorkspace() {
   );
 
   return (
-    <div className="h-screen flex flex-col">
+    <div className="h-full flex flex-col">
       {/* Chat header — only when messages exist */}
       {!isEmpty && (
         <div className="h-14 px-4 border-b border-white/8 flex items-center gap-3 glass shrink-0">
@@ -507,41 +570,77 @@ export default function ChatWorkspace() {
             </h1>
 
             <div className="w-full">
+              {(deepResearch || webSearch) && (
+                <div className="flex items-center gap-2 px-3 pb-1">
+                  {deepResearch && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-ink-700 text-ink-100 border border-white/10">
+                      <Search size={10} /> Deep Research
+                    </span>
+                  )}
+                  {webSearch && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-ink-700 text-ink-100 border border-white/10">
+                      <Globe size={10} /> Web Search
+                    </span>
+                  )}
+                </div>
+              )}
               <div className="composer-shell">
                 <div className="composer-glow" />
                 <div className="relative z-10 flex items-end gap-1 px-2 py-2 md:px-3 md:py-2.5">
-                  <div className="flex items-center gap-0.5 shrink-0 pb-0.5">
-                    <button className="c-btn" onClick={(e) => { addRipple(e); handleFileAttach(); }} aria-label="Attach file">
-                      <Paperclip size={17} strokeWidth={1.8} />
-                      <span className="c-tip">Attach file</span>
-                    </button>
-                  </div>
+                  {(prefs.file_attachment_enabled ?? true) && (
+                    <div className="flex items-center gap-0.5 shrink-0 pb-0.5 relative" ref={featureMenuRef}>
+                      <button className="c-btn" onClick={(e) => { addRipple(e); setFeatureMenuOpen((o) => { if (!o) { const btn = (e.target as HTMLElement).closest('button'); if (btn) { const rect = btn.getBoundingClientRect(); const spaceBelow = window.innerHeight - rect.bottom; setFeatureMenuUp(spaceBelow < 200); } } return !o; }); }} aria-label="More features">
+                        <Plus size={17} strokeWidth={2.2} className="text-white/70" />
+                        <span className="c-tip">Features</span>
+                      </button>
+                      {featureMenuOpen && (
+                        <div className={`absolute ${featureMenuUp ? 'bottom-full mb-1 slide-in-from-bottom-1' : 'top-full mt-1 slide-in-from-top-1'} left-1/2 -translate-x-1/2 w-44 bg-ink-800 border border-white/10 rounded-xl shadow-2xl overflow-hidden z-50 animate-in fade-in`}>
+                          <button onClick={() => { setFeatureMenuOpen(false); handleFileAttach('image/*'); }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] text-white hover:bg-white/5 transition">
+                            <Image size={16} /> Photos
+                          </button>
+                          <button onClick={() => { setFeatureMenuOpen(false); handleFileAttach('*/*'); }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] text-white hover:bg-white/5 transition">
+                            <FileText size={16} /> Files
+                          </button>
+                          <button onClick={() => { setFeatureMenuOpen(false); setDeepResearch((v) => !v); }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] text-white hover:bg-white/5 transition">
+                            <Search size={16} /> Deep Research
+                            {deepResearch && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-white" />}
+                          </button>
+                          <button onClick={() => { setFeatureMenuOpen(false); setWebSearch((v) => !v); }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] text-white hover:bg-white/5 transition">
+                            <Globe size={16} /> Web Search
+                            {webSearch && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-white" />}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
                   <div className="flex-1 relative min-h-[44px] flex items-center">
                     {recording ? (
                       <div className="flex items-center gap-2 w-full px-1">
                         <div className="c-voice-waves text-white/60">
                           <span className="c-voice-wave" /><span className="c-voice-wave" /><span className="c-voice-wave" /><span className="c-voice-wave" /><span className="c-voice-wave" />
                         </div>
-                        <span className="text-[13px] text-white/50 font-medium tracking-wide animate-pulse">Listening…</span>
+                        <span className="text-[13px] text-white/50 font-medium tracking-wide animate-pulse">Listening...</span>
                       </div>
                     ) : (
                       <textarea
                         ref={inputRef}
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
+                        onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && (prefs.send_on_enter ?? true)) { e.preventDefault(); send(); } }}
                         rows={1}
-                        placeholder="Ask Ksemo anything…"
+                        placeholder="Ask Ksemo anything..."
                         className="w-full bg-transparent px-1 py-2 text-[14px] text-white placeholder:text-ink-400 resize-none focus:outline-none max-h-[120px] scrollbar-hide relative z-10 leading-relaxed"
-                        style={{ caretColor: '#ffffff' }}
+                  style={{ caretColor: 'var(--color-white)' }}
                       />
                     )}
                   </div>
                   <div className="flex items-center gap-0.5 shrink-0 pb-0.5">
-                    <button className={cn('c-btn', recording && 'c-voice-active')} onClick={(e) => { addRipple(e); toggleRecording(); }} aria-label={recording ? 'Stop recording' : 'Voice input'}>
-                      <Mic size={17} strokeWidth={1.8} />
-                      <span className="c-tip">{recording ? 'Stop' : 'Voice input'}</span>
-                    </button>
+                    {(prefs.voice_input_enabled ?? true) && (
+                      <button className={cn('c-btn', recording && 'c-voice-active')} onClick={(e) => { addRipple(e); toggleRecording(); }} aria-label={recording ? 'Stop recording' : 'Voice input'}>
+                        <Mic size={17} strokeWidth={1.8} />
+                        <span className="c-tip">{recording ? 'Stop' : 'Voice input'}</span>
+                      </button>
+                    )}
                     <button className={cn('c-btn c-send', !input.trim() && 'disabled')} onClick={(e) => { addRipple(e); send(); }} disabled={!input.trim()} aria-label="Send message">
                       <ArrowUp size={17} strokeWidth={2.5} />
                       <span className="c-tip">Send</span>
@@ -582,6 +681,8 @@ export default function ChatWorkspace() {
                     if (fav) { await removeFavorite(m.id); } else { await addFavorite(m.id); }
                   }}
                   checkFavorite={isFavorite}
+                  showTokenCount={prefs.show_token_count ?? false}
+                  readAloudEnabled={prefs.read_aloud_enabled ?? true}
                 />
               ))}
 
@@ -701,11 +802,12 @@ function ActionBarBtn({ icon, tooltip, onClick, active }: {
   );
 }
 
-function MessageBubble({ m, isUser, editing, editText, onEditStart, onEditCancel, onEditSave, onEditText, onCopy, onShare, onDelete, onRegenerate, onToggleFavorite, checkFavorite }: {
+function MessageBubble({ m, isUser, editing, editText, onEditStart, onEditCancel, onEditSave, onEditText, onCopy, onShare, onDelete, onRegenerate, onToggleFavorite, checkFavorite, showTokenCount, readAloudEnabled }: {
   m: Message; isUser: boolean; editing: boolean; editText: string;
   onEditStart: () => void; onEditCancel: () => void; onEditSave: () => void; onEditText: (v: string) => void;
   onCopy: () => void; onShare: () => void; onDelete: () => void; onRegenerate: () => void;
   onToggleFavorite: () => void; checkFavorite: (messageId: string) => Promise<boolean>;
+  showTokenCount?: boolean; readAloudEnabled?: boolean;
 }) {
   const [copied, setCopied] = useState(false);
   const [shared, setShared] = useState(false);
@@ -759,9 +861,16 @@ function MessageBubble({ m, isUser, editing, editText, onEditStart, onEditCancel
 
   return (
     <div className={cn('group flex gap-3 animate-fade-in', isUser && 'flex-row-reverse')}>
-      {!isUser && <Avatar />}
-      <div className={cn('flex-1 min-w-0', isUser ? 'max-w-[50%] flex flex-col items-end' : 'max-w-[90%]')}>
-        {!isUser && <div className="mb-1"><span className="text-[12px] font-medium text-white">Ksemo</span></div>}
+        {!isUser && <Avatar />}
+        <div className={cn('flex-1 min-w-0', isUser ? 'max-w-[50%] flex flex-col items-end' : 'max-w-[90%]')}>
+          {!isUser && (
+            <div className="mb-1 flex items-center gap-2">
+              <span className="text-[12px] font-medium text-white">Ksemo</span>
+              {showTokenCount && m.tokens != null && m.tokens > 0 && (
+                <span className="text-[10px] text-ink-400">{m.tokens} tokens</span>
+              )}
+            </div>
+          )}
         {editing ? (
           <div className="space-y-2">
             <Textarea value={editText} onChange={(e) => onEditText(e.target.value)} rows={4} autoFocus />
@@ -799,7 +908,7 @@ function MessageBubble({ m, isUser, editing, editText, onEditStart, onEditCancel
         )}
 
         {!editing && !isUser && (
-          <div className="mt-1.5 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+          <div className="mt-1.5 flex items-center gap-0.5">
             <ActionBarBtn
               icon={copied ? <Check size={14} /> : <Copy size={14} />}
               tooltip={copied ? 'Copied' : 'Copy'}
@@ -824,9 +933,11 @@ function MessageBubble({ m, isUser, editing, editText, onEditStart, onEditCancel
               />
               {moreOpen && (
                 <div className="msg-more-menu open">
-                  <button onClick={() => { reading ? stopReading() : readAloud(); setMoreOpen(false); }}>
-                    <Volume2 size={14} /> {reading ? 'Stop reading' : 'Read aloud'}
-                  </button>
+                  {readAloudEnabled !== false && (
+                    <button onClick={() => { reading ? stopReading() : readAloud(); setMoreOpen(false); }}>
+                      <Volume2 size={14} /> {reading ? 'Stop reading' : 'Read aloud'}
+                    </button>
+                  )}
                   <button className="danger" onClick={() => { onDelete(); setMoreOpen(false); }}>
                     <Trash2 size={14} /> Delete
                   </button>

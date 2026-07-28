@@ -63,6 +63,15 @@ export async function updateProfile(userId: string, patch: Partial<Profile>): Pr
   return updated;
 }
 
+const LAST_CHAT_KEY = 'ksemo_last_active_chat';
+
+export function getLastActiveChatId(): string | null {
+  try { return localStorage.getItem(LAST_CHAT_KEY); } catch { return null; }
+}
+export function setLastActiveChatId(id: string) {
+  try { localStorage.setItem(LAST_CHAT_KEY, id); } catch {}
+}
+
 // ---------- Chats ----------
 export async function listChats(filter?: { archived?: boolean }): Promise<Chat[]> {
   if (!dbFailed) {
@@ -158,6 +167,30 @@ export async function deleteChat(id: string): Promise<void> {
   }
   const chats = getLocal<Chat[]>('chats', []);
   setLocal('chats', chats.filter(c => c.id !== id));
+}
+
+export async function deleteAllChats(): Promise<void> {
+  if (!dbFailed) {
+    try {
+      const { error } = await supabase.from('chats').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      if (!error) {
+        setLocal('chats', []);
+        setLocal('messages', []);
+        setLocal('favorites', []);
+        window.dispatchEvent(new CustomEvent('ksemo-chats-deleted'));
+        return;
+      }
+      console.error("Supabase deleteAllChats error:", error);
+      dbFailed = true;
+    } catch (e) {
+      console.error("Supabase deleteAllChats exception:", e);
+      dbFailed = true;
+    }
+  }
+  setLocal('chats', []);
+  setLocal('messages', []);
+  setLocal('favorites', []);
+  window.dispatchEvent(new CustomEvent('ksemo-chats-deleted'));
 }
 
 export async function togglePin(id: string, pinned: boolean): Promise<void> {
@@ -303,6 +336,19 @@ export async function removeFavorite(messageId: string): Promise<void> {
   }
   const favs = getLocal<Favorite[]>('favorites', []);
   setLocal('favorites', favs.filter(f => f.message_id !== messageId));
+}
+
+export async function deleteAllFavorites(): Promise<void> {
+  if (!dbFailed) {
+    try {
+      const { error } = await supabase.from('favorites').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      if (!error) {
+        setLocal('favorites', []);
+        return;
+      }
+    } catch {}
+  }
+  setLocal('favorites', []);
 }
 
 export async function isFavorite(messageId: string): Promise<boolean> {
@@ -535,6 +581,20 @@ export async function searchMessages(query: string): Promise<(Message & { chat?:
       };
     })
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+}
+
+export function getRecentSearches(): string[] {
+  return getLocal<string[]>('recent_searches', []);
+}
+
+export function addRecentSearch(query: string): void {
+  const searches = getLocal<string[]>('recent_searches', []);
+  const updated = [query, ...searches.filter(s => s !== query)].slice(0, 10);
+  setLocal('recent_searches', updated);
+}
+
+export function clearRecentSearches(): void {
+  setLocal('recent_searches', []);
 }
 
 // ---------- AI usage logging ----------

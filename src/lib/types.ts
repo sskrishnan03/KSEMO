@@ -84,11 +84,31 @@ export interface AppPreferences {
   show_token_count?: boolean;
   streaming?: boolean;
   language?: string;
+  reduce_motion?: boolean;
+  compact_mode?: boolean;
   notifications_email?: boolean;
   notifications_security?: boolean;
   notifications_product?: boolean;
-  reduce_motion?: boolean;
-  compact_mode?: boolean;
+  notifications_in_app?: boolean;
+  notifications_sound?: boolean;
+  theme?: 'dark' | 'light' | 'system';
+  font_size?: 'small' | 'medium' | 'large';
+  auto_rename_chats?: boolean;
+  voice_input_enabled?: boolean;
+  file_attachment_enabled?: boolean;
+  read_aloud_enabled?: boolean;
+  suggestions_enabled?: boolean;
+  sidebar_auto_collapse?: boolean;
+  shortcut_new_chat?: boolean;
+  shortcut_search?: boolean;
+  shortcut_settings?: boolean;
+  shortcut_toggle_sidebar?: boolean;
+  shortcut_stop_generation?: boolean;
+  shortcut_voice_chat?: boolean;
+
+
+  shortcut_files?: boolean;
+  shortcut_history?: boolean;
 }
 
 export interface AIUsage {

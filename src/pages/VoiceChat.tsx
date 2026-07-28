@@ -2,7 +2,9 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Mic, MicOff, X } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { createChat, insertMessage, updateChat, logUsage } from '../lib/data';
+import { useTheme } from '../components/ThemeProvider';
+import { createChat, insertMessage, updateChat, logUsage, listChats, setLastActiveChatId } from '../lib/data';
+import type { Chat } from '../lib/types';
 import { streamChat, type ChatMessage } from '../lib/ai';
 import { estimateTokens } from '../lib/utils';
 
@@ -28,6 +30,7 @@ function stripMarkdown(text: string): string {
 
 export default function VoiceChat() {
   const nav = useNavigate();
+  const { resolvedTheme } = useTheme();
   const [state, setState] = useState<VoiceState>('listening');
   const [muted, setMuted] = useState(false);
   const [voiceLevel, setVoiceLevel] = useState(0);
@@ -363,9 +366,17 @@ export default function VoiceChat() {
     stateRef.current = 'listening';
     setState('listening');
 
-    const c = await createChat({ title: 'Voice Chat', type: 'voice' });
+    const chats = await listChats();
+    const existingEmpty = chats.find((c) => c.title === 'New chat');
+    let c: Chat | null;
+    if (existingEmpty) {
+      c = existingEmpty;
+    } else {
+      c = await createChat();
+    }
     if (!c) return;
     setChatId(c.id);
+    setLastActiveChatId(c.id);
     conversationRef.current = [];
     exchangesRef.current = 0;
     totalTokensRef.current = 0;
@@ -484,7 +495,7 @@ export default function VoiceChat() {
       ctx.closePath();
       
       // Pure black solid fill (no stroke border line)
-      ctx.fillStyle = '#000000';
+      ctx.fillStyle = resolvedTheme === 'light' ? '#2d2a27' : '#000000';
       ctx.fill();
 
       animFrame = requestAnimationFrame(render);
@@ -492,7 +503,7 @@ export default function VoiceChat() {
 
     render();
     return () => cancelAnimationFrame(animFrame);
-  }, [hasKey, started]);
+  }, [hasKey, started, resolvedTheme]);
 
   if (!hasKey) {
     return (

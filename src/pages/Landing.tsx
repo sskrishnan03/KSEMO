@@ -2,8 +2,8 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ArrowRight, Sparkles, MessageSquare, Layers, Shield, ChevronDown,
-  Menu, X, Bot, Wand2, Search, Pin, Zap, Code2, FileText, Brain,
-  Globe, Lock, Check, ArrowUpRight,
+  Menu, X, Bot, Search, Pin, Zap, Brain,
+  Lock, Check, ArrowUpRight,
 } from 'lucide-react';
 import { Button } from '../components/ui';
 import { cn } from '../lib/utils';
@@ -13,29 +13,19 @@ import { useAuthContext } from '../components/AuthProvider';
 
 const features = [
   { icon: MessageSquare, title: 'Realtime streaming chat', desc: 'Token-by-token responses with markdown, code blocks, tables, and math. Stop, regenerate, and continue on demand.' },
-  { icon: Wand2, title: '20+ AI tools', desc: 'Summarizer, translator, code generator, SQL builder, regex maker, email writer, flashcards, and more — all in one place.' },
   { icon: Layers, title: 'Organized workspace', desc: 'Pinned chats, favorites, categories, and full-text search across every conversation you have.' },
   { icon: Shield, title: 'Private by design', desc: 'Row-level security on every table, encrypted sessions, and your data never leaves your workspace.' },
-  { icon: Search, title: 'Search everything', desc: 'Full-text search across all chats, tools, and notes. Find anything instantly with instant results.' },
+  { icon: Search, title: 'Search everything', desc: 'Full-text search across all chats, messages, and files. Find anything instantly with instant results.' },
   { icon: Brain, title: 'Multi-model support', desc: 'Switch between AI models mid-conversation. Use the best model for each task — coding, writing, analysis.' },
 ];
 
-const tools = [
-  { icon: Code2, name: 'Code Generator', desc: 'Generate production-ready code from plain English descriptions.' },
-  { icon: FileText, name: 'Summarizer', desc: 'Condense articles, docs, and notes into key takeaways.' },
-  { icon: Globe, name: 'Translator', desc: 'Translate between 50+ languages with natural phrasing.' },
-  { icon: Zap, name: 'Bug Fixer', desc: 'Paste broken code, get the fix with an explanation.' },
-  { icon: Wand2, name: 'SQL Generator', desc: 'Describe what you need in English, get optimized queries.' },
-  { icon: Brain, name: 'Research Assistant', desc: 'Deep-dive analysis with structured, cited output.' },
-];
-
 const faqs = [
-  { q: 'What is Ksemo?', a: 'Ksemo is an AI workspace — a focused, monochrome environment for chatting with AI, organizing conversations, and running purpose-built AI tools. Think of it as your personal AI command center.' },
+  { q: 'What is Ksemo?', a: 'Ksemo is an AI workspace — a focused, monochrome environment for chatting with AI and organizing conversations. Think of it as your personal AI command center.' },
   { q: 'Is my data private?', a: 'Every table uses row-level security so you can only ever access your own data. Sessions are encrypted, and you can export or delete your data at any time from Settings.' },
   { q: 'Does it work offline?', a: 'Ksemo runs in the browser. The local engine produces responses even when no backend is connected, so the app is always usable.' },
   { q: 'Which AI models are supported?', a: 'Ksemo connects to leading AI providers including OpenAI, Anthropic, Google, and open-source models via OpenRouter. You can switch models per conversation.' },
   { q: 'Can I cancel anytime?', a: 'Yes. Plans are month-to-month and you can cancel or downgrade from Settings at any time. Your data stays yours.' },
-  { q: 'How is this different from ChatGPT?', a: 'Ksemo is a workspace, not just a chat. It organizes conversations, runs specialized AI tools, supports multiple models, and keeps everything in a focused, distraction-free environment.' },
+  { q: 'How is this different from ChatGPT?', a: 'Ksemo is a workspace, not just a chat. It organizes conversations, supports multiple models, and keeps everything in a focused, distraction-free environment.' },
 ];
 
 /* ──────────────────── Demo conversations ──────────────────── */
@@ -176,9 +166,6 @@ function ChatDemo() {
               </div>
               <div className="flex items-center gap-3 h-9 px-3 rounded-lg text-[13px] text-ink-200 hover:bg-white/5 cursor-default">
                 <Search size={16} className="text-ink-300" /> Search
-              </div>
-              <div className="flex items-center gap-3 h-9 px-3 rounded-lg text-[13px] text-ink-200 hover:bg-white/5 cursor-default">
-                <Wand2 size={16} className="text-ink-300" /> AI Tools
               </div>
             </div>
 
@@ -347,7 +334,6 @@ export default function Landing() {
           </Link>
           <div className="hidden md:flex items-center gap-8 text-sm text-ink-200">
             <a href="#features" className="hover:text-white transition">Features</a>
-            <a href="#tools" className="hover:text-white transition">Tools</a>
             <a href="#faq" className="hover:text-white transition">FAQ</a>
           </div>
           <div className="hidden md:flex items-center gap-2">
@@ -370,7 +356,6 @@ export default function Landing() {
         {menuOpen && (
           <div className="md:hidden glass-strong border-t border-white/8 px-6 py-4 flex flex-col gap-3 animate-slide-down">
             <a href="#features" onClick={() => setMenuOpen(false)} className="text-sm text-ink-100 py-1">Features</a>
-            <a href="#tools" onClick={() => setMenuOpen(false)} className="text-sm text-ink-100 py-1">Tools</a>
             <a href="#faq" onClick={() => setMenuOpen(false)} className="text-sm text-ink-100 py-1">FAQ</a>
             {profile ? (
               <div className="flex flex-col gap-2 pt-2">
@@ -401,7 +386,7 @@ export default function Landing() {
             Your personal AI workspace.
           </h1>
           <p className="mt-6 text-lg text-ink-200 max-w-2xl mx-auto text-balance animate-slide-up" style={{ animationDelay: '60ms' }}>
-            Ksemo unifies AI-powered tools and your entire conversation history into a
+            Ksemo unifies AI chat and your entire conversation history into a
             calm, focused charcoal workspace designed for thinking.
           </p>
           <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3 animate-slide-up" style={{ animationDelay: '120ms' }}>
@@ -481,44 +466,7 @@ export default function Landing() {
       </section>
 
 
-      {/* ── Tools showcase ── */}
-      <section id="tools" className="py-24 px-6 border-t border-white/8">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center max-w-2xl mx-auto mb-14">
-            <div className="text-[12px] uppercase tracking-wider text-ink-300 mb-3">AI Tools</div>
-            <h2 className="text-3xl md:text-4xl font-semibold tracking-tight">20+ purpose-built tools</h2>
-            <p className="mt-4 text-ink-200 max-w-xl mx-auto">Each tool is fine-tuned for its task. No generic prompts needed — just describe what you want and get results.</p>
-          </div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {tools.map((t, i) => (
-              <div key={t.name} className="group rounded-2xl bg-ink-850 border border-white/8 p-5 hover:border-white/15 transition-all duration-300 animate-slide-up" style={{ animationDelay: `${i * 40}ms` }}>
-                <div className="flex items-start gap-4">
-                  <div className="h-10 w-10 rounded-xl bg-ink-800 border border-white/10 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                    <t.icon size={18} className="text-white" />
-                  </div>
-                  <div>
-                    <h3 className="text-[14px] font-semibold text-white mb-1">{t.name}</h3>
-                    <p className="text-[13px] text-ink-300 leading-relaxed">{t.desc}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-12 flex flex-wrap justify-center gap-2">
-            {['Grammar Fix', 'Email Writer', 'Blog Writer', 'Resume Writer', 'Math Solver', 'Meeting Notes', 'Flashcards', 'Quiz Generator', 'Mind Maps', 'Flowcharts'].map((t) => (
-              <span key={t} className="px-3.5 py-2 rounded-xl bg-ink-850 border border-white/8 text-[13px] text-ink-200 hover:border-white/15 hover:text-white transition cursor-default">
-                {t}
-              </span>
-            ))}
-          </div>
-
-          <div className="mt-10 text-center">
-            <Link to="/signup"><Button size="lg">Try every tool <ArrowRight size={16} /></Button></Link>
-          </div>
-        </div>
-      </section>
 
 
       {/* ── Bento highlight ── */}
@@ -627,7 +575,6 @@ export default function Landing() {
               <div className="text-[12px] font-semibold text-white uppercase tracking-wider mb-3">Product</div>
               <div className="space-y-2">
                 <a href="#features" className="block text-[13px] text-ink-300 hover:text-white transition">Features</a>
-                <a href="#tools" className="block text-[13px] text-ink-300 hover:text-white transition">AI Tools</a>
                 <a href="#faq" className="block text-[13px] text-ink-300 hover:text-white transition">FAQ</a>
               </div>
             </div>

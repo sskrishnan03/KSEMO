@@ -6,10 +6,77 @@
 @layer base {
   :root {
     color-scheme: dark;
+
+    /* ─── Dark theme (default) ─── */
+    --ink-950: #0a0a0a;
+    --ink-900: #121212;
+    --ink-850: #161616;
+    --ink-800: #1a1a1a;
+    --ink-750: #1f1f1f;
+    --ink-700: #262626;
+    --ink-600: #333333;
+    --ink-500: #404040;
+    --ink-400: #525252;
+    --ink-300: #737373;
+    --ink-200: #a3a3a3;
+    --ink-100: #d4d4d4;
+    --ink-50: #f5f5f5;
+    --color-white: #ffffff;
+    --color-border: rgba(255, 255, 255, 0.08);
+    --glass-bg: rgba(18, 18, 18, 0.72);
+    --glass-strong-bg: rgba(18, 18, 18, 0.88);
+    --tooltip-bg: rgba(30, 30, 30, 0.95);
+    --tooltip-border: rgba(255, 255, 255, 0.1);
+    --tooltip-color: #d4d4d4;
+    --menu-bg: rgba(30, 30, 30, 0.96);
+    --menu-border: rgba(255, 255, 255, 0.1);
+    --menu-shadow: rgba(0, 0, 0, 0.4);
+    --menu-hover-bg: rgba(255, 255, 255, 0.08);
+    --composer-border: rgba(255, 255, 255, 0.10);
+    --composer-border-hover: rgba(255, 255, 255, 0.14);
+    --composer-border-focus: rgba(255, 255, 255, 0.18);
+    --composer-glow-color: rgba(255, 255, 255, 0.18);
+  }
+
+  [data-theme="light"] {
+    color-scheme: light;
+
+    --ink-950: #e2ddd6;
+    --ink-900: #eae6e0;
+    --ink-850: #f5f2ed;
+    --ink-800: #f0ece6;
+    --ink-750: #e8e4de;
+    --ink-700: #ddd8d1;
+    --ink-600: #c9c4bc;
+    --ink-500: #b0aaa2;
+    --ink-400: #969088;
+    --ink-300: #4a4642;
+    --ink-200: #2d2a27;
+    --ink-100: #1a1816;
+    --ink-50: #0d0d0d;
+    --color-white: #0d0d0d;
+    --color-border: rgba(0, 0, 0, 0.1);
+    --glass-bg: rgba(234, 230, 224, 0.82);
+    --glass-strong-bg: rgba(234, 230, 224, 0.92);
+    --tooltip-bg: rgba(226, 221, 214, 0.96);
+    --tooltip-border: rgba(0, 0, 0, 0.12);
+    --tooltip-color: #0d0d0d;
+    --menu-bg: rgba(245, 242, 237, 0.97);
+    --menu-border: rgba(0, 0, 0, 0.1);
+    --menu-shadow: rgba(0, 0, 0, 0.1);
+    --menu-hover-bg: rgba(0, 0, 0, 0.06);
+    --composer-border: rgba(0, 0, 0, 0.1);
+    --composer-border-hover: rgba(0, 0, 0, 0.14);
+    --composer-border-focus: rgba(0, 0, 0, 0.18);
+    --composer-glow-color: rgba(0, 0, 0, 0.08);
   }
 
   * {
-    border-color: rgba(255, 255, 255, 0.08);
+    border-color: var(--color-border, rgba(255, 255, 255, 0.08));
+  }
+
+  [data-theme="light"] * {
+    border-color: rgba(0, 0, 0, 0.1);
   }
 
   html {
@@ -19,8 +86,8 @@
   }
 
   body {
-    background-color: #121212;
-    color: #ffffff;
+    background-color: var(--ink-900);
+    color: var(--color-white);
     font-family: 'Inter', 'SF Pro Display', system-ui, sans-serif;
     font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
     line-height: 1.5;
@@ -30,6 +97,18 @@
   ::selection {
     background: rgba(255, 255, 255, 0.18);
     color: #ffffff;
+  }
+
+  [data-theme="light"] ::selection {
+    background: rgba(0, 0, 0, 0.12);
+    color: #000000;
+  }
+
+  [data-theme="light"] ::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.15);
+  }
+  [data-theme="light"] ::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.25);
   }
 
   ::-webkit-scrollbar {
@@ -49,22 +128,38 @@
     background: rgba(255, 255, 255, 0.2);
     background-clip: padding-box;
   }
+
+  [data-theme="light"] ::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.1);
+  }
+  [data-theme="light"] ::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.2);
+  }
 }
 
 @layer components {
   .glass {
-    background: rgba(18, 18, 18, 0.72);
+    background: var(--glass-bg, rgba(18, 18, 18, 0.72));
     backdrop-filter: blur(16px) saturate(140%);
     -webkit-backdrop-filter: blur(16px) saturate(140%);
   }
+  [data-theme="light"] .glass {
+    background: rgba(234, 230, 224, 0.82);
+  }
   .glass-strong {
-    background: rgba(18, 18, 18, 0.88);
+    background: var(--glass-strong-bg, rgba(18, 18, 18, 0.88));
     backdrop-filter: blur(24px) saturate(160%);
     -webkit-backdrop-filter: blur(24px) saturate(160%);
+  }
+  [data-theme="light"] .glass-strong {
+    background: rgba(234, 230, 224, 0.92);
   }
   .grain {
     background-image: radial-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 0);
     background-size: 4px 4px;
+  }
+  [data-theme="light"] .grain {
+    background-image: radial-gradient(rgba(0, 0, 0, 0.035) 1px, transparent 0);
   }
   .text-balance {
     text-wrap: balance;
@@ -73,6 +168,9 @@
     background: linear-gradient(90deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 100%);
     background-size: 200% 100%;
     animation: shimmer 2s linear infinite;
+  }
+  [data-theme="light"] .skeleton {
+    background: linear-gradient(90deg, rgba(0,0,0,0.04) 0%, rgba(0,0,0,0.08) 50%, rgba(0,0,0,0.04) 100%);
   }
 }
 
@@ -90,7 +188,7 @@
     width: 8px;
     height: 1.1em;
     margin-left: 2px;
-    background: #ffffff;
+    background: var(--color-white, #ffffff);
     vertical-align: text-bottom;
     animation: blinkCaret 1s step-end infinite;
   }
@@ -111,9 +209,9 @@
   transform: translateX(-50%) translateY(4px);
   padding: 4px 8px;
   border-radius: 6px;
-  background: rgba(30, 30, 30, 0.95);
-  border: 1px solid rgba(255,255,255,0.1);
-  color: #e5e5e5;
+  background: var(--tooltip-bg, rgba(30, 30, 30, 0.95));
+  border: 1px solid var(--tooltip-border, rgba(255,255,255,0.1));
+  color: var(--tooltip-color, #e5e5e5);
   font-size: 11px;
   line-height: 1.3;
   white-space: nowrap;
@@ -129,7 +227,7 @@
   left: 50%;
   transform: translateX(-50%);
   border: 4px solid transparent;
-  border-top-color: rgba(30, 30, 30, 0.95);
+  border-top-color: var(--tooltip-bg, rgba(30, 30, 30, 0.95));
 }
 .msg-action-btn:hover .msg-tooltip {
   opacity: 1;
@@ -144,9 +242,9 @@
   min-width: 160px;
   padding: 4px;
   border-radius: 12px;
-  background: rgba(30, 30, 30, 0.96);
-  border: 1px solid rgba(255,255,255,0.1);
-  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  background: var(--menu-bg, rgba(30, 30, 30, 0.96));
+  border: 1px solid var(--menu-border, rgba(255,255,255,0.1));
+  box-shadow: 0 8px 32px var(--menu-shadow, rgba(0,0,0,0.4));
   z-index: 50;
   opacity: 0;
   transform: translateY(4px) scale(0.97);
@@ -166,12 +264,12 @@
   padding: 8px 12px;
   border-radius: 8px;
   font-size: 13px;
-  color: #d4d4d4;
+  color: var(--ink-100);
   transition: background 0.15s ease, color 0.15s ease;
 }
 .msg-more-menu button:hover {
-  background: rgba(255,255,255,0.08);
-  color: #fff;
+  background: var(--menu-hover-bg, rgba(255,255,255,0.08));
+  color: var(--color-white, #fff);
 }
 .msg-more-menu button.danger {
   color: #f87171;
@@ -210,29 +308,29 @@
 .md-body ul { list-style: disc; }
 .md-body ol { list-style: decimal; }
 .md-body li { margin: 0.25rem 0; }
-.md-body li::marker { color: rgba(255,255,255,0.4); }
+.md-body li::marker { color: var(--ink-300); }
 .md-body a {
   text-decoration: underline;
   text-underline-offset: 2px;
-  text-decoration-color: rgba(255,255,255,0.35);
+  text-decoration-color: var(--ink-300);
 }
-.md-body a:hover { text-decoration-color: #ffffff; }
+.md-body a:hover { text-decoration-color: var(--color-white); }
 .md-body blockquote {
-  border-left: 2px solid rgba(255,255,255,0.2);
+  border-left: 2px solid var(--ink-400);
   padding-left: 1rem;
-  color: rgba(255,255,255,0.7);
+  color: var(--ink-300);
   font-style: italic;
 }
 .md-body code:not(pre code) {
-  background: rgba(255,255,255,0.08);
+  background: var(--ink-700);
   padding: 0.15rem 0.4rem;
   border-radius: 6px;
   font-family: 'JetBrains Mono', monospace;
   font-size: 0.85em;
 }
 .md-body pre {
-  background: #0a0a0a;
-  border: 1px solid rgba(255,255,255,0.08);
+  background: var(--ink-950);
+  border: 1px solid var(--ink-600);
   border-radius: 12px;
   padding: 1rem;
   overflow-x: auto;
@@ -242,7 +340,7 @@
 }
 .md-body pre code {
   font-family: 'JetBrains Mono', monospace;
-  color: #f5f5f5;
+  color: var(--ink-50);
   white-space: pre;
   word-break: normal;
 }
@@ -254,17 +352,17 @@
   overflow-x: auto;
 }
 .md-body th, .md-body td {
-  border: 1px solid rgba(255,255,255,0.1);
+  border: 1px solid var(--ink-500);
   padding: 0.5rem 0.75rem;
   text-align: left;
 }
 .md-body th {
-  background: rgba(255,255,255,0.04);
+  background: var(--ink-750);
   font-weight: 600;
 }
 .md-body hr {
   border: none;
-  border-top: 1px solid rgba(255,255,255,0.1);
+  border-top: 1px solid var(--ink-500);
   margin: 1.5rem 0;
 }
 
@@ -274,10 +372,10 @@
 .composer-shell {
   position: relative;
   border-radius: 16px;
-  background: rgba(18, 18, 18, 0.72);
+  background: var(--glass-bg, rgba(18, 18, 18, 0.72));
   backdrop-filter: blur(16px) saturate(140%);
   -webkit-backdrop-filter: blur(16px) saturate(140%);
-  border: 1px solid rgba(255,255,255,0.10);
+  border: 1px solid var(--composer-border, rgba(255,255,255,0.10));
   box-shadow:
     0 1px 2px 0 rgba(0,0,0,0.4),
     0 1px 3px 0 rgba(0,0,0,0.3),
@@ -285,10 +383,10 @@
   transition: border-color 0.3s ease, box-shadow 0.3s ease;
 }
 .composer-shell:hover {
-  border-color: rgba(255,255,255,0.14);
+  border-color: var(--composer-border-hover, rgba(255,255,255,0.14));
 }
 .composer-shell:focus-within {
-  border-color: rgba(255,255,255,0.18);
+  border-color: var(--composer-border-focus, rgba(255,255,255,0.18));
   box-shadow:
     0 1px 2px 0 rgba(0,0,0,0.4),
     0 4px 12px -2px rgba(0,0,0,0.5),
@@ -303,11 +401,11 @@
   padding: 1px;
   background: conic-gradient(
     from var(--composer-angle, 0deg),
-    rgba(255,255,255,0.0) 0%,
-    rgba(255,255,255,0.18) 25%,
+    transparent 0%,
+    var(--composer-glow-color, rgba(255,255,255,0.18)) 25%,
     rgba(200,200,200,0.10) 50%,
-    rgba(255,255,255,0.18) 75%,
-    rgba(255,255,255,0.0) 100%
+    var(--composer-glow-color, rgba(255,255,255,0.18)) 75%,
+    transparent 100%
   );
   -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
@@ -375,7 +473,7 @@
   border: none;
   cursor: pointer;
   background: transparent;
-  color: #737373;
+  color: var(--ink-300);
   transition: all 0.2s cubic-bezier(0.16,1,0.3,1);
   overflow: hidden;
   flex-shrink: 0;
@@ -385,7 +483,7 @@
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  background: rgba(255,255,255,0.05);
+  background: color-mix(in srgb, var(--color-white, #fff) 5%, transparent);
   opacity: 0;
   transform: scale(0.6);
   transition: opacity 0.2s ease, transform 0.2s cubic-bezier(0.16,1,0.3,1);
@@ -395,7 +493,7 @@
   transform: scale(1);
 }
 .c-btn:hover {
-  color: #ffffff;
+  color: var(--color-white, #ffffff);
 }
 .c-btn:active {
   transform: scale(0.90);
@@ -413,7 +511,7 @@
 .c-btn .c-ripple {
   position: absolute;
   border-radius: 50%;
-  background: rgba(255,255,255,0.15);
+  background: color-mix(in srgb, var(--color-white, #fff) 15%, transparent);
   transform: scale(0);
   animation: cRipple 0.45s ease-out forwards;
   pointer-events: none;
@@ -426,61 +524,65 @@
   }
 }
 
-/* Send button — project white style matching active layout */
+/* Send button */
 .c-send {
-  background: rgba(255, 255, 255, 0.08);
-  color: #ffffff;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 1px 2px rgba(0,0,0,0.4);
+  background: var(--ink-50);
+  color: var(--ink-900);
+  border: 1px solid var(--ink-300);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+  transition: all 0.2s cubic-bezier(0.16,1,0.3,1);
 }
 .c-send:hover {
-  background: rgba(255, 255, 255, 0.15);
-  border-color: rgba(255, 255, 255, 0.2);
-  box-shadow: 0 2px 8px rgba(255,255,255,0.05);
+  background: var(--ink-100);
+  border-color: var(--ink-400);
+  color: var(--ink-900);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
 }
 .c-send:active {
   transform: scale(0.90);
   box-shadow: none;
 }
-.c-send:disabled {
-  background: rgba(255, 255, 255, 0.03);
-  color: #404040;
+.c-send.disabled, .c-send:disabled {
+  background: color-mix(in srgb, var(--color-white) 5%, transparent);
+  color: var(--ink-500);
   border-color: transparent;
   box-shadow: none;
   transform: none;
   cursor: not-allowed;
 }
-.c-send:disabled:hover {
+.c-send.disabled:hover, .c-send:disabled:hover {
   transform: none;
   box-shadow: none;
+  color: var(--ink-500);
 }
 
-/* Stop button — white style matching project palette */
+/* Stop button */
 .c-stop {
-  background: rgba(255, 255, 255, 0.08);
-  color: #ffffff;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 1px 2px rgba(0,0,0,0.4);
+  background: var(--ink-50);
+  color: var(--ink-900);
+  border: 1px solid var(--ink-300);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.15);
   animation: cStopPulse 1.5s ease-in-out infinite;
 }
 .c-stop:hover {
-  background: rgba(255, 255, 255, 0.15);
-  border-color: rgba(255, 255, 255, 0.2);
+  background: var(--ink-100);
+  border-color: var(--ink-400);
+  color: var(--ink-900);
 }
 @keyframes cStopPulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(255,255,255,0.08); }
-  50% { box-shadow: 0 0 0 5px rgba(255,255,255,0); }
+  0%, 100% { box-shadow: 0 0 0 0 var(--ink-300); opacity: 1; }
+  50% { box-shadow: 0 0 0 5px transparent; opacity: 0.7; }
 }
 
 /* Voice recording active — white pulse */
 .c-voice-active {
-  background: rgba(255,255,255,0.10);
-  color: #ffffff;
+  background: color-mix(in srgb, var(--color-white, #fff) 10%, transparent);
+  color: var(--color-white, #ffffff);
   animation: cVoicePulse 1.2s ease-in-out infinite;
 }
 @keyframes cVoicePulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(255,255,255,0.12); }
-  50% { box-shadow: 0 0 0 4px rgba(255,255,255,0); }
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-white, #fff) 12%, transparent); }
+  50% { box-shadow: 0 0 0 4px transparent; }
 }
 
 /* Voice wave bars */
@@ -514,9 +616,9 @@
   transform: translateX(-50%) translateY(4px);
   padding: 4px 8px;
   border-radius: 6px;
-  background: rgba(30,30,30,0.95);
-  border: 1px solid rgba(255,255,255,0.1);
-  color: #d4d4d4;
+  background: var(--tooltip-bg, rgba(30,30,30,0.95));
+  border: 1px solid var(--tooltip-border, rgba(255,255,255,0.1));
+  color: var(--tooltip-color, #d4d4d4);
   font-size: 11px;
   white-space: nowrap;
   pointer-events: none;
@@ -531,7 +633,7 @@
   left: 50%;
   transform: translateX(-50%);
   border: 4px solid transparent;
-  border-top-color: rgba(30,30,30,0.95);
+  border-top-color: var(--tooltip-bg, rgba(30,30,30,0.95));
 }
 .c-btn:hover .c-tip {
   opacity: 1;
@@ -561,3 +663,5 @@
   25% { transform: rotate(-8deg); }
   75% { transform: rotate(8deg); }
 }
+
+

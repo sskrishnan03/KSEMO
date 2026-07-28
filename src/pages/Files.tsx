@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { 
   FileText, Trash2, Download, Upload as UploadIcon, Search, 
   SquarePen, FileCode, Image, FileSpreadsheet, ChevronRight, X, 
-  ExternalLink, MessageSquare, FileUp, Sparkles, Database
+  ExternalLink, MessageSquare, FileUp, Sparkles, Database, Headphones
 } from 'lucide-react';
 import { EmptyState, Button, Input, Modal } from '../components/ui';
 import { listUploads, deleteUpload, createUpload, listChats, createChat, updateUpload } from '../lib/data';
@@ -79,6 +79,12 @@ export default function Files() {
   };
 
   const handleUploadFile = async (file: File) => {
+    // Reject video files
+    if (file.type.startsWith('video/')) {
+      alert(`Video files are not supported. "${file.name}" was not uploaded.`);
+      return;
+    }
+
     setUploading(true);
     setUploadProgress(0);
     
@@ -156,50 +162,19 @@ export default function Files() {
     });
   };
 
-  // Categorize files
-  const stats = () => {
-    let docs = { count: 0, size: 0 };
-    let code = { count: 0, size: 0 };
-    let sheets = { count: 0, size: 0 };
-    let images = { count: 0, size: 0 };
-
-    files.forEach(f => {
-      const type = f.type.toLowerCase();
-      const ext = f.name.split('.').pop()?.toLowerCase() || '';
-
-      if (type.includes('image/')) {
-        images.count++;
-        images.size += f.size;
-      } else if (
-        type.includes('javascript') || type.includes('typescript') || 
-        type.includes('python') || type.includes('json') || type.includes('code') ||
-        ['js', 'jsx', 'ts', 'tsx', 'py', 'json', 'html', 'css', 'go', 'rs', 'cpp', 'sh'].includes(ext)
-      ) {
-        code.count++;
-        code.size += f.size;
-      } else if (
-        type.includes('csv') || type.includes('spreadsheet') || type.includes('sheet') ||
-        type.includes('excel') || ['csv', 'xlsx', 'xls'].includes(ext)
-      ) {
-        sheets.count++;
-        sheets.size += f.size;
-      } else {
-        docs.count++;
-        docs.size += f.size;
-      }
-    });
-
-    return [
-      { label: 'Documents', count: docs.count, size: docs.size, icon: FileText, color: 'text-white bg-white/5 border-white/8' },
-      { label: 'Source Code', count: code.count, size: code.size, icon: FileCode, color: 'text-white bg-white/5 border-white/8' },
-      { label: 'Data Sheets', count: sheets.count, size: sheets.size, icon: FileSpreadsheet, color: 'text-white bg-white/5 border-white/8' },
-      { label: 'Visuals/Images', count: images.count, size: images.size, icon: Image, color: 'text-white bg-white/5 border-white/8' }
-    ];
+  const getFileCategory = (f: Upload) => {
+    const ext = f.name.split('.').pop()?.toLowerCase() || '';
+    if (f.type.includes('image/')) return 'Image';
+    if (f.type.includes('audio/')) return 'Audio';
+    if (['js', 'ts', 'py', 'json', 'html', 'css', 'go', 'rs', 'cpp', 'sh'].includes(ext)) return 'Code';
+    if (['csv', 'xlsx', 'xls'].includes(ext)) return 'Sheet';
+    return 'Document';
   };
 
   const getFileIcon = (f: Upload) => {
     const ext = f.name.split('.').pop()?.toLowerCase() || '';
     if (f.type.includes('image/')) return <Image size={18} />;
+    if (f.type.includes('audio/')) return <Headphones size={18} />;
     if (['js', 'ts', 'py', 'json', 'html', 'css', 'rs', 'go'].includes(ext)) return <FileCode size={18} />;
     if (['csv', 'xlsx', 'xls'].includes(ext)) return <FileSpreadsheet size={18} />;
     return <FileText size={18} />;
@@ -209,6 +184,9 @@ export default function Files() {
     const ext = f.name.split('.').pop()?.toLowerCase() || '';
     if (f.type.includes('image/')) {
       return `This is an image asset file (.${ext.toUpperCase()}). The AI has scanned the image layout, detecting visual assets and patterns. You can query the assistant about the visual context, request OCR text extraction, or seek graphic suggestions.`;
+    }
+    if (f.type.includes('audio/')) {
+      return `This is an audio file (.${ext.toUpperCase()}). The AI can analyze the audio for speech transcription, speaker identification, sentiment analysis, or audio pattern recognition. Ask the assistant to transcribe, summarize, or extract insights from this recording.`;
     }
     if (['js', 'jsx', 'ts', 'tsx', 'py', 'json', 'html', 'css', 'go', 'rs', 'cpp', 'sh'].includes(ext)) {
       return `This is a developer source code file in .${ext.toUpperCase()}. It contains functional script segments or component declarations. Ask the assistant to debug errors, refactor algorithms, optimize complexity, or write automated tests.`;
@@ -222,6 +200,7 @@ export default function Files() {
   const getMockTags = (f: Upload) => {
     const ext = f.name.split('.').pop()?.toLowerCase() || '';
     if (f.type.includes('image/')) return ['Visual Asset', 'Image OCR', ext.toUpperCase()];
+    if (f.type.includes('audio/')) return ['Audio', 'Speech/Media', ext.toUpperCase()];
     if (['js', 'ts', 'py', 'json', 'html', 'css', 'go', 'rs'].includes(ext)) return ['Source Code', 'Engineering', ext.toUpperCase()];
     if (['csv', 'xlsx'].includes(ext)) return ['Tabular Data', 'Sheet Analytics', ext.toUpperCase()];
     return ['Text Reference', 'Workspace File', ext.toUpperCase()];
@@ -240,24 +219,6 @@ export default function Files() {
               <Database size={22} className="text-white/80" /> Files & Knowledge Base
             </h1>
             <p className="mt-2 text-ink-300">Manage your workspace files, document summaries, and RAG contexts.</p>
-          </div>
-
-          {/* Stats Summary Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            {stats().map((s) => (
-              <div key={s.label} className="bg-ink-850 border border-white/8 rounded-2xl p-4 flex flex-col justify-between h-24 hover:border-white/15 transition-all duration-200">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-medium tracking-wider uppercase text-ink-300">{s.label}</span>
-                  <div className={`p-1.5 rounded-lg border ${s.color}`}>
-                    <s.icon size={13} />
-                  </div>
-                </div>
-                <div className="flex items-baseline gap-1.5 mt-2">
-                  <span className="text-xl font-bold text-white">{s.count}</span>
-                  <span className="text-[11px] text-ink-400">({formatBytes(s.size)})</span>
-                </div>
-              </div>
-            ))}
           </div>
 
           {/* Drag & Drop Upload Zone */}
@@ -299,7 +260,7 @@ export default function Files() {
                   <FileUp size={20} />
                 </div>
                 <h3 className="text-[13px] font-semibold text-white">Drag & drop files here, or browse</h3>
-                <p className="text-[11px] text-ink-400 mt-1">Supports PDF, CSV, Excel, TXT, images up to 50MB</p>
+                <p className="text-[11px] text-ink-400 mt-1">All file types accepted. Maximum file size: 50MB</p>
               </>
             )}
           </div>
@@ -354,6 +315,7 @@ export default function Files() {
                     <div className="flex-1 min-w-0">
                       <div className="text-[13px] font-medium text-white truncate">{f.name}</div>
                       <div className="text-[11px] text-ink-300 flex items-center gap-2 mt-0.5">
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-white/5 text-ink-200 border border-white/8">{getFileCategory(f)}</span>
                         <span>{formatBytes(f.size)}</span>
                         <span>·</span>
                         <span>{formatRelativeTime(f.created_at)}</span>
