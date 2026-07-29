@@ -562,9 +562,7 @@ export default function ChatWorkspace() {
       {isEmpty && (
         <div className="flex-1 min-h-0 flex flex-col items-center justify-center px-4 md:px-6">
           <div className="w-full max-w-3xl flex flex-col items-center text-center animate-fade-in">
-            <div className="h-12 w-12 rounded-2xl bg-ink-800 border border-white/10 flex items-center justify-center mb-6">
-              <span className="font-bold text-white text-[22px]">K</span>
-            </div>
+            <img src="/KSEMOlogo.png" alt="KSEMO" className="h-12 w-12 rounded-2xl object-contain mb-6" />
             <h1 className="text-[20px] md:text-[24px] font-semibold text-white tracking-tight leading-tight mb-8">
               {getTimeOfDayGreeting(firstName)}
             </h1>
@@ -775,9 +773,7 @@ export default function ChatWorkspace() {
 
 function Avatar() {
   return (
-    <div className="h-8 w-8 rounded-xl bg-ink-800 border border-white/10 flex items-center justify-center shrink-0">
-      <span className="font-bold text-white text-[13px]">K</span>
-    </div>
+    <img src="/KSEMOlogo.png" alt="KSEMO" className="h-8 w-8 rounded-xl object-contain shrink-0" />
   );
 }
 

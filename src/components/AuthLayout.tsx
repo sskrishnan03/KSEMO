@@ -11,7 +11,7 @@ export function AuthLayout({ children, title, subtitle, footer }: { children: Re
         <div className="absolute top-1/3 left-1/2 -translate-x-1/2 h-[350px] w-[350px] bg-white/5 blur-[120px] rounded-full" />
         
         <Link to="/" className="relative flex items-center gap-2.5">
-          <div className="h-8 w-8 rounded-xl bg-ink-800 border border-white/10 flex items-center justify-center font-bold text-white text-[14px]">K</div>
+          <img src="/KSEMOlogo.png" alt="KSEMO" className="h-8 w-8 rounded-xl object-contain" />
           <span className="text-[18px] font-semibold tracking-tight text-white">Ksemo</span>
         </Link>
 

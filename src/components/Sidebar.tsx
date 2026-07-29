@@ -262,7 +262,7 @@ export function Sidebar({ collapsed, onToggleCollapse }: Props) {
           {/* Header */}
           <div className="h-14 px-3 flex items-center justify-between border-b border-white/8 shrink-0">
             <Link to="/" className="flex items-center gap-2 px-2 select-none">
-              <div className="h-7 w-7 rounded-lg bg-ink-800 border border-white/10 flex items-center justify-center font-bold text-white text-[13px]">K</div>
+              <img src="/KSEMOlogo.png" alt="KSEMO" className="h-7 w-7 rounded-lg object-contain" />
               <span className="text-[15px] font-semibold tracking-tight text-white/90">Ksemo</span>
             </Link>
             <button onClick={onToggleCollapse} className="h-8 w-8 rounded-lg flex items-center justify-center text-ink-300 hover:bg-white/5 hover:text-white transition shrink-0" title="Collapse sidebar">

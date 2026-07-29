@@ -155,7 +155,7 @@ function ChatDemo() {
           <div className="hidden md:flex flex-col w-[260px] bg-ink-950 border-r border-white/8">
             {/* Sidebar header */}
             <div className="h-14 px-3 flex items-center gap-2.5 border-b border-white/8 shrink-0">
-              <div className="h-7 w-7 rounded-lg bg-ink-800 border border-white/10 flex items-center justify-center font-bold text-white text-[13px]">K</div>
+              <img src="/KSEMOlogo.png" alt="KSEMO" className="h-7 w-7 rounded-lg object-contain" />
               <span className="text-[15px] font-semibold tracking-tight text-white/90">Ksemo</span>
             </div>
 
@@ -237,9 +237,7 @@ function ChatDemo() {
                 {/* Assistant message (left-aligned, no bubble) */}
                 {phase === 'streaming' && typedText && (
                   <div className="flex gap-3 animate-fade-in">
-                    <div className="h-8 w-8 rounded-xl bg-ink-800 border border-white/10 flex items-center justify-center shrink-0">
-                      <span className="text-[13px] font-bold text-white">K</span>
-                    </div>
+                    <img src="/KSEMOlogo.png" alt="KSEMO" className="h-8 w-8 rounded-xl object-contain shrink-0" />
                     <div className="flex-1 min-w-0 max-w-[90%]">
                       <p className="text-[12px] font-medium text-white mb-1">Ksemo</p>
                       <div className="text-[14px] text-ink-200 leading-[1.7] break-words overflow-hidden">
@@ -253,9 +251,7 @@ function ChatDemo() {
                 {/* Assistant message fully rendered */}
                 {phase === 'done' && (
                   <div className="flex gap-3 animate-fade-in">
-                    <div className="h-8 w-8 rounded-xl bg-ink-800 border border-white/10 flex items-center justify-center shrink-0">
-                      <span className="text-[13px] font-bold text-white">K</span>
-                    </div>
+                    <img src="/KSEMOlogo.png" alt="KSEMO" className="h-8 w-8 rounded-xl object-contain shrink-0" />
                     <div className="flex-1 min-w-0 max-w-[90%]">
                       <p className="text-[12px] font-medium text-white mb-1">Ksemo</p>
                       <div className="text-[14px] text-ink-200 leading-[1.7] break-words overflow-hidden">
@@ -268,9 +264,7 @@ function ChatDemo() {
                 {/* Streaming loading dots */}
                 {phase === 'streaming' && !typedText && (
                   <div className="flex gap-3 animate-fade-in">
-                    <div className="h-8 w-8 rounded-xl bg-ink-800 border border-white/10 flex items-center justify-center shrink-0">
-                      <span className="text-[13px] font-bold text-white">K</span>
-                    </div>
+                    <img src="/KSEMOlogo.png" alt="KSEMO" className="h-8 w-8 rounded-xl object-contain shrink-0" />
                     <div>
                       <p className="text-[12px] font-medium text-white mb-1">Ksemo</p>
                       <div className="flex items-center gap-1.5 h-8">
@@ -329,7 +323,7 @@ export default function Landing() {
       <header className={cn('fixed top-0 inset-x-0 z-50 transition-all duration-300', scrolled ? 'glass-strong border-b border-white/8' : 'border-b border-transparent')}>
         <nav className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2.5">
-            <div className="h-8 w-8 rounded-xl bg-ink-800 border border-white/10 flex items-center justify-center font-bold text-white">K</div>
+            <img src="/KSEMOlogo.png" alt="KSEMO" className="h-8 w-8 rounded-xl object-contain" />
             <span className="text-[17px] font-semibold tracking-tight">Ksemo</span>
           </Link>
           <div className="hidden md:flex items-center gap-8 text-sm text-ink-200">
@@ -566,7 +560,7 @@ export default function Landing() {
           <div className="grid md:grid-cols-4 gap-8 mb-8">
             <div className="md:col-span-2">
               <Link to="/" className="flex items-center gap-2 mb-3">
-                <div className="h-7 w-7 rounded-lg bg-ink-800 border border-white/10 flex items-center justify-center font-bold text-white text-[13px]">K</div>
+                <img src="/KSEMOlogo.png" alt="KSEMO" className="h-7 w-7 rounded-lg object-contain" />
                 <span className="text-[15px] font-semibold text-white tracking-tight">Ksemo</span>
               </Link>
               <p className="text-[13px] text-ink-300 max-w-sm leading-relaxed">An AI workspace for people who think for a living. Chat, create, and organize — all in one focused environment.</p>

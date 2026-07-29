@@ -11,9 +11,7 @@ interface DecodedShare {
 
 function Avatar() {
   return (
-    <div className="h-8 w-8 rounded-full bg-ink-800 border border-white/10 flex items-center justify-center shrink-0 select-none">
-      <span className="font-bold text-white text-[13px]">K</span>
-    </div>
+    <img src="/KSEMOlogo.png" alt="KSEMO" className="h-8 w-8 rounded-full object-contain shrink-0 select-none" />
   );
 }
 

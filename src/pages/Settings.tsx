@@ -2,10 +2,10 @@ import { useEffect, useState, useRef, useCallback, type FormEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   User, Sliders, Database, Trash2, Check, AlertCircle,
-  Download, LogOut, Bell, Globe, Sparkles, Palette, KeyRound,
+  Download, LogOut, Bell, Sparkles, Palette, KeyRound,
   MonitorSmartphone, Mic, MessageSquare, Search, Info, RefreshCw,
   Keyboard, Shield, HelpCircle,
-  Mail, Send,
+  Mail, Send, CheckCircle,
 } from 'lucide-react';
 import { Button, Input, Textarea, Modal, Badge } from '../components/ui';
 import { useAuthContext } from '../components/AuthProvider';
@@ -26,18 +26,7 @@ const THEME_OPTIONS = [
   { value: 'system' as const, label: 'System', desc: 'Follow OS setting' },
 ];
 
-const LANGUAGE_OPTIONS = [
-  { value: 'en', label: 'English' },
-  { value: 'es', label: 'Spanish' },
-  { value: 'fr', label: 'French' },
-  { value: 'de', label: 'German' },
-  { value: 'ja', label: 'Japanese' },
-  { value: 'zh', label: 'Chinese' },
-  { value: 'hi', label: 'Hindi' },
-  { value: 'pt', label: 'Portuguese' },
-  { value: 'ar', label: 'Arabic' },
-  { value: 'ko', label: 'Korean' },
-];
+
 
 const SHORTCUTS: { key: string; label: string; desc: string; prefKey: keyof AppPreferences }[] = [
   { key: 'Ctrl/Cmd + N', label: 'New chat', desc: 'Start a new conversation', prefKey: 'shortcut_new_chat' },
@@ -92,6 +81,12 @@ export default function Settings() {
   const [feedbackSubj, setFeedbackSubj] = useState('');
   const [feedbackBody, setFeedbackBody] = useState('');
   const [feedbackSent, setFeedbackSent] = useState(false);
+
+  // Password reset
+  const [resetOpen, setResetOpen] = useState(false);
+  const [resetSending, setResetSending] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
+  const [resetError, setResetError] = useState('');
 
   // Help & Support chat
   const [helpMessages, setHelpMessages] = useState<{ role: 'user' | 'assistant'; content: string }[]>([
@@ -203,6 +198,25 @@ export default function Settings() {
     setFeedbackSubj(''); setFeedbackBody('');
     setFeedbackSent(true);
     setTimeout(() => setFeedbackSent(false), 2500);
+  };
+
+  const requestPasswordReset = async () => {
+    if (!user?.email) return;
+    setResetSending(true);
+    setResetError('');
+    try {
+      const res = await fetch('/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: user.email }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setResetError(data.error || 'Something went wrong.'); setResetSending(false); return; }
+      setResetSent(true);
+    } catch {
+      setResetError('Could not reach the server.');
+    }
+    setResetSending(false);
   };
 
   const HELP_KB: { q: RegExp; a: string }[] = [
@@ -332,8 +346,8 @@ export default function Settings() {
               <div className="space-y-3">
                 <SectionHeader icon={KeyRound} title="Password" desc="Change your account password via email." />
                 <div className="rounded-2xl bg-ink-850 border border-white/8 p-4">
-                  <p className="text-[12px] text-ink-300 mb-3">Your password is managed through your email provider. Click below to request a password reset link.</p>
-                  <Button variant="outline" size="sm"><Mail size={14} /> Request password reset</Button>
+                  <p className="text-[12px] text-ink-300 mb-3">A password reset link will be sent to your email address on file.</p>
+                  <Button variant="outline" size="sm" onClick={() => { setResetSent(false); setResetError(''); setResetOpen(true); }}><Mail size={14} /> Request password reset</Button>
                 </div>
 
                 <SectionHeader icon={Shield} title="Two-factor authentication" desc="Add an extra layer of security to your account." />
@@ -366,28 +380,16 @@ export default function Settings() {
               <div className="space-y-3">
                 <SectionHeader icon={MessageSquare} title="Chat behavior" desc="How conversations work in the workspace." />
                 <div className="rounded-2xl bg-ink-850 border border-white/8 p-4 space-y-1">
-                  <Toggle label="Send on Enter" desc="Press Enter to send, Shift+Enter for newline" value={prefs.send_on_enter ?? true} onChange={(v) => updatePref('send_on_enter', v)} />
-                  <Toggle label="Streaming responses" desc="Show AI responses token by token as they generate" value={prefs.streaming ?? true} onChange={(v) => updatePref('streaming', v)} />
-                  <Toggle label="Show token count" desc="Display token usage under each message" value={prefs.show_token_count ?? false} onChange={(v) => updatePref('show_token_count', v)} />
-                  <Toggle label="Auto-rename chats" desc="Automatically title new chats from the first message" value={prefs.auto_rename_chats ?? true} onChange={(v) => updatePref('auto_rename_chats', v)} />
-                  <Toggle label="Placeholder suggestions" desc="Show rotating hint text in the chat input" value={prefs.suggestions_enabled ?? true} onChange={(v) => updatePref('suggestions_enabled', v)} />
+                  <Toggle label="Send on Enter" desc="Press Enter to send, Shift+Enter for newline" value={prefs.send_on_enter ?? true} onChange={async (v) => { updatePref('send_on_enter', v); if (user) await upsertSettings(user.id, { ...prefs, send_on_enter: v }); }} />
+                  <Toggle label="Auto-rename chats" desc="Automatically title new chats from the first message" value={prefs.auto_rename_chats ?? true} onChange={async (v) => { updatePref('auto_rename_chats', v); if (user) await upsertSettings(user.id, { ...prefs, auto_rename_chats: v }); }} />
                 </div>
 
                 <SectionHeader icon={Mic} title="Input & output" desc="Control voice, files, and read-aloud features." />
                 <div className="rounded-2xl bg-ink-850 border border-white/8 p-4 space-y-1">
-                  <Toggle label="Voice input" desc="Show the microphone button for speech-to-text" value={prefs.voice_input_enabled ?? true} onChange={(v) => updatePref('voice_input_enabled', v)} />
-                  <Toggle label="File attachments" desc="Allow attaching files to messages" value={prefs.file_attachment_enabled ?? true} onChange={(v) => updatePref('file_attachment_enabled', v)} />
-                  <Toggle label="Read aloud" desc="Show the read-aloud option on assistant messages" value={prefs.read_aloud_enabled ?? true} onChange={(v) => updatePref('read_aloud_enabled', v)} />
+                  <Toggle label="Voice input" desc="Show the microphone button for speech-to-text" value={prefs.voice_input_enabled ?? true} onChange={async (v) => { updatePref('voice_input_enabled', v); if (user) await upsertSettings(user.id, { ...prefs, voice_input_enabled: v }); }} />
+                  <Toggle label="File attachments" desc="Allow attaching files to messages" value={prefs.file_attachment_enabled ?? true} onChange={async (v) => { updatePref('file_attachment_enabled', v); if (user) await upsertSettings(user.id, { ...prefs, file_attachment_enabled: v }); }} />
+                  <Toggle label="Read aloud" desc="Show the read-aloud option on assistant messages" value={prefs.read_aloud_enabled ?? true} onChange={async (v) => { updatePref('read_aloud_enabled', v); if (user) await upsertSettings(user.id, { ...prefs, read_aloud_enabled: v }); }} />
                 </div>
-
-                <SectionHeader icon={Globe} title="Language" desc="Preferred language for the interface." />
-                <div className="rounded-2xl bg-ink-850 border border-white/8 p-4">
-                  <select value={prefs.language ?? 'en'} onChange={(e) => updatePref('language', e.target.value)} className="w-full h-11 px-3.5 rounded-xl bg-ink-900 border border-white/10 text-white focus:outline-none focus:border-white/25">
-                    {LANGUAGE_OPTIONS.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
-                  </select>
-                </div>
-
-                <Button onClick={savePrefs} loading={savingPrefs}>{savedPrefs ? <Check size={15} /> : null} Save preferences</Button>
               </div>
             )}
 
@@ -607,6 +609,38 @@ export default function Settings() {
       <Modal open={clearSearchOpen} onClose={() => setClearSearchOpen(false)} title="Clear search history" size="sm"
         footer={<><Button variant="ghost" size="sm" onClick={() => setClearSearchOpen(false)}>Cancel</Button><Button variant="danger" size="sm" onClick={clearSearchHandler}>Clear history</Button></>}>
         <p className="text-[13px] text-ink-200">This will remove all recent search queries from this device. This action cannot be undone.</p>
+      </Modal>
+
+      <Modal open={resetOpen} onClose={() => setResetOpen(false)} title="Reset password" size="sm"
+        footer={
+          resetSent ? (
+            <Button variant="outline" size="sm" onClick={() => setResetOpen(false)}>Close</Button>
+          ) : (
+            <><Button variant="ghost" size="sm" onClick={() => setResetOpen(false)}>Cancel</Button><Button size="sm" loading={resetSending} onClick={requestPasswordReset}>Send reset link</Button></>
+          )
+        }>
+        {resetSent ? (
+          <div className="space-y-4 text-center py-4">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-white/5 border border-white/10">
+              <CheckCircle size={22} className="text-white" />
+            </div>
+            <p className="text-[14px] text-ink-200">
+              A password reset link has been sent to<br />
+              <span className="text-white font-medium">{user?.email}</span>
+            </p>
+            <p className="text-[13px] text-ink-300">The link expires in 15 minutes. Check your spam folder if you don't see it.</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <p className="text-[13px] text-ink-200">A password reset link will be sent to:</p>
+            <div className="px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 text-[14px] text-white font-medium">{user?.email}</div>
+            {resetError && (
+              <div className="flex items-start gap-2 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-[13px] text-white">
+                <AlertCircle size={15} className="mt-0.5 shrink-0" /> {resetError}
+              </div>
+            )}
+          </div>
+        )}
       </Modal>
     </div>
   );
