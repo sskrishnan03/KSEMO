@@ -1,7 +1,7 @@
 import { useEffect, useState, useLayoutEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
-  SquarePen, MessageSquare, Search, Settings, File,
+  SquarePen, MessageSquare, Search, Settings,
   Archive, Trash2, Pin, Shield,
   MoreHorizontal, PanelLeft, LogOut, Mic,
   Edit2, Share2, HelpCircle, Filter,
@@ -159,10 +159,6 @@ export function Sidebar({ collapsed, onToggleCollapse }: Props) {
 
   const navItems = [
     { to: '/app/search', icon: Search, label: 'Search', active: loc.pathname.startsWith('/app/search'), animationClass: 'icon-wiggle' },
-
-
-    { to: '/app/files', icon: File, label: 'Files', active: loc.pathname.startsWith('/app/files'), animationClass: 'icon-bounce' },
-
   ];
 
   const isAdmin = profile?.role === 'admin';

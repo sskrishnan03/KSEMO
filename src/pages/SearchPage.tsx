@@ -1,28 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, MessageSquare, FileText, Sparkles, ArrowRight, Clock, Image, FileSpreadsheet } from 'lucide-react';
+import { Search, MessageSquare, Sparkles, ArrowRight, Clock } from 'lucide-react';
 import { Input, EmptyState } from '../components/ui';
-import { searchChats, searchMessages, listUploads, addRecentSearch, getRecentSearches } from '../lib/data';
-import type { Chat, Message, Upload } from '../lib/types';
+import { searchChats, searchMessages, addRecentSearch, getRecentSearches } from '../lib/data';
+import type { Chat, Message } from '../lib/types';
 import { formatRelativeTime, truncate } from '../lib/utils';
 
-type Tab = 'all' | 'chats' | 'messages' | 'files' | 'images' | 'documents';
-
-function categorizeUpload(u: Upload): 'image' | 'document' | 'other' {
-  const t = u.type.toLowerCase();
-  if (t.startsWith('image/')) return 'image';
-  if (t.includes('pdf') || t.includes('spreadsheet') || t.includes('document') || t.includes('text/') || t.includes('csv')) return 'document';
-  return 'other';
-}
+type Tab = 'all' | 'chats' | 'messages';
 
 export default function SearchPage() {
   const [query, setQuery] = useState('');
   const [tab, setTab] = useState<Tab>('all');
   const [chats, setChats] = useState<Chat[]>([]);
   const [messages, setMessages] = useState<(Message & { chat?: { id: string; title: string } })[]>([]);
-  const [files, setFiles] = useState<Upload[]>([]);
-  const [images, setImages] = useState<Upload[]>([]);
-  const [documents, setDocuments] = useState<Upload[]>([]);
   const [searched, setSearched] = useState(false);
   const [loading, setLoading] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
@@ -34,7 +24,7 @@ export default function SearchPage() {
 
   useEffect(() => {
     if (!query.trim()) {
-      setChats([]); setMessages([]); setFiles([]); setImages([]); setDocuments([]); setSearched(false);
+      setChats([]); setMessages([]); setSearched(false);
       return;
     }
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -43,17 +33,12 @@ export default function SearchPage() {
       setSearched(true);
       try {
         const q = query.toLowerCase();
-        const [c, m, allUploads] = await Promise.all([
+        const [c, m] = await Promise.all([
           searchChats(q),
           searchMessages(q),
-          listUploads(),
         ]);
-        const matchedUploads = allUploads.filter((u) => u.name.toLowerCase().includes(q));
         setChats(c);
         setMessages(m);
-        setFiles(matchedUploads.filter((u) => categorizeUpload(u) === 'other'));
-        setImages(matchedUploads.filter((u) => categorizeUpload(u) === 'image'));
-        setDocuments(matchedUploads.filter((u) => categorizeUpload(u) === 'document'));
         addRecentSearch(q);
         setRecentSearches(getRecentSearches());
       } catch { /* ignore */ }
@@ -62,30 +47,16 @@ export default function SearchPage() {
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, [query]);
 
-  const total = chats.length + messages.length + files.length + images.length + documents.length;
+  const total = chats.length + messages.length;
 
-  const tabs: { id: Tab; label: string; icon?: typeof Search; count: number }[] = [
+  const tabs: { id: Tab; label: string; count: number }[] = [
     { id: 'all', label: 'All', count: total },
     { id: 'chats', label: 'Chats', count: chats.length },
     { id: 'messages', label: 'Messages', count: messages.length },
-    { id: 'images', label: 'Images', count: images.length },
-    { id: 'documents', label: 'Documents', count: documents.length },
-    { id: 'files', label: 'Files', count: files.length },
   ];
 
   const showChats = tab === 'all' || tab === 'chats';
   const showMessages = tab === 'all' || tab === 'messages';
-  const showImages = tab === 'all' || tab === 'images';
-  const showDocuments = tab === 'all' || tab === 'documents';
-  const showFiles = tab === 'all' || tab === 'files';
-
-  const openFile = (u: Upload) => {
-    if (u.chat_id) {
-      window.location.href = `/app/chat/${u.chat_id}`;
-    } else if (u.url) {
-      window.open(u.url, '_blank');
-    }
-  };
 
   return (
     <div className="h-full overflow-y-auto">
@@ -147,38 +118,7 @@ export default function SearchPage() {
                 </Link>
               ))}
 
-              {showImages && images.map((f) => (
-                <button key={f.id} onClick={() => openFile(f)} className="w-full text-left group flex items-center gap-3 rounded-xl bg-ink-850 border border-white/8 p-3.5 hover:border-white/15 transition">
-                  <div className="h-9 w-9 rounded-lg bg-ink-800 border border-white/8 flex items-center justify-center text-ink-200"><Image size={16} /></div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-[13px] text-white truncate">{f.name}</div>
-                    <div className="text-[11px] text-ink-300">Image · {formatRelativeTime(f.created_at)}</div>
-                  </div>
-                  <ArrowRight size={14} className="text-ink-300 group-hover:text-white transition" />
-                </button>
-              ))}
 
-              {showDocuments && documents.map((f) => (
-                <button key={f.id} onClick={() => openFile(f)} className="w-full text-left group flex items-center gap-3 rounded-xl bg-ink-850 border border-white/8 p-3.5 hover:border-white/15 transition">
-                  <div className="h-9 w-9 rounded-lg bg-ink-800 border border-white/8 flex items-center justify-center text-ink-200"><FileSpreadsheet size={16} /></div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-[13px] text-white truncate">{f.name}</div>
-                    <div className="text-[11px] text-ink-300">Document · {formatRelativeTime(f.created_at)}</div>
-                  </div>
-                  <ArrowRight size={14} className="text-ink-300 group-hover:text-white transition" />
-                </button>
-              ))}
-
-              {showFiles && files.map((f) => (
-                <button key={f.id} onClick={() => openFile(f)} className="w-full text-left group flex items-center gap-3 rounded-xl bg-ink-850 border border-white/8 p-3.5 hover:border-white/15 transition">
-                  <div className="h-9 w-9 rounded-lg bg-ink-800 border border-white/8 flex items-center justify-center text-ink-200"><FileText size={16} /></div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-[13px] text-white truncate">{f.name}</div>
-                    <div className="text-[11px] text-ink-300">File · {formatRelativeTime(f.created_at)}</div>
-                  </div>
-                  <ArrowRight size={14} className="text-ink-300 group-hover:text-white transition" />
-                </button>
-              ))}
             </div>
           </>
         )}

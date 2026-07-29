@@ -15,8 +15,6 @@ import Dashboard from './pages/Dashboard';
 
 import SearchPage from './pages/SearchPage';
 
-import Files from './pages/Files';
-
 import Notifications from './pages/Notifications';
 import Settings from './pages/Settings';
 import VoiceChat from './pages/VoiceChat';
@@ -44,7 +42,6 @@ export default function App() {
 
             <Route path="/app/search" element={<ProtectedRoute><AppLayout><SearchPage /></AppLayout></ProtectedRoute>} />
 
-            <Route path="/app/files" element={<ProtectedRoute><AppLayout><Files /></AppLayout></ProtectedRoute>} />
             <Route path="/app/notifications" element={<ProtectedRoute><AppLayout><Notifications /></AppLayout></ProtectedRoute>} />
             <Route path="/app/voice-chat" element={<ProtectedRoute><AppLayout><VoiceChat /></AppLayout></ProtectedRoute>} />
             <Route path="/app/settings" element={<ProtectedRoute><AppLayout><Settings /></AppLayout></ProtectedRoute>} />

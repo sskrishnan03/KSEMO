@@ -4,7 +4,7 @@ import {
   User, Sliders, Database, Trash2, Check, AlertCircle,
   Download, LogOut, Bell, Sparkles, Palette, KeyRound,
   MonitorSmartphone, Mic, MessageSquare, Search, Info, RefreshCw,
-  Keyboard, Shield, HelpCircle,
+  Shield, HelpCircle,
   Mail, Send, CheckCircle,
 } from 'lucide-react';
 import { Button, Input, Textarea, Modal, Badge } from '../components/ui';
@@ -18,7 +18,7 @@ import { downloadFile, cn } from '../lib/utils';
 import { supabase } from '../lib/supabase';
 import type { AppPreferences } from '../lib/types';
 
-type Tab = 'account' | 'security' | 'preferences' | 'notifications' | 'appearance' | 'keyboard' | 'data' | 'feedback' | 'help';
+type Tab = 'account' | 'security' | 'preferences' | 'notifications' | 'appearance' | 'data' | 'feedback' | 'help';
 
 const THEME_OPTIONS = [
   { value: 'dark' as const, label: 'Dark', desc: 'Default dark theme' },
@@ -27,18 +27,6 @@ const THEME_OPTIONS = [
 ];
 
 
-
-const SHORTCUTS: { key: string; label: string; desc: string; prefKey: keyof AppPreferences }[] = [
-  { key: 'Ctrl/Cmd + N', label: 'New chat', desc: 'Start a new conversation', prefKey: 'shortcut_new_chat' },
-  { key: 'Ctrl/Cmd + K', label: 'Search', desc: 'Open global search', prefKey: 'shortcut_search' },
-  { key: 'Ctrl/Cmd + ,', label: 'Settings', desc: 'Open settings page', prefKey: 'shortcut_settings' },
-  { key: 'Ctrl/Cmd + B', label: 'Toggle sidebar', desc: 'Collapse or expand the sidebar', prefKey: 'shortcut_toggle_sidebar' },
-  { key: 'Esc', label: 'Stop generation', desc: 'Stop the AI from generating', prefKey: 'shortcut_stop_generation' },
-  { key: 'Ctrl/Cmd + Shift + V', label: 'Voice chat', desc: 'Open voice conversation mode', prefKey: 'shortcut_voice_chat' },
-
-  { key: 'Ctrl/Cmd + Shift + F', label: 'Files', desc: 'Open the file manager', prefKey: 'shortcut_files' },
-  { key: 'Ctrl/Cmd + Shift + H', label: 'History', desc: 'Open chat history', prefKey: 'shortcut_history' },
-];
 
 export default function Settings() {
   const { profile, user, signOut, refresh } = useAuthContext();
@@ -223,7 +211,7 @@ export default function Settings() {
     { q: /how.*send|enter.*send|shift.*enter/i, a: "Press **Enter** to send a message. Press **Shift+Enter** for a new line. You can toggle this in **Settings > Preferences > Send on Enter**." },
     { q: /keyboard|shortcut|hotkey/i, a: "Ksemo has global shortcuts: **Ctrl/Cmd+N** (new chat), **Ctrl/Cmd+K** (search), **Ctrl/Cmd+B** (toggle sidebar), **Ctrl/Cmd+,** (settings), **Esc** (stop generation). Manage them in **Settings > Keyboard**." },
     { q: /voice|speech|mic/i, a: "Voice chat lets you talk to the AI hands-free. Open it from the sidebar menu or press **Ctrl/Cmd+Shift+V**. Enable/disable the mic button in **Settings > Preferences > Voice input**." },
-    { q: /file|upload|attach|pdf|csv/i, a: "You can attach files (PDF, CSV, images, text) to messages using the paperclip icon in the chat input. Toggle this in **Settings > Preferences > File attachments**." },
+    { q: /file|upload|attach|pdf|csv/i, a: "File attachments are not supported in the current version. For more help, contact support at **support@ksemo.com**." },
 
     { q: /search|find/i, a: "Global search is available via **Ctrl/Cmd+K**. It searches across chats, messages, files, and favorites." },
     { q: /favorite|bookmark/i, a: "Click the star icon on any assistant message to save it to your favorites. View favorites from the sidebar favorites tab." },
@@ -269,7 +257,6 @@ export default function Settings() {
     { id: 'preferences', label: 'Preferences', icon: Sliders, group: 'Preferences' },
     { id: 'notifications', label: 'Notifications', icon: Bell, group: 'Preferences' },
     { id: 'appearance', label: 'Appearance', icon: Palette, group: 'Preferences' },
-    { id: 'keyboard', label: 'Keyboard', icon: Keyboard, group: 'Preferences' },
     { id: 'data', label: 'Data Control', icon: Database, group: 'Data' },
     { id: 'feedback', label: 'Feedback', icon: Sparkles, group: 'Support' },
     { id: 'help', label: 'Help & Support', icon: HelpCircle, group: 'Support' },
@@ -384,10 +371,9 @@ export default function Settings() {
                   <Toggle label="Auto-rename chats" desc="Automatically title new chats from the first message" value={prefs.auto_rename_chats ?? true} onChange={async (v) => { updatePref('auto_rename_chats', v); if (user) await upsertSettings(user.id, { ...prefs, auto_rename_chats: v }); }} />
                 </div>
 
-                <SectionHeader icon={Mic} title="Input & output" desc="Control voice, files, and read-aloud features." />
+                <SectionHeader icon={Mic} title="Input & output" desc="Control voice and read-aloud features." />
                 <div className="rounded-2xl bg-ink-850 border border-white/8 p-4 space-y-1">
                   <Toggle label="Voice input" desc="Show the microphone button for speech-to-text" value={prefs.voice_input_enabled ?? true} onChange={async (v) => { updatePref('voice_input_enabled', v); if (user) await upsertSettings(user.id, { ...prefs, voice_input_enabled: v }); }} />
-                  <Toggle label="File attachments" desc="Allow attaching files to messages" value={prefs.file_attachment_enabled ?? true} onChange={async (v) => { updatePref('file_attachment_enabled', v); if (user) await upsertSettings(user.id, { ...prefs, file_attachment_enabled: v }); }} />
                   <Toggle label="Read aloud" desc="Show the read-aloud option on assistant messages" value={prefs.read_aloud_enabled ?? true} onChange={async (v) => { updatePref('read_aloud_enabled', v); if (user) await upsertSettings(user.id, { ...prefs, read_aloud_enabled: v }); }} />
                 </div>
               </div>
@@ -435,39 +421,6 @@ export default function Settings() {
                       </button>
                     ))}
                   </div>
-                </div>
-
-                <Button onClick={savePrefs} loading={savingPrefs}>{savedPrefs ? <Check size={15} /> : null} Save preferences</Button>
-              </div>
-            )}
-
-            {/* ====== KEYBOARD SHORTCUTS ====== */}
-            {tab === 'keyboard' && (
-              <div className="space-y-3">
-                <SectionHeader icon={Keyboard} title="Keyboard shortcuts" desc="Use hotkeys to navigate and control Ksemo faster." />
-                <div className="rounded-2xl bg-ink-850 border border-white/8 p-4 space-y-1">
-                  {SHORTCUTS.map((s) => (
-                    <Toggle
-                      key={s.prefKey}
-                      label={s.label}
-                      desc={`${s.key} — ${s.desc}`}
-                      value={prefs[s.prefKey] as boolean ?? true}
-                      onChange={(v) => updatePref(s.prefKey, v)}
-                    />
-                  ))}
-                </div>
-
-                <SectionHeader icon={Info} title="Quick reference" desc="All available shortcuts at a glance." />
-                <div className="rounded-2xl bg-ink-850 border border-white/8 divide-y divide-white/5">
-                  {SHORTCUTS.map((s) => (
-                    <div key={s.key} className="flex items-center justify-between px-5 py-3">
-                      <div>
-                        <div className="text-[13px] text-white">{s.label}</div>
-                        <div className="text-[11px] text-ink-300">{s.desc}</div>
-                      </div>
-                      <kbd className="px-2 py-1 rounded-lg bg-white/5 border border-white/10 text-[11px] text-ink-200 font-mono shrink-0 ml-4">{s.key}</kbd>
-                    </div>
-                  ))}
                 </div>
 
                 <Button onClick={savePrefs} loading={savingPrefs}>{savedPrefs ? <Check size={15} /> : null} Save preferences</Button>

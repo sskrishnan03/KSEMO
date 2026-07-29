@@ -50,18 +50,6 @@ export interface Favorite {
   chat?: Pick<Chat, 'id' | 'title'>;
 }
 
-export interface Upload {
-  id: string;
-  user_id: string;
-  chat_id: string | null;
-  name: string;
-  size: number;
-  type: string;
-  storage_path: string;
-  url: string | null;
-  created_at: string;
-}
-
 export interface Notification {
   id: string;
   user_id: string;
@@ -77,6 +65,14 @@ export interface UserSettings {
   user_id: string;
   preferences: AppPreferences;
   updated_at: string;
+}
+
+export interface PromptTemplate {
+  id: string;
+  name: string;
+  content: string;
+  category?: string;
+  created_at: string;
 }
 
 export interface AppPreferences {
@@ -95,7 +91,6 @@ export interface AppPreferences {
   font_size?: 'small' | 'medium' | 'large';
   auto_rename_chats?: boolean;
   voice_input_enabled?: boolean;
-  file_attachment_enabled?: boolean;
   read_aloud_enabled?: boolean;
   suggestions_enabled?: boolean;
   sidebar_auto_collapse?: boolean;
@@ -107,7 +102,8 @@ export interface AppPreferences {
   shortcut_voice_chat?: boolean;
 
 
-  shortcut_files?: boolean;
+
+
   shortcut_history?: boolean;
 }
 

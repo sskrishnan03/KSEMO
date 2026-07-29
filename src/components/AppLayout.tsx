@@ -52,10 +52,6 @@ export function AppLayout({ children }: { children: ReactNode }) {
       nav('/app/voice-chat');
     }
 
-    if (isMeta && e.shiftKey && e.key === 'F' && (prefs.shortcut_files ?? true) && !isInInput) {
-      e.preventDefault();
-      nav('/app/files');
-    }
     if (isMeta && e.shiftKey && e.key === 'H' && (prefs.shortcut_history ?? true) && !isInInput) {
       e.preventDefault();
       nav('/app/history');

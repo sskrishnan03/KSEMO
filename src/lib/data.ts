@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
-import type { Chat, Message, Notification, Profile, Upload, UserSettings, AppPreferences, Favorite } from './types';
+import type { Chat, Message, Notification, Profile, UserSettings, AppPreferences, Favorite, PromptTemplate } from './types';
+export type { PromptTemplate };
 
 // Flag to stick to local storage if DB is not set up
 let dbFailed = false;
@@ -447,82 +448,6 @@ export async function upsertSettings(userId: string, prefs: AppPreferences): Pro
   });
 }
 
-// ---------- Uploads ----------
-export async function listUploads(): Promise<Upload[]> {
-  if (!dbFailed) {
-    try {
-      const { data, error } = await supabase.from('uploads').select('*').order('created_at', { ascending: false });
-      if (!error) return (data ?? []) as Upload[];
-      dbFailed = true;
-    } catch {
-      dbFailed = true;
-    }
-  }
-  return getLocal<Upload[]>('uploads', []);
-}
-
-export async function deleteUpload(id: string): Promise<void> {
-  if (!dbFailed) {
-    try {
-      const { error } = await supabase.from('uploads').delete().eq('id', id);
-      if (!error) return;
-      dbFailed = true;
-    } catch {
-      dbFailed = true;
-    }
-  }
-  const uploads = getLocal<Upload[]>('uploads', []);
-  setLocal('uploads', uploads.filter(u => u.id !== id));
-}
-
-export async function createUpload(patch: Partial<Upload>): Promise<Upload> {
-  if (!dbFailed) {
-    try {
-      const { id, user_id, ...dbPayload } = patch;
-      const { data, error } = await supabase.from('uploads').insert(dbPayload).select().maybeSingle();
-      if (!error && data) return data as Upload;
-      dbFailed = true;
-    } catch {
-      dbFailed = true;
-    }
-  }
-
-  const uploads = getLocal<Upload[]>('uploads', []);
-  const newUpload: Upload = {
-    id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2),
-    user_id: 'local',
-    chat_id: patch.chat_id || null,
-    name: patch.name || 'Untitled File',
-    size: patch.size || 0,
-    type: patch.type || 'application/octet-stream',
-    storage_path: patch.storage_path || '',
-    url: patch.url || null,
-    created_at: new Date().toISOString(),
-    ...patch
-  };
-  uploads.unshift(newUpload);
-  setLocal('uploads', uploads);
-  return newUpload;
-}
-
-export async function updateUpload(id: string, patch: Partial<Upload>): Promise<void> {
-  if (!dbFailed) {
-    try {
-      const { error } = await supabase.from('uploads').update(patch).eq('id', id);
-      if (!error) return;
-      dbFailed = true;
-    } catch {
-      dbFailed = true;
-    }
-  }
-  const uploads = getLocal<Upload[]>('uploads', []);
-  const idx = uploads.findIndex(u => u.id === id);
-  if (idx !== -1) {
-    uploads[idx] = { ...uploads[idx], ...patch };
-    setLocal('uploads', uploads);
-  }
-}
-
 // ---------- Feedback ----------
 export async function submitFeedback(category: string, subject: string, body: string): Promise<void> {
   if (!dbFailed) {
@@ -595,6 +520,39 @@ export function addRecentSearch(query: string): void {
 
 export function clearRecentSearches(): void {
   setLocal('recent_searches', []);
+}
+
+// ---------- Prompt Templates ----------
+const TEMPLATES_KEY = 'ksemo_prompt_templates';
+
+export function listTemplates(): PromptTemplate[] {
+  return getLocal<PromptTemplate[]>(TEMPLATES_KEY, []);
+}
+
+export function saveTemplate(template: Omit<PromptTemplate, 'id' | 'created_at'>): PromptTemplate {
+  const templates = listTemplates();
+  const newTemplate: PromptTemplate = {
+    id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2),
+    created_at: new Date().toISOString(),
+    ...template,
+  };
+  templates.unshift(newTemplate);
+  setLocal(TEMPLATES_KEY, templates);
+  return newTemplate;
+}
+
+export function updateTemplate(id: string, patch: Partial<PromptTemplate>): void {
+  const templates = listTemplates();
+  const idx = templates.findIndex(t => t.id === id);
+  if (idx !== -1) {
+    templates[idx] = { ...templates[idx], ...patch };
+    setLocal(TEMPLATES_KEY, templates);
+  }
+}
+
+export function deleteTemplate(id: string): void {
+  const templates = listTemplates();
+  setLocal(TEMPLATES_KEY, templates.filter(t => t.id !== id));
 }
 
 // ---------- AI usage logging ----------

@@ -165,10 +165,10 @@ function generateLocalResponse(prompt: string, history: ChatMessage[]): string {
       "I'm **Ksemo**, a premium AI workspace assistant.",
       '',
       'I can help you with:',
-      '- Writing and editing — emails, blogs, resumes, docs',
-      '- Code — generate, debug, explain, refactor across languages',
-      '- Analysis — summarize documents, extract insights, compare options',
-      '- Reasoning — math, logic, research, decision-making',
+      '- **Writing & Editing** — emails, blogs, resumes, docs',
+      '- **Code** — generate, debug, explain, refactor across languages',
+      '- **Analysis** — summarize documents, extract insights, compare options',
+      '- **Reasoning** — math, logic, research, decision-making',
       '',
       'How can I help?',
     ].join('\n');
@@ -183,9 +183,9 @@ function generateLocalResponse(prompt: string, history: ChatMessage[]): string {
     return [
       "I've received the file content. Here's my analysis:",
       '',
-      '1. **Document Type** — I can see this is a structured document with extractable content.',
-      '2. **Key Observations** — The file contains text-based content that has been successfully parsed and loaded into context.',
-      '3. **Recommendations** — Ask me specific questions about this file: summarize sections, extract data, find patterns, or rewrite content.',
+      '**Document Type** — I can see this is a structured document with extractable content.',
+      '**Key Observations** — The file contains text-based content that has been successfully parsed and loaded into context.',
+      '**Recommendations** — Ask me specific questions about this file: summarize sections, extract data, find patterns, or rewrite content.',
       '',
       'What would you like me to do with this file?',
     ].join('\n');
@@ -208,13 +208,13 @@ function generateLocalResponse(prompt: string, history: ChatMessage[]): string {
   }
 
   if (/summar/i.test(p)) {
-    return 'Here\'s a concise summary of the key points:\n\n1. **Core idea** — the main thesis in one line.\n2. **Supporting points** — the two or three reasons or evidence.\n3. **Implication** — what it means for the reader.\n\nPaste the full text and I\'ll produce a tight summary tailored to your audience.';
+    return 'Here\'s a concise summary of the key points:\n\n**Core idea** — the main thesis in one line.\n**Supporting points** — the two or three reasons or evidence.\n**Implication** — what it means for the reader.\n\nPaste the full text and I\'ll produce a tight summary tailored to your audience.';
   }
 
   if (/\b(list|ideas|brainstorm|ways to|how to)\b/.test(p)) {
     const topic = prompt.replace(/.*?(list|ideas|brainstorm|ways to|how to)\s*/i, '').slice(0, 80) || 'your topic';
-    return `Here are directions for **${topic}**:\n\n1. Start with the goal.\n2. Break it into concrete steps.\n3. Remove friction.\n4. Measure progress.\n5. Iterate weekly.`;
+    return `Here are directions for **${topic}**:\n\n- Start with the goal.\n- Break it into concrete steps.\n- Remove friction.\n- Measure progress.\n- Iterate weekly.`;
   }
 
-  return `Here's my take on "${prompt.slice(0, 120)}" — I'd approach this in three moves:\n\n1. Frame the question.\n2. Gather the constraints.\n3. Propose the smallest first step.\n\nThis is exchange #${userCount}. Share more context and I'll give you something specific.`;
+  return `Here's my take on "${prompt.slice(0, 120)}" — I'd approach this in three moves:\n\n- Frame the question.\n- Gather the constraints.\n- Propose the smallest first step.\n\nThis is exchange #${userCount}. Share more context and I'll give you something specific.`;
 }

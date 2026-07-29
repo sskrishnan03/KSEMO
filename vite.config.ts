@@ -9,6 +9,7 @@ export default defineConfig({
       '/send-email': 'http://localhost:3001',
       '/forgot-password': 'http://localhost:3001',
       '/reset-password': 'http://localhost:3001',
+      '/api/web-search': 'http://localhost:3001',
     },
   },
 });

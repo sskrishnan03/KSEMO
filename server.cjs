@@ -122,6 +122,40 @@ function resetEmailHtml(resetUrl) {
 </html>`;
 }
 
+// ── Web Search (DuckDuckGo) ──────────────────────────────────────────
+app.get('/api/web-search', async (req, res) => {
+  try {
+    const query = req.query.q;
+    if (!query) return res.status(400).json({ error: 'Query parameter q is required' });
+
+    const url = `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`;
+    const response = await fetch(url);
+    const data = await response.json();
+
+    const results = [];
+    if (data.RelatedTopics && Array.isArray(data.RelatedTopics)) {
+      for (const topic of data.RelatedTopics) {
+        if (topic.Text) {
+          results.push({ title: topic.Text.split(' - ')[0] || topic.Text, snippet: topic.Text, url: topic.FirstURL });
+        }
+        if (topic.Topics) {
+          for (const sub of topic.Topics) {
+            if (sub.Text) results.push({ title: sub.Text.split(' - ')[0] || sub.Text, snippet: sub.Text, url: sub.FirstURL });
+          }
+        }
+      }
+    }
+    if (data.AbstractText) {
+      results.unshift({ title: data.Headline || 'Summary', snippet: data.AbstractText, url: data.AbstractURL });
+    }
+
+    res.json({ results: results.slice(0, 10), abstract: data.AbstractText });
+  } catch (error) {
+    console.error('Web search error:', error);
+    res.status(500).json({ error: 'Search failed', results: [] });
+  }
+});
+
 // ── Routes ───────────────────────────────────────────────────────────
 
 // Generic email sender

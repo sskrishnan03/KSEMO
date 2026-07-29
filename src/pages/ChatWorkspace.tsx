@@ -3,8 +3,7 @@ import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import {
   Square, Copy, Check,
   Pencil, Share2,
-  Volume2, RotateCw, Star, MoreHorizontal, Trash2, Mic, ArrowUp,
-  Plus, FileText, Image, Globe, Search,
+  Volume2, RotateCw, Star, MoreHorizontal, Trash2, Mic, ArrowUp, Plus,
 } from 'lucide-react';
 import { Button, Modal, Textarea } from '../components/ui';
 import { Markdown } from '../components/Markdown';
@@ -15,7 +14,6 @@ import { supabase } from '../lib/supabase';
 import { streamChat, type ChatMessage, type ContentPart } from '../lib/ai';
 import { estimateTokens, cn } from '../lib/utils';
 import { ShareModal } from '../components/ShareModal';
-import { parseFile, buildFileMessage } from '../lib/fileParser';
 import { setLastActiveChatId } from '../lib/data';
 
 function getTimeOfDayGreeting(name: string): string {
@@ -56,11 +54,6 @@ export default function ChatWorkspace() {
   const [confirmDeleteMessageId, setConfirmDeleteMessageId] = useState<string | null>(null);
   const [pendingImage, setPendingImage] = useState<string | null>(null);
   const [prefs, setPrefs] = useState<AppPreferences>({});
-  const [featureMenuOpen, setFeatureMenuOpen] = useState(false);
-  const [featureMenuUp, setFeatureMenuUp] = useState(false);
-  const [deepResearch, setDeepResearch] = useState(false);
-  const [webSearch, setWebSearch] = useState(false);
-  const featureMenuRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
 
   const isEmpty = messages.length === 0 && !streaming;
@@ -69,7 +62,7 @@ export default function ChatWorkspace() {
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+
 
 
   const playChime = (start: boolean) => {
@@ -145,15 +138,6 @@ export default function ChatWorkspace() {
     return () => window.removeEventListener('ksemo-stop-generation', handler);
   }, [streaming]);
 
-  useEffect(() => {
-    if (!featureMenuOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (featureMenuRef.current && !featureMenuRef.current.contains(e.target as Node)) setFeatureMenuOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [featureMenuOpen]);
-
   const addRipple = (e: React.MouseEvent<HTMLButtonElement>) => {
     const btn = e.currentTarget;
     const rect = btn.getBoundingClientRect();
@@ -167,55 +151,12 @@ export default function ChatWorkspace() {
     setTimeout(() => ripple.remove(), 500);
   };
 
-  const handleFileAttach = (accept?: string) => {
-    if (fileInputRef.current) {
-      if (accept) fileInputRef.current.setAttribute('accept', accept);
-      else fileInputRef.current.removeAttribute('accept');
-      fileInputRef.current.click();
-    }
-  };
-
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    try {
-      const parsed = await parseFile(file);
-      const msg = buildFileMessage(parsed);
-
-      if (parsed.imageDataUrl) {
-        setPendingImage(parsed.imageDataUrl);
-        setInput((prev) => {
-          const prefix = prev ? prev + '\n\n' : '';
-          return prefix + msg.text;
-        });
-      } else {
-        setInput((prev) => {
-          const prefix = prev ? prev + '\n\n' : '';
-          return prefix + msg.text;
-        });
-      }
-    } catch {
-      setInput((prev) => prev + (prev ? '\n' : '') + `[Attached: ${file.name}]`);
-    }
-    e.target.value = '';
-  };
-
   const send = async () => {
     if (!input.trim() || !chatId || streaming) return;
     let content = input.trim();
     const imageToSend = pendingImage;
     setInput('');
     setPendingImage(null);
-
-    if (deepResearch) {
-      content = '[Deep Research mode enabled] Conduct thorough research and provide a comprehensive, in-depth analysis. ' + content;
-      setDeepResearch(false);
-    }
-    if (webSearch) {
-      content = '[Web Search mode enabled] Search the web for the latest information and provide up-to-date results. ' + content;
-      setWebSearch(false);
-    }
 
     const userContent: string | ContentPart[] = imageToSend
       ? [{ type: 'text', text: content }, { type: 'image_url', image_url: { url: imageToSend } }]
@@ -412,55 +353,14 @@ export default function ChatWorkspace() {
 
   const composerInner = (
     <>
-      <input
-        ref={fileInputRef}
-        type="file"
-        className="hidden"
-        onChange={handleFileChange}
-        accept="*/*"
-      />
-      {(deepResearch || webSearch) && (
-        <div className="relative z-10 flex items-center gap-2 px-3 pt-1.5 pb-0">
-          {deepResearch && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-ink-700 text-ink-100 border border-white/10">
-              <Search size={10} /> Deep Research
-            </span>
-          )}
-          {webSearch && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-ink-700 text-ink-100 border border-white/10">
-              <Globe size={10} /> Web Search
-            </span>
-          )}
-        </div>
-      )}
       <div className="composer-shell">
         <div className="composer-glow" />
         <div className="relative z-10 flex items-end gap-1 px-2 py-2 md:px-3 md:py-2.5">
-          <div className="flex items-center gap-0.5 shrink-0 pb-0.5 relative" ref={featureMenuRef}>
-            <button className="c-btn" onClick={(e) => { addRipple(e); setFeatureMenuOpen((o) => { if (!o) { const btn = (e.target as HTMLElement).closest('button'); if (btn) { const rect = btn.getBoundingClientRect(); const spaceBelow = window.innerHeight - rect.bottom; setFeatureMenuUp(spaceBelow < 200); } } return !o; }); }} aria-label="More features">
+          <div className="flex items-center gap-0.5 shrink-0 pb-0.5">
+            <button className="c-btn" aria-label="More features">
               <Plus size={17} strokeWidth={2.2} className="text-white/70" />
-              <span className="c-tip">Features</span>
             </button>
-            {featureMenuOpen && (
-              <div className={`absolute ${featureMenuUp ? 'bottom-full mb-1 slide-in-from-bottom-1' : 'top-full mt-1 slide-in-from-top-1'} left-1/2 -translate-x-1/2 w-44 bg-ink-800 border border-white/10 rounded-xl shadow-2xl overflow-hidden z-50 animate-in fade-in`}>
-                <button onClick={() => { setFeatureMenuOpen(false); handleFileAttach('image/*'); }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] text-white hover:bg-white/5 transition">
-                  <Image size={16} /> Photos
-                </button>
-                <button onClick={() => { setFeatureMenuOpen(false); handleFileAttach('*/*'); }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] text-white hover:bg-white/5 transition">
-                  <FileText size={16} /> Files
-                </button>
-                <button onClick={() => { setFeatureMenuOpen(false); setDeepResearch((v) => !v); }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] text-white hover:bg-white/5 transition">
-                  <Search size={16} /> Deep Research
-                  {deepResearch && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-white" />}
-                </button>
-                <button onClick={() => { setFeatureMenuOpen(false); setWebSearch((v) => !v); }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] text-white hover:bg-white/5 transition">
-                  <Globe size={16} /> Web Search
-                  {webSearch && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-white" />}
-                </button>
-              </div>
-            )}
           </div>
-
           <div className="flex-1 relative min-h-[44px] flex items-center">
             {recording ? (
               <div className="flex items-center gap-2 w-full px-1">
@@ -568,50 +468,15 @@ export default function ChatWorkspace() {
             </h1>
 
             <div className="w-full">
-              {(deepResearch || webSearch) && (
-                <div className="flex items-center gap-2 px-3 pb-1">
-                  {deepResearch && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-ink-700 text-ink-100 border border-white/10">
-                      <Search size={10} /> Deep Research
-                    </span>
-                  )}
-                  {webSearch && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-ink-700 text-ink-100 border border-white/10">
-                      <Globe size={10} /> Web Search
-                    </span>
-                  )}
-                </div>
-              )}
               <div className="composer-shell">
                 <div className="composer-glow" />
                 <div className="relative z-10 flex items-end gap-1 px-2 py-2 md:px-3 md:py-2.5">
-                  {(prefs.file_attachment_enabled ?? true) && (
-                    <div className="flex items-center gap-0.5 shrink-0 pb-0.5 relative" ref={featureMenuRef}>
-                      <button className="c-btn" onClick={(e) => { addRipple(e); setFeatureMenuOpen((o) => { if (!o) { const btn = (e.target as HTMLElement).closest('button'); if (btn) { const rect = btn.getBoundingClientRect(); const spaceBelow = window.innerHeight - rect.bottom; setFeatureMenuUp(spaceBelow < 200); } } return !o; }); }} aria-label="More features">
+                  <div className="flex items-center gap-0.5 shrink-0 pb-0.5">
+                      <button className="c-btn" aria-label="More features">
                         <Plus size={17} strokeWidth={2.2} className="text-white/70" />
-                        <span className="c-tip">Features</span>
                       </button>
-                      {featureMenuOpen && (
-                        <div className={`absolute ${featureMenuUp ? 'bottom-full mb-1 slide-in-from-bottom-1' : 'top-full mt-1 slide-in-from-top-1'} left-1/2 -translate-x-1/2 w-44 bg-ink-800 border border-white/10 rounded-xl shadow-2xl overflow-hidden z-50 animate-in fade-in`}>
-                          <button onClick={() => { setFeatureMenuOpen(false); handleFileAttach('image/*'); }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] text-white hover:bg-white/5 transition">
-                            <Image size={16} /> Photos
-                          </button>
-                          <button onClick={() => { setFeatureMenuOpen(false); handleFileAttach('*/*'); }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] text-white hover:bg-white/5 transition">
-                            <FileText size={16} /> Files
-                          </button>
-                          <button onClick={() => { setFeatureMenuOpen(false); setDeepResearch((v) => !v); }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] text-white hover:bg-white/5 transition">
-                            <Search size={16} /> Deep Research
-                            {deepResearch && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-white" />}
-                          </button>
-                          <button onClick={() => { setFeatureMenuOpen(false); setWebSearch((v) => !v); }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] text-white hover:bg-white/5 transition">
-                            <Globe size={16} /> Web Search
-                            {webSearch && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-white" />}
-                          </button>
-                        </div>
-                      )}
                     </div>
-                  )}
-                  <div className="flex-1 relative min-h-[44px] flex items-center">
+                    <div className="flex-1 relative min-h-[44px] flex items-center">
                     {recording ? (
                       <div className="flex items-center gap-2 w-full px-1">
                         <div className="c-voice-waves text-white/60">
