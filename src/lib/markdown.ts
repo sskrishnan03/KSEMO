@@ -37,8 +37,10 @@ export function renderMarkdown(src: string): string {
   const lines = src.replace(/\r\n/g, '\n').split('\n');
   const html: string[] = [];
   let i = 0;
+  let safety = 0;
 
-  while (i < lines.length) {
+  while (i < lines.length && safety < 100000) {
+    safety++;
     const line = lines[i];
 
     // Code block
@@ -85,7 +87,8 @@ export function renderMarkdown(src: string): string {
     }
 
     // Table (header | sep | rows)
-    if (line.includes('|') && i + 1 < lines.length && /^\s*\|?[\s:|-]+\|?\s*$/.test(lines[i + 1])) {
+    const isSep = i + 1 < lines.length && /^\s*\|?(?:[\s:]*:?-{3,}:?[\s:]*(?:\|[\s:]*:?-{3,}:?[\s:]*)*)\|?\s*$/.test(lines[i + 1]);
+    if (line.includes('|') && isSep) {
       const header = line.split('|').map((c) => c.trim()).filter(Boolean);
       i += 2;
       const rows: string[][] = [];

@@ -42,22 +42,25 @@ export default function Login() {
   };
 
   useEffect(() => {
+    const gsiReady = () => {
+      const g = (window as any).google?.accounts?.id;
+      if (!g) return;
+      if (!(window as any).__gsui_initted) {
+        (window as any).__gsui_initted = true;
+        g.initialize({
+          client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID || '617109549081-3d2gevdkujut3rjfl56o3ol3ksl06kbi.apps.googleusercontent.com',
+          callback: handleGoogleCredentialResponse,
+        });
+      }
+      const el = document.getElementById('google-btn-inner');
+      if (el) g.renderButton(el, { theme: 'outline', size: 'large', width: 220, shape: 'rectangular', text: 'continue_with' });
+    };
+    if ((window as any).google?.accounts?.id) { gsiReady(); return; }
     const script = document.createElement('script');
     script.src = 'https://accounts.google.com/gsi/client';
     script.async = true;
     script.defer = true;
-    script.onload = () => {
-      if ((window as any).google) {
-        (window as any).google.accounts.id.initialize({
-          client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID || '617109549081-3d2gevdkujut3rjfl56o3ol3ksl06kbi.apps.googleusercontent.com',
-          callback: handleGoogleCredentialResponse,
-        });
-        (window as any).google.accounts.id.renderButton(
-          document.getElementById('google-btn-inner'),
-          { theme: 'outline', size: 'large', width: 220, shape: 'rectangular', text: 'continue_with' }
-        );
-      }
-    };
+    script.onload = gsiReady;
     document.body.appendChild(script);
     return () => { document.body.removeChild(script); };
   }, []);
