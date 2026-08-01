@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Globe, ArrowUpRight, Copy, Check } from 'lucide-react';
 import { Markdown } from '../components/Markdown';
 import { Button } from '../components/ui';
+import { fetchSharedChat } from '../lib/data';
 
 interface DecodedShare {
   title: string;
@@ -22,14 +23,10 @@ export default function SharedChatView() {
   const [copiedId, setCopiedId] = useState<number | null>(null);
   const [invalid, setInvalid] = useState(false);
 
-  useEffect(() => {
-    if (!shareData) {
-      setInvalid(true);
-      return;
-    }
-
+  // Legacy fallback: older share links embedded the chat as base64 in the URL.
+  const decodeLegacy = (raw: string): DecodedShare | null => {
     try {
-      let base64 = shareData.replace(/-/g, '+').replace(/_/g, '/');
+      let base64 = raw.replace(/-/g, '+').replace(/_/g, '/');
       while (base64.length % 4) {
         base64 += '=';
       }
@@ -40,16 +37,41 @@ export default function SharedChatView() {
       }
       const json = new TextDecoder().decode(bytes);
       const decoded = JSON.parse(json);
-
       if (decoded && decoded.title && Array.isArray(decoded.messages)) {
-        setData(decoded);
-      } else {
-        setInvalid(true);
+        return { title: decoded.title, messages: decoded.messages };
       }
-    } catch (err) {
-      console.error('Failed to decode share URL:', err);
-      setInvalid(true);
+    } catch {
+      /* ignore */
     }
+    return null;
+  };
+
+  useEffect(() => {
+    if (!shareData) {
+      setInvalid(true);
+      return;
+    }
+    let cancelled = false;
+    setInvalid(false);
+    setData(null);
+
+    const load = async () => {
+      const shared = await fetchSharedChat(shareData);
+      if (cancelled) return;
+      if (shared && shared.title && Array.isArray(shared.messages)) {
+        setData(shared);
+        return;
+      }
+      const legacy = decodeLegacy(shareData);
+      if (!cancelled && legacy) {
+        setData(legacy);
+        return;
+      }
+      if (!cancelled) setInvalid(true);
+    };
+    load();
+
+    return () => { cancelled = true; };
   }, [shareData]);
 
   const handleCopyText = async (text: string, idx: number) => {

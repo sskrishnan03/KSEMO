@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import type { Chat, Message, Notification, Profile, UserSettings, AppPreferences, Favorite } from './types';
+import type { Chat, Message, Notification, Profile, UserSettings, AppPreferences } from './types';
 
 // Flag to stick to local storage if DB is not set up
 let dbFailed = false;
@@ -163,7 +163,6 @@ export async function deleteAllChats(): Promise<void> {
       if (!error) {
         setLocal('chats', []);
         setLocal('messages', []);
-        setLocal('favorites', []);
         window.dispatchEvent(new CustomEvent('ksemo-chats-deleted'));
         return;
       }
@@ -176,7 +175,6 @@ export async function deleteAllChats(): Promise<void> {
   }
   setLocal('chats', []);
   setLocal('messages', []);
-  setLocal('favorites', []);
   window.dispatchEvent(new CustomEvent('ksemo-chats-deleted'));
 }
 
@@ -263,52 +261,53 @@ export async function deleteMessage(id: string): Promise<void> {
   setLocal('messages', msgs.filter(m => m.id !== id));
 }
 
-// ---------- Favorites ----------
-export async function addFavorite(messageId: string, note?: string): Promise<void> {
-  if (!dbFailed) {
-    try {
-      const { error } = await supabase.from('favorites').upsert({ message_id: messageId, note });
-      if (!error || error.code === '23505') return;
-    } catch {}
-  }
-  const favs = getLocal<Favorite[]>('favorites', []);
-  if (!favs.some(f => f.message_id === messageId)) {
-    favs.push({
-      id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2),
-      message_id: messageId,
-      note,
-      created_at: new Date().toISOString()
-    } as Favorite);
-    setLocal('favorites', favs);
-  }
+// ---------- Shared chats ----------
+export interface SharedChatPayload {
+  title: string;
+  messages: { role: string; content: string }[];
 }
 
-export async function removeFavorite(messageId: string): Promise<void> {
-  if (!dbFailed) {
-    try {
-      const { error } = await supabase.from('favorites').delete().eq('message_id', messageId);
-      if (!error) return;
-    } catch {}
+function generateShareToken(length = 12): string {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  const bytes = new Uint8Array(length);
+  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+    crypto.getRandomValues(bytes);
+  } else {
+    for (let i = 0; i < bytes.length; i++) bytes[i] = Math.floor(Math.random() * 256);
   }
-  const favs = getLocal<Favorite[]>('favorites', []);
-  setLocal('favorites', favs.filter(f => f.message_id !== messageId));
+  let out = '';
+  for (let i = 0; i < bytes.length; i++) out += alphabet[bytes[i] % alphabet.length];
+  return out;
 }
 
-export async function isFavorite(messageId: string): Promise<boolean> {
-  if (!dbFailed) {
-    try {
-      const { count, error } = await supabase
-        .from('favorites')
-        .select('id', { count: 'exact', head: true })
-        .eq('message_id', messageId);
-      if (!error) return (count ?? 0) > 0;
-      dbFailed = true;
-    } catch {
-      dbFailed = true;
+export async function createSharedChat(chatId: string, title: string, messages: { role: string; content: string }[]): Promise<string | null> {
+  const token = generateShareToken();
+  try {
+    const { error } = await supabase
+      .from('shared_chats')
+      .insert({ chat_id: chatId, token, title, messages });
+    if (!error) return token;
+    console.error('Supabase createSharedChat error:', error);
+  } catch (e) {
+    console.error('Supabase createSharedChat exception:', e);
+  }
+  return null;
+}
+
+export async function fetchSharedChat(token: string): Promise<SharedChatPayload | null> {
+  try {
+    const { data, error } = await supabase.rpc('get_shared_chat', { p_token: token });
+    if (error) {
+      console.error('Supabase fetchSharedChat error:', error);
+      return null;
     }
+    if (data && data.title && Array.isArray(data.messages)) {
+      return { title: data.title, messages: data.messages };
+    }
+  } catch (e) {
+    console.error('Supabase fetchSharedChat exception:', e);
   }
-  const favs = getLocal<Favorite[]>('favorites', []);
-  return favs.some(f => f.message_id === messageId);
+  return null;
 }
 
 // ---------- Notifications ----------
@@ -532,7 +531,7 @@ export function dispatchSimulatedEmail(email: string, fullName: string, type: 's
         ? `Sign-Out Alert: Ksemo Workspace`
         : `New Login Alert: Ksemo Workspace`,
     body: isSignup
-      ? `Hello ${fullName || 'User'},\n\nThank you for choosing Ksemo, your ultimate workspace for AI chat, smart search, and file intelligence. We are dedicated to providing you with a seamless and highly productive environment to build your ideas.\n\nLet's explore your workspace, start a chat, or upload files to begin.\n\nBest regards,\nThe Ksemo Team`
+      ? `Hello ${fullName || 'User'},\n\nThank you for choosing Ksemo, your ultimate workspace for AI chat and smart search. We are dedicated to providing you with a seamless and highly productive environment to build your ideas.\n\nLet's explore your workspace and start a chat to begin.\n\nBest regards,\nThe Ksemo Team`
       : isSignout
         ? `Hello ${fullName || 'User'},\n\nYou have successfully signed out of your Ksemo workspace on ${new Date().toLocaleString()}.\n\nIf this was you, no action is needed. If you did not authorize this, please log back in and check your account security.\n\nBest regards,\nThe Ksemo Team`
         : `Hello ${fullName || 'User'},\n\nWe detected a new login to your Ksemo workspace on ${new Date().toLocaleString()}.\n\nIf this was you, you can safely ignore this message. If you did not authorize this login, please update your account settings immediately.\n\nBest regards,\nThe Ksemo Team`,

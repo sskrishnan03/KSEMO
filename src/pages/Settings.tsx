@@ -173,18 +173,14 @@ export default function Settings() {
 
   const exportData = async () => {
     if (!user) return;
-    const [chats, msgs, favs, uploads] = await Promise.all([
+    const [chats, msgs] = await Promise.all([
       supabase.from('chats').select('*').eq('user_id', user.id),
       supabase.from('messages').select('*').eq('user_id', user.id),
-      supabase.from('favorites').select('*').eq('user_id', user.id),
-      supabase.from('uploads').select('*').eq('user_id', user.id),
     ]);
     const data = {
       profile,
       chats: chats.data,
       messages: msgs.data,
-      favorites: favs.data,
-      uploads: uploads.data,
       settings: prefs,
       exportedAt: new Date().toISOString(),
     };
@@ -249,12 +245,10 @@ export default function Settings() {
     { q: /how.*send|enter.*send|shift.*enter/i, a: "Press **Enter** to send a message. Press **Shift+Enter** for a new line. You can toggle this in **Settings > Preferences > Send on Enter**." },
     { q: /keyboard|shortcut|hotkey/i, a: "Ksemo has global shortcuts: **Ctrl/Cmd+N** (new chat), **Ctrl/Cmd+K** (search), **Ctrl/Cmd+B** (toggle sidebar), **Ctrl/Cmd+,** (settings), **Esc** (stop generation). Manage them in **Settings > Keyboard**." },
     { q: /voice|speech|mic/i, a: "Voice chat lets you talk to the AI hands-free. Open it from the sidebar menu or press **Ctrl/Cmd+Shift+V**. Enable/disable the mic button in **Settings > Preferences > Voice input**." },
-    { q: /file|upload|attach|pdf|csv/i, a: "File attachments are not supported in the current version. For more help, contact support at **support@ksemo.com**." },
 
-    { q: /search|find/i, a: "Global search is available via **Ctrl/Cmd+K**. It searches across chats, messages, files, and favorites." },
-    { q: /favorite|bookmark/i, a: "Click the star icon on any assistant message to save it to your favorites. View favorites from the sidebar favorites tab." },
+    { q: /search|find/i, a: "Global search is available via **Ctrl/Cmd+K**. It searches across your chats and messages." },
     { q: /delete.*chat|remove.*chat|clear.*chat/i, a: "Click the trash icon next to a chat in the sidebar to delete it. To delete ALL chats at once, go to **Settings > Data Control > Delete all chats**." },
-    { q: /export|download.*data/i, a: "Go to **Settings > Data Control > Export data** to download all your chats, messages, favorites, and settings as a JSON file." },
+    { q: /export|download.*data/i, a: "Go to **Settings > Data Control > Export data** to download all your chats, messages, and settings as a JSON file." },
     { q: /model|gpt|claude|ai.*engine/i, a: "Ksemo runs on Google\u2019s Gemini API. The default model is **ksemo-pro** (Gemini Flash). Some features use the local fallback when no API key is set." },
     { q: /dark.*mode|theme|light|appearance/i, a: "Go to **Settings > Appearance** to switch between dark, light, or system theme." },
     { q: /compact|spacing|layout/i, a: "Compact mode and sidebar options are available in **Settings > Preferences**." },
@@ -266,7 +260,7 @@ export default function Settings() {
     { q: /bug|report|issue|error/i, a: "Found a bug? Email us directly at **support@ksemo.com** with details about the issue. Include what happened, what you expected, and steps to reproduce if possible." },
     { q: /feedback|suggest|improve/i, a: "Go to **Settings > Feedback** to send general feedback, feature requests, or improvement suggestions." },
     { q: /admin|dashboard|usage/i, a: "The Admin panel is accessible from the sidebar (admin users only). It shows user management and usage analytics." },
-    { q: /help|what.*can|how.*use|getting.*start/i, a: "Welcome! Ksemo is an AI workspace. Key features:\n- **AI Chat** — streaming conversations with the AI\n- **Voice Chat** — hands-free voice conversations\n- **File Analysis** — upload PDFs, CSVs, images\n- **Smart Search** — find anything across your workspace\n\nUse the sidebar to navigate, or ask me anything specific!" },
+    { q: /help|what.*can|how.*use|getting.*start/i, a: "Welcome! Ksemo is an AI workspace. Key features:\n- **AI Chat** — streaming conversations with the AI\n- **Voice Chat** — hands-free voice conversations\n- **Smart Search** — find anything across your workspace\n\nUse the sidebar to navigate, or ask me anything specific!" },
   ];
 
   const sendHelpMessage = async () => {
@@ -540,13 +534,13 @@ export default function Settings() {
 
                 <div className="rounded-2xl bg-ink-850 border border-white/8 p-4">
                   <h3 className="text-[14px] font-semibold text-white mb-1 flex items-center gap-2"><Download size={15} /> Export your data</h3>
-                  <p className="text-[12px] text-ink-300 mb-4">Download all your chats, messages, favorites, uploads, and settings as a JSON file.</p>
+                  <p className="text-[12px] text-ink-300 mb-4">Download all your chats, messages, and settings as a JSON file.</p>
                   <Button variant="outline" size="sm" onClick={exportData}><Download size={14} /> Export data</Button>
                 </div>
 
                 <div className="rounded-2xl bg-ink-850 border border-orange-500/20 p-4">
                   <h3 className="text-[14px] font-semibold text-white mb-1 flex items-center gap-2"><Trash2 size={15} /> Delete all chats</h3>
-                  <p className="text-[12px] text-ink-300 mb-4">Permanently delete every chat, message, and favorite in your account. This action is immediate and irreversible.</p>
+                  <p className="text-[12px] text-ink-300 mb-4">Permanently delete every chat and message in your account. This action is immediate and irreversible.</p>
                   <Button variant="danger" size="sm" onClick={() => { setDeleteAllConfirm(''); setDeleteAllOpen(true); }}><Trash2 size={14} /> Delete all chats</Button>
                 </div>
 
@@ -660,7 +654,7 @@ export default function Settings() {
 
       <Modal open={deleteAllOpen} onClose={() => setDeleteAllOpen(false)} title="Delete all chats" size="sm"
         footer={<><Button variant="ghost" size="sm" onClick={() => setDeleteAllOpen(false)}>Cancel</Button><Button variant="danger" size="sm" loading={deletingAll} disabled={deleteAllConfirm !== 'DELETE ALL CHATS'} onClick={deleteAllChatsHandler}>Delete all chats</Button></>}>
-        <p className="text-[13px] text-ink-200 mb-2">This will permanently delete <strong className="text-white">all your chats, messages, and favorites</strong>. This action is irreversible.</p>
+        <p className="text-[13px] text-ink-200 mb-2">This will permanently delete <strong className="text-white">all your chats and messages</strong>. This action is irreversible.</p>
         <p className="text-[13px] text-ink-200 mb-4">Type <span className="text-white font-mono">DELETE ALL CHATS</span> to confirm.</p>
         <Input value={deleteAllConfirm} onChange={(e) => setDeleteAllConfirm(e.target.value)} placeholder="Type DELETE ALL CHATS" />
       </Modal>

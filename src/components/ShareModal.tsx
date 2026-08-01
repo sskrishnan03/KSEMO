@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Globe, Lock, Check, Copy, Mail, Send } from 'lucide-react';
 import { Modal, Button } from './ui';
-import { listMessages, sendEmail } from '../lib/data';
+import { listMessages, sendEmail, createSharedChat } from '../lib/data';
 import type { Chat, Message } from '../lib/types';
 
 interface ShareModalProps {
@@ -19,6 +19,7 @@ export function ShareModal({ open, onClose, chat }: ShareModalProps) {
   const [email, setEmail] = useState('');
   const [sending, setSending] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
+  const [shareError, setShareError] = useState('');
 
   // Fetch messages if we toggle to public or when modal opens
   useEffect(() => {
@@ -28,6 +29,7 @@ export function ShareModal({ open, onClose, chat }: ShareModalProps) {
       setEmail('');
       setEmailSent(false);
       setSending(false);
+      setShareError('');
       return;
     }
     
@@ -45,18 +47,18 @@ export function ShareModal({ open, onClose, chat }: ShareModalProps) {
     fetchMsgs();
   }, [open, chat.id]);
 
-  const buildPublicLink = (): string => {
-    const cleanMsgs = messages.map(m => ({ role: m.role, content: m.content }));
-    const payload = { title: chat.title, messages: cleanMsgs };
-    const json = JSON.stringify(payload);
-    const bytes = new TextEncoder().encode(json);
-    let binary = '';
-    for (let i = 0; i < bytes.byteLength; i++) {
-      binary += String.fromCharCode(bytes[i]);
+  const createShareLink = async (): Promise<string | null> => {
+    if (generatedLink) return generatedLink;
+    setShareError('');
+    const cleanMsgs = messages.map((m) => ({ role: m.role, content: m.content }));
+    const token = await createSharedChat(chat.id, chat.title, cleanMsgs);
+    if (!token) {
+      setShareError('Could not create the share link. Please make sure the shared_chats database migration has been applied.');
+      return null;
     }
-    const base64 = btoa(binary);
-    const safeBase64 = base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-    return `${window.location.origin}/share/${safeBase64}`;
+    const link = `${window.location.origin}/share/${token}`;
+    setGeneratedLink(link);
+    return link;
   };
 
   const handleCreateOrCopy = async () => {
@@ -69,16 +71,16 @@ export function ShareModal({ open, onClose, chat }: ShareModalProps) {
       } catch (err) {
         console.error(err);
       }
-    } else {
-      const link = generatedLink || buildPublicLink();
-      if (!generatedLink) setGeneratedLink(link);
-      try {
-        await navigator.clipboard.writeText(link);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-      } catch (err) {
-        console.error(err);
-      }
+      return;
+    }
+    const link = await createShareLink();
+    if (!link) return;
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error(err);
     }
   };
 
@@ -86,8 +88,11 @@ export function ShareModal({ open, onClose, chat }: ShareModalProps) {
     if (!email.trim()) return;
     setSending(true);
     setEmailSent(false);
-    const link = generatedLink || buildPublicLink();
-    if (!generatedLink) setGeneratedLink(link);
+    const link = await createShareLink();
+    if (!link) {
+      setSending(false);
+      return;
+    }
     const subject = `${chat.title} — shared with you on Ksemo`;
     const body = `Hi,\n\nSomeone shared a Ksemo conversation with you: "${chat.title}".\n\nOpen it here: ${link}\n\n— Ksemo Workspace`;
     try {
@@ -95,6 +100,7 @@ export function ShareModal({ open, onClose, chat }: ShareModalProps) {
       setEmailSent(true);
     } catch (err) {
       console.error(err);
+      setShareError('Failed to send the email. Please try again.');
     } finally {
       setSending(false);
     }
@@ -104,6 +110,7 @@ export function ShareModal({ open, onClose, chat }: ShareModalProps) {
   useEffect(() => {
     setGeneratedLink('');
     setEmailSent(false);
+    setShareError('');
   }, [shareType]);
 
   return (
@@ -232,6 +239,12 @@ export function ShareModal({ open, onClose, chat }: ShareModalProps) {
                 {sending ? 'Sending…' : <><Send size={13} /> Send</>}
               </Button>
             </div>
+          </div>
+        )}
+
+        {shareError && (
+          <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/25 text-[11px] text-red-300 leading-relaxed select-none">
+            {shareError}
           </div>
         )}
 

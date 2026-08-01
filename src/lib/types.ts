@@ -40,16 +40,6 @@ export interface Message {
   created_at: string;
 }
 
-export interface Favorite {
-  id: string;
-  user_id: string;
-  message_id: string;
-  note: string | null;
-  created_at: string;
-  message?: Message;
-  chat?: Pick<Chat, 'id' | 'title'>;
-}
-
 export interface Notification {
   id: string;
   user_id: string;
