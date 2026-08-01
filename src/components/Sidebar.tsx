@@ -129,7 +129,7 @@ export function Sidebar({ collapsed, onToggleCollapse }: Props) {
     if (dateFilter === 'week') return diffDays < 7;
     if (dateFilter === 'month') return diffDays < 30;
     return true;
-  });
+  }).slice(0, 2);
   const grouped = dateFilter === 'all'
     ? groupByDate(filtered, 'updated_at')
     : [{ label: '', items: filtered }];

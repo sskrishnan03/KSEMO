@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import {
   ArrowRight, Layers, Shield, ChevronDown,
   Menu, X, Search, Zap, Brain,
-  Lock, Check, ArrowUpRight, Mic, MicOff, AudioLines,
+  Lock, Check, ArrowUpRight, Mic, AudioLines, Settings, LogOut,
 } from 'lucide-react';
 import { Button } from '../components/ui';
 import { cn } from '../lib/utils';
@@ -32,8 +32,12 @@ const faqs = [
 /* ──────────────────── Demo voice conversation ──────────────────── */
 
 const demoLines = [
-  { label: 'Morning briefing', text: 'Good morning! Here is your briefing — three meetings today, and your top priority is the product demo at 2 p.m.' },
-  { label: 'Poetry', text: 'The ocean breathes in silver light, where stars dissolve into the deep.' },
+  { label: 'Greeting', text: "Hi, I'm Ksemo, your AI voice assistant. How can I help you today?" },
+];
+
+const demoRecentChats = [
+  { title: 'Hi, I’m Ksemo' },
+  { title: 'Getting started' },
 ];
 
 /* ──────────────────── Wobbly circle (mirrors the real VoiceChat canvas renderer) ──────────────────── */
@@ -104,30 +108,27 @@ function WobblyCircle({ className, phase = 'idle', minRadius = 110 }: { classNam
 /* ──────────────────── Animated voice demo (mirrors the real app UI, actually speaks) ──────────────────── */
 
 function VoiceDemo() {
-  const [idx, setIdx] = useState(0);
   const [started, setStarted] = useState(false);
-  const [muted, setMuted] = useState(false);
   const [phase, setPhase] = useState<'idle' | 'listening' | 'thinking' | 'speaking'>('idle');
   const [spoken, setSpoken] = useState('');
+  const [view, setView] = useState<'voice' | 'search'>('voice');
+  const [accountOpen, setAccountOpen] = useState(false);
+  const [demoQuery, setDemoQuery] = useState('');
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
-  const mutedRef = useRef(muted);
   const startedRef = useRef(started);
 
-  useEffect(() => { mutedRef.current = muted; }, [muted]);
   useEffect(() => { startedRef.current = started; }, [started]);
 
-  // Speak a demo sentence out loud (real TTS) with live word-by-word subtitles
+  const finishDemo = useCallback(() => {
+    setStarted(false);
+    setPhase('idle');
+    setSpoken('');
+    try { window.speechSynthesis.cancel(); } catch { /* ok */ }
+  }, []);
+
+  // Speak the greeting out loud (real TTS) with live word-by-word subtitles
   const speakLine = useCallback((lineIdx: number) => {
     if (!startedRef.current) return;
-
-    if (mutedRef.current) {
-      setSpoken('');
-      setPhase('listening');
-      timers.current.push(setTimeout(() => {
-        if (startedRef.current) setIdx((p) => (p + 1) % demoLines.length);
-      }, 1800));
-      return;
-    }
 
     const l = demoLines[lineIdx % demoLines.length];
     setPhase('speaking');
@@ -138,14 +139,7 @@ function VoiceDemo() {
       words.forEach((_, wi) => {
         timers.current.push(setTimeout(() => setSpoken(words.slice(0, wi + 1).join(' ')), wi * 140));
       });
-      timers.current.push(setTimeout(() => {
-        if (!startedRef.current) return;
-        setPhase('listening');
-        setSpoken('');
-        timers.current.push(setTimeout(() => {
-          if (startedRef.current) setIdx((p) => (p + 1) % demoLines.length);
-        }, 1800));
-      }, words.length * 140 + 400));
+      timers.current.push(setTimeout(finishDemo, words.length * 140 + 500));
       return;
     }
 
@@ -165,41 +159,16 @@ function VoiceDemo() {
     };
 
     u.onend = () => {
-      if (!startedRef.current) return;
       setSpoken(l.text);
-      setPhase('listening');
-      timers.current.push(setTimeout(() => {
-        if (startedRef.current) setIdx((p) => (p + 1) % demoLines.length);
-      }, 2000));
+      timers.current.push(setTimeout(finishDemo, 1200));
     };
 
     u.onerror = () => {
-      if (!startedRef.current) return;
-      setPhase('listening');
-      timers.current.push(setTimeout(() => {
-        if (startedRef.current) setIdx((p) => (p + 1) % demoLines.length);
-      }, 1500));
+      timers.current.push(setTimeout(finishDemo, 500));
     };
 
     window.speechSynthesis.speak(u);
-  }, []);
-
-  // Cycle: listen → think → speak, advancing through the demo lines
-  useEffect(() => {
-    if (!started || mutedRef.current) return;
-    setPhase('listening');
-    setSpoken('');
-    timers.current.push(setTimeout(() => {
-      if (!startedRef.current || mutedRef.current) return;
-      setPhase('thinking');
-      setSpoken('');
-      timers.current.push(setTimeout(() => speakLine(idx), 1100));
-    }, 1400));
-    return () => {
-      timers.current.forEach(clearTimeout);
-      timers.current = [];
-    };
-  }, [idx, started, speakLine]);
+  }, [finishDemo]);
 
   // Cleanup on unmount
   useEffect(() => () => {
@@ -209,169 +178,192 @@ function VoiceDemo() {
   }, []);
 
   const startDemo = useCallback(() => {
-    if (started) return;
+    if (startedRef.current) return;
+    startedRef.current = true;
     setStarted(true);
-    setPhase('listening');
-  }, [started]);
-
-  const endDemo = useCallback(() => {
-    setStarted(false);
-    setPhase('idle');
-    setSpoken('');
-    try { window.speechSynthesis.cancel(); } catch { /* ok */ }
-  }, []);
-
-  const toggleMute = useCallback(() => {
-    if (muted) {
-      setMuted(false);
-      timers.current.push(setTimeout(() => {
-        if (!startedRef.current) return;
-        setPhase('thinking');
-        setSpoken('');
-        timers.current.push(setTimeout(() => speakLine(idx), 1100));
-      }, 400));
-    } else {
-      setMuted(true);
-      try { window.speechSynthesis.cancel(); } catch { /* ok */ }
-      setPhase('listening');
-      setSpoken('');
-      timers.current.push(setTimeout(() => {
-        if (startedRef.current) setIdx((p) => (p + 1) % demoLines.length);
-      }, 1800));
-    }
-  }, [muted, idx, speakLine]);
+    setPhase('speaking');
+    speakLine(0);
+  }, [speakLine]);
 
   return (
-    <div className="relative max-w-4xl mx-auto">
+    <div className="relative max-w-5xl mx-auto">
       {/* ambient glow behind the card */}
       <div className="absolute -inset-8 bg-gradient-to-tr from-white/[0.05] via-transparent to-white/[0.03] blur-[90px] rounded-full pointer-events-none" />
 
-      <div className="relative rounded-[2rem] border border-white/10 bg-ink-900 overflow-hidden shadow-lift">
+      <div className="relative rounded-2xl border border-white/10 bg-ink-900 overflow-hidden shadow-lift">
         {/* top highlight line */}
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/25 to-transparent" />
         {/* corner glows */}
         <div className="absolute -top-24 -left-24 h-72 w-72 rounded-full bg-white/[0.05] blur-[90px] pointer-events-none" />
         <div className="absolute -bottom-24 -right-24 h-72 w-72 rounded-full bg-white/[0.04] blur-[90px] pointer-events-none" />
 
-        <div className="relative flex flex-col items-center px-6 sm:px-10 pt-10 pb-8">
+        {/* App mockup: sidebar + main workspace */}
+        <div className="relative flex flex-col md:flex-row min-h-[500px]">
 
-          {/* live badge */}
-          <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] text-ink-300 mb-10">
-            <span className={cn('h-1.5 w-1.5 rounded-full', started ? 'bg-emerald-400 animate-pulse-soft' : 'bg-ink-500')} />
-            {started ? 'Live conversation' : 'Live demo — press start'}
-          </div>
-
-          {/* orb stage */}
-          <div className="relative flex items-center justify-center w-full">
-
-            {/* floating feature chips */}
-            <div className="hidden lg:flex absolute left-0 top-1/4 items-center gap-2 px-3.5 py-2 rounded-full border border-white/10 bg-white/5 backdrop-blur text-[12px] text-ink-200 animate-slide-up">
-              <Mic size={13} className="text-white/80" /> Speak naturally
-            </div>
-            <div className="hidden lg:flex absolute right-0 top-1/2 items-center gap-2 px-3.5 py-2 rounded-full border border-white/10 bg-white/5 backdrop-blur text-[12px] text-ink-200 animate-slide-up" style={{ animationDelay: '80ms' }}>
-              <Zap size={13} className="text-white/80" /> Instant answers
-            </div>
-            <div className="hidden lg:flex absolute left-10 bottom-2 items-center gap-2 px-3.5 py-2 rounded-full border border-white/10 bg-white/5 backdrop-blur text-[12px] text-ink-200 animate-slide-up" style={{ animationDelay: '160ms' }}>
-              <Layers size={13} className="text-white/80" /> Saved in Recent
+          {/* Sidebar */}
+          <div className="hidden md:flex w-[240px] shrink-0 border-r border-white/8 bg-ink-950 flex-col">
+            {/* logo + project name */}
+            <div className="h-14 px-4 flex items-center gap-2 border-b border-white/8 shrink-0">
+              <img src="/KSEMOlogo.png" alt="KSEMO" className="h-7 w-7 rounded-lg object-contain" />
+              <span className="text-[14px] font-semibold tracking-tight text-white/90">Ksemo</span>
             </div>
 
-            {/* rotating conic ring */}
-            <div
-              className="absolute h-80 w-80 sm:h-96 sm:w-96 rounded-full animate-spin opacity-50"
-              style={{
-                background: 'conic-gradient(from 0deg, transparent 0deg, rgba(255,255,255,0.22) 50deg, transparent 110deg, transparent 180deg, rgba(255,255,255,0.14) 240deg, transparent 300deg)',
-                animationDuration: '26s',
-              }}
-            />
-            {/* halo ring that swells when speaking */}
-            <div className={cn(
-              'absolute h-60 w-60 sm:h-72 sm:w-72 rounded-full border border-white/10 transition-all duration-700',
-              started && phase === 'speaking' && 'scale-110 border-white/25',
-            )} />
-            {/* soft glow under the orb */}
-            <div className="absolute h-52 w-52 sm:h-64 sm:w-64 rounded-full bg-white/[0.06] blur-3xl" />
-
-            {/* core wobbly orb */}
-            <div className="relative h-44 w-44 sm:h-56 sm:w-56">
-              <WobblyCircle
-                phase={started ? phase : 'idle'}
-                minRadius={56}
-                className="w-full h-full object-contain"
-              />
-            </div>
-          </div>
-
-          {/* status + subtitle */}
-          <div className="mt-10 text-center max-w-xl min-h-[48px]">
-            {!started ? (
-              <p className="text-[13px] text-ink-300 leading-relaxed">
-                Tap <span className="text-white font-medium">Start Voice Chat</span> — Ksemo listens, thinks, and answers out loud.
-              </p>
-            ) : phase === 'speaking' ? (
-              <p className="text-base sm:text-lg font-medium leading-relaxed text-white">{spoken}</p>
-            ) : phase === 'thinking' ? (
-              <p className="text-xs font-semibold tracking-widest text-ink-300 uppercase animate-pulse-soft">Thinking…</p>
-            ) : (
-              <p className="text-xs font-semibold tracking-widest text-ink-300 uppercase animate-pulse-soft">Listening…</p>
-            )}
-          </div>
-
-          {/* controls */}
-          <div className="mt-8">
-            {!started ? (
+            {/* nav */}
+            <div className="px-2 pt-3 space-y-0.5 shrink-0">
               <button
-                onClick={startDemo}
-                className="px-10 h-14 rounded-full bg-white text-ink-900 font-semibold text-[14px] tracking-wide shadow-lift hover:bg-white/90 active:scale-95 transition-all"
+                onClick={() => { setView('voice'); setAccountOpen(false); }}
+                className={cn(
+                  'w-full flex items-center gap-2.5 px-3 h-9 rounded-lg text-[12px] text-left transition',
+                  view === 'voice' ? 'bg-white/8 text-white' : 'text-ink-200 hover:bg-white/5 hover:text-white',
+                )}
               >
-                <span className="flex items-center gap-2.5">
-                  <Mic size={17} />
-                  Start Voice Chat
-                </span>
+                <Mic size={14} className="shrink-0" /> Voice Chat
               </button>
-            ) : (
-              <div className="flex items-center gap-5 animate-scale-in">
-                <button
-                  onClick={endDemo}
-                  className="w-14 h-14 rounded-full border border-white/15 bg-white/5 hover:bg-white/10 active:scale-95 text-white flex items-center justify-center transition-all shadow-soft"
-                  aria-label="End session"
-                  title="End session"
-                >
-                  <X size={20} />
-                </button>
+              <button
+                onClick={() => { setView('search'); setAccountOpen(false); }}
+                className={cn(
+                  'w-full flex items-center gap-2.5 px-3 h-9 rounded-lg text-[12px] text-left transition',
+                  view === 'search' ? 'bg-white/8 text-white' : 'text-ink-200 hover:bg-white/5 hover:text-white',
+                )}
+              >
+                <Search size={14} className="shrink-0" /> Search
+              </button>
+            </div>
 
-                <div className="flex items-center gap-4 h-16 px-6 rounded-full border border-white/10 bg-ink-800/90 shadow-glow">
-                  <div className={cn('c-voice-waves', phase === 'speaking' ? 'text-white' : 'text-white/40')} style={{ transform: 'scale(1.5)' }}>
-                    {Array.from({ length: 12 }).map((_, i) => (
-                      <span key={i} className="c-voice-wave" style={{ height: `${4 + (i % 5) * 3}px`, animationDelay: `${i * 0.06}s` }} />
-                    ))}
-                  </div>
-                  <span className="w-px h-8 bg-white/10" />
+            {/* recent chats */}
+            <div className="px-3 pt-4">
+              <div className="text-[10px] uppercase tracking-wider text-ink-300 px-2 mb-1">Recent</div>
+              <div className="space-y-0.5">
+                {demoRecentChats.map((c) => (
                   <button
-                    onClick={toggleMute}
-                    className={cn(
-                      'h-11 w-11 rounded-full flex items-center justify-center transition-all active:scale-95',
-                      muted ? 'bg-ink-700 text-white' : 'bg-white/10 text-white hover:bg-white/15',
-                    )}
-                    aria-label={muted ? 'Unmute microphone' : 'Mute microphone'}
-                    title={muted ? 'Unmute' : 'Mute'}
+                    key={c.title}
+                    onClick={() => { setView('voice'); setAccountOpen(false); startDemo(); }}
+                    className="w-full flex items-center gap-2 px-2.5 h-8 rounded-lg text-ink-200 text-[12px] hover:bg-white/5 hover:text-white transition"
                   >
-                    {muted ? <MicOff size={19} /> : <Mic size={19} />}
+                    <Mic size={13} className="text-ink-300 shrink-0" />
+                    <span className="truncate">{c.title}</span>
                   </button>
-                </div>
+                ))}
               </div>
-            )}
-          </div>
-        </div>
+            </div>
 
-        {/* decorative bottom waveform */}
-        <div className="relative h-12 opacity-30 pointer-events-none flex items-end justify-center gap-[3px] px-8">
-          {Array.from({ length: 48 }).map((_, i) => (
-            <span
-              key={i}
-              className="w-[3px] rounded-full bg-white"
-              style={{ height: `${6 + Math.abs(Math.sin(i * 0.32)) * 18}px` }}
-            />
-          ))}
+            <div className="flex-1" />
+
+            {/* footer / account menu */}
+            <div className="relative border-t border-white/8 p-2 shrink-0">
+              <button
+                onClick={() => setAccountOpen((v) => !v)}
+                className="w-full flex items-center gap-2.5 px-2.5 h-10 rounded-lg hover:bg-white/5 transition"
+              >
+                <div className="h-6 w-6 rounded-full bg-ink-700 border border-white/10 flex items-center justify-center text-[9px] font-semibold text-white shrink-0">KS</div>
+                <div className="leading-tight min-w-0 text-left">
+                  <div className="text-white truncate text-[12px]">K. S</div>
+                  <div className="text-[9px] text-ink-400">Free Account</div>
+                </div>
+              </button>
+              {accountOpen && (
+                <>
+                  <div className="fixed inset-0 z-30" onClick={() => setAccountOpen(false)} />
+                  <div className="absolute bottom-full left-2 mb-1 z-40 w-[190px] rounded-xl bg-ink-900 border border-white/10 p-1 shadow-2xl animate-in fade-in duration-100">
+                    <button
+                      onClick={() => setAccountOpen(false)}
+                      className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-[12px] text-ink-100 hover:bg-white/5 hover:text-white transition text-left"
+                    >
+                      <Settings size={13} className="text-ink-300" /> Settings
+                    </button>
+                    <button
+                      onClick={() => setAccountOpen(false)}
+                      className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-[12px] text-red-400 hover:bg-red-500/10 hover:text-red-300 transition text-left"
+                    >
+                      <LogOut size={13} /> Sign out
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Main workspace */}
+          <div className="flex-1 min-w-0 flex flex-col items-center px-4 sm:px-8 pt-5 pb-8">
+
+            {/* mobile logo bar */}
+            <div className="md:hidden w-full flex items-center gap-2 pb-5">
+              <img src="/KSEMOlogo.png" alt="KSEMO" className="h-7 w-7 rounded-lg object-contain" />
+              <span className="text-[14px] font-semibold tracking-tight text-white/90">Ksemo</span>
+            </div>
+
+            {/* content */}
+            <div className="flex-1 min-h-0 w-full flex flex-col items-center justify-center">
+              {view === 'search' ? (
+                <div className="w-full max-w-md text-center animate-fade-in">
+                  <div className="relative mb-4">
+                    <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-300 shrink-0" />
+                    <input
+                      value={demoQuery}
+                      onChange={(e) => setDemoQuery(e.target.value)}
+                      placeholder="Search chats, messages, files…"
+                      autoFocus
+                      className="w-full h-9 pl-9 pr-3 rounded-xl bg-ink-850 border border-white/10 text-ink-100 text-[12px] placeholder:text-ink-400 outline-none focus:border-white/20 transition"
+                    />
+                  </div>
+                  <p className="text-[12px] text-ink-300 mb-6">Search chats, messages, and files</p>
+                  <div className="space-y-2 text-left">
+                    {demoRecentChats
+                      .filter((c) => c.title.toLowerCase().includes(demoQuery.trim().toLowerCase()))
+                      .map((c) => (
+                        <button
+                          key={c.title}
+                          onClick={() => { setView('voice'); setDemoQuery(''); startDemo(); }}
+                          className="w-full flex items-center gap-2.5 px-3.5 py-3 rounded-xl bg-ink-850 border border-white/8 text-ink-200 text-[12px] hover:border-white/15 transition"
+                        >
+                          <Mic size={14} className="text-ink-300 shrink-0" />
+                          <span className="truncate">{c.title}</span>
+                        </button>
+                      ))}
+                  </div>
+                  {demoRecentChats.filter((c) => c.title.toLowerCase().includes(demoQuery.trim().toLowerCase())).length === 0 && (
+                    <p className="text-[12px] text-ink-400 py-8">
+                      No results for “{demoQuery}”
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <>
+                  {/* core wobbly orb — mirrors the real Voice Chat circle */}
+                  <div className="relative w-64 h-64 sm:w-72 sm:h-72">
+                    <WobblyCircle
+                      phase={started ? phase : 'idle'}
+                      minRadius={100}
+                      className="w-full h-full object-contain"
+                    />
+                  </div>
+
+                  {/* live subtitles (shown while the greeting plays) */}
+                  {started && (
+                    <div className="mt-6 text-center animate-fade-in max-w-md px-4 min-h-[24px]">
+                      <p className="text-sm font-medium leading-relaxed text-ink-100 transition-all duration-300">{spoken}</p>
+                    </div>
+                  )}
+
+                  {/* single start control — after the greeting it returns here */}
+                  <div className="z-20 py-2 h-14 flex items-center justify-center">
+                    {!started ? (
+                      <button
+                        onClick={startDemo}
+                        className="px-8 h-12 rounded-full border border-white/10 bg-ink-800 text-white hover:bg-ink-700 active:scale-95 transition-all shadow-glow font-semibold tracking-wide text-[13px]"
+                      >
+                        Start Voice Chat
+                      </button>
+                    ) : (
+                      <div className="h-12 flex items-center">
+                        <span className="text-[11px] uppercase tracking-widest text-ink-300 animate-pulse-soft">Speaking…</span>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </div>
