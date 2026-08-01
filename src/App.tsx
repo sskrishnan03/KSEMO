@@ -9,7 +9,6 @@ import Signup from './pages/Signup';
 import Forgot from './pages/Forgot';
 import Reset from './pages/Reset';
 import Verify from './pages/Verify';
-import ChatWorkspace from './pages/ChatWorkspace';
 import Dashboard from './pages/Dashboard';
 
 
@@ -37,13 +36,13 @@ export default function App() {
             <Route path="/share/:shareData" element={<SharedChatView />} />
             <Route path="/app" element={<ProtectedRoute><AppLayout><Dashboard /></AppLayout></ProtectedRoute>}>
             </Route>
-            <Route path="/app/chat/:chatId" element={<ProtectedRoute><AppLayout><ChatWorkspace /></AppLayout></ProtectedRoute>} />
+            <Route path="/app/voice-chat" element={<ProtectedRoute><AppLayout><VoiceChat /></AppLayout></ProtectedRoute>} />
+            <Route path="/app/voice-chat/:chatId" element={<ProtectedRoute><AppLayout><VoiceChat /></AppLayout></ProtectedRoute>} />
 
 
             <Route path="/app/search" element={<ProtectedRoute><AppLayout><SearchPage /></AppLayout></ProtectedRoute>} />
 
             <Route path="/app/notifications" element={<ProtectedRoute><AppLayout><Notifications /></AppLayout></ProtectedRoute>} />
-            <Route path="/app/voice-chat" element={<ProtectedRoute><AppLayout><VoiceChat /></AppLayout></ProtectedRoute>} />
             <Route path="/app/settings" element={<ProtectedRoute><AppLayout><Settings /></AppLayout></ProtectedRoute>} />
             <Route path="/app/admin" element={<AdminRoute><Admin /></AdminRoute>} />
             <Route path="*" element={<Navigate to="/" replace />} />

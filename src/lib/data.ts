@@ -1,6 +1,5 @@
 import { supabase } from './supabase';
-import type { Chat, Message, Notification, Profile, UserSettings, AppPreferences, Favorite, PromptTemplate } from './types';
-export type { PromptTemplate };
+import type { Chat, Message, Notification, Profile, UserSettings, AppPreferences, Favorite } from './types';
 
 // Flag to stick to local storage if DB is not set up
 let dbFailed = false;
@@ -23,20 +22,6 @@ function setLocal<T>(key: string, val: T): void {
 }
 
 // ---------- Profiles ----------
-export async function getProfile(userId: string): Promise<Profile | null> {
-  if (!dbFailed) {
-    try {
-      const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
-      if (!error) return data as Profile | null;
-      console.warn('Supabase getProfile failed, using fallback:', error.message);
-      dbFailed = true;
-    } catch {
-      dbFailed = true;
-    }
-  }
-  return getLocal<Profile | null>(`profile_${userId}`, null);
-}
-
 export async function updateProfile(userId: string, patch: Partial<Profile>): Promise<Profile | null> {
   if (!dbFailed) {
     try {
@@ -66,9 +51,6 @@ export async function updateProfile(userId: string, patch: Partial<Profile>): Pr
 
 const LAST_CHAT_KEY = 'ksemo_last_active_chat';
 
-export function getLastActiveChatId(): string | null {
-  try { return localStorage.getItem(LAST_CHAT_KEY); } catch { return null; }
-}
 export function setLastActiveChatId(id: string) {
   try { localStorage.setItem(LAST_CHAT_KEY, id); } catch {}
 }
@@ -132,6 +114,10 @@ export async function createChat(patch?: Partial<Chat>): Promise<Chat | null> {
   return newChat;
 }
 
+export async function createVoiceChat(): Promise<Chat | null> {
+  return createChat({ category: 'voice' });
+}
+
 export async function updateChat(id: string, patch: Partial<Chat>): Promise<void> {
   if (!dbFailed) {
     try {
@@ -192,10 +178,6 @@ export async function deleteAllChats(): Promise<void> {
   setLocal('messages', []);
   setLocal('favorites', []);
   window.dispatchEvent(new CustomEvent('ksemo-chats-deleted'));
-}
-
-export async function togglePin(id: string, pinned: boolean): Promise<void> {
-  await updateChat(id, { pinned });
 }
 
 // ---------- Messages ----------
@@ -282,33 +264,6 @@ export async function deleteMessage(id: string): Promise<void> {
 }
 
 // ---------- Favorites ----------
-export async function listFavorites(): Promise<(Favorite & { message?: Message; chat?: { id: string; title: string } })[]> {
-  if (!dbFailed) {
-    try {
-      const { data, error } = await supabase
-        .from('favorites')
-        .select('*, message:messages(*), chat:chats(id, title)')
-        .order('created_at', { ascending: false });
-      if (!error) return (data ?? []) as any[];
-      dbFailed = true;
-    } catch {
-      dbFailed = true;
-    }
-  }
-  const favs = getLocal<Favorite[]>('favorites', []);
-  const msgs = getLocal<Message[]>('messages', []);
-  const chats = getLocal<Chat[]>('chats', []);
-  return favs.map(f => {
-    const msg = msgs.find(m => m.id === f.message_id);
-    const chat = msg ? chats.find(c => c.id === msg.chat_id) : undefined;
-    return {
-      ...f,
-      message: msg,
-      chat: chat ? { id: chat.id, title: chat.title } : undefined
-    };
-  }).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-}
-
 export async function addFavorite(messageId: string, note?: string): Promise<void> {
   if (!dbFailed) {
     try {
@@ -337,19 +292,6 @@ export async function removeFavorite(messageId: string): Promise<void> {
   }
   const favs = getLocal<Favorite[]>('favorites', []);
   setLocal('favorites', favs.filter(f => f.message_id !== messageId));
-}
-
-export async function deleteAllFavorites(): Promise<void> {
-  if (!dbFailed) {
-    try {
-      const { error } = await supabase.from('favorites').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      if (!error) {
-        setLocal('favorites', []);
-        return;
-      }
-    } catch {}
-  }
-  setLocal('favorites', []);
 }
 
 export async function isFavorite(messageId: string): Promise<boolean> {
@@ -522,39 +464,6 @@ export function clearRecentSearches(): void {
   setLocal('recent_searches', []);
 }
 
-// ---------- Prompt Templates ----------
-const TEMPLATES_KEY = 'ksemo_prompt_templates';
-
-export function listTemplates(): PromptTemplate[] {
-  return getLocal<PromptTemplate[]>(TEMPLATES_KEY, []);
-}
-
-export function saveTemplate(template: Omit<PromptTemplate, 'id' | 'created_at'>): PromptTemplate {
-  const templates = listTemplates();
-  const newTemplate: PromptTemplate = {
-    id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2),
-    created_at: new Date().toISOString(),
-    ...template,
-  };
-  templates.unshift(newTemplate);
-  setLocal(TEMPLATES_KEY, templates);
-  return newTemplate;
-}
-
-export function updateTemplate(id: string, patch: Partial<PromptTemplate>): void {
-  const templates = listTemplates();
-  const idx = templates.findIndex(t => t.id === id);
-  if (idx !== -1) {
-    templates[idx] = { ...templates[idx], ...patch };
-    setLocal(TEMPLATES_KEY, templates);
-  }
-}
-
-export function deleteTemplate(id: string): void {
-  const templates = listTemplates();
-  setLocal(TEMPLATES_KEY, templates.filter(t => t.id !== id));
-}
-
 // ---------- AI usage logging ----------
 export async function logUsage(model: string, promptTokens: number, completionTokens: number, latencyMs: number): Promise<void> {
   if (!dbFailed) {
@@ -596,6 +505,15 @@ async function sendEmailViaProxy(to: string, subject: string, body: string): Pro
 function openMailtoLink(to: string, subject: string, body: string): void {
   const mailtoLink = `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   window.open(mailtoLink, '_blank');
+}
+
+export async function sendEmail(to: string, subject: string, body: string): Promise<boolean> {
+  const ok = await sendEmailViaProxy(to, subject, body);
+  if (!ok) {
+    console.log("SMTP proxy not available, opening mail client as fallback");
+    openMailtoLink(to, subject, body);
+  }
+  return ok;
 }
 
 export function dispatchSimulatedEmail(email: string, fullName: string, type: 'signup' | 'signin' | 'signout') {

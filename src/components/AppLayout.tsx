@@ -33,7 +33,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
 
     if (isMeta && e.key === 'n' && (prefs.shortcut_new_chat ?? true) && !isInInput) {
       e.preventDefault();
-      nav('/app');
+      nav('/app/voice-chat');
     }
     if (isMeta && e.key === 'k' && (prefs.shortcut_search ?? true) && !isInInput) {
       e.preventDefault();
@@ -52,10 +52,6 @@ export function AppLayout({ children }: { children: ReactNode }) {
       nav('/app/voice-chat');
     }
 
-    if (isMeta && e.shiftKey && e.key === 'H' && (prefs.shortcut_history ?? true) && !isInInput) {
-      e.preventDefault();
-      nav('/app/history');
-    }
     if (e.key === 'Escape' && (prefs.shortcut_stop_generation ?? true)) {
       window.dispatchEvent(new CustomEvent('ksemo-stop-generation'));
     }

@@ -166,14 +166,3 @@ export function EmptyState({ icon, title, description, action }: { icon?: ReactN
     </div>
   );
 }
-
-export function Tooltip({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <span className="relative group inline-flex">
-      {children}
-      <span className="pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-2 py-1 rounded-md bg-ink-700 border border-white/10 text-[11px] text-white whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-50">
-        {label}
-      </span>
-    </span>
-  );
-}

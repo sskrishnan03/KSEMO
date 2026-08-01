@@ -67,6 +67,28 @@ export interface UserSettings {
   updated_at: string;
 }
 
+export interface AppPreferences {
+  send_on_enter?: boolean;
+  show_token_count?: boolean;
+  compact_mode?: boolean;
+  notifications_email?: boolean;
+  notifications_security?: boolean;
+  notifications_product?: boolean;
+  notifications_in_app?: boolean;
+  notifications_sound?: boolean;
+  theme?: 'dark' | 'light' | 'system';
+  font_size?: 'small' | 'medium' | 'large';
+  auto_rename_chats?: boolean;
+  voice_input_enabled?: boolean;
+  read_aloud_enabled?: boolean;
+  shortcut_new_chat?: boolean;
+  shortcut_search?: boolean;
+  shortcut_settings?: boolean;
+  shortcut_toggle_sidebar?: boolean;
+  shortcut_stop_generation?: boolean;
+  shortcut_voice_chat?: boolean;
+}
+
 export interface PromptTemplate {
   id: string;
   name: string;

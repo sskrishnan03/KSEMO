@@ -13,14 +13,6 @@ export function formatRelativeTime(date: string | Date): string {
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
-export function formatBytes(bytes: number): string {
-  if (bytes === 0) return '0 B';
-  const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
-}
-
 export function formatNumber(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
@@ -36,10 +28,6 @@ export function initials(name: string): string {
 
 export function truncate(str: string, n: number): string {
   return str.length > n ? `${str.slice(0, n)}…` : str;
-}
-
-export function slugify(str: string): string {
-  return str.toLowerCase().trim().replace(/[^\w\s-]/g, '').replace(/[\s_-]+/g, '-').replace(/^-+|-+$/g, '');
 }
 
 export function downloadFile(filename: string, content: string, type = 'text/plain'): void {
@@ -74,8 +62,4 @@ export function groupByDate<T extends { created_at?: string; updated_at?: string
     groups.get(label)!.push(item);
   }
   return Array.from(groups.entries()).map(([label, items]) => ({ label, items }));
-}
-
-export function sleep(ms: number): Promise<void> {
-  return new Promise((r) => setTimeout(r, ms));
 }

@@ -10,5 +10,3 @@ export const supabase = createClient(url, anonKey, {
     detectSessionInUrl: true,
   },
 });
-
-export const AI_EDGE_URL = `${url}/functions/v1/ksemo-ai`;

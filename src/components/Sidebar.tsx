@@ -1,13 +1,13 @@
 import { useEffect, useState, useLayoutEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
-  SquarePen, MessageSquare, Search, Settings,
+  Search, Settings,
   Archive, Trash2, Pin, Shield,
   MoreHorizontal, PanelLeft, LogOut, Mic,
   Edit2, Share2, HelpCircle, Filter,
 } from 'lucide-react';
 import { cn, groupByDate, truncate, initials } from '../lib/utils';
-import { listChats, createChat, updateChat, deleteChat, getSettings } from '../lib/data';
+import { listChats, updateChat, deleteChat, getSettings } from '../lib/data';
 import { useAuthContext } from './AuthProvider';
 import { Button, Modal } from './ui';
 import type { Chat, AppPreferences } from '../lib/types';
@@ -78,6 +78,7 @@ export function Sidebar({ collapsed, onToggleCollapse }: Props) {
     await updateChat(c.id, { title: renameTitle.trim() });
     load();
     setRenamingChatId(null);
+    window.dispatchEvent(new CustomEvent('ksemo-chats-updated'));
   };
 
   const handleShare = (c: Chat) => {
@@ -102,7 +103,11 @@ export function Sidebar({ collapsed, onToggleCollapse }: Props) {
   useEffect(() => {
     const handler = () => load();
     window.addEventListener('ksemo-chats-deleted', handler);
-    return () => window.removeEventListener('ksemo-chats-deleted', handler);
+    window.addEventListener('ksemo-chats-updated', handler);
+    return () => {
+      window.removeEventListener('ksemo-chats-deleted', handler);
+      window.removeEventListener('ksemo-chats-updated', handler);
+    };
   }, []);
 
   const filtered = chats.filter((c) => {
@@ -128,23 +133,6 @@ export function Sidebar({ collapsed, onToggleCollapse }: Props) {
   const grouped = dateFilter === 'all'
     ? groupByDate(filtered, 'updated_at')
     : [{ label: '', items: filtered }];
-
-  const newChat = async () => {
-    // If already on an empty "New chat", just stay there
-    if (loc.pathname.startsWith('/app/chat/')) {
-      const currentId = loc.pathname.split('/app/chat/')[1];
-      const current = chats.find((c) => c.id === currentId);
-      if (current && current.title === 'New chat') return;
-    }
-    // If an existing empty "New chat" exists anywhere, navigate to it instead of creating duplicate
-    const existingEmpty = chats.find((c) => c.title === 'New chat');
-    if (existingEmpty) {
-      nav(`/app/chat/${existingEmpty.id}`);
-      return;
-    }
-    const c = await createChat();
-    if (c) nav(`/app/chat/${c.id}`);
-  };
 
   const togglePin = async (c: Chat) => {
     await updateChat(c.id, { pinned: !c.pinned });
@@ -185,21 +173,12 @@ export function Sidebar({ collapsed, onToggleCollapse }: Props) {
             <PanelLeft size={17} className="transition-transform duration-500 rotate-180" />
           </button>
 
-          {/* New chat icon */}
-          <button
-            onClick={newChat}
-            className="group h-9 w-9 rounded-xl flex items-center justify-center text-ink-300 hover:text-white hover:bg-white/8 transition-all duration-200"
-            title="New chat"
-          >
-            <SquarePen size={18} className="icon-bounce" />
-          </button>
-
           {/* Voice chat icon */}
           <Link
             to="/app/voice-chat"
             className={cn(
               'group h-9 w-9 rounded-xl flex items-center justify-center transition-all duration-200',
-              loc.pathname === '/app/voice-chat' ? 'text-white bg-white/10' : 'text-ink-300 hover:text-white hover:bg-white/8',
+              loc.pathname === '/app/voice-chat' || loc.pathname.startsWith('/app/voice-chat/') ? 'text-white bg-white/10' : 'text-ink-300 hover:text-white hover:bg-white/8',
             )}
             title="Voice Chat"
           >
@@ -270,17 +249,10 @@ export function Sidebar({ collapsed, onToggleCollapse }: Props) {
           <nav className={cn('px-2 pt-3 pb-2 space-y-0.5 shrink-0', compact && 'space-y-0 pt-2')}>
             {/* Action buttons */}
             <button
-              onClick={newChat}
-              className={cn('group w-full flex items-center gap-3 px-3 rounded-lg text-[13px] text-ink-200 hover:bg-white/5 hover:text-white transition-colors', compact ? 'h-8' : 'h-9')}
-            >
-              <SquarePen size={16} className="icon-bounce" />
-              New Chat
-            </button>
-            <button
               onClick={() => nav('/app/voice-chat')}
               className={cn(
                 'group w-full flex items-center gap-3 px-3 rounded-lg text-[13px] text-left transition-colors',
-                loc.pathname === '/app/voice-chat' ? 'bg-white/8 text-white' : 'text-ink-200 hover:bg-white/5 hover:text-white',
+                loc.pathname === '/app/voice-chat' || loc.pathname.startsWith('/app/voice-chat/') ? 'bg-white/8 text-white' : 'text-ink-200 hover:bg-white/5 hover:text-white',
                 compact ? 'h-8' : 'h-9',
               )}
             >
@@ -392,7 +364,7 @@ export function Sidebar({ collapsed, onToggleCollapse }: Props) {
               <div key={g.label || '__all__'} className="mb-2">
                 {g.label && <div className="px-3 py-1 text-[10px] uppercase tracking-wider text-ink-300">{g.label}</div>}
                 {g.items.map((c) => {
-                  const active = loc.pathname === `/app/chat/${c.id}`;
+                  const active = loc.pathname === `/app/voice-chat/${c.id}`;
                   const isMenuOpen = activeMenuChatId === c.id;
                   return (
                     <div key={c.id} className="group relative">
@@ -420,17 +392,13 @@ export function Sidebar({ collapsed, onToggleCollapse }: Props) {
                       ) : (
                         <>
                           <Link
-                            to={`/app/chat/${c.id}`}
+                            to={`/app/voice-chat/${c.id}`}
                             className={cn(
                               'flex items-center gap-2 px-3 h-9 rounded-lg text-[13px] transition-colors pr-8',
                               active ? 'bg-white/8 text-white' : 'text-ink-200 hover:bg-white/5 hover:text-white',
                             )}
                           >
-                            {c.type === 'voice' ? (
-                              <Mic size={14} className="text-ink-300 shrink-0" />
-                            ) : (
-                              <MessageSquare size={14} className="text-ink-300 shrink-0" />
-                            )}
+                            <Mic size={14} className="text-ink-300 shrink-0" />
                             <span className="truncate">{truncate(c.title, 28)}</span>
                           </Link>
                           <button
@@ -586,9 +554,8 @@ export function Sidebar({ collapsed, onToggleCollapse }: Props) {
                     if (confirmDeleteId) {
                       await deleteChat(confirmDeleteId);
                       load();
-                      if (loc.pathname === `/app/chat/${confirmDeleteId}`) {
-                        const c = await createChat();
-                        if (c) nav(`/app/chat/${c.id}`, { replace: true });
+                      if (loc.pathname === `/app/voice-chat/${confirmDeleteId}`) {
+                        nav('/app/voice-chat', { replace: true });
                       }
                     }
                     setConfirmDeleteId(null);

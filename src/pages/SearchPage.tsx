@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, MessageSquare, Sparkles, ArrowRight, Clock } from 'lucide-react';
+import { Search, Mic, Sparkles, ArrowRight, Clock, X } from 'lucide-react';
 import { Input, EmptyState } from '../components/ui';
 import { searchChats, searchMessages, addRecentSearch, getRecentSearches } from '../lib/data';
 import type { Chat, Message } from '../lib/types';
-import { formatRelativeTime, truncate } from '../lib/utils';
+import { cn, formatRelativeTime, truncate } from '../lib/utils';
 
 type Tab = 'all' | 'chats' | 'messages';
 
@@ -73,9 +73,19 @@ export default function SearchPage() {
             placeholder="Search chats, messages, files…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            className="pl-12 h-12 text-[15px]"
+            className={cn('pl-12 h-12 text-[15px]', query && 'pr-10')}
           />
           {loading && <span className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />}
+          {!loading && query && (
+            <button
+              onClick={() => { setQuery(''); setChats([]); setMessages([]); setSearched(false); }}
+              className="absolute right-3 top-1/2 -translate-y-1/2 h-6 w-6 flex items-center justify-center rounded-md text-ink-300 hover:text-white hover:bg-white/5 transition"
+              title="Cancel search"
+              aria-label="Cancel search"
+            >
+              <X size={16} />
+            </button>
+          )}
         </div>
 
         {searched && (
@@ -98,18 +108,18 @@ export default function SearchPage() {
 
             <div className="space-y-2">
               {showChats && chats.map((c) => (
-                <Link key={c.id} to={`/app/chat/${c.id}`} className="group flex items-center gap-3 rounded-xl bg-ink-850 border border-white/8 p-3.5 hover:border-white/15 transition">
-                  <div className="h-9 w-9 rounded-lg bg-ink-800 border border-white/8 flex items-center justify-center text-ink-200"><MessageSquare size={16} /></div>
+                <Link key={c.id} to={`/app/voice-chat/${c.id}`} className="group flex items-center gap-3 rounded-xl bg-ink-850 border border-white/8 p-3.5 hover:border-white/15 transition">
+                  <div className="h-9 w-9 rounded-lg bg-ink-800 border border-white/8 flex items-center justify-center text-ink-200"><Mic size={16} /></div>
                   <div className="flex-1 min-w-0">
                     <div className="text-[13px] text-white truncate">{c.title}</div>
-                    <div className="text-[11px] text-ink-300">Chat · {formatRelativeTime(c.updated_at)}</div>
+                    <div className="text-[11px] text-ink-300">Voice Chat · {formatRelativeTime(c.updated_at)}</div>
                   </div>
                   <ArrowRight size={14} className="text-ink-300 group-hover:text-white transition" />
                 </Link>
               ))}
 
               {showMessages && messages.map((m) => (
-                <Link key={m.id} to={`/app/chat/${m.chat_id}`} className="group block rounded-xl bg-ink-850 border border-white/8 p-3.5 hover:border-white/15 transition">
+                <Link key={m.id} to={`/app/voice-chat/${m.chat_id}`} className="group block rounded-xl bg-ink-850 border border-white/8 p-3.5 hover:border-white/15 transition">
                   <div className="flex items-center gap-2 mb-1.5">
                     <Sparkles size={13} className="text-ink-300" />
                     <span className="text-[11px] text-ink-300">{m.chat?.title ?? 'Chat'} · {formatRelativeTime(m.created_at)}</span>
