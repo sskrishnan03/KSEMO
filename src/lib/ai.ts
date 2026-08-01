@@ -28,52 +28,92 @@ export interface StreamResult {
   fromEdge: boolean;
 }
 
+/**
+ * System prompt used by the voice assistant. Written to feel warm, natural
+ * and human when spoken aloud, and never to sound like a canned robot reply.
+ */
+export const VOICE_SYSTEM_PROMPT = `You are Ksemo, a friendly voice assistant who talks to the user out loud, like a real person. Because your words are spoken, they must always sound natural and human.
 
-function mapModelForOpenRouter(modelName: string): string {
+How to talk:
+- Answer the question directly and keep it short — usually 2 to 4 sentences, unless the user asks for more detail.
+- Sound warm and conversational: use contractions like "I'll" and "that's", vary sentence length, and never use bullet points, lists, markdown, or anything that looks written for a screen.
+- Respond to exactly what was asked. Never repeat a scripted or canned answer.
+- If you don't know something, say so honestly and offer to help find out.
+- End naturally, the way a person would, sometimes with a quick follow-up question.`;
+
+
+// gemini-flash-lite-latest is fast, cheap and non-thinking, which keeps
+// voice replies quick and avoids burning free-tier quota on hidden thoughts.
+function mapModelForGemini(modelName: string): string {
   const map: Record<string, string> = {
-    'ksemo-pro': 'openai/gpt-4o-mini',
-    'ksemo-max': 'anthropic/claude-3.5-sonnet',
-    'ksemo-fast': 'openai/gpt-4o-mini',
-    'gpt-4o': 'openai/gpt-4o',
-    'gemini-1.5-pro': 'google/gemini-pro',
-    'claude-3.5-sonnet': 'anthropic/claude-3.5-sonnet',
-    'grok-2': 'xai/grok-2',
-    'deepseek-v3': 'deepseek/deepseek-chat',
+    'ksemo-pro': 'gemini-flash-lite-latest',
+    'ksemo-max': 'gemini-flash-lite-latest',
+    'ksemo-fast': 'gemini-flash-lite-latest',
+    'gemini-2.0-flash': 'gemini-flash-lite-latest',
+    'gemini-2.5-flash': 'gemini-flash-lite-latest',
+    'gemini-flash': 'gemini-flash-lite-latest',
+    'gemini-pro': 'gemini-flash-lite-latest',
   };
   return map[modelName] || modelName;
 }
 
-async function openRouterStream(opts: StreamOptions, apiKey: string, start: number): Promise<StreamResult> {
-  const cleanMessages = opts.messages.map(({ role, content }) => ({ role, content }));
+function textFromContent(content: string | ContentPart[]): string {
+  if (typeof content === 'string') return content;
+  return content
+    .filter((p): p is TextPart => p.type === 'text')
+    .map((p) => p.text)
+    .join('\n');
+}
 
-  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
-      'HTTP-Referer': window.location.origin,
-      'X-Title': 'Ksemo AI Workspace',
-    },
-    body: JSON.stringify({
-      model: mapModelForOpenRouter(opts.model),
-      messages: cleanMessages,
+async function geminiStream(opts: StreamOptions, apiKey: string, start: number): Promise<StreamResult> {
+  const model = mapModelForGemini(opts.model);
+  const systemText = opts.messages
+    .filter((m) => m.role === 'system')
+    .map((m) => textFromContent(m.content))
+    .join('\n');
+  const contents = opts.messages
+    .filter((m) => m.role === 'user' || m.role === 'assistant')
+    .map((m) => ({
+      role: m.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: textFromContent(m.content) }],
+    }));
+
+  const body: Record<string, unknown> = {
+    contents,
+    generationConfig: {
       temperature: opts.temperature ?? 0.7,
-      max_tokens: opts.maxTokens ?? 2048,
-      stream: true,
-    }),
+      maxOutputTokens: opts.maxTokens ?? 2048,
+    },
+  };
+  if (systemText) {
+    body.systemInstruction = { parts: [{ text: systemText }] };
+  }
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${encodeURIComponent(apiKey)}`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
     signal: opts.signal,
   });
 
   if (!res.ok) {
-    throw new Error(`OpenRouter ${res.status}: ${await res.text()}`);
+    const detail = await res.text();
+    if (res.status === 400 || res.status === 401 || res.status === 403) {
+      throw new Error(`Gemini API key is invalid or unauthorized (${res.status}). Please update your API key.`);
+    }
+    if (res.status === 429) {
+      throw new Error(`Gemini API quota exceeded (${res.status}). Please try again later or check your billing.`);
+    }
+    throw new Error(`Gemini ${res.status}: ${detail}`);
   }
 
-  const body = res.body;
-  if (!body) {
-    throw new Error('No response body received from OpenRouter');
+  const stream = res.body;
+  if (!stream) {
+    throw new Error('No response body received from Gemini');
   }
 
-  const reader = body.getReader();
+  const reader = stream.getReader();
   const decoder = new TextDecoder();
   let full = '';
   let buffer = '';
@@ -88,13 +128,19 @@ async function openRouterStream(opts: StreamOptions, apiKey: string, start: numb
       const trimmed = line.trim();
       if (!trimmed || !trimmed.startsWith('data:')) continue;
       const payload = trimmed.slice(5).trim();
-      if (payload === '[DONE]') continue;
+      if (!payload || payload === '[DONE]') continue;
       try {
         const json = JSON.parse(payload);
-        const token = json.choices?.[0]?.delta?.content ?? '';
-        if (token) {
-          full += token;
-          opts.onToken(token);
+        const parts = json.candidates?.[0]?.content?.parts;
+        if (Array.isArray(parts)) {
+          for (const part of parts) {
+            if (part.thought === true) continue;
+            const token = part.text ?? '';
+            if (token) {
+              full += token;
+              opts.onToken(token);
+            }
+          }
         }
       } catch {
         // ignore partial/malformed JSON
@@ -109,17 +155,14 @@ async function openRouterStream(opts: StreamOptions, apiKey: string, start: numb
 
 export async function streamChat(opts: StreamOptions): Promise<StreamResult> {
   const start = performance.now();
-  const openRouterKey = import.meta.env.VITE_OPENROUTER_API_KEY ||
-    localStorage.getItem('ksemo_openrouter_api_key');
+  // The Gemini API key comes only from the .env file (VITE_GEMINI_API_KEY).
+  // When a key is configured, never silently fall back to canned local
+  // responses: surface the real error so the user knows the key/service
+  // needs attention.
+  const geminiKey = import.meta.env.VITE_GEMINI_API_KEY;
 
-  if (openRouterKey) {
-    try {
-      return await openRouterStream(opts, openRouterKey, start);
-    } catch (err) {
-      if ((err as Error).name === 'AbortError') throw err;
-      console.warn('OpenRouter call failed, falling back to local:', err);
-      return localStream(opts, start);
-    }
+  if (geminiKey) {
+    return await geminiStream(opts, geminiKey, start);
   }
 
   return localStream(opts, start);

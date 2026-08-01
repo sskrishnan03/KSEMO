@@ -8,6 +8,7 @@ import {
 import { Button } from '../components/ui';
 import { cn } from '../lib/utils';
 import { useAuthContext } from '../components/AuthProvider';
+import { getStoredVoiceId, pickVoice } from '../lib/voices';
 
 /* ──────────────────── data ──────────────────── */
 
@@ -24,7 +25,7 @@ const faqs = [
   { q: 'What is Ksemo?', a: 'Ksemo is a voice-first AI workspace. Instead of typing, you talk to your AI and it talks back — while every conversation is saved to your Recent list for later.' },
   { q: 'Is my data private?', a: 'Every table uses row-level security so you can only ever access your own data. Sessions are encrypted, and you can export or delete your data at any time from Settings.' },
   { q: 'Does it work offline?', a: 'Ksemo runs in the browser. The local engine produces responses even when no backend is connected, so the app is always usable.' },
-  { q: 'Which AI models are supported?', a: 'Ksemo connects to leading AI providers including OpenAI, Anthropic, Google, and open-source models via OpenRouter. You can switch models per voice session.' },
+  { q: 'Which AI models are supported?', a: 'Ksemo runs on Google\u2019s Gemini API, giving you fast, high-quality AI answers. You can switch models per voice session.' },
   { q: 'Can I cancel anytime?', a: 'Yes. Plans are month-to-month and you can cancel or downgrade from Settings at any time. Your data stays yours.' },
   { q: 'How is this different from ChatGPT?', a: 'Ksemo is voice-first. You speak naturally and Ksemo answers out loud — no chat window to manage. Every talk is saved with a mic icon in Recent so you can pick it back up anytime.' },
 ];
@@ -134,8 +135,11 @@ function VoiceDemo() {
     setPhase('speaking');
     setSpoken('');
 
+    const words = l.text.split(/\s+/).filter(Boolean);
+    let wordTimer: ReturnType<typeof setInterval> | null = null;
+    const stopWordTimer = () => { if (wordTimer) { clearInterval(wordTimer); wordTimer = null; } };
+
     if (!('speechSynthesis' in window)) {
-      const words = l.text.split(' ');
       words.forEach((_, wi) => {
         timers.current.push(setTimeout(() => setSpoken(words.slice(0, wi + 1).join(' ')), wi * 140));
       });
@@ -145,25 +149,37 @@ function VoiceDemo() {
 
     try { window.speechSynthesis.cancel(); } catch { /* ok */ }
 
+    // Word-by-word subtitle reveal on a timer (same approach as the real app),
+    // so subtitles stream in live while the voice speaks. Word-boundary events
+    // are unreliable across browsers and previously only showed words after speech.
+    if (words.length) {
+      const revealMs = Math.max(2500, words.length * 360);
+      const perWordMs = Math.max(100, revealMs / words.length);
+      let index = 0;
+      setSpoken(words[0]);
+      wordTimer = setInterval(() => {
+        index += 1;
+        setSpoken(words.slice(0, index).join(' '));
+        if (index >= words.length) stopWordTimer();
+      }, perWordMs);
+    }
+
     const u = new SpeechSynthesisUtterance(l.text);
     u.rate = 0.95;
     u.pitch = 0.85;
     u.volume = 1;
 
-    u.onboundary = (e: SpeechSynthesisEvent) => {
-      if (e.name !== 'word') return;
-      const rest = l.text.slice(e.charIndex);
-      const sp = rest.search(/\s/);
-      const end = sp === -1 ? l.text.length : e.charIndex + sp;
-      setSpoken(l.text.slice(0, end));
-    };
+    const v = pickVoice(getStoredVoiceId(), window.speechSynthesis.getVoices());
+    if (v) u.voice = v;
 
     u.onend = () => {
+      stopWordTimer();
       setSpoken(l.text);
       timers.current.push(setTimeout(finishDemo, 1200));
     };
 
     u.onerror = () => {
+      stopWordTimer();
       timers.current.push(setTimeout(finishDemo, 500));
     };
 
@@ -301,12 +317,12 @@ function VoiceDemo() {
                     <input
                       value={demoQuery}
                       onChange={(e) => setDemoQuery(e.target.value)}
-                      placeholder="Search chats, messages, files…"
+                      placeholder="Search all, chat, message…"
                       autoFocus
                       className="w-full h-9 pl-9 pr-3 rounded-xl bg-ink-850 border border-white/10 text-ink-100 text-[12px] placeholder:text-ink-400 outline-none focus:border-white/20 transition"
                     />
                   </div>
-                  <p className="text-[12px] text-ink-300 mb-6">Search chats, messages, and files</p>
+                  <p className="text-[12px] text-ink-300 mb-6">Search all chats and messages</p>
                   <div className="space-y-2 text-left">
                     {demoRecentChats
                       .filter((c) => c.title.toLowerCase().includes(demoQuery.trim().toLowerCase()))

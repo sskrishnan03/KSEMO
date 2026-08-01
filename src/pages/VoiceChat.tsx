@@ -1,13 +1,15 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { Mic, MicOff, X, Share2, Copy, RefreshCw, MoreHorizontal, Trash2, Volume2, Check } from 'lucide-react';
+import { Mic, MicOff, X, Share2, Copy, MoreHorizontal, Trash2, Volume2, Check, Download, FileDown, FileType, FileText, AudioWaveform } from 'lucide-react';
 import { cn, estimateTokens } from '../lib/utils';
 import { useTheme } from '../components/ThemeProvider';
 import { useAuthContext } from '../components/AuthProvider';
-import { createVoiceChat, insertMessage, updateChat, updateMessage, deleteMessage, getSettings, logUsage, listChats, listMessages, setLastActiveChatId } from '../lib/data';
-import { streamChat, type ChatMessage } from '../lib/ai';
+import { createVoiceChat, insertMessage, updateChat, deleteMessage, getSettings, logUsage, listChats, listMessages, setLastActiveChatId } from '../lib/data';
+import { streamChat, VOICE_SYSTEM_PROMPT, type ChatMessage } from '../lib/ai';
+import { VOICE_STORAGE_KEY, getStoredVoiceId, setStoredVoiceId, loadVoices, pickVoice } from '../lib/voices';
 import { Markdown } from '../components/Markdown';
 import { ShareModal } from '../components/ShareModal';
+import { exportChatAsPDF, exportChatAsDocx, exportChatAsText } from '../lib/exportChat';
 import type { Chat } from '../lib/types';
 
 type HistoryEntry = { id?: string; role: 'user' | 'assistant'; content: string };
@@ -66,17 +68,13 @@ export default function VoiceChat() {
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [moreMenuIndex, setMoreMenuIndex] = useState<number | null>(null);
   const [moreMenuPos, setMoreMenuPos] = useState<{ left: number; bottom: number } | null>(null);
-  const [regeneratingIndex, setRegeneratingIndex] = useState<number | null>(null);
+  const [exportOpen, setExportOpen] = useState(false);
   const [readAloudEnabled, setReadAloudEnabled] = useState(true);
-  const [liveUserText, setLiveUserText] = useState('');
+  const [readingIndex, setReadingIndex] = useState<number | null>(null);
+  const [loadingChat, setLoadingChat] = useState(false);
 
   const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
   const isSpeechSupported = !!SpeechRecognition;
-
-  const [hasKey, setHasKey] = useState(() => {
-    return !!(import.meta.env.VITE_OPENROUTER_API_KEY || localStorage.getItem('ksemo_openrouter_api_key'));
-  });
-  const [apiKeyInput, setApiKeyInput] = useState('');
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const recognitionRef = useRef<any>(null);
@@ -96,18 +94,33 @@ export default function VoiceChat() {
   const processingRef = useRef(false);
   const transcriptRef = useRef<HTMLDivElement | null>(null);
   const continueRef = useRef(false);
-  const isContinue = !!routeChatId;
+  const selectedVoiceIdRef = useRef<string>(getStoredVoiceId());
+  const readingIndexRef = useRef<number | null>(null);
 
   // Continue mode = an existing chat was opened from the sidebar.
   useEffect(() => { continueRef.current = !!routeChatId; }, [routeChatId]);
 
-  // Connect read-aloud availability to the user's Settings preference.
+  // Connect read-aloud + voice selection to the user's Settings preference.
   useEffect(() => {
     if (!profile?.id) return;
     getSettings(profile.id).then((s) => {
+      const v = s?.preferences?.voice_id;
+      if (v) {
+        selectedVoiceIdRef.current = v;
+        setStoredVoiceId(v);
+      }
       setReadAloudEnabled(s?.preferences?.read_aloud_enabled ?? true);
     }).catch(() => {});
   }, [profile?.id]);
+
+  // React live if the voice changes in another tab.
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === VOICE_STORAGE_KEY) selectedVoiceIdRef.current = getStoredVoiceId();
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
 
   // Sync state and muted to refs for the callbacks
   useEffect(() => { stateRef.current = state; }, [state]);
@@ -118,15 +131,6 @@ export default function VoiceChat() {
   const voiceLevelRef = useRef(0);
   useEffect(() => { voiceLevelRef.current = voiceLevel; }, [voiceLevel]);
 
-  const saveApiKey = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!apiKeyInput.trim()) return;
-    localStorage.setItem('ksemo_openrouter_api_key', apiKeyInput.trim());
-    setHasKey(true);
-    stopAll();
-    setStarted(false);
-  };
-
   // Get or create mic stream
   const getMicStream = useCallback(async (): Promise<MediaStream> => {
     if (streamRef.current && streamRef.current.active) return streamRef.current;
@@ -136,7 +140,6 @@ export default function VoiceChat() {
         noiseSuppression: true,
         autoGainControl: true,
         channelCount: 1,
-        sampleRate: 16000,
       },
     });
     streamRef.current = stream;
@@ -172,40 +175,43 @@ export default function VoiceChat() {
   }, []);
 
   // TTS with local service preference, queue unsticking, and safety timeout
-  const speak = useCallback((text: string, onWordBoundary?: (spokenText: string) => void): Promise<boolean> => {
-    return new Promise((resolve) => {
-      if (!('speechSynthesis' in window)) { resolve(false); return; }
-      
-      try { window.speechSynthesis.cancel(); } catch {}
-      try { window.speechSynthesis.resume(); } catch {} // Unpause Chrome's audio queue
-      
-      const u = new SpeechSynthesisUtterance(text);
-      utteranceRef.current = u; // Prevent garbage collection
-      
-      u.rate = continueRef.current ? 0.82 : 0.92;
-      u.pitch = 0.9;
-      u.volume = 0.85;
-      
-      const voices = window.speechSynthesis.getVoices();
-      const enVoices = voices.filter(v => v.lang.startsWith('en'));
-      // Prefer offline local service voices (prevents silent failures from network-based cloud voices)
-      const localEnVoices = enVoices.filter(v => v.localService);
-      const candidates = localEnVoices.length > 0 ? localEnVoices : enVoices;
+  const speak = useCallback(async (text: string, onWordBoundary?: (spokenText: string) => void): Promise<boolean> => {
+    if (!('speechSynthesis' in window)) return false;
 
-      const preferred = candidates.find(v => /daniel|alex|james|matthew|thomas|google.*male|google.*gb|en-gb.*male/i.test(v.name))
-        || candidates.find(v => /david|mark|richard|daniel|google.*english|samantha|en-us/i.test(v.name))
-        || candidates[0];
+    // Stay silent while the user is in another tab/window — they only want to
+    // hear the assistant when this app is in front.
+    if (document.hidden || !document.hasFocus()) return false;
 
-      if (preferred) {
-        u.voice = preferred;
-        console.log("TTS voice selected:", preferred.name, "LocalService:", preferred.localService);
-      }
+    try { window.speechSynthesis.cancel(); } catch {}
+    try { window.speechSynthesis.resume(); } catch {} // Unpause Chrome's audio queue
 
+    // Browser voices load asynchronously; if none are ready yet, wait for them
+    // so we never fall back to a broken default voice.
+    const voices = await loadVoices();
+
+    const u = new SpeechSynthesisUtterance(text);
+    utteranceRef.current = u; // Prevent garbage collection
+
+    u.rate = continueRef.current ? 0.82 : 0.92;
+    u.pitch = 1.0;
+    u.volume = 0.9;
+
+    const preferred = pickVoice(selectedVoiceIdRef.current, voices);
+    if (preferred) {
+      u.voice = preferred;
+      console.log("TTS voice selected:", preferred.name, "LocalService:", preferred.localService);
+    }
+
+    return new Promise<boolean>((resolve) => {
       let resolved = false;
+      const words = text.split(/\s+/).filter(Boolean);
+      let wordTimerId: number | undefined;
+      let boundaryFired = false;
       const done = () => {
         if (resolved) return;
         resolved = true;
         if (timeoutId) clearTimeout(timeoutId);
+        if (wordTimerId !== undefined) clearInterval(wordTimerId);
         utteranceRef.current = null;
         resolve(false);
       };
@@ -213,21 +219,44 @@ export default function VoiceChat() {
       u.onend = done;
       u.onerror = done;
 
-      if (onWordBoundary) {
-        u.onboundary = (event: any) => {
-          if (event.name === 'word') {
-            const charIndex = event.charIndex;
-            const remaining = text.slice(charIndex);
-            const nextSpace = remaining.search(/\s/);
-            const wordEnd = nextSpace === -1 ? text.length : charIndex + nextSpace;
-            onWordBoundary(text.slice(0, wordEnd));
-          }
+      // Word-by-word subtitle reveal kept in exact sync with the audio. The
+      // utterance's boundary events fire in real time as each word is actually
+      // spoken, so subtitles never run ahead of or behind the voice.
+      if (onWordBoundary && words.length) {
+        const revealMs = Math.max(2500, words.length * 360);
+        const perWordMs = Math.max(100, revealMs / words.length);
+        let index = 0;
+
+        // Live sync: reveal everything spoken up to the boundary word.
+        u.onboundary = (e: SpeechSynthesisEvent) => {
+          if (resolved) return;
+          boundaryFired = true;
+          if (wordTimerId !== undefined) { clearInterval(wordTimerId); wordTimerId = undefined; }
+          const charIndex = e.charIndex ?? 0;
+          const charLength = e.charLength ?? 0;
+          const end = charIndex + (charLength > 0 ? charLength : 0);
+          const spaceIdx = text.indexOf(' ', end);
+          const shown = text.slice(0, spaceIdx === -1 ? text.length : spaceIdx + 1).trim();
+          onWordBoundary(shown || text.slice(0, charIndex).trim());
         };
+
+        // Fallback revealer — only used if the chosen voice never emits
+        // boundary events. Starts instantly so subtitles appear right away.
+        onWordBoundary(words[0]);
+        wordTimerId = window.setInterval(() => {
+          if (boundaryFired) { if (wordTimerId !== undefined) clearInterval(wordTimerId); wordTimerId = undefined; return; }
+          index += 1;
+          onWordBoundary(words.slice(0, index).join(' '));
+          if (index >= words.length && wordTimerId !== undefined) {
+            clearInterval(wordTimerId);
+            wordTimerId = undefined;
+          }
+        }, perWordMs);
       }
 
-      // Safety timeout: 250ms per word + 4 seconds padding
-      const wordCount = text.split(/\s+/).length;
-      const timeoutMs = Math.max(5000, wordCount * 250 + 4000);
+      // Generous safety timeout so long answers are never cut off:
+      // 350ms per word + 8 seconds padding, min 15s.
+      const timeoutMs = Math.max(15000, words.length * 350 + 8000);
       const timeoutId = setTimeout(() => {
         console.warn("TTS speak timeout triggered");
         try { window.speechSynthesis.cancel(); } catch {}
@@ -241,8 +270,24 @@ export default function VoiceChat() {
   // Process user speech → AI → TTS → listen again
   const processUserSpeech = useCallback(async (text: string) => {
     if (processingRef.current) return;
-    if (!text.trim() || !chatIdRef.current) return;
+    if (!text.trim()) return;
     processingRef.current = true;
+
+    // Create the chat lazily on the first spoken message so an empty session
+    // never leaves an empty chat behind.
+    if (!chatIdRef.current) {
+      const c = await createVoiceChat();
+      if (!c) {
+        processingRef.current = false;
+        stateRef.current = 'listening';
+        setState('listening');
+        return;
+      }
+      chatIdRef.current = c.id;
+      setChatId(c.id);
+      setLastActiveChatId(c.id);
+      window.dispatchEvent(new CustomEvent('ksemo-chats-updated'));
+    }
 
     stateRef.current = 'thinking';
     setState('thinking');
@@ -258,7 +303,7 @@ export default function VoiceChat() {
     try {
       const result = await streamChat({
         model: 'ksemo-pro',
-        messages: [...conversationRef.current],
+        messages: [{ role: 'system', content: VOICE_SYSTEM_PROMPT }, ...conversationRef.current.slice(-12)],
         signal: controller.signal,
         onToken: () => {},
       });
@@ -275,7 +320,6 @@ export default function VoiceChat() {
 
       stateRef.current = 'speaking';
       setState('speaking');
-      setLiveUserText(''); // Clear the recognized user text once the AI starts replying
       setAiResponseText(''); // Start with empty subtitles
       
       const plainText = stripMarkdown(result.content);
@@ -288,16 +332,49 @@ export default function VoiceChat() {
         stateRef.current = 'listening';
         setState('listening');
         setAiResponseText(''); // Clear subtitles when speaking completes
+        // Brief pause so the mic doesn't snap back on the instant speech ends.
+        await new Promise((r) => setTimeout(r, 900));
+        if (mutedRef.current || stateRef.current !== 'listening') return;
         startRecognition();
       }
     } catch (err) {
       if ((err as Error).name === 'AbortError') {
         stateRef.current = 'listening';
         setState('listening');
+        await new Promise((r) => setTimeout(r, 500));
+        if (mutedRef.current || stateRef.current !== 'listening') return;
         startRecognition();
         return;
       }
       console.error('Voice chat error:', err);
+      const errMsg = (err as Error)?.message ?? '';
+
+      // Invalid/expired API key: tell the user and keep listening.
+      if (/invalid api key|unauthorized|user not found|api key is invalid/i.test(errMsg)) {
+        stateRef.current = 'error';
+        setState('error');
+        await speak("I couldn't reach the AI service because the Gemini API key is invalid or expired. Please update it in the environment file and refresh the app.");
+        stateRef.current = 'listening';
+        setState('listening');
+        await new Promise((r) => setTimeout(r, 500));
+        if (mutedRef.current || stateRef.current !== 'listening') return;
+        startRecognition();
+        return;
+      }
+
+      // Quota / rate limit: let the user know and keep the session running.
+      if (/quota|rate limit|too many requests/i.test(errMsg)) {
+        stateRef.current = 'error';
+        setState('error');
+        await speak("The AI service is currently busy or out of quota. Please wait a moment and ask again.");
+        stateRef.current = 'listening';
+        setState('listening');
+        await new Promise((r) => setTimeout(r, 500));
+        if (mutedRef.current || stateRef.current !== 'listening') return;
+        startRecognition();
+        return;
+      }
+
       stateRef.current = 'error';
       setState('error');
       await new Promise((r) => setTimeout(r, RECONNECT_DELAY_MS));
@@ -317,15 +394,15 @@ export default function VoiceChat() {
 
   // Start speech recognition
   const startRecognition = useCallback(() => {
-    if (mutedRef.current || stateRef.current !== 'listening' || !isSpeechSupported) return;
+    if (!startedRef.current || mutedRef.current || stateRef.current !== 'listening' || !isSpeechSupported) return;
 
     try { recognitionRef.current?.stop(); } catch { /* ok */ }
 
     const recognition = new SpeechRecognition();
     recognition.continuous = true;
     recognition.interimResults = false;
-    recognition.lang = 'en-US';
-    recognition.maxAlternatives = 1;
+    recognition.lang = 'en-IN';
+    recognition.maxAlternatives = 3;
 
     recognition.onstart = () => {
       console.log("Speech recognition session started successfully");
@@ -342,7 +419,6 @@ export default function VoiceChat() {
       const text = transcript.trim();
       if (!text || processingRef.current) return;
       reconnectAttemptsRef.current = 0;
-      setLiveUserText(text);
       stateRef.current = 'thinking';
       setState('thinking');
       try { recognition.stop(); } catch { /* ok */ }
@@ -351,7 +427,7 @@ export default function VoiceChat() {
 
     recognition.onend = () => {
       console.log("Speech recognition session ended. State:", stateRef.current);
-      if (stateRef.current === 'listening' && !mutedRef.current && recognitionRef.current === recognition) {
+      if (startedRef.current && stateRef.current === 'listening' && !mutedRef.current && recognitionRef.current === recognition) {
         try { recognition.start(); } catch { /* already started */ }
       }
     };
@@ -366,9 +442,9 @@ export default function VoiceChat() {
       if (e.error === 'aborted') {
         return; // Don't restart if aborted
       }
-      if (stateRef.current === 'listening' && !mutedRef.current && recognitionRef.current === recognition) {
+      if (startedRef.current && stateRef.current === 'listening' && !mutedRef.current && recognitionRef.current === recognition) {
         setTimeout(() => {
-          if (stateRef.current === 'listening' && !mutedRef.current && recognitionRef.current === recognition) {
+          if (startedRef.current && stateRef.current === 'listening' && !mutedRef.current && recognitionRef.current === recognition) {
             try { recognition.start(); } catch { /* ok */ }
           }
         }, 250);
@@ -395,7 +471,8 @@ export default function VoiceChat() {
     }
   }, [stopAnalyser]);
 
-  // Click gesture handler to boot up WebAudio and speech engine
+  // Click gesture handler to boot up WebAudio and speech engine.
+  // The circle shows instantly; chat creation/reuse happens in the background.
   const startSessionFlow = async () => {
     if (startedRef.current) return;
     try {
@@ -419,20 +496,17 @@ export default function VoiceChat() {
       console.error('AudioContext gesture initialize error:', err);
     }
 
+    // Reveal the session UI right away so it never feels like it's "loading".
+    startedRef.current = true;
     setStarted(true);
     stateRef.current = 'listening';
     setState('listening');
 
     if (!chatIdRef.current) {
-      // Fresh session: reuse an existing empty chat (like "New chat") so we don't pile up unused ones
-      const chats = await listChats();
-      const existingEmpty = chats.find((c) => c.title === 'New chat');
-      const c = existingEmpty ?? (await createVoiceChat());
-      if (!c) return;
-      setChatId(c.id);
-      setLastActiveChatId(c.id);
+      // Fresh session: the chat is created lazily on the first spoken message,
+      // so an empty session never leaves an empty chat behind.
       conversationRef.current = [];
-      window.dispatchEvent(new CustomEvent('ksemo-chats-updated'));
+      setHistory([]);
     }
     exchangesRef.current = 0;
     totalTokensRef.current = 0;
@@ -446,21 +520,38 @@ export default function VoiceChat() {
     return () => { stopAll(); };
   }, []);
 
+  // Stay silent when the user leaves this tab/window: cancel any speech in
+  // progress so nothing keeps talking in the background.
+  useEffect(() => {
+    const onLeave = () => {
+      if (document.hidden || !document.hasFocus()) {
+        try { window.speechSynthesis.cancel(); } catch { /* ok */ }
+      }
+    };
+    document.addEventListener('visibilitychange', onLeave);
+    window.addEventListener('blur', onLeave);
+    return () => {
+      document.removeEventListener('visibilitychange', onLeave);
+      window.removeEventListener('blur', onLeave);
+    };
+  }, []);
+
   // On route change: reset, and if a specific chat is opened, load its conversation
   // so the AI has context. The screen looks and behaves exactly like a normal voice chat.
   useEffect(() => {
     let cancelled = false;
     const setup = async () => {
       stopAll();
+      startedRef.current = false;
       setStarted(false);
       stateRef.current = 'listening';
       setState('listening');
       setAiResponseText('');
-      setLiveUserText('');
       conversationRef.current = [];
       setHistory([]);
       setChatId(routeChatId ?? null);
       if (routeChatId) {
+        setLoadingChat(true);
         setLastActiveChatId(routeChatId);
         const msgs = await listMessages(routeChatId);
         if (cancelled) return;
@@ -469,10 +560,12 @@ export default function VoiceChat() {
           .map((m) => ({ id: m.id, role: m.role as 'user' | 'assistant', content: m.content }));
         conversationRef.current = loaded;
         setHistory(loaded);
+        setLoadingChat(false);
       }
     };
     setup();
     return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [routeChatId, stopAll]);
 
   // Keep the saved-chat transcript scrolled to the newest message
@@ -484,8 +577,9 @@ export default function VoiceChat() {
   // End session → save the conversation title, reset, and return to the normal voice chat screen.
   const endSession = useCallback(async () => {
     stopAll();
+    startedRef.current = false;
+    stateRef.current = 'listening';
     setStarted(false);
-    setLiveUserText('');
 
 
     if (chatIdRef.current && conversationRef.current.length > 0) {
@@ -499,7 +593,7 @@ export default function VoiceChat() {
 
     if (routeChatId) {
       // Ended a continued session → reload the saved conversation so the
-      // text-only view shows the latest messages and can be continued again.
+      // transcript stays up to date and can be continued with one click.
       const msgs = await listMessages(routeChatId);
       const loaded: HistoryEntry[] = msgs
         .filter((m) => m.role === 'user' || m.role === 'assistant')
@@ -514,14 +608,20 @@ export default function VoiceChat() {
       return;
     }
 
+    const endedChatId = chatIdRef.current;
     chatIdRef.current = null;
     setChatId(null);
     conversationRef.current = [];
+    setHistory([]);
     exchangesRef.current = 0;
     totalTokensRef.current = 0;
     reconnectAttemptsRef.current = 0;
 
-    if (loc.pathname.startsWith('/app/voice-chat/')) {
+    if (endedChatId) {
+      // Open the ended chat so its transcript stays on screen and can be
+      // continued with one click — never fall back to the start screen.
+      nav(`/app/voice-chat/${endedChatId}`);
+    } else if (loc.pathname.startsWith('/app/voice-chat/')) {
       nav('/app/voice-chat', { replace: true });
     }
   }, [nav, stopAll, loc.pathname, routeChatId]);
@@ -536,6 +636,24 @@ export default function VoiceChat() {
     } catch { /* ignore */ }
   };
 
+  // Export the current chat as PDF / Word / text — user messages right, AI left.
+  const handleExport = async (format: 'pdf' | 'docx' | 'txt') => {
+    setExportOpen(false);
+    if (!history.length) return;
+    const firstUser = history.find((h) => h.role === 'user');
+    const title = firstUser
+      ? firstUser.content.slice(0, 48) + (firstUser.content.length > 48 ? '…' : '')
+      : 'Voice Chat';
+    const messages = history.map((h) => ({ role: h.role, content: h.content }));
+    try {
+      if (format === 'pdf') await exportChatAsPDF(title, messages);
+      else if (format === 'docx') await exportChatAsDocx(title, messages);
+      else exportChatAsText(title, messages);
+    } catch (err) {
+      console.error('Export failed:', err);
+    }
+  };
+
   // Copy a message to the clipboard
   const handleCopyMessage = async (index: number, content: string) => {
     try {
@@ -545,48 +663,21 @@ export default function VoiceChat() {
     } catch { /* ignore */ }
   };
 
-  // Read a single AI message aloud
-  const handleReadAloud = (content: string) => {
+  // Read a single AI message aloud; clicking again stops it.
+  const handleReadAloud = async (index: number, content: string) => {
+    if (readingIndexRef.current === index) {
+      window.speechSynthesis?.cancel();
+      readingIndexRef.current = null;
+      setReadingIndex(null);
+      return;
+    }
     window.speechSynthesis?.cancel();
-    speak(stripMarkdown(content));
-  };
-
-  // Regenerate an AI response: drop that response, rebuild context up to it, and re-ask
-  const handleRegenerate = async (index: number) => {
-    const target = history[index];
-    if (!target || target.role !== 'assistant' || !chatIdRef.current) return;
-    if (processingRef.current) return;
-    processingRef.current = true;
-    setRegeneratingIndex(index);
-
-    // Everything before this AI message becomes the prompt context
-    const prefix = history.slice(0, index).map((m) => ({ role: m.role, content: m.content }));
-    conversationRef.current = prefix;
-
-    try {
-      const controller = new AbortController();
-      abortRef.current = controller;
-      const result = await streamChat({
-        model: 'ksemo-pro',
-        messages: [...conversationRef.current],
-        signal: controller.signal,
-        onToken: () => {},
-      });
-      if (controller.signal.aborted) return;
-
-      conversationRef.current = [...prefix, { role: 'assistant', content: result.content }];
-      setHistory((h) => h.map((m, i) => (i === index ? { ...m, content: result.content } : m)));
-      if (target.id) await updateMessage(target.id, { content: result.content });
-      await logUsage('ksemo-pro', estimateTokens(prefix.map((m) => typeof m.content === 'string' ? m.content : '').join(' ')), result.tokens, result.latencyMs);
-    } catch (err) {
-      if ((err as Error).name !== 'AbortError') {
-        console.error('Regenerate failed:', err);
-        stateRef.current = 'error';
-        setState('error');
-      }
-    } finally {
-      processingRef.current = false;
-      setRegeneratingIndex(null);
+    readingIndexRef.current = index;
+    setReadingIndex(index);
+    await speak(stripMarkdown(content));
+    if (readingIndexRef.current === index) {
+      readingIndexRef.current = null;
+      setReadingIndex(null);
     }
   };
 
@@ -615,7 +706,6 @@ export default function VoiceChat() {
 
   // Real-time amplitude loop (drives the wobbly circle with the live mic level)
   useEffect(() => {
-    if (!hasKey) return;
     let animFrame: number;
     let time = 0;
     const dataArray = new Uint8Array(128);
@@ -646,11 +736,10 @@ export default function VoiceChat() {
 
     loop();
     return () => cancelAnimationFrame(animFrame);
-  }, [hasKey, started]);
+  }, [started]);
 
   // Canvas Fluid Circle Renderer (fresh voice chat only)
   useEffect(() => {
-    if (!hasKey) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -711,53 +800,7 @@ export default function VoiceChat() {
 
     render();
     return () => cancelAnimationFrame(animFrame);
-  }, [hasKey, resolvedTheme, started]);
-
-  if (!hasKey) {
-    return (
-      <div className="min-h-screen bg-ink-900 text-white flex items-center justify-center p-6">
-        <div className="w-full max-w-sm bg-ink-850 border border-white/5 rounded-2xl p-6 space-y-6 text-center shadow-glow">
-          <div className="mx-auto w-12 h-12 rounded-full bg-white/5 flex items-center justify-center text-white">
-            <Mic size={24} />
-          </div>
-          <div>
-            <h2 className="text-xl font-semibold text-white mb-2">OpenRouter API Key Required</h2>
-            <p className="text-xs text-ink-300 leading-relaxed">
-              The Voice Assistant requires an OpenRouter API key to converse with you. Your key will be saved safely in your browser local storage.
-            </p>
-          </div>
-          <form onSubmit={saveApiKey} className="flex flex-col gap-3.5">
-            <input
-              type="password"
-              placeholder="sk-or-v1-..."
-              value={apiKeyInput}
-              onChange={(e) => setApiKeyInput(e.target.value)}
-              className="w-full h-11 px-3.5 rounded-xl bg-ink-900 border border-white/10 text-white focus:outline-none focus:border-white/20 text-sm placeholder:text-ink-400 focus:ring-1 focus:ring-white/20 transition-all"
-              required
-            />
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={() => nav('/app')}
-                className="flex-1 h-11 rounded-xl bg-white/5 hover:bg-white/10 text-white text-sm transition font-medium border border-white/10"
-              >
-                Back to App
-              </button>
-              <button
-                type="submit"
-                className="flex-1 h-11 rounded-xl bg-ink-800 text-white border border-white/10 hover:bg-ink-700 active:bg-ink-750 transition font-semibold"
-              >
-                Save & Connect
-              </button>
-            </div>
-          </form>
-          <p className="text-[10px] text-ink-400">
-            Get an API key at <a href="https://openrouter.ai/" target="_blank" rel="noreferrer" className="text-white/60 hover:text-white hover:underline transition">openrouter.ai</a>
-          </p>
-        </div>
-      </div>
-    );
-  }
+  }, [resolvedTheme, started]);
 
   const openMoreMenu = (e: React.MouseEvent, i: number) => {
     e.stopPropagation();
@@ -771,9 +814,8 @@ export default function VoiceChat() {
       {history.map((h, i) => {
         const isUser = h.role === 'user';
         const isCopied = copiedIndex === i;
-        const isRegenerating = regeneratingIndex === i;
         return (
-          <div key={i} className="group">
+          <div key={i} className={cn(isUser && 'group')}>
             <div className={cn('flex', isUser ? 'justify-end' : 'justify-start')}>
               <div
                 className={cn(
@@ -791,17 +833,12 @@ export default function VoiceChat() {
               </div>
             </div>
 
-            {/* Message action row (revealed on hover) */}
-            <div className={cn('flex items-center gap-1 mt-1.5 opacity-0 group-hover:opacity-100 transition-opacity', isUser ? 'justify-end' : 'justify-start')}>
+            {/* Message action row — copy + share on every message, more options on AI replies.
+                User messages reveal the buttons only on hover; AI replies keep them visible. */}
+            <div className={cn('flex items-center gap-1 mt-1.5', isUser ? 'justify-end opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity' : 'justify-start')}>
               <MessageActionButton title="Copy" onClick={() => handleCopyMessage(i, h.content)}>
                 {isCopied ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
               </MessageActionButton>
-
-              {!isUser && (
-                <MessageActionButton title={isRegenerating ? 'Regenerating…' : 'Regenerate'} onClick={() => handleRegenerate(i)}>
-                  <RefreshCw size={12} className={isRegenerating ? 'animate-spin' : ''} />
-                </MessageActionButton>
-              )}
 
               <MessageActionButton title="Share chat" onClick={handleShareActive}>
                 <Share2 size={12} />
@@ -819,120 +856,99 @@ export default function VoiceChat() {
     </div>
   );
 
-  // Full-page text-only view when a saved chat is opened (before starting the voice session)
-  if (isContinue && !started) {
-    return (
-      <div className="h-full w-full bg-transparent flex flex-col overflow-hidden select-none animate-fade-in">
-        {/* Nav bar with share button in the top-right corner */}
-        <div className="shrink-0 h-14 border-b border-white/8 flex items-center justify-between px-4 sm:px-6">
-          <span className="text-[13px] font-semibold text-white tracking-tight">Conversation</span>
-          <div className="flex items-center gap-2">
-            {chatId && (
-              <button
-                onClick={handleShareActive}
-                className="h-8 px-3 rounded-lg flex items-center gap-2 text-ink-300 hover:text-white hover:bg-white/5 border border-white/10 transition"
-                title="Share this chat"
-                aria-label="Share this chat"
-              >
-                <Share2 size={14} /> Share
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Full-page scrollable transcript (invisible scrollbar) */}
-        <div ref={transcriptRef} className="flex-1 w-full max-w-2xl mx-auto overflow-y-auto scrollbar-hide px-4 sm:px-6 py-6">
-          {history.length === 0 ? (
-            <div className="h-full flex items-center justify-center text-ink-400 text-[13px]">No messages yet.</div>
-          ) : (
-            renderMessages()
-          )}
-        </div>
-
-        {/* Continue with this chat */}
-        <div className="shrink-0 pb-6 pt-2 flex items-center justify-center">
-          <button
-            onClick={startSessionFlow}
-            className="px-8 h-12 rounded-full border border-white/10 bg-ink-800 text-white hover:bg-ink-700 active:scale-95 transition-all shadow-glow font-semibold tracking-wide text-[13px]"
-          >
-            Continue with this chat
-          </button>
-        </div>
-
-        {/* More options dropdown (opens ABOVE the button) */}
-        {moreMenuIndex !== null && moreMenuPos && (
-          <>
-            <div className="fixed inset-0 z-40" onClick={() => { setMoreMenuIndex(null); setMoreMenuPos(null); }} />
-            <div
-              className="fixed z-50 w-40 rounded-xl bg-ink-900 border border-white/10 p-1 shadow-2xl animate-in fade-in duration-100"
-              style={{ left: moreMenuPos.left, bottom: moreMenuPos.bottom }}
-            >
-              {(() => {
-                const target = history[moreMenuIndex];
-                if (!target) return null;
-                return (
-                  <div className="space-y-0.5">
-                    {readAloudEnabled && (
-                      <button
-                        onClick={() => { setMoreMenuIndex(null); setMoreMenuPos(null); handleReadAloud(target.content); }}
-                        className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-[12px] text-ink-100 hover:bg-white/5 hover:text-white transition text-left"
-                      >
-                        <Volume2 size={13} className="text-ink-300" /> Read aloud
-                      </button>
-                    )}
-                    <button
-                      onClick={() => handleDeleteMessage(moreMenuIndex)}
-                      className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-[12px] text-red-400 hover:bg-red-500/10 hover:text-red-300 transition text-left"
-                    >
-                      <Trash2 size={13} /> Delete
-                    </button>
-                  </div>
-                );
-              })()}
-            </div>
-          </>
-        )}
-
-        {shareChat && (
-          <ShareModal open={!!shareChat} onClose={() => setShareChat(null)} chat={shareChat} />
-        )}
-      </div>
-    );
-  }
-
   return (
     <div className="h-full w-full bg-transparent flex flex-col items-center overflow-hidden py-6 px-4 sm:px-6 select-none animate-fade-in">
 
-      {/* Top bar with share button */}
-      <div className="w-full max-w-2xl mx-auto flex items-center justify-end h-8 shrink-0">
-        {chatId && (
-          <button
-            onClick={handleShareActive}
-            className="h-8 w-8 rounded-lg flex items-center justify-center text-ink-300 hover:text-white hover:bg-white/5 transition"
-            title="Share this chat"
-            aria-label="Share this chat"
-          >
-            <Share2 size={16} />
-          </button>
+      {/* Top bar with export + share buttons (top-right corner, navbar style) */}
+      <div className="w-full flex items-center justify-end h-8 shrink-0 px-4 sm:px-6 relative">
+        {chatId && history.length > 0 && (
+          <>
+            <div className="relative">
+              <button
+                onClick={() => setExportOpen((o) => !o)}
+                className="h-8 w-8 rounded-lg flex items-center justify-center text-ink-300 hover:text-white hover:bg-white/5 transition"
+                title="Export chat"
+                aria-label="Export chat"
+              >
+                <Download size={16} />
+              </button>
+
+              {exportOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setExportOpen(false)} />
+                  <div className="absolute right-0 top-full mt-1 w-48 rounded-xl border border-white/10 bg-ink-800 shadow-lift z-50 py-1 animate-scale-in">
+                    <div className="px-3 pt-1.5 pb-1 text-[10px] uppercase tracking-wider text-ink-400">Export as</div>
+                    <button
+                      onClick={() => handleExport('pdf')}
+                      className="w-full flex items-center gap-2.5 px-3 h-9 text-[12px] text-ink-100 hover:bg-white/5 hover:text-white transition"
+                    >
+                      <FileDown size={13} className="text-ink-300 shrink-0" /> PDF document
+                    </button>
+                    <button
+                      onClick={() => handleExport('docx')}
+                      className="w-full flex items-center gap-2.5 px-3 h-9 text-[12px] text-ink-100 hover:bg-white/5 hover:text-white transition"
+                    >
+                      <FileType size={13} className="text-ink-300 shrink-0" /> Word document
+                    </button>
+                    <button
+                      onClick={() => handleExport('txt')}
+                      className="w-full flex items-center gap-2.5 px-3 h-9 text-[12px] text-ink-100 hover:bg-white/5 hover:text-white transition"
+                    >
+                      <FileText size={13} className="text-ink-300 shrink-0" /> Plain text
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+
+            <button
+              onClick={handleShareActive}
+              className="h-8 w-8 rounded-lg flex items-center justify-center text-ink-300 hover:text-white hover:bg-white/5 transition ml-1"
+              title="Share this chat"
+              aria-label="Share this chat"
+            >
+              <Share2 size={16} />
+            </button>
+          </>
         )}
       </div>
 
-      {/* Main Voice Assistant Viewport */}
-      <div className="flex-1 w-full flex flex-col items-center justify-center min-h-0 relative">
-        <div className="relative w-80 h-80 flex items-center justify-center">
-          <canvas ref={canvasRef} className="w-full h-full max-w-[450px] max-h-[450px] object-contain" />
+      {!started && loadingChat ? (
+        <div className="flex-1 w-full flex items-center justify-center">
+          <div className="h-6 w-6 rounded-full border-2 border-ink-300/30 border-t-ink-300 animate-spin" />
         </div>
+      ) : !started && history.length > 0 ? (
+        <>
+          <div ref={transcriptRef} className="flex-1 w-full max-w-2xl mx-auto overflow-y-auto scrollbar-hide px-4 sm:px-6 py-4">
+            {renderMessages()}
+          </div>
 
-        {/* Real-time Subtitles / Status Guide (Shown below the circle when started) */}
-        {started && (
-          <div className="mt-8 text-center animate-fade-in max-w-lg px-4">
-            {!isSpeechSupported ? (
-              <p className="text-[13px] font-semibold text-red-400 uppercase">
-                Web Speech API not supported in this browser
-              </p>
-            ) : (
-              <>
-                {state === 'speaking' ? (
+          <div className="z-20 py-2 h-14 flex items-center justify-center shrink-0">
+            <button
+              onClick={startSessionFlow}
+              className="px-8 h-12 rounded-full border border-white/10 bg-ink-800 text-white hover:bg-ink-700 active:scale-95 transition-all shadow-glow font-semibold tracking-wide text-[13px] flex items-center gap-2"
+            >
+              <AudioWaveform size={16} className="shrink-0" />
+              Continue Voice Chat
+            </button>
+          </div>
+        </>
+      ) : (
+        <>
+          {/* Main Voice Assistant Viewport */}
+          <div className="flex-1 w-full flex flex-col items-center justify-center min-h-0 relative">
+            <div className="relative w-80 h-80 flex items-center justify-center">
+              <canvas ref={canvasRef} className="w-full h-full max-w-[450px] max-h-[450px] object-contain" />
+            </div>
+
+            {/* Real-time Subtitles / Status Guide (Shown below the circle when started) */}
+            {started && (
+              <div className="mt-8 text-center animate-fade-in max-w-lg px-4 min-h-[52px]">
+                {!isSpeechSupported ? (
+                  <p className="text-[13px] font-semibold text-red-400 uppercase">
+                    Web Speech API not supported in this browser
+                  </p>
+                ) : state === 'speaking' ? (
                   <p className="text-sm font-medium leading-relaxed text-ink-100 transition-all duration-300">
                     {aiResponseText}
                   </p>
@@ -940,60 +956,52 @@ export default function VoiceChat() {
                   <p className="text-xs font-semibold tracking-wider text-ink-400 uppercase animate-pulse-soft">
                     Thinking…
                   </p>
-                ) : (
-                  // Show the recognized user speech in small text while listening
-                  liveUserText ? (
-                    <p className="text-xs text-ink-300 leading-relaxed max-w-sm mx-auto">
-                      <span className="text-ink-500 font-medium">You:</span> {liveUserText}
-                    </p>
-                  ) : (
-                    <div className="h-5" />
-                  )
-                )}
-              </>
+                ) : null}
+              </div>
             )}
           </div>
-        )}
-      </div>
 
-      {/* Center/Bottom Action Controls */}
-      <div className="z-20 py-2 h-14 flex items-center justify-center">
-        {!started ? (
-          <button
-            onClick={startSessionFlow}
-            className="px-8 h-12 rounded-full border border-white/10 bg-ink-800 text-white hover:bg-ink-700 active:scale-95 transition-all shadow-glow font-semibold tracking-wide text-[13px]"
-          >
-            {history.length > 0 ? 'Continue Voice Chat' : 'Start Voice Chat'}
-          </button>
-        ) : (
-          <div className="flex items-center gap-6 animate-scale-in">
-            {/* End Call / Close button */}
-            <button
-              onClick={endSession}
-              className="w-12 h-12 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 active:scale-95 text-white flex items-center justify-center transition-all shadow-soft"
-              aria-label="End voice session"
-              title="End session"
-            >
-              <X size={20} />
-            </button>
+          {/* Center/Bottom Action Controls */}
+          <div className="z-20 py-2 h-14 flex items-center justify-center">
+            {!started ? (
+              <button
+                onClick={startSessionFlow}
+                className="px-8 h-12 rounded-full border border-white/10 bg-ink-800 text-white hover:bg-ink-700 active:scale-95 transition-all shadow-glow font-semibold tracking-wide text-[13px] flex items-center gap-2"
+              >
+                <Mic size={16} className="shrink-0" />
+                Start Voice Chat
+              </button>
+            ) : (
+              <div className="flex items-center gap-6 animate-scale-in">
+                {/* End Call / Close button */}
+                <button
+                  onClick={endSession}
+                  className="w-12 h-12 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 active:scale-95 text-white flex items-center justify-center transition-all shadow-soft"
+                  aria-label="End voice session"
+                  title="End session"
+                >
+                  <X size={20} />
+                </button>
 
-            {/* Mute button */}
-            <button
-              onClick={() => setMuted((m) => !m)}
-              className={cn(
-                "w-12 h-12 rounded-full border flex items-center justify-center transition-all shadow-soft active:scale-95",
-                muted
-                  ? "bg-ink-700 text-white border-white/20 hover:bg-ink-600"
-                  : "bg-white/5 border-white/10 hover:bg-white/10 text-white"
-              )}
-              aria-label={muted ? 'Unmute microphone' : 'Mute microphone'}
-              title={muted ? 'Unmute' : 'Mute'}
-            >
-              {muted ? <MicOff size={20} /> : <Mic size={20} />}
-            </button>
+                {/* Mute button */}
+                <button
+                  onClick={() => setMuted((m) => !m)}
+                  className={cn(
+                    "w-12 h-12 rounded-full border flex items-center justify-center transition-all shadow-soft active:scale-95",
+                    muted
+                      ? "bg-ink-700 text-white border-white/20 hover:bg-ink-600"
+                      : "bg-white/5 border-white/10 hover:bg-white/10 text-white"
+                  )}
+                  aria-label={muted ? 'Unmute microphone' : 'Mute microphone'}
+                  title={muted ? 'Unmute' : 'Mute'}
+                >
+                  {muted ? <MicOff size={20} /> : <Mic size={20} />}
+                </button>
+              </div>
+            )}
           </div>
-        )}
-      </div>
+        </>
+      )}
 
       {/* More options dropdown (opens ABOVE the button) */}
       {moreMenuIndex !== null && moreMenuPos && (
@@ -1010,10 +1018,11 @@ export default function VoiceChat() {
                 <div className="space-y-0.5">
                   {readAloudEnabled && (
                     <button
-                      onClick={() => { setMoreMenuIndex(null); setMoreMenuPos(null); handleReadAloud(target.content); }}
+                      onClick={() => { setMoreMenuIndex(null); setMoreMenuPos(null); handleReadAloud(moreMenuIndex, target.content); }}
                       className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-[12px] text-ink-100 hover:bg-white/5 hover:text-white transition text-left"
                     >
-                      <Volume2 size={13} className="text-ink-300" /> Read aloud
+                      <Volume2 size={13} className="text-ink-300" />
+                      {readingIndex === moreMenuIndex ? 'Stop reading' : 'Read aloud'}
                     </button>
                   )}
                   <button

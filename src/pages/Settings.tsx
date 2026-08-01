@@ -4,7 +4,7 @@ import {
   User, Sliders, Database, Trash2, Check, AlertCircle,
   Download, LogOut, Bell, Sparkles, Palette, KeyRound,
   MonitorSmartphone, Mic, MessageSquare, Search, Info, RefreshCw,
-  Shield, HelpCircle,
+  Shield, HelpCircle, Volume2, AudioLines, Play,
   Mail, Send, CheckCircle,
 } from 'lucide-react';
 import { Button, Input, Textarea, Modal, Badge } from '../components/ui';
@@ -17,6 +17,7 @@ import {
 import { downloadFile, cn } from '../lib/utils';
 import { supabase } from '../lib/supabase';
 import type { AppPreferences } from '../lib/types';
+import { DEFAULT_VOICE_ID, VOICE_PREVIEW_TEXT, setStoredVoiceId, loadVoices, pickVoice, detectVoices, type DetectedVoice } from '../lib/voices';
 
 type Tab = 'account' | 'security' | 'preferences' | 'notifications' | 'appearance' | 'data' | 'feedback' | 'help';
 
@@ -54,6 +55,7 @@ export default function Settings() {
   const [prefs, setPrefs] = useState<AppPreferences>({});
   const [savingPrefs, setSavingPrefs] = useState(false);
   const [savedPrefs, setSavedPrefs] = useState(false);
+  const [voiceOptions, setVoiceOptions] = useState<DetectedVoice[] | null>(null);
 
   // Modals
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -106,9 +108,45 @@ export default function Settings() {
     }).catch(() => {});
   }, [user]);
 
+  // Detect the real, distinct voices installed on this device and build the
+  // Top-5 list from them (a male/female mix, ranked by how human they sound).
+  useEffect(() => {
+    let mounted = true;
+    const update = async () => {
+      const voices = await loadVoices();
+      if (!mounted) return;
+      setVoiceOptions(detectVoices(voices, 5));
+    };
+    update();
+    const onVoices = () => { update(); };
+    window.speechSynthesis?.addEventListener('voiceschanged', onVoices);
+    return () => {
+      mounted = false;
+      window.speechSynthesis?.removeEventListener('voiceschanged', onVoices);
+    };
+  }, []);
+
   const updatePref = useCallback(<K extends keyof AppPreferences>(key: K, value: AppPreferences[K]) => {
     setPrefs((p) => ({ ...p, [key]: value }));
   }, []);
+
+  const selectVoice = async (id: string) => {
+    updatePref('voice_id', id);
+    setStoredVoiceId(id);
+    if (user) await upsertSettings(user.id, { ...prefs, voice_id: id });
+  };
+
+  const previewVoice = async (id: string, voice?: SpeechSynthesisVoice) => {
+    await selectVoice(id);
+    try { window.speechSynthesis?.cancel(); } catch { /* ok */ }
+    const u = new SpeechSynthesisUtterance(VOICE_PREVIEW_TEXT);
+    const v = voice ?? pickVoice(id, await loadVoices());
+    if (v) u.voice = v;
+    u.rate = 0.92;
+    u.pitch = 1;
+    u.volume = 1;
+    window.speechSynthesis?.speak(u);
+  };
 
   const saveProfile = async (e: FormEvent) => {
     e.preventDefault();
@@ -217,7 +255,7 @@ export default function Settings() {
     { q: /favorite|bookmark/i, a: "Click the star icon on any assistant message to save it to your favorites. View favorites from the sidebar favorites tab." },
     { q: /delete.*chat|remove.*chat|clear.*chat/i, a: "Click the trash icon next to a chat in the sidebar to delete it. To delete ALL chats at once, go to **Settings > Data Control > Delete all chats**." },
     { q: /export|download.*data/i, a: "Go to **Settings > Data Control > Export data** to download all your chats, messages, favorites, and settings as a JSON file." },
-    { q: /model|gpt|claude|ai.*engine/i, a: "Ksemo uses OpenRouter to access multiple AI models. The default model is **ksemo-pro** (GPT-4o-mini). Some features use the local fallback when no API key is set." },
+    { q: /model|gpt|claude|ai.*engine/i, a: "Ksemo runs on Google\u2019s Gemini API. The default model is **ksemo-pro** (Gemini Flash). Some features use the local fallback when no API key is set." },
     { q: /dark.*mode|theme|light|appearance/i, a: "Go to **Settings > Appearance** to switch between dark, light, or system theme." },
     { q: /compact|spacing|layout/i, a: "Compact mode and sidebar options are available in **Settings > Preferences**." },
     { q: /stream|token.*count|read.*aloud/i, a: "In **Settings > Preferences**, you can toggle streaming responses, token count display, and read-aloud for assistant messages." },
@@ -365,16 +403,84 @@ export default function Settings() {
             {/* ====== PREFERENCES ====== */}
             {tab === 'preferences' && (
               <div className="space-y-3">
-                <SectionHeader icon={MessageSquare} title="Chat behavior" desc="How conversations work in the workspace." />
-                <div className="rounded-2xl bg-ink-850 border border-white/8 p-4 space-y-1">
-                  <Toggle label="Send on Enter" desc="Press Enter to send, Shift+Enter for newline" value={prefs.send_on_enter ?? true} onChange={async (v) => { updatePref('send_on_enter', v); if (user) await upsertSettings(user.id, { ...prefs, send_on_enter: v }); }} />
-                  <Toggle label="Auto-rename chats" desc="Automatically title new chats from the first message" value={prefs.auto_rename_chats ?? true} onChange={async (v) => { updatePref('auto_rename_chats', v); if (user) await upsertSettings(user.id, { ...prefs, auto_rename_chats: v }); }} />
-                </div>
-
                 <SectionHeader icon={Mic} title="Input & output" desc="Control voice and read-aloud features." />
                 <div className="rounded-2xl bg-ink-850 border border-white/8 p-4 space-y-1">
                   <Toggle label="Voice input" desc="Show the microphone button for speech-to-text" value={prefs.voice_input_enabled ?? true} onChange={async (v) => { updatePref('voice_input_enabled', v); if (user) await upsertSettings(user.id, { ...prefs, voice_input_enabled: v }); }} />
                   <Toggle label="Read aloud" desc="Show the read-aloud option on assistant messages" value={prefs.read_aloud_enabled ?? true} onChange={async (v) => { updatePref('read_aloud_enabled', v); if (user) await upsertSettings(user.id, { ...prefs, read_aloud_enabled: v }); }} />
+                </div>
+
+                <SectionHeader icon={Volume2} title="Voice" desc="Pick one of the top 5 voices found on this device — each one is a real, different voice." />
+                <div className="rounded-2xl border border-white/8 bg-ink-850 overflow-hidden">
+                  <div className="px-4 py-3 border-b border-white/8 flex items-center gap-2.5">
+                    <span className="h-8 w-8 rounded-lg bg-white/8 flex items-center justify-center"><AudioLines size={15} className="text-white" /></span>
+                    <div className="min-w-0">
+                      <div className="text-[13px] font-semibold text-white">Top 5 voices</div>
+                      <div className="text-[11px] text-ink-300">
+                        {voiceOptions === null
+                          ? 'Detecting your voices…'
+                          : voiceOptions.length > 0
+                            ? `${voiceOptions.length} real voices found on this device`
+                            : 'No voices found on this device'}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="py-1.5">
+                    <div
+                      onClick={() => selectVoice(DEFAULT_VOICE_ID)}
+                      className={cn('flex items-center gap-3 px-4 py-2.5 cursor-pointer transition', (prefs.voice_id ?? DEFAULT_VOICE_ID) === DEFAULT_VOICE_ID ? 'bg-white/10' : 'hover:bg-white/5')}
+                    >
+                      <span className={cn('h-6 w-6 rounded-full flex items-center justify-center shrink-0', (prefs.voice_id ?? DEFAULT_VOICE_ID) === DEFAULT_VOICE_ID ? 'bg-white text-ink-900' : 'bg-white/8 text-ink-200')}>
+                        <Sparkles size={12} />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="flex items-center gap-2">
+                          <span className="text-[13px] font-semibold text-white">Auto (recommended)</span>
+                          {(prefs.voice_id ?? DEFAULT_VOICE_ID) === DEFAULT_VOICE_ID && <Check size={13} className="text-white shrink-0" />}
+                        </span>
+                        <span className="text-[11px] text-ink-300">Ksemo picks the best voice automatically</span>
+                      </span>
+                    </div>
+
+                    <div className="h-px bg-white/5 mx-4 my-1" />
+
+                    {voiceOptions === null ? (
+                      <div className="px-4 py-6 text-center text-[12px] text-ink-300">Detecting your device's voices…</div>
+                    ) : voiceOptions.length === 0 ? (
+                      <div className="px-4 py-6 text-center text-[12px] text-ink-300">No voices found on this device.</div>
+                    ) : (
+                      voiceOptions.map((d, i) => {
+                        const selected = (prefs.voice_id ?? DEFAULT_VOICE_ID) === d.id;
+                        return (
+                          <div
+                            key={d.id}
+                            onClick={() => selectVoice(d.id)}
+                            className={cn('group flex items-center gap-3 px-4 py-2.5 cursor-pointer transition', selected ? 'bg-white/10' : 'hover:bg-white/5')}
+                          >
+                            <span className={cn('h-6 w-6 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0', selected ? 'bg-white text-ink-900' : 'bg-white/8 text-ink-200')}>{i + 1}</span>
+                            <span className="min-w-0 flex-1">
+                              <span className="flex items-center gap-2">
+                                <span className="text-[13px] font-semibold text-white truncate">{d.label}</span>
+                                {selected && <Check size={13} className="text-white shrink-0" />}
+                              </span>
+                              <span className="text-[11px] text-ink-300">
+                                {d.lang} · {d.gender === 'female' ? 'Female' : d.gender === 'male' ? 'Male' : 'Voice'}{d.neural ? ' · Neural' : ''}
+                              </span>
+                            </span>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); previewVoice(d.id, d.voice); }}
+                              title={`Preview ${d.label}`}
+                              aria-label={`Preview ${d.label}`}
+                              className={cn('h-8 w-8 rounded-full flex items-center justify-center transition shrink-0', selected ? 'bg-white text-ink-900 hover:bg-white/90' : 'bg-white/8 text-white hover:bg-white/15')}
+                            >
+                              <Play size={14} />
+                            </button>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
                 </div>
               </div>
             )}

@@ -81,6 +81,7 @@ export interface AppPreferences {
   auto_rename_chats?: boolean;
   voice_input_enabled?: boolean;
   read_aloud_enabled?: boolean;
+  voice_id?: string;
   shortcut_new_chat?: boolean;
   shortcut_search?: boolean;
   shortcut_settings?: boolean;
@@ -114,6 +115,7 @@ export interface AppPreferences {
   auto_rename_chats?: boolean;
   voice_input_enabled?: boolean;
   read_aloud_enabled?: boolean;
+  voice_id?: string;
   suggestions_enabled?: boolean;
   sidebar_auto_collapse?: boolean;
   shortcut_new_chat?: boolean;

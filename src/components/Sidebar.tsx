@@ -111,9 +111,10 @@ export function Sidebar({ collapsed, onToggleCollapse }: Props) {
   }, []);
 
   const filtered = chats.filter((c) => {
+    if (filter === 'all') return !c.pinned && !c.archived; // 'all' shows only regular chats
     if (filter === 'pinned') return c.pinned && !c.archived;
     if (filter === 'archived') return c.archived;
-    return !c.archived && !c.pinned;
+    return true;
   }).filter((c) => {
     if (dateFilter === 'all') return true;
     const d = new Date(c.updated_at ?? c.created_at ?? Date.now());
@@ -129,7 +130,7 @@ export function Sidebar({ collapsed, onToggleCollapse }: Props) {
     if (dateFilter === 'week') return diffDays < 7;
     if (dateFilter === 'month') return diffDays < 30;
     return true;
-  }).slice(0, 2);
+  });
   const grouped = dateFilter === 'all'
     ? groupByDate(filtered, 'updated_at')
     : [{ label: '', items: filtered }];
@@ -180,7 +181,7 @@ export function Sidebar({ collapsed, onToggleCollapse }: Props) {
               'group h-9 w-9 rounded-xl flex items-center justify-center transition-all duration-200',
               loc.pathname === '/app/voice-chat' || loc.pathname.startsWith('/app/voice-chat/') ? 'text-white bg-white/10' : 'text-ink-300 hover:text-white hover:bg-white/8',
             )}
-            title="Voice Chat"
+            title="New Voice Chat"
           >
             <Mic size={17} className="icon-wiggle" />
           </Link>
@@ -257,7 +258,7 @@ export function Sidebar({ collapsed, onToggleCollapse }: Props) {
               )}
             >
               <Mic size={16} className="shrink-0 icon-wiggle" />
-              Voice Chat
+              New Voice Chat
             </button>
 
             {/* Other nav items */}
