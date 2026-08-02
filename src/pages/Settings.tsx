@@ -4,7 +4,7 @@ import {
   User, Sliders, Database, Trash2, Check, AlertCircle,
   Download, LogOut, Bell, Sparkles, Palette, KeyRound,
   MonitorSmartphone, Mic, MessageSquare, Search, Info, RefreshCw,
-  Shield, HelpCircle, Volume2, AudioLines, Play, Pause, RotateCcw, Languages,
+  Shield, HelpCircle, Volume2, AudioLines, Play, RotateCcw, Languages,
   Mail, Send, CheckCircle,
 } from 'lucide-react';
 import { Button, Input, Textarea, Modal, Badge } from '../components/ui';
@@ -93,9 +93,6 @@ export default function Settings() {
   const voiceMemory = getVoiceMemory();
   const [vp, setVp] = useState<VoicePreferences>(voiceMemory.getPreferences());
   const [languages, setLanguages] = useState<{ code: string; label: string }[]>(FALLBACK_LANGUAGES);
-  const [langVoices, setLangVoices] = useState<DetectedVoice[]>([]);
-  const [previewingVoice, setPreviewingVoice] = useState<DetectedVoice | null>(null);
-  const [isPreviewing, setIsPreviewing] = useState(false);
 
   // Modals
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -184,20 +181,6 @@ export default function Settings() {
     return () => { mounted = false; };
   }, []);
 
-  // Voices available for the currently selected language (falls back to all).
-  useEffect(() => {
-    let mounted = true;
-    loadVoices().then((voices) => {
-      if (!mounted) return;
-      const target = vp.language.toLowerCase().replace('_', '-');
-      const filtered = voices.filter((v) => v.lang.toLowerCase().replace('_', '-') === target);
-      const pool = filtered.length ? filtered : voices;
-      setLangVoices(detectVoices(pool, 10));
-    });
-    return () => { mounted = false; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vp.language]);
-
   const updatePref = useCallback(<K extends keyof AppPreferences>(key: K, value: AppPreferences[K]) => {
     setPrefs((p) => ({ ...p, [key]: value }));
   }, []);
@@ -233,27 +216,6 @@ export default function Settings() {
 
   const handleVpChange = <K extends keyof VoicePreferences>(key: K, value: VoicePreferences[K]) => {
     persistVp({ ...vp, [key]: value });
-  };
-
-  const selectGridVoice = (id: string) => persistVp({ ...vp, voiceId: id });
-
-  const previewGridVoice = async (voice: DetectedVoice) => {
-    if (isPreviewing) {
-      try { window.speechSynthesis?.cancel(); } catch { /* ok */ }
-      setIsPreviewing(false);
-      setPreviewingVoice(null);
-      return;
-    }
-    setIsPreviewing(true);
-    setPreviewingVoice(voice);
-    const u = new SpeechSynthesisUtterance(VOICE_PREVIEW_TEXT);
-    u.voice = voice.voice;
-    u.rate = vp.rate;
-    u.pitch = vp.pitch;
-    u.volume = vp.volume;
-    u.onend = () => { setIsPreviewing(false); setPreviewingVoice(null); };
-    u.onerror = () => { setIsPreviewing(false); setPreviewingVoice(null); };
-    window.speechSynthesis.speak(u);
   };
 
   const resetVoiceDefaults = () => {
@@ -612,54 +574,6 @@ export default function Settings() {
                       </button>
                     ))}
                   </div>
-                </div>
-
-                {/* Voices for the selected language */}
-                <SectionHeader icon={AudioLines} title="Voices for this language" desc="Voices that can speak the selected language. Tap one to use it, tap the play button to preview." />
-                <div className="rounded-2xl bg-ink-850 border border-white/8 p-4">
-                  {langVoices.length === 0 ? (
-                    <div className="py-4 text-center text-[12px] text-ink-300">Detecting voices for {langLabel(vp.language)}…</div>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                      {langVoices.map((voice) => {
-                        const selected = vp.voiceId === voice.id;
-                        return (
-                          <button
-                            key={voice.id}
-                            onClick={() => selectGridVoice(voice.id)}
-                            className={cn(
-                              'rounded-xl border text-left p-3 transition',
-                              selected ? 'border-white/30 bg-white/10' : 'border-white/10 bg-white/5 hover:border-white/25'
-                            )}
-                          >
-                            <div className="flex items-start justify-between mb-2">
-                              <div className="min-w-0">
-                                <div className="text-[13px] font-medium text-white truncate">{voice.label}</div>
-                                <div className="text-[11px] text-ink-300">{voice.lang}</div>
-                              </div>
-                              <span
-                                role="button"
-                                tabIndex={0}
-                                onClick={(e) => { e.stopPropagation(); previewGridVoice(voice); }}
-                                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); previewGridVoice(voice); } }}
-                                className="h-7 w-7 rounded-full flex items-center justify-center bg-white/8 text-white hover:bg-white/15 transition shrink-0 ml-2"
-                                title="Preview"
-                                aria-label={`Preview ${voice.label}`}
-                              >
-                                {isPreviewing && previewingVoice?.id === voice.id ? <Pause size={13} /> : <Play size={13} />}
-                              </span>
-                            </div>
-                            <div className="flex gap-2">
-                              {voice.neural && <span className="text-[10px] bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded-full">Neural</span>}
-                              <span className="text-[10px] bg-white/10 text-ink-200 px-2 py-0.5 rounded-full capitalize">
-                                {voice.gender === 'female' ? 'Female' : voice.gender === 'male' ? 'Male' : 'Voice'}
-                              </span>
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
                 </div>
 
                 {/* Voice sound: speed / pitch / volume */}
