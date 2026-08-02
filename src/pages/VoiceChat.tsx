@@ -1026,11 +1026,7 @@ export default function VoiceChat() {
                     <p className="text-sm font-medium leading-relaxed text-ink-100 transition-all duration-300 min-h-[1.5em]">
                       {streamingText}
                     </p>
-                  ) : (
-                    <p className="text-xs font-semibold tracking-wider text-ink-400 uppercase animate-pulse-soft">
-                      Thinking…
-                    </p>
-                  )
+                  ) : null
                 ) : state === 'error' ? (
                   <p className="text-[13px] font-semibold text-red-400 uppercase">
                     Microphone not available
