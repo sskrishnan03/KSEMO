@@ -18,8 +18,8 @@ const SMTP_CONFIG = {
   port: 587,
   secure: false,
   auth: {
-    user: process.env.GMAIL_USER,
-    pass: process.env.GMAIL_APP_PASSWORD,
+    user: process.env.GMAIL_USER || process.env.VITE_GMAIL_USER,
+    pass: process.env.GMAIL_APP_PASSWORD || process.env.VITE_GMAIL_APP_PASSWORD,
   },
 };
 const transporter = nodemailer.createTransport(SMTP_CONFIG);
@@ -163,9 +163,14 @@ app.get('/api/web-search', async (req, res) => {
 // Generic email sender
 app.post('/send-email', async (req, res) => {
   try {
-    const { to, subject, body, from } = req.body;
+    const { to, subject, body } = req.body;
+    if (!SMTP_CONFIG.auth.user || !SMTP_CONFIG.auth.pass) {
+      return res.status(500).json({ success: false, error: 'SMTP credentials are not configured on the server.' });
+    }
+    // Always send from the authenticated Gmail account — Gmail rejects
+    // custom "from" addresses that don't belong to the account.
     const mailOptions = {
-      from: from || `Ksemo Voice Chat <${SMTP_CONFIG.auth.user}>`,
+      from: `Ksemo Voice Chat <${SMTP_CONFIG.auth.user}>`,
       to,
       subject,
       text: body,
