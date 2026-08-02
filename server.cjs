@@ -11,13 +11,15 @@ app.use(express.json());
 const PORT = process.env.PORT || 3001;
 
 // ── SMTP (Google Gmail) ──────────────────────────────────────────────
+// Credentials come ONLY from the local .env file. They must never be
+// hardcoded or committed to the repository.
 const SMTP_CONFIG = {
   host: 'smtp.gmail.com',
   port: 587,
   secure: false,
   auth: {
-    user: process.env.GMAIL_USER || 'sskrishnan03@gmail.com',
-    pass: process.env.GMAIL_APP_PASSWORD || 'uiif wgee qqsx gybb',
+    user: process.env.GMAIL_USER,
+    pass: process.env.GMAIL_APP_PASSWORD,
   },
 };
 const transporter = nodemailer.createTransport(SMTP_CONFIG);

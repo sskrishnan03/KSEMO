@@ -682,8 +682,8 @@ export default function Landing() {
           <div className="border-t border-white/8 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
             <p className="text-[12px] text-ink-300">© 2026 Ksemo. All rights reserved.</p>
             <div className="flex items-center gap-4">
-              <a href="#" className="text-[12px] text-ink-300 hover:text-white transition flex items-center gap-1">Privacy <ArrowUpRight size={10} /></a>
-              <a href="#" className="text-[12px] text-ink-300 hover:text-white transition flex items-center gap-1">Terms <ArrowUpRight size={10} /></a>
+              <Link to="/privacy" className="text-[12px] text-ink-300 hover:text-white transition flex items-center gap-1">Privacy <ArrowUpRight size={10} /></Link>
+              <Link to="/terms" className="text-[12px] text-ink-300 hover:text-white transition flex items-center gap-1">Terms <ArrowUpRight size={10} /></Link>
             </div>
           </div>
         </div>

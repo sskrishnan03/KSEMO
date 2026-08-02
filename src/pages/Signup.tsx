@@ -76,7 +76,7 @@ export default function Signup() {
       if (!(window as any).__gsui_initted) {
         (window as any).__gsui_initted = true;
         g.initialize({
-          client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID || '617109549081-3d2gevdkujut3rjfl56o3ol3ksl06kbi.apps.googleusercontent.com',
+          client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID || '',
           callback: handleGoogleCredentialResponse,
         });
       }

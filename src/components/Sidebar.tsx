@@ -4,7 +4,7 @@ import {
   Search, Settings,
   Archive, Trash2, Pin, Shield,
   MoreHorizontal, PanelLeft, LogOut, Mic,
-  Edit2, Share2, HelpCircle, Filter,
+  Edit2, Share2, HelpCircle, Filter, Zap,
 } from 'lucide-react';
 import { cn, groupByDate, truncate, initials } from '../lib/utils';
 import { listChats, updateChat, deleteChat, getSettings } from '../lib/data';
@@ -147,6 +147,7 @@ export function Sidebar({ collapsed, onToggleCollapse }: Props) {
   };
 
   const navItems = [
+    { to: '/app/plugins', icon: Zap, label: 'Plugins', active: loc.pathname === '/app/plugins', animationClass: 'icon-wiggle' },
     { to: '/app/search', icon: Search, label: 'Search', active: loc.pathname.startsWith('/app/search'), animationClass: 'icon-wiggle' },
   ];
 

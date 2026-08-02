@@ -488,7 +488,7 @@ async function sendEmailViaProxy(to: string, subject: string, body: string): Pro
         to,
         subject,
         body,
-        from: `Ksemo Workspace <sskrishnan03@gmail.com>`
+        from: `Ksemo Workspace <noreply@ksemo.app>`
       })
     });
     
