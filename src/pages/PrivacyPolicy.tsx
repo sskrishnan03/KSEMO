@@ -14,64 +14,27 @@ export default function PrivacyPolicy() {
       <LegalSection heading="1. Information We Collect">
         <p><strong>Account information.</strong> When you create an account, we collect your name, username, and email address so you can sign in and access your workspace.</p>
         <p><strong>Voice conversations.</strong> When you use Voice Chat, we record and store the transcripts of your conversations (what you say and the AI's responses) so you can search, revisit, and continue them later from Recent.</p>
-        <p><strong>Google account data.</strong> If you choose to connect the Email, Calendar, or Tasks plugins, we ask for your permission to access your Gmail, Google Calendar, and Google Tasks data using Google OAuth. We only access the data required to fulfill the commands you give (for example, sending an email, reading your inbox, creating a calendar event, or adding a task).</p>
+        <p><strong>Google sign-in data.</strong> If you choose to sign in with Google, we receive your name and email address from Google to create and identify your account.</p>
         <p><strong>Usage information.</strong> We may collect basic technical information such as your browser type, device type, and the pages you visit to keep the service running and improve it.</p>
       </LegalSection>
 
       <LegalSection heading="2. How We Use Your Information">
         <p>We use the information we collect to:</p>
-        <p>• Provide and operate the service, including voice recognition, AI responses, and plugin features.</p>
-        <p>• Save, search, and restore your conversations and notes.</p>
-        <p>• Execute the actions you request through connected Google services (send email, create events, manage tasks).</p>
+        <p>• Provide and operate the service, including voice recognition and AI responses.</p>
+        <p>• Save, search, and restore your conversations.</p>
         <p>• Respond to your requests and provide customer support.</p>
         <p>• Improve the reliability and security of the service.</p>
       </LegalSection>
 
-      <LegalSection heading="3. Google API Data Usage">
-        <p>
-          Ksemo's use and transfer to any other app of information received from Google APIs will
-          adhere to the{" "}
-          <a
-            href="https://developers.google.com/terms/api-services-user-data-policy"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="underline underline-offset-2 hover:text-white transition"
-          >
-            Google API Services User Data Policy
-          </a>
-          , including the Limited Use requirements. We only use Google user data to provide and
-          improve the specific features you ask us to perform, and we never use it for advertising,
-          marketing, or any purpose outside the service you requested.
-        </p>
-        <p>
-          You can revoke our access to your Google data at any time by disconnecting the plugin in
-          the Plugins page, or by removing Ksemo from your Google account at{" "}
-          <a
-            href="https://myaccount.google.com/permissions"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="underline underline-offset-2 hover:text-white transition"
-          >
-            myaccount.google.com/permissions
-          </a>
-          .
-        </p>
-      </LegalSection>
-
-      <LegalSection heading="4. Third-Party Services">
+      <LegalSection heading="3. Third-Party Services">
         <p>
           Ksemo uses Google's Gemini API to generate AI responses. The commands you speak may be sent
-          to Gemini solely for the purpose of producing your answer. We also rely on Google Cloud
-          Platform for the OAuth connection to Gmail, Calendar, and Tasks when you enable those
-          plugins, and on a hosted database for account and conversation storage.
-        </p>
-        <p>
-          Notes created with the Notes plugin are stored locally in your browser and are not
-          uploaded to our servers unless you choose to share them.
+          to Gemini solely for the purpose of producing your answer. We also rely on a hosted database
+          for account and conversation storage.
         </p>
       </LegalSection>
 
-      <LegalSection heading="5. Storage and Security">
+      <LegalSection heading="4. Storage and Security">
         <p>
           We store your data on secure servers and use row-level security so that you can only ever
           access your own data. We take reasonable measures — including encryption in transit and at
@@ -80,7 +43,7 @@ export default function PrivacyPolicy() {
         </p>
       </LegalSection>
 
-      <LegalSection heading="6. Data Retention and Deletion">
+      <LegalSection heading="5. Data Retention and Deletion">
         <p>
           We retain your account, conversations, and settings for as long as your account is active.
           You can delete individual conversations at any time from the app. If you wish to delete
@@ -89,15 +52,14 @@ export default function PrivacyPolicy() {
         </p>
       </LegalSection>
 
-      <LegalSection heading="7. Your Choices and Controls">
+      <LegalSection heading="6. Your Choices and Controls">
         <p>You are in control of your data:</p>
-        <p>• You can export or delete your conversations and notes at any time.</p>
-        <p>• You can connect or disconnect Google plugins at any time from the Plugins page.</p>
-        <p>• You can revoke Google access from your Google account settings.</p>
+        <p>• You can export or delete your conversations at any time.</p>
+        <p>• You can revoke Google sign-in access from your Google account settings.</p>
         <p>• You can close your account at any time.</p>
       </LegalSection>
 
-      <LegalSection heading="8. Cookies">
+      <LegalSection heading="7. Cookies">
         <p>
           We use cookies and similar technologies to keep you signed in, remember your preferences,
           and understand how the service is used. You can control cookies through your browser
@@ -105,7 +67,7 @@ export default function PrivacyPolicy() {
         </p>
       </LegalSection>
 
-      <LegalSection heading="9. Children's Privacy">
+      <LegalSection heading="8. Children's Privacy">
         <p>
           Ksemo is not directed at children under the age of 13, and we do not knowingly collect
           personal information from children. If you believe a child has provided us with personal
@@ -113,7 +75,7 @@ export default function PrivacyPolicy() {
         </p>
       </LegalSection>
 
-      <LegalSection heading="10. Changes to This Policy">
+      <LegalSection heading="9. Changes to This Policy">
         <p>
           We may update this Privacy Policy from time to time. When we do, we will revise the "Last
           updated" date above and, where appropriate, notify you. Continued use of the service after
@@ -121,7 +83,7 @@ export default function PrivacyPolicy() {
         </p>
       </LegalSection>
 
-      <LegalSection heading="11. Contact Us">
+      <LegalSection heading="10. Contact Us">
         <p>
           If you have questions about this Privacy Policy or your data, please contact us at{" "}
           <a href="mailto:support@ksemo.app" className="underline underline-offset-2 hover:text-white transition">

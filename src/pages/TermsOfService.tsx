@@ -14,8 +14,7 @@ export default function TermsOfService() {
       <LegalSection heading="1. The Service">
         <p>
           Ksemo provides a voice-first AI workspace that lets you have spoken conversations with an
-          AI assistant, search past conversations, create notes, and — when you connect them — use
-          your Google Gmail, Calendar, and Tasks through voice commands.
+          AI assistant and search past conversations.
         </p>
       </LegalSection>
 
@@ -34,15 +33,14 @@ export default function TermsOfService() {
         <p>• Transmit malware, viruses, or harmful code.</p>
         <p>• Attempt to gain unauthorized access to other users' accounts or data.</p>
         <p>• Use the service in a way that disrupts or degrades its availability for others.</p>
-        <p>• Use connected Google services to send unsolicited or abusive communications.</p>
+        <p>• Use the service to send unsolicited or abusive communications.</p>
       </LegalSection>
 
       <LegalSection heading="4. Third-Party Services">
         <p>
-          Ksemo integrates with third-party services including Google (Gmail, Calendar, Tasks, and
-          Gemini AI). Your use of those services is also subject to their own terms and privacy
-          policies. When you connect your Google account, you grant Ksemo access only to the data and
-          actions needed to perform the tasks you request.
+          Ksemo uses third-party services, including Google's Gemini AI for AI responses. Your use of
+          those services is also subject to their own terms and privacy policies. We only send the
+          data needed to produce the responses you request.
         </p>
       </LegalSection>
 

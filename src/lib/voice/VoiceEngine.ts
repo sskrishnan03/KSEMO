@@ -6,8 +6,6 @@ import { EmotionDetector } from './EmotionDetector';
 import { VoiceActivityDetector } from './VoiceActivityDetector';
 import { WakeWordDetector } from './WakeWordDetector';
 import { VoiceMemory, getVoiceMemory } from './VoiceMemory';
-import { PluginIntegrator } from './PluginIntegrator';
-import { initializePlugins } from '../plugins';
 
 export class VoiceEngine {
   private audioManager: AudioManager;
@@ -22,7 +20,6 @@ export class VoiceEngine {
   private eventListeners: Map<string, Set<(event: VoiceEvent) => void>> = new Map();
   private currentTranscript = '';
   private abortController: AbortController | null = null;
-  private pluginIntegrator: PluginIntegrator | null = null;
 
   constructor() {
     this.audioManager = new AudioManager();
@@ -32,9 +29,6 @@ export class VoiceEngine {
     this.vad = new VoiceActivityDetector();
     this.wakeWordDetector = new WakeWordDetector();
     this.voiceMemory = getVoiceMemory();
-
-    // Initialize plugins
-    initializePlugins();
 
     this.setupEventListeners();
   }
@@ -93,15 +87,6 @@ export class VoiceEngine {
   }
 
   async initialize(): Promise<void> {
-    // Initialize plugin integrator
-    this.pluginIntegrator = new PluginIntegrator({
-      userId: 'user',
-      voiceEngine: this,
-      sendMessage: (message: string) => {
-        this.emit('plugin_message', { message });
-      },
-    });
-
     const prefs = this.voiceMemory.getPreferences();
 
     const audioConfig: AudioConfig = {
@@ -251,16 +236,6 @@ export class VoiceEngine {
 
   getCurrentTranscript(): string {
     return this.currentTranscript;
-  }
-
-  async processPluginCommand(transcript: string): Promise<any> {
-    if (!this.pluginIntegrator) return null;
-    return await this.pluginIntegrator.processVoiceCommand(transcript);
-  }
-
-  getAvailablePluginActions(): any[] {
-    if (!this.pluginIntegrator) return [];
-    return this.pluginIntegrator.getAvailableActions();
   }
 
   getAudioLevel(): number {

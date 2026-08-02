@@ -10,8 +10,6 @@ import { VOICE_STORAGE_KEY, getStoredVoiceId, setStoredVoiceId, loadVoices, pick
 import { Markdown } from '../components/Markdown';
 import { ShareModal } from '../components/ShareModal';
 import { exportChatAsPDF, exportChatAsDocx, exportChatAsText } from '../lib/exportChat';
-import { getPluginRegistry } from '../lib/plugins';
-import { parsePluginCommand } from '../lib/voice/PluginIntentParser';
 import type { Chat } from '../lib/types';
 
 type HistoryEntry = { id?: string; role: 'user' | 'assistant'; content: string };
@@ -54,81 +52,6 @@ function stripMarkdown(text: string): string {
 }
 
 // Fast, offline parameter extraction used when the LLM parser is unavailable.
-function extractPluginParamsLegacy(text: string, action: any): Record<string, any> {
-  const params: Record<string, any> = {};
-  const lowerText = text.toLowerCase();
-
-  for (const param of action.parameters) {
-    if (param.name === 'to' && lowerText.includes('to ')) {
-      const match = lowerText.match(/to\s+([^\s]+(?:\s+[^\s]+)?)/);
-      if (match) params.to = match[1].replace(/^(with|saying|about|subject)\b/, '').trim();
-    } else if (param.name === 'from' && lowerText.includes('from ')) {
-      const match = lowerText.match(/from\s+([^\s]+(?:\s+[^\s]+)?)/);
-      if (match) params.from = match[1];
-    } else if (param.name === 'value' && /\d+/.test(lowerText)) {
-      const match = lowerText.match(/(\d+(?:\.\d+)?)/);
-      if (match) params.value = parseFloat(match[1]);
-    } else if (param.name === 'task' && lowerText.length > 10) {
-      const triggers = ['add task', 'create task', 'new task', 'to do', 'remember to'];
-      for (const trigger of triggers) {
-        if (lowerText.includes(trigger)) {
-          const index = lowerText.indexOf(trigger) + trigger.length;
-          params.task = text.slice(index).trim().replace(/^to\s+/i, '');
-          break;
-        }
-      }
-    } else if (param.name === 'content' && lowerText.length > 10) {
-      const triggers = ['create note', 'take a note', 'write note', 'save note'];
-      for (const trigger of triggers) {
-        if (lowerText.includes(trigger)) {
-          const index = lowerText.indexOf(trigger) + trigger.length;
-          params.content = text.slice(index).trim();
-          break;
-        }
-      }
-    } else if (param.name === 'expression' && /\d+/.test(lowerText)) {
-      const mathWords = ['calculate', 'what is', 'compute', 'solve'];
-      for (const word of mathWords) {
-        if (lowerText.includes(word)) {
-          const index = lowerText.indexOf(word) + word.length;
-          params.expression = text.slice(index).trim();
-          break;
-        }
-      }
-    } else if (param.name === 'query') {
-      const triggers = ['search', 'google', 'look up', 'find'];
-      for (const trigger of triggers) {
-        if (lowerText.includes(trigger)) {
-          const index = lowerText.indexOf(trigger) + trigger.length;
-          params.query = text.slice(index).trim();
-          break;
-        }
-      }
-    } else if (param.name === 'location') {
-      const triggers = ['weather', 'forecast'];
-      for (const trigger of triggers) {
-        if (lowerText.includes(trigger)) {
-          const index = lowerText.indexOf(trigger) + trigger.length;
-          const location = text.slice(index).trim().replace(/^(in|at|for)\s+/i, '');
-          if (location) params.location = location;
-          break;
-        }
-      }
-    } else if (param.name === 'minutes' && /\d+\s*(minute|min)/i.test(lowerText)) {
-      const match = lowerText.match(/(\d+)\s*(minute|min)/i);
-      if (match) params.minutes = parseInt(match[1]);
-    } else if (param.name === 'seconds' && /\d+\s*(second|sec)/i.test(lowerText)) {
-      const match = lowerText.match(/(\d+)\s*(second|sec)/i);
-      if (match) params.seconds = parseInt(match[1]);
-    } else if (param.name === 'time' && /\d+/.test(lowerText)) {
-      const match = lowerText.match(/(\d+(?::\d+)?(?:\s*(am|pm))?)/i);
-      if (match) params.time = match[1];
-    }
-  }
-
-  return params;
-}
-
 export default function VoiceChat() {
   const nav = useNavigate();
   const loc = useLocation();
@@ -350,90 +273,6 @@ export default function VoiceChat() {
     if (processingRef.current) return;
     if (!text.trim()) return;
     processingRef.current = true;
-
-    // First, try to process as a plugin command
-    const registry = getPluginRegistry();
-    const match = registry.findActionByVoiceTrigger(text);
-
-    if (!match) {
-      // The command clearly targets a plugin that isn't connected yet — say
-      // what to do instead of letting the AI give a dead-end answer.
-      const all = registry.findActionByVoiceTriggerInAll(text);
-      if (all && !all.enabled) {
-        processingRef.current = false;
-        stateRef.current = 'speaking';
-        setState('speaking');
-        await speak(`The ${all.plugin.config.name} plugin isn't connected yet. Open the Plugins page, click ${all.plugin.config.name}, and press Connect. Then try your command again.`);
-        stateRef.current = 'listening';
-        setState('listening');
-        await new Promise((r) => setTimeout(r, 600));
-        if (mutedRef.current || stateRef.current !== 'listening') return;
-        startRecognition();
-        return;
-      }
-    }
-
-    if (match) {
-      const { plugin, action } = match;
-
-      // Extract parameters: ask the LLM first for accuracy, fall back to fast
-      // regex extraction if the LLM isn't available.
-      const parsed = await parsePluginCommand(text, plugin.config.id, action);
-      const params: Record<string, any> = parsed && Object.keys(parsed).length > 0
-        ? parsed
-        : extractPluginParamsLegacy(text, action);
-
-      // If required info is missing, ask for it instead of failing silently.
-      const missing = action.parameters.filter((p) => p.required && !params[p.name]);
-      if (missing.length > 0) {
-        const names = missing.map((m) => m.name).join(' and ');
-        processingRef.current = false;
-        stateRef.current = 'speaking';
-        setState('speaking');
-        await speak(`I need ${names} for that. Please say it again with that information.`);
-        stateRef.current = 'listening';
-        setState('listening');
-        await new Promise((r) => setTimeout(r, 600));
-        if (mutedRef.current || stateRef.current !== 'listening') return;
-        startRecognition();
-        return;
-      }
-
-      try {
-        const context = {
-          userId: profile?.id || '',
-          voiceEngine: null,
-          sendMessage: () => {},
-        };
-        const result = await registry.executeAction(plugin.config.id, action.id, params, context);
-
-        const message = result.success
-          ? (result.voiceResponse || 'Done.')
-          : `Sorry, that didn't work. ${result.error || 'Unknown error.'}`;
-
-        stateRef.current = 'speaking';
-        setState('speaking');
-        await speak(message);
-        stateRef.current = 'listening';
-        setState('listening');
-        await new Promise((r) => setTimeout(r, 600));
-        if (mutedRef.current || stateRef.current !== 'listening') return;
-        startRecognition();
-      } catch (error) {
-        console.error('Plugin execution error:', error);
-        stateRef.current = 'speaking';
-        setState('speaking');
-        await speak('Sorry, that plugin hit an error. Please try again.');
-        stateRef.current = 'listening';
-        setState('listening');
-        await new Promise((r) => setTimeout(r, 600));
-        if (mutedRef.current || stateRef.current !== 'listening') return;
-        startRecognition();
-      }
-
-      processingRef.current = false;
-      return;
-    }
 
     // Create the chat lazily on the first spoken message so an empty session
     // never leaves an empty chat behind.

@@ -16,10 +16,8 @@ import SearchPage from './pages/SearchPage';
 import Notifications from './pages/Notifications';
 import Settings from './pages/Settings';
 import VoiceChat from './pages/VoiceChat';
-import Plugins from './pages/Plugins';
 import Admin from './pages/Admin';
 import SharedChatView from './pages/SharedChatView';
-import OAuthCallback from './pages/OAuthCallback';
 
 export default function App() {
   return (
@@ -40,9 +38,7 @@ export default function App() {
             <Route path="/app" element={<ProtectedRoute><AppLayout><Dashboard /></AppLayout></ProtectedRoute>}>
             </Route>
             <Route path="/app/voice-chat" element={<ProtectedRoute><AppLayout><VoiceChat /></AppLayout></ProtectedRoute>} />
-            <Route path="/app/plugins" element={<ProtectedRoute><AppLayout><Plugins /></AppLayout></ProtectedRoute>} />
             <Route path="/app/voice-chat/:chatId" element={<ProtectedRoute><AppLayout><VoiceChat /></AppLayout></ProtectedRoute>} />
-            <Route path="/oauth/callback" element={<OAuthCallback />} />
 
 
             <Route path="/app/search" element={<ProtectedRoute><AppLayout><SearchPage /></AppLayout></ProtectedRoute>} />
