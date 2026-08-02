@@ -33,10 +33,15 @@ export class TTSEngine {
     }
 
     const voices = await loadVoices();
-    // Prefer a voice matching the requested language so multi-language
-    // setups don't get spoken in the wrong accent.
+    // Honor an explicitly selected voice first, so clicking a voice in the
+    // Settings page's Top-5 list is always respected regardless of language.
     let selectedVoice: SpeechSynthesisVoice | null = null;
-    if (config.language) {
+    if (config.voiceId && config.voiceId !== 'auto') {
+      selectedVoice = pickVoice(config.voiceId, voices);
+    }
+    // Otherwise prefer a voice matching the requested language so multi-language
+    // setups don't get spoken in the wrong accent.
+    if (!selectedVoice && config.language) {
       const target = config.language.toLowerCase().replace('_', '-');
       const langVoices = voices.filter((v) => v.lang.toLowerCase().replace('_', '-') === target);
       if (langVoices.length) {
@@ -65,7 +70,6 @@ export class TTSEngine {
       let resolved = false;
       const words = text.split(/\s+/).filter(Boolean);
       let wordTimer: number | undefined;
-      let boundaryFired = false;
 
       const done = (ok: boolean) => {
         if (resolved) return;
@@ -73,6 +77,11 @@ export class TTSEngine {
         this.isSpeaking = false;
         if (wordTimer !== undefined) {
           clearInterval(wordTimer);
+          wordTimer = undefined;
+        }
+        // Always finish the caption, even if boundary events were sparse.
+        if (onWordBoundary && words.length > 0) {
+          onWordBoundary(text.trim());
         }
         this.emit('state_change', { state: 'idle' });
         resolve(ok);
@@ -83,40 +92,37 @@ export class TTSEngine {
         this.emit('state_change', { state: 'speaking' });
       };
 
-      // Word boundary handling for streaming text display
+      // Word-by-word caption reveal. Two sources feed it — real boundary
+      // events (which can be sparse) and a fallback timer that always runs to
+      // completion — so the caption never stalls partway through a sentence.
       if (onWordBoundary && words.length > 0) {
         const revealMs = Math.max(2500, words.length * 360);
         const perWordMs = Math.max(100, revealMs / words.length);
         let index = 0;
+        let furthest = 1;
+
+        const reveal = (count: number) => {
+          if (resolved || count <= furthest) return;
+          furthest = count;
+          onWordBoundary(words.slice(0, count).join(' '));
+        };
 
         utterance.onboundary = (e: SpeechSynthesisEvent) => {
           if (resolved) return;
-          boundaryFired = true;
-          if (wordTimer !== undefined) {
-            clearInterval(wordTimer);
-            wordTimer = undefined;
-          }
-
           const charIndex = e.charIndex ?? 0;
           const charLength = e.charLength ?? 0;
           const end = charIndex + (charLength > 0 ? charLength : 0);
           const spaceIdx = text.indexOf(' ', end);
           const shown = text.slice(0, spaceIdx === -1 ? text.length : spaceIdx + 1).trim();
-          onWordBoundary(shown || text.slice(0, charIndex).trim());
+          const shownCount = shown ? shown.split(/\s+/).length : 0;
+          if (shownCount) reveal(shownCount);
         };
 
-        // Fallback timer if boundary events don't fire
+        // Fallback: reveal one word per tick; boundary events may jump ahead.
         onWordBoundary(words[0]);
         wordTimer = window.setInterval(() => {
-          if (boundaryFired) {
-            if (wordTimer !== undefined) {
-              clearInterval(wordTimer);
-              wordTimer = undefined;
-            }
-            return;
-          }
           index += 1;
-          onWordBoundary(words.slice(0, index).join(' '));
+          reveal(index);
           if (index >= words.length && wordTimer !== undefined) {
             clearInterval(wordTimer);
             wordTimer = undefined;

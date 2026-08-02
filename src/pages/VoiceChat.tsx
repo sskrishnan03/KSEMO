@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { Mic, MicOff, X, Share2, Copy, MoreHorizontal, Trash2, Volume2, Check, Download, FileDown, FileType, FileText, AudioWaveform, Settings } from 'lucide-react';
+import { Mic, MicOff, X, Share2, Copy, MoreHorizontal, Trash2, Volume2, Check, Download, FileDown, FileType, FileText, AudioWaveform } from 'lucide-react';
 import { cn, estimateTokens } from '../lib/utils';
 import { useTheme } from '../components/ThemeProvider';
 import { useAuthContext } from '../components/AuthProvider';
@@ -12,7 +12,6 @@ import { ShareModal } from '../components/ShareModal';
 import { exportChatAsPDF, exportChatAsDocx, exportChatAsText } from '../lib/exportChat';
 import { getVoiceEngine } from '../lib/voice/VoiceEngine';
 import { adjustResponseForEmotion } from '../lib/voice/StreamingResponseHandler';
-import { VoiceSettings } from '../components/voice/VoiceSettings';
 import type { VoiceEvent, TranscriptEvent, EmotionData, Emotion, TTSConfig, VoicePreferences, InputMode } from '../lib/voice/types';
 import type { Chat } from '../lib/types';
 
@@ -22,6 +21,11 @@ type VoiceState = 'idle' | 'listening' | 'thinking' | 'speaking' | 'interrupted'
 
 const RECONNECT_DELAY_MS = 1500;
 const MAX_RECONNECT_ATTEMPTS = 5;
+
+// Voice commands: say "start" (or a friendlier phrase) on the idle screen to
+// begin a session, and say "hang up" (or similar) mid-call to end it.
+const START_COMMAND_RE = /\b(start|begin|wake up|hey ksemo|hello|let'?s (go|start|talk)|talk to me)\b/i;
+const END_COMMAND_RE = /\b(hang\s*up|hangup|end\s*(the\s*)?(call|chat|session)|goodbye|bye\s*bye|gotta go|i'?m done)\b/i;
 
 function MessageActionButton({ title, onClick, danger, children }: { title: string; onClick: (e: React.MouseEvent) => void; danger?: boolean; children: React.ReactNode }) {
   return (
@@ -86,13 +90,8 @@ export default function VoiceChat() {
   const [voiceLevel, setVoiceLevel] = useState(0);
   const [chatId, setChatId] = useState<string | null>(null);
   const [started, setStarted] = useState(false);
-  const [interimTranscript, setInterimTranscript] = useState('');
-  const [streamingText, setStreamingText] = useState('');
   const [aiResponseText, setAiResponseText] = useState('');
-  const [emotion, setEmotion] = useState<Emotion | null>(null);
-  const [latencyMs, setLatencyMs] = useState<number | null>(null);
   const [inputMode, setInputMode] = useState<InputMode>(engine.getPreferences().inputMode);
-  const [showSettings, setShowSettings] = useState(false);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [shareChat, setShareChat] = useState<Chat | null>(null);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
@@ -102,6 +101,7 @@ export default function VoiceChat() {
   const [readAloudEnabled, setReadAloudEnabled] = useState(true);
   const [readingIndex, setReadingIndex] = useState<number | null>(null);
   const [loadingChat, setLoadingChat] = useState(false);
+  const [warmMic, setWarmMic] = useState(false);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -118,6 +118,10 @@ export default function VoiceChat() {
   const emotionRef = useRef<EmotionData | null>(null);
   const transcriptRef = useRef<HTMLDivElement | null>(null);
   const readingIndexRef = useRef<number | null>(null);
+  const spokenSoFarRef = useRef('');
+  const startSessionRef = useRef<() => void>(() => {});
+  const endSessionRef = useRef<() => void | Promise<void>>(() => {});
+  const warmNextRef = useRef(false);
 
   // Sync state and muted to refs for the callbacks
   useEffect(() => { stateRef.current = state; }, [state]);
@@ -158,7 +162,6 @@ export default function VoiceChat() {
     processingRef.current = false;
     engine.stopBargeInMonitoring();
     engine.interrupt();
-    setInterimTranscript('');
   }, [engine]);
 
   // Process user speech → AI (streaming, sentence-by-sentence TTS) → listen again
@@ -195,21 +198,37 @@ export default function VoiceChat() {
     if (turn !== turnRef.current) return;
 
     conversationRef.current.push({ role: 'user', content: text });
-    const userMsg = await insertMessage({ chat_id: chatIdRef.current, role: 'user', content: text });
-    setHistory((h) => [...h, { id: userMsg?.id ?? undefined, role: 'user', content: text }]);
+    // Save the user's message in the background so it doesn't delay the AI's
+    // first spoken words. The transcript bubble appears once it's stored.
+    insertMessage({ chat_id: chatIdRef.current, role: 'user', content: text })
+      .then((m) => {
+        if (turn === turnRef.current) {
+          setHistory((h) => [...h, { id: m?.id ?? undefined, role: 'user', content: text }]);
+        }
+      })
+      .catch(() => {
+        if (turn === turnRef.current) {
+          setHistory((h) => [...h, { id: undefined, role: 'user', content: text }]);
+        }
+      });
 
     const controller = new AbortController();
     abortRef.current = controller;
     engine.setAbortController(controller);
 
-    setInterimTranscript('');
-    setStreamingText('');
     setAiResponseText('');
+    spokenSoFarRef.current = '';
     stateRef.current = 'thinking';
     setState('thinking');
 
     const detectedEmotion = emotionRef.current?.emotion ?? null;
-    const systemPrompt = adjustResponseForEmotion(VOICE_SYSTEM_PROMPT, detectedEmotion ?? 'neutral');
+    // Personalize the replies: the AI knows the logged-in user's name and can
+    // address them naturally, the way a real person would.
+    const userName = profile?.full_name || profile?.username || '';
+    const basePrompt = userName
+      ? `${VOICE_SYSTEM_PROMPT}\n\nThe user's name is ${userName}. Address them by name now and then, naturally, like a real person — never force it into every sentence.`
+      : VOICE_SYSTEM_PROMPT;
+    const systemPrompt = adjustResponseForEmotion(basePrompt, detectedEmotion ?? 'neutral');
     const prefs = engine.getPreferences();
     const tone = emotionToneAdjustment(detectedEmotion);
     const ttsOverrides: Partial<TTSConfig> = {
@@ -232,9 +251,14 @@ export default function VoiceChat() {
         const sentence = sentences.shift()!;
         stateRef.current = 'speaking';
         setState('speaking');
-        const ok = await engine.speak(stripMarkdown(sentence), ttsOverrides, (revealed) => setAiResponseText(revealed));
+        // Caption grows across sentences: already-spoken words stay visible
+        // while the current sentence reveals word-by-word, so the full reply
+        // is shown by the time speaking finishes.
+        const prefix = spokenSoFarRef.current;
+        const ok = await engine.speak(stripMarkdown(sentence), ttsOverrides, (revealed) => setAiResponseText(prefix ? `${prefix} ${revealed}` : revealed));
         if (!ok) break;
         if (turn !== turnRef.current) break;
+        spokenSoFarRef.current = prefix ? `${prefix} ${stripMarkdown(sentence)}` : stripMarkdown(sentence);
       }
       pumpActive = false;
       if (drainResolve) {
@@ -254,7 +278,7 @@ export default function VoiceChat() {
     };
 
     const flushSentences = () => {
-      const parts = buffer.split(/(?<=[.!?])\s+|\r?\n+/);
+      const parts = buffer.split(/(?<=[.!?])\s+|\r?\n+|(?<=[,;:])\s+/);
       if (parts.length > 1) {
         for (let i = 0; i < parts.length - 1; i++) {
           const s = parts[i].trim();
@@ -295,8 +319,13 @@ export default function VoiceChat() {
         onToken: (token) => {
           if (turn !== turnRef.current) return;
           buffer += token;
-          setStreamingText((prev) => prev + token);
           flushSentences();
+          // Long runs without punctuation still start speaking quickly instead
+          // of waiting for a whole sentence to arrive.
+          if (buffer.split(/\s+/).filter(Boolean).length >= 10) {
+            enqueueSentence(buffer.trim());
+            buffer = '';
+          }
         },
       });
 
@@ -309,13 +338,11 @@ export default function VoiceChat() {
       const aiMsg = await insertMessage({ chat_id: chatIdRef.current, role: 'assistant', content: result.content, model: 'ksemo-pro', tokens: result.tokens });
       await logUsage('ksemo-pro', estimateTokens(text), result.tokens, result.latencyMs);
       setHistory((h) => [...h, { id: aiMsg?.id ?? undefined, role: 'assistant', content: result.content }]);
-      setLatencyMs(result.latencyMs);
 
       if (buffer.trim()) { enqueueSentence(buffer.trim()); buffer = ''; }
       await (drainPromise ?? Promise.resolve());
 
       if (turn !== turnRef.current) return;
-      setStreamingText('');
       setAiResponseText('');
       await resumeListening(turn);
     } catch (err) {
@@ -361,18 +388,47 @@ export default function VoiceChat() {
       if (turn === turnRef.current) processingRef.current = false;
       if (turn === turnRef.current) engine.stopBargeInMonitoring();
     }
+  }, [engine, profile]);
+
+  // Hang up — say a natural goodbye first, THEN end the session. Used both by
+  // the "hang up" voice command and the End (X) button, so it always speaks.
+  const handleHangUp = useCallback(async () => {
+    if (!startedRef.current) return;
+    turnRef.current += 1; // invalidate any in-flight AI turn
+    processingRef.current = false;
+    engine.stopBargeInMonitoring();
+    engine.stopListening();
+    if (abortRef.current) { abortRef.current.abort(); abortRef.current = null; }
+    if (mutedRef.current) {
+      // Muted: can't hear a goodbye, so just end.
+      endSessionRef.current();
+      return;
+    }
+    stateRef.current = 'speaking';
+    setState('speaking');
+    await engine.speak("Alright, it was nice talking to you. Goodbye!", undefined, (revealed) => setAiResponseText(revealed));
+    endSessionRef.current();
   }, [engine]);
 
   // Engine event wiring (singleton listeners are removed on unmount).
   useEffect(() => {
-    const onInterim = (ev: VoiceEvent) => {
-      setInterimTranscript((ev.data as TranscriptEvent)?.text ?? '');
-    };
-
     const onFinal = (ev: VoiceEvent) => {
       const t = ((ev.data as TranscriptEvent)?.text ?? '').trim();
-      setInterimTranscript('');
-      if (!t || processingRef.current || !startedRef.current || mutedRef.current) return;
+      if (!t) return;
+
+      // Not in a session yet — the mic listens for a "start" command.
+      if (!startedRef.current) {
+        if (START_COMMAND_RE.test(t)) startSessionRef.current();
+        return;
+      }
+
+      // Mid-call voice command to hang up / end the conversation.
+      if (END_COMMAND_RE.test(t)) {
+        handleHangUp();
+        return;
+      }
+
+      if (processingRef.current || mutedRef.current) return;
       reconnectAttemptsRef.current = 0;
       processUserSpeech(t);
     };
@@ -388,17 +444,20 @@ export default function VoiceChat() {
     const onEmotion = (ev: VoiceEvent) => {
       const data = ev.data as EmotionData;
       emotionRef.current = data;
-      setEmotion(data.emotion);
     };
 
     const onWakeWord = () => {
-      // Wake word heard → start listening for the actual command.
-      if (!startedRef.current || mutedRef.current) return;
+      if (mutedRef.current) return;
+      if (!startedRef.current) {
+        // Warm mic after a call: the wake word doubles as the "start" command.
+        startSessionRef.current();
+        return;
+      }
+      // Wake word heard mid-call → start listening for the actual command.
       engine.stopWakeWordStandby();
       engine.startListening();
       stateRef.current = 'listening';
       setState('listening');
-      setInterimTranscript('');
     };
 
     const onPTTActivated = () => {
@@ -423,7 +482,6 @@ export default function VoiceChat() {
       setInputMode(p.inputMode === 'wake_word' && !p.wakeWordEnabled ? 'hands_free' : p.inputMode);
     };
 
-    engine.on('transcript_interim', onInterim);
     engine.on('transcript_final', onFinal);
     engine.on('speech_started', onSpeechStarted);
     engine.on('emotion_detected', onEmotion);
@@ -433,7 +491,6 @@ export default function VoiceChat() {
     engine.on('preferences_changed', onPrefsChanged);
 
     return () => {
-      engine.off('transcript_interim', onInterim);
       engine.off('transcript_final', onFinal);
       engine.off('speech_started', onSpeechStarted);
       engine.off('emotion_detected', onEmotion);
@@ -442,7 +499,7 @@ export default function VoiceChat() {
       engine.off('error', onEngineError);
       engine.off('preferences_changed', onPrefsChanged);
     };
-  }, [engine, processUserSpeech, triggerBargeIn]);
+  }, [engine, processUserSpeech, triggerBargeIn, handleHangUp]);
 
   // Stop everything the engine is doing.
   const stopAll = useCallback(() => {
@@ -450,6 +507,19 @@ export default function VoiceChat() {
     engine.stopBargeInMonitoring();
     if (abortRef.current) { abortRef.current.abort(); abortRef.current = null; }
     try { window.speechSynthesis?.cancel(); } catch { /* ok */ }
+  }, [engine]);
+
+  // After a call ends, keep the mic warm on the transcript/start screen so the
+  // user can just say "start" to begin a new call (hands-free mode only).
+  const enableStartCommandListening = useCallback(async () => {
+    try {
+      await engine.startSession();
+      const mode = engine.getPreferences().inputMode;
+      setWarmMic(mode !== 'wake_word' && mode !== 'push_to_talk');
+    } catch (err) {
+      console.error('Failed to enable start-command listening:', err);
+      setWarmMic(false);
+    }
   }, [engine]);
 
   // Click gesture handler to boot up WebAudio and speech engine.
@@ -478,10 +548,9 @@ export default function VoiceChat() {
     // Reveal the session UI right away so it never feels like it's "loading".
     startedRef.current = true;
     setStarted(true);
+    setWarmMic(false);
     stateRef.current = 'idle';
     setState('idle');
-    setLatencyMs(null);
-    setEmotion(null);
 
     if (!chatIdRef.current) {
       // Fresh session: the chat is created lazily on the first spoken message,
@@ -538,13 +607,17 @@ export default function VoiceChat() {
     let cancelled = false;
     const setup = async () => {
       await stopAll();
+      if (warmNextRef.current) {
+        warmNextRef.current = false;
+        await enableStartCommandListening();
+      } else {
+        setWarmMic(false);
+      }
       startedRef.current = false;
       setStarted(false);
       stateRef.current = 'idle';
       setState('idle');
       setAiResponseText('');
-      setStreamingText('');
-      setInterimTranscript('');
       conversationRef.current = [];
       setHistory([]);
       setChatId(routeChatId ?? null);
@@ -575,6 +648,8 @@ export default function VoiceChat() {
 
   // End session → save the conversation title, reset, and return to the normal voice chat screen.
   const endSession = useCallback(async () => {
+    // Keep the mic warm on the screen we land on so "start" begins a new call.
+    warmNextRef.current = true;
     await stopAll();
     startedRef.current = false;
     stateRef.current = 'idle';
@@ -603,6 +678,8 @@ export default function VoiceChat() {
       exchangesRef.current = 0;
       totalTokensRef.current = 0;
       reconnectAttemptsRef.current = 0;
+      warmNextRef.current = false;
+      await enableStartCommandListening();
       return;
     }
 
@@ -618,11 +695,23 @@ export default function VoiceChat() {
     if (endedChatId) {
       // Open the ended chat so its transcript stays on screen and can be
       // continued with one click — never fall back to the start screen.
+      // The route-change setup effect consumes warmNextRef and warms the mic.
       nav(`/app/voice-chat/${endedChatId}`);
     } else if (loc.pathname.startsWith('/app/voice-chat/')) {
       nav('/app/voice-chat', { replace: true });
+      warmNextRef.current = false;
+      await enableStartCommandListening();
+    } else {
+      warmNextRef.current = false;
     }
-  }, [nav, stopAll, loc.pathname, routeChatId]);
+  }, [nav, stopAll, loc.pathname, routeChatId, enableStartCommandListening]);
+
+  // Keep the latest start/end callbacks reachable from the engine's voice
+  // command handler so "start" / "hang up" always hit the current closures.
+  useEffect(() => {
+    startSessionRef.current = startSessionFlow;
+    endSessionRef.current = endSession;
+  });
 
   // Mute / Unmute handler. Only reacts to `muted` changes — session startup is
   // handled by startSessionFlow, and an in-flight AI turn is left to finish so
@@ -909,19 +998,8 @@ export default function VoiceChat() {
   return (
     <div className="h-full w-full bg-transparent flex flex-col items-center overflow-hidden py-6 px-4 sm:px-6 select-none animate-fade-in">
 
-      {/* Top bar with settings + export + share buttons (top-right corner, navbar style) */}
+      {/* Top bar with export + share buttons (top-right corner, navbar style) */}
       <div className="w-full flex items-center justify-end h-8 shrink-0 px-4 sm:px-6 relative">
-        {started && (
-          <button
-            onClick={() => setShowSettings(true)}
-            className="h-8 w-8 rounded-lg flex items-center justify-center text-ink-300 hover:text-white hover:bg-white/5 transition"
-            title="Voice settings"
-            aria-label="Voice settings"
-          >
-            <Settings size={16} />
-          </button>
-        )}
-
         {chatId && history.length > 0 && (
           <>
             <div className="relative ml-1">
@@ -984,7 +1062,7 @@ export default function VoiceChat() {
             {renderMessages()}
           </div>
 
-          <div className="z-20 py-2 h-14 flex items-center justify-center shrink-0">
+          <div className="z-20 py-2 shrink-0 flex flex-col items-center justify-center gap-2">
             <button
               onClick={startSessionFlow}
               className="px-8 h-12 rounded-full border border-white/10 bg-ink-800 text-white hover:bg-ink-700 active:scale-95 transition-all shadow-glow font-semibold tracking-wide text-[13px] flex items-center gap-2"
@@ -992,6 +1070,11 @@ export default function VoiceChat() {
               <AudioWaveform size={16} className="shrink-0" />
               Continue Voice Chat
             </button>
+            {warmMic && (
+              <p className="text-[11px] text-ink-400/80 tracking-wide">
+                or just say <span className="text-ink-200 font-medium">"start"</span>
+              </p>
+            )}
           </div>
         </>
       ) : (
@@ -1014,23 +1097,9 @@ export default function VoiceChat() {
                     {aiResponseText}
                   </p>
                 ) : state === 'thinking' ? (
-                  streamingText ? (
-                    <p className="text-sm font-medium leading-relaxed text-ink-100 transition-all duration-300 min-h-[1.5em]">
-                      {streamingText}
-                    </p>
-                  ) : (
-                    <p className="text-xs font-semibold tracking-wider text-ink-400 uppercase animate-pulse-soft">
-                      Thinking…
-                    </p>
-                  )
-                ) : state === 'listening' ? (
-                  interimTranscript ? (
-                    <p className="text-sm font-medium leading-relaxed text-ink-100">{interimTranscript}</p>
-                  ) : (
-                    <p className="text-xs font-semibold tracking-wider text-ink-400 uppercase animate-pulse-soft">
-                      I'm listening…
-                    </p>
-                  )
+                  <p className="text-xs font-semibold tracking-wider text-ink-400 uppercase animate-pulse-soft">
+                    Thinking…
+                  </p>
                 ) : state === 'idle' ? (
                   inputMode === 'wake_word' ? (
                     <p className="text-xs font-semibold tracking-wider text-ink-400 uppercase animate-pulse-soft">
@@ -1048,32 +1117,25 @@ export default function VoiceChat() {
                 ) : null}
               </div>
             )}
-
-            {/* Emotion + latency indicators */}
-            {started && (emotion || latencyMs !== null) && (
-              <div className="mt-3 flex items-center justify-center gap-3 text-[11px] text-ink-400">
-                {emotion && (
-                  <span className="px-2 py-0.5 rounded-full bg-white/5 border border-white/10 capitalize">{emotion}</span>
-                )}
-                {latencyMs !== null && (
-                  <span className="px-2 py-0.5 rounded-full bg-white/5 border border-white/10">
-                    {(latencyMs / 1000).toFixed(1)}s response
-                  </span>
-                )}
-              </div>
-            )}
           </div>
 
           {/* Center/Bottom Action Controls */}
-          <div className="z-20 py-2 h-14 flex items-center justify-center">
+          <div className="z-20 py-2 shrink-0 flex flex-col items-center justify-center gap-2">
             {!started ? (
-              <button
-                onClick={startSessionFlow}
-                className="px-8 h-12 rounded-full border border-white/10 bg-ink-800 text-white hover:bg-ink-700 active:scale-95 transition-all shadow-glow font-semibold tracking-wide text-[13px] flex items-center gap-2"
-              >
-                <Mic size={16} className="shrink-0" />
-                Start Voice Chat
-              </button>
+              <>
+                <button
+                  onClick={startSessionFlow}
+                  className="px-8 h-12 rounded-full border border-white/10 bg-ink-800 text-white hover:bg-ink-700 active:scale-95 transition-all shadow-glow font-semibold tracking-wide text-[13px] flex items-center gap-2"
+                >
+                  <Mic size={16} className="shrink-0" />
+                  Start Voice Chat
+                </button>
+                {warmMic && (
+                  <p className="text-[11px] text-ink-400/80 tracking-wide">
+                    or just say <span className="text-ink-200 font-medium">"start"</span>
+                  </p>
+                )}
+              </>
             ) : (
               <div className="flex items-center gap-6 animate-scale-in">
                 {/* Push to talk */}
@@ -1091,9 +1153,9 @@ export default function VoiceChat() {
                   </button>
                 )}
 
-                {/* End Call / Close button */}
+                {/* End Call / Close button — speaks a goodbye first, then ends */}
                 <button
-                  onClick={endSession}
+                  onClick={handleHangUp}
                   className="w-12 h-12 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 active:scale-95 text-white flex items-center justify-center transition-all shadow-soft"
                   aria-label="End voice session"
                   title="End session"
@@ -1158,10 +1220,6 @@ export default function VoiceChat() {
 
       {shareChat && (
         <ShareModal open={!!shareChat} onClose={() => setShareChat(null)} chat={shareChat} />
-      )}
-
-      {showSettings && (
-        <VoiceSettings onClose={() => setShowSettings(false)} />
       )}
     </div>
   );

@@ -18,6 +18,7 @@ import { downloadFile, cn } from '../lib/utils';
 import { supabase } from '../lib/supabase';
 import type { AppPreferences } from '../lib/types';
 import { DEFAULT_VOICE_ID, VOICE_PREVIEW_TEXT, setStoredVoiceId, loadVoices, pickVoice, detectVoices, type DetectedVoice } from '../lib/voices';
+import { getVoiceEngine } from '../lib/voice/VoiceEngine';
 
 type Tab = 'account' | 'security' | 'preferences' | 'notifications' | 'appearance' | 'data' | 'feedback' | 'help';
 
@@ -133,7 +134,13 @@ export default function Settings() {
   const selectVoice = async (id: string) => {
     updatePref('voice_id', id);
     setStoredVoiceId(id);
-    if (user) await upsertSettings(user.id, { ...prefs, voice_id: id });
+    // Apply immediately to the shared voice engine so the change takes effect
+    // right away (the engine singleton persists across pages).
+    getVoiceEngine().updatePreferences({ voiceId: id });
+    if (user) {
+      const next = { ...prefs, voice_id: id };
+      await upsertSettings(user.id, next);
+    }
   };
 
   const previewVoice = async (id: string, voice?: SpeechSynthesisVoice) => {
