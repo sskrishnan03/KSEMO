@@ -4,7 +4,7 @@ import { Mic, MicOff, X, Share2, Copy, MoreHorizontal, Trash2, Volume2, Check, D
 import { cn, estimateTokens } from '../lib/utils';
 import { useTheme } from '../components/ThemeProvider';
 import { useAuthContext } from '../components/AuthProvider';
-import { createVoiceChat, insertMessage, updateChat, deleteMessage, getSettings, logUsage, listChats, listMessages, setLastActiveChatId } from '../lib/data';
+import { createVoiceChat, insertMessage, updateChat, deleteMessage, getSettings, upsertSettings, logUsage, listChats, listMessages, setLastActiveChatId } from '../lib/data';
 import { streamChat, VOICE_SYSTEM_PROMPT, type ChatMessage } from '../lib/ai';
 import { getStoredVoiceId, setStoredVoiceId, VOICE_STORAGE_KEY } from '../lib/voices';
 import { Markdown } from '../components/Markdown';
@@ -14,7 +14,7 @@ import { getVoiceEngine } from '../lib/voice/VoiceEngine';
 import { adjustResponseForEmotion } from '../lib/voice/StreamingResponseHandler';
 import { VoiceSettings } from '../components/voice/VoiceSettings';
 import type { VoiceEvent, TranscriptEvent, EmotionData, Emotion, TTSConfig, VoicePreferences, InputMode } from '../lib/voice/types';
-import type { Chat } from '../lib/types';
+import type { Chat, AppPreferences } from '../lib/types';
 
 type HistoryEntry = { id?: string; role: 'user' | 'assistant'; content: string };
 
@@ -119,6 +119,13 @@ export default function VoiceChat() {
   const transcriptRef = useRef<HTMLDivElement | null>(null);
   const readingIndexRef = useRef<number | null>(null);
 
+  // Cloud-sync refs: mirror VoiceMemory into Supabase so voice preferences
+  // follow the user across devices, and the Settings page stays consistent.
+  const settingsRef = useRef<AppPreferences>({});
+  const applyingCloudRef = useRef(false);
+  const cloudWriteTimerRef = useRef<number | null>(null);
+  const pendingCloudPrefsRef = useRef<VoicePreferences | null>(null);
+
   // Sync state and muted to refs for the callbacks
   useEffect(() => { stateRef.current = state; }, [state]);
   useEffect(() => { mutedRef.current = muted; }, [muted]);
@@ -129,17 +136,46 @@ export default function VoiceChat() {
   useEffect(() => { voiceLevelRef.current = voiceLevel; }, [voiceLevel]);
 
   // Connect read-aloud + voice selection to the user's Settings preference.
-  // Supabase is the source of truth for voice_id; mirror it into VoiceMemory.
+  // Supabase is the source of truth for voice settings; mirror them into
+  // VoiceMemory (applyingCloudRef blocks the echo write-back below).
   useEffect(() => {
     if (!profile?.id) return;
     getSettings(profile.id).then((s) => {
-      const v = s?.preferences?.voice_id;
+      const cloud = s?.preferences ?? {};
+      settingsRef.current = cloud;
+      applyingCloudRef.current = true;
+      const vp = cloud.voice_preferences;
+      if (vp && Object.keys(vp).length) {
+        engine.updatePreferences({ ...vp });
+      }
+      const v = cloud.voice_id;
       if (v) {
         engine.updatePreferences({ voiceId: v });
         setStoredVoiceId(v);
       }
-      setReadAloudEnabled(s?.preferences?.read_aloud_enabled ?? true);
+      setReadAloudEnabled(cloud.read_aloud_enabled ?? true);
+      applyingCloudRef.current = false;
     }).catch(() => {});
+  }, [profile?.id]);
+
+  // Debounced write-back of voice prefs → Supabase (cloud sync + keeps the
+  // Settings page's voice selector in sync). Fires on every change, coalesced.
+  const scheduleCloudPrefsWrite = useCallback((prefs: VoicePreferences) => {
+    if (applyingCloudRef.current) return;
+    if (!profile?.id) return;
+    pendingCloudPrefsRef.current = prefs;
+    if (cloudWriteTimerRef.current !== null) window.clearTimeout(cloudWriteTimerRef.current);
+    cloudWriteTimerRef.current = window.setTimeout(() => {
+      cloudWriteTimerRef.current = null;
+      const p = pendingCloudPrefsRef.current;
+      if (!p || !profile?.id) return;
+      pendingCloudPrefsRef.current = null;
+      upsertSettings(profile.id, {
+        ...settingsRef.current,
+        voice_id: p.voiceId,
+        voice_preferences: { ...p },
+      }).catch(() => {});
+    }, 500);
   }, [profile?.id]);
 
   // React live if the voice changes in another tab.
@@ -421,6 +457,7 @@ export default function VoiceChat() {
     const onPrefsChanged = (ev: VoiceEvent) => {
       const p = ev.data as VoicePreferences;
       setInputMode(p.inputMode === 'wake_word' && !p.wakeWordEnabled ? 'hands_free' : p.inputMode);
+      scheduleCloudPrefsWrite(p);
     };
 
     engine.on('transcript_interim', onInterim);
@@ -442,7 +479,7 @@ export default function VoiceChat() {
       engine.off('error', onEngineError);
       engine.off('preferences_changed', onPrefsChanged);
     };
-  }, [engine, processUserSpeech, triggerBargeIn]);
+  }, [engine, processUserSpeech, triggerBargeIn, scheduleCloudPrefsWrite]);
 
   // Stop everything the engine is doing.
   const stopAll = useCallback(() => {
@@ -512,7 +549,10 @@ export default function VoiceChat() {
 
   // Cleanup on unmount
   useEffect(() => {
-    return () => { stopAll(); };
+    return () => {
+      stopAll();
+      if (cloudWriteTimerRef.current !== null) window.clearTimeout(cloudWriteTimerRef.current);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

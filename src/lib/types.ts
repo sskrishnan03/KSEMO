@@ -1,3 +1,5 @@
+import type { VoicePreferences } from './voice/types';
+
 export type Role = 'user' | 'moderator' | 'admin';
 
 export interface Profile {
@@ -72,6 +74,7 @@ export interface AppPreferences {
   voice_input_enabled?: boolean;
   read_aloud_enabled?: boolean;
   voice_id?: string;
+  voice_preferences?: Partial<VoicePreferences>;
   shortcut_new_chat?: boolean;
   shortcut_search?: boolean;
   shortcut_settings?: boolean;
