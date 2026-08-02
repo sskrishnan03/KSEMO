@@ -99,11 +99,8 @@ export class VoiceEngine {
 
     await this.audioManager.initialize(audioConfig);
 
-    const analyser = this.audioManager.getAudioContext()?.createAnalyser();
+    const analyser = this.audioManager.getAnalyser();
     if (analyser) {
-      analyser.fftSize = 2048;
-      analyser.smoothingTimeConstant = 0.8;
-
       await this.emotionDetector.initialize(analyser);
       this.vad.initialize(analyser);
     }
@@ -175,13 +172,15 @@ export class VoiceEngine {
     }
   }
 
-  async speak(text: string, onWordBoundary?: (spokenText: string) => void): Promise<boolean> {
+  async speak(text: string, overrides?: Partial<TTSConfig>, onWordBoundary?: (spokenText: string) => void): Promise<boolean> {
     const prefs = this.voiceMemory.getPreferences();
     const ttsConfig: TTSConfig = {
       voiceId: prefs.voiceId,
       pitch: prefs.pitch,
       rate: prefs.rate,
       volume: prefs.volume,
+      language: prefs.language,
+      ...overrides,
     };
 
     return this.tts.speak(text, ttsConfig, onWordBoundary);
@@ -222,6 +221,38 @@ export class VoiceEngine {
 
   setAbortController(controller: AbortController): void {
     this.abortController = controller;
+  }
+
+  // Watch the mic (VAD only, recognition stays off) so a user can interrupt
+  // the assistant mid-speech. Uses a higher threshold than normal listening so
+  // the assistant's own voice doesn't trigger it (echo cancellation helps too).
+  startBargeInMonitoring(): void {
+    this.vad.updateConfig({
+      threshold: 0.3,
+      silenceDuration: 800,
+      minSpeechDuration: 300,
+    });
+    if (!this.vad.isActive()) {
+      this.vad.startDetection(50);
+    }
+  }
+
+  stopBargeInMonitoring(): void {
+    const prefs = this.voiceMemory.getPreferences();
+    this.vad.updateConfig({
+      threshold: 0.15,
+      silenceDuration: prefs.silenceDuration,
+      minSpeechDuration: 250,
+    });
+    this.vad.stopDetection();
+  }
+
+  startWakeWordStandby(): void {
+    this.wakeWordDetector.startListening();
+  }
+
+  stopWakeWordStandby(): void {
+    this.wakeWordDetector.stopListening();
   }
 
   private setState(newState: VoiceState): void {

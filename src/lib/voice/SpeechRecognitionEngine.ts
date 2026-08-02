@@ -6,6 +6,8 @@ export class SpeechRecognitionEngine {
   private isContinuous = false;
   private silenceTimer: number | null = null;
   private lastSpeechTime = 0;
+  private activeToken = 0;
+  private lastStartToken = 0;
   private eventListeners: Map<string, Set<(event: VoiceEvent) => void>> = new Map();
 
   constructor() {
@@ -28,12 +30,16 @@ export class SpeechRecognitionEngine {
 
     this.recognition.onstart = () => {
       this.isListening = true;
+      this.emit('started', {});
       this.emit('state_change', { state: 'listening' });
     };
 
     this.recognition.onend = () => {
       this.isListening = false;
-      if (this.isContinuous) {
+      this.emit('end', {});
+      // Restart in continuous mode only if this is still the active session
+      // (stop()/abort() bump activeToken, invalidating a stale restart).
+      if (this.isContinuous && this.lastStartToken === this.activeToken) {
         try {
           this.recognition.start();
         } catch (e) {
@@ -127,6 +133,8 @@ export class SpeechRecognitionEngine {
       }
     }
 
+    this.activeToken++;
+    this.lastStartToken = this.activeToken;
     try {
       this.recognition.start();
     } catch (e) {
@@ -136,9 +144,10 @@ export class SpeechRecognitionEngine {
 
   stop(): void {
     if (this.recognition) {
+      this.isContinuous = false;
+      this.activeToken++;
       try {
         this.recognition.stop();
-        this.isContinuous = false;
       } catch (e) {
         // Already stopped
       }
@@ -147,9 +156,10 @@ export class SpeechRecognitionEngine {
 
   abort(): void {
     if (this.recognition) {
+      this.isContinuous = false;
+      this.activeToken++;
       try {
         this.recognition.abort();
-        this.isContinuous = false;
       } catch (e) {
         // Already stopped
       }

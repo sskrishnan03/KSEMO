@@ -33,13 +33,29 @@ export class TTSEngine {
     }
 
     const voices = await loadVoices();
-    this.selectedVoice = pickVoice(config.voiceId, voices);
+    // Prefer a voice matching the requested language so multi-language
+    // setups don't get spoken in the wrong accent.
+    let selectedVoice: SpeechSynthesisVoice | null = null;
+    if (config.language) {
+      const target = config.language.toLowerCase().replace('_', '-');
+      const langVoices = voices.filter((v) => v.lang.toLowerCase().replace('_', '-') === target);
+      if (langVoices.length) {
+        selectedVoice = pickVoice(config.voiceId, langVoices);
+      }
+    }
+    if (!selectedVoice) {
+      selectedVoice = pickVoice(config.voiceId, voices);
+    }
+    this.selectedVoice = selectedVoice;
 
     const utterance = new SpeechSynthesisUtterance(text);
 
     utterance.rate = config.rate;
     utterance.pitch = config.pitch;
     utterance.volume = config.volume;
+    if (config.language) {
+      utterance.lang = config.language;
+    }
 
     if (this.selectedVoice) {
       utterance.voice = this.selectedVoice;
@@ -51,7 +67,7 @@ export class TTSEngine {
       let wordTimer: number | undefined;
       let boundaryFired = false;
 
-      const done = () => {
+      const done = (ok: boolean) => {
         if (resolved) return;
         resolved = true;
         this.isSpeaking = false;
@@ -59,11 +75,9 @@ export class TTSEngine {
           clearInterval(wordTimer);
         }
         this.emit('state_change', { state: 'idle' });
-        resolve(false);
+        resolve(ok);
       };
 
-      utterance.onend = done;
-      utterance.onerror = done;
       utterance.onstart = () => {
         this.isSpeaking = true;
         this.emit('state_change', { state: 'speaking' });
@@ -119,17 +133,17 @@ export class TTSEngine {
         } catch (e) {
           // Ignore
         }
-        done();
+        done(false);
       }, timeoutMs);
 
       utterance.onend = () => {
         clearTimeout(timeoutId);
-        done();
+        done(true);
       };
 
       utterance.onerror = () => {
         clearTimeout(timeoutId);
-        done();
+        done(false);
       };
 
       window.speechSynthesis.speak(utterance);

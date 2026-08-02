@@ -7,19 +7,63 @@ interface VoiceSettingsProps {
   onClose: () => void;
 }
 
+const FALLBACK_LANGUAGES = [
+  { code: 'en-US', label: 'English (US)' },
+  { code: 'en-GB', label: 'English (UK)' },
+  { code: 'en-IN', label: 'English (India)' },
+  { code: 'hi-IN', label: 'Hindi' },
+  { code: 'es-ES', label: 'Spanish' },
+  { code: 'fr-FR', label: 'French' },
+  { code: 'de-DE', label: 'German' },
+  { code: 'zh-CN', label: 'Chinese (Simplified)' },
+];
+
+function langLabel(code: string): string {
+  const known: Record<string, string> = {
+    'en-US': 'English (US)', 'en-GB': 'English (UK)', 'en-IN': 'English (India)',
+    'en-AU': 'English (Australia)', 'en-CA': 'English (Canada)', 'en-IE': 'English (Ireland)',
+    'es-ES': 'Spanish', 'fr-FR': 'French', 'de-DE': 'German', 'it-IT': 'Italian',
+    'pt-BR': 'Portuguese (Brazil)', 'pt-PT': 'Portuguese', 'hi-IN': 'Hindi',
+    'zh-CN': 'Chinese (Simplified)', 'zh-TW': 'Chinese (Taiwan)', 'ja-JP': 'Japanese',
+    'ko-KR': 'Korean', 'ru-RU': 'Russian', 'ar-SA': 'Arabic', 'nl-NL': 'Dutch',
+    'sv-SE': 'Swedish', 'pl-PL': 'Polish', 'tr-TR': 'Turkish', 'da-DK': 'Danish',
+    'fi-FI': 'Finnish', 'nb-NO': 'Norwegian', 'cs-CZ': 'Czech', 'el-GR': 'Greek',
+    'th-TH': 'Thai', 'vi-VN': 'Vietnamese', 'id-ID': 'Indonesian',
+  };
+  if (known[code]) return known[code];
+  try {
+    return new Intl.DisplayNames(['en'], { type: 'language' }).of(code.split('-')[0]) ?? code;
+  } catch {
+    return code;
+  }
+}
+
 export function VoiceSettings({ onClose }: VoiceSettingsProps) {
   const voiceMemory = getVoiceMemory();
   const [preferences, setPreferences] = useState<VoicePreferences>(voiceMemory.getPreferences());
   const [availableVoices, setAvailableVoices] = useState<DetectedVoice[]>([]);
   const [previewVoice, setPreviewVoice] = useState<DetectedVoice | null>(null);
   const [isPreviewing, setIsPreviewing] = useState(false);
+  const [languages, setLanguages] = useState<{ code: string; label: string }[]>(FALLBACK_LANGUAGES);
 
   useEffect(() => {
     loadVoices().then(voices => {
-      const detected = detectVoices(voices, 10);
-      setAvailableVoices(detected);
+      const langs = Array.from(new Set(voices.map(v => v.lang))).sort();
+      if (langs.length) {
+        setLanguages(langs.map(code => ({ code, label: langLabel(code) })));
+      }
     });
   }, []);
+
+  useEffect(() => {
+    loadVoices().then(voices => {
+      const target = preferences.language.toLowerCase().replace('_', '-');
+      const filtered = voices.filter(v => v.lang.toLowerCase().replace('_', '-') === target);
+      const pool = filtered.length ? filtered : voices;
+      setAvailableVoices(detectVoices(pool, 10));
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preferences.language]);
 
   const handlePreferenceChange = <K extends keyof VoicePreferences>(
     key: K,
@@ -211,6 +255,72 @@ export function VoiceSettings({ onClose }: VoiceSettingsProps) {
               ))}
             </div>
           </section>
+
+          {/* Language */}
+          <section>
+            <h3 className="text-sm font-medium text-gray-300 mb-3">Language</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-56 overflow-y-auto pr-1">
+              {languages.map((lang) => (
+                <button
+                  key={lang.code}
+                  onClick={() => handlePreferenceChange('language', lang.code)}
+                  className={`px-4 py-3 rounded-xl text-sm font-medium text-left transition-all ${
+                    preferences.language === lang.code
+                      ? 'bg-white text-black'
+                      : 'bg-white/10 text-white hover:bg-white/20'
+                  }`}
+                >
+                  {lang.label}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-gray-500 mt-2">
+              Used for speech recognition and the assistant's speaking voice.
+            </p>
+          </section>
+
+          {/* Wake Word */}
+          {preferences.inputMode === 'wake_word' && (
+            <section>
+              <h3 className="text-sm font-medium text-gray-300 mb-3">Wake Word</h3>
+              <label className="flex items-center justify-between p-3 bg-white/5 rounded-xl cursor-pointer hover:bg-white/10 transition-colors">
+                <span className="text-sm text-white">Enable Wake Word</span>
+                <input
+                  type="checkbox"
+                  checked={preferences.wakeWordEnabled}
+                  onChange={(e) => handlePreferenceChange('wakeWordEnabled', e.target.checked)}
+                  className="w-5 h-5 rounded accent-white"
+                />
+              </label>
+              <div className="mt-3">
+                <label className="text-xs text-gray-400 block mb-1">
+                  Wake word(s) — separate multiple with commas
+                </label>
+                <input
+                  type="text"
+                  value={preferences.wakeWord}
+                  onChange={(e) => handlePreferenceChange('wakeWord', e.target.value)}
+                  placeholder="Hey KSEMO"
+                  className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-white text-sm focus:outline-none focus:border-white/30"
+                />
+              </div>
+              <div className="mt-4">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-sm font-medium text-gray-300">Sensitivity</span>
+                  <span className="text-sm text-white">{preferences.wakeWordSensitivity.toFixed(2)}</span>
+                </div>
+                <input
+                  type="range"
+                  min="0.1"
+                  max="1"
+                  step="0.05"
+                  value={preferences.wakeWordSensitivity}
+                  onChange={(e) => handlePreferenceChange('wakeWordSensitivity', parseFloat(e.target.value))}
+                  className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-white"
+                />
+              </div>
+            </section>
+          )}
 
           {/* Silence Duration */}
           <section>

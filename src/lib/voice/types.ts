@@ -40,7 +40,7 @@ export interface EmotionData {
 }
 
 export interface VoiceEvent {
-  type: 'state_change' | 'transcript' | 'emotion' | 'error' | 'interrupt' | 'silence';
+  type: string;
   data: any;
   timestamp: number;
 }
@@ -58,6 +58,7 @@ export interface TTSConfig {
   pitch: number;
   rate: number;
   volume: number;
+  language?: string;
 }
 
 export interface RecognitionConfig {

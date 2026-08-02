@@ -74,14 +74,13 @@ export class WakeWordDetector {
 
   startListening(): void {
     if (this.isListening) return;
+    if (!this.recognition) return;
     this.isListening = true;
 
-    if (this.recognition) {
-      try {
-        this.recognition.start();
-      } catch (e) {
-        // Already started
-      }
+    try {
+      this.recognition.start();
+    } catch (e) {
+      // Already started
     }
   }
 

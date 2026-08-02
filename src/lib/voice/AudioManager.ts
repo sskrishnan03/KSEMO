@@ -5,7 +5,6 @@ export class AudioManager {
   private audioContext: AudioContext | null = null;
   private source: MediaStreamAudioSourceNode | null = null;
   private analyser: AnalyserNode | null = null;
-  private gainNode: GainNode | null = null;
 
   async initialize(config: AudioConfig): Promise<void> {
     try {
@@ -32,12 +31,9 @@ export class AudioManager {
       this.analyser.fftSize = 2048;
       this.analyser.smoothingTimeConstant = 0.8;
 
-      this.gainNode = this.audioContext.createGain();
-      this.gainNode.gain.value = 1.0;
-
+      // Analysis-only chain: never route the live mic back to the speakers
+      // (that would cause a feedback loop through the assistant's voice).
       this.source.connect(this.analyser);
-      this.analyser.connect(this.gainNode);
-      this.gainNode.connect(this.audioContext.destination);
     } catch (error) {
       console.error('AudioManager initialization failed:', error);
       throw error;
@@ -75,6 +71,10 @@ export class AudioManager {
     return this.stream;
   }
 
+  getAnalyser(): AnalyserNode | null {
+    return this.analyser;
+  }
+
   getAudioContext(): AudioContext | null {
     return this.audioContext;
   }
@@ -93,11 +93,6 @@ export class AudioManager {
     if (this.analyser) {
       this.analyser.disconnect();
       this.analyser = null;
-    }
-
-    if (this.gainNode) {
-      this.gainNode.disconnect();
-      this.gainNode = null;
     }
 
     if (this.audioContext && this.audioContext.state !== 'closed') {

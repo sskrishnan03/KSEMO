@@ -1,18 +1,27 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { Mic, MicOff, X, Share2, Copy, MoreHorizontal, Trash2, Volume2, Check, Download, FileDown, FileType, FileText, AudioWaveform } from 'lucide-react';
+import { Mic, MicOff, X, Share2, Copy, MoreHorizontal, Trash2, Volume2, Check, Download, FileDown, FileType, FileText, AudioWaveform, Settings } from 'lucide-react';
 import { cn, estimateTokens } from '../lib/utils';
 import { useTheme } from '../components/ThemeProvider';
 import { useAuthContext } from '../components/AuthProvider';
 import { createVoiceChat, insertMessage, updateChat, deleteMessage, getSettings, logUsage, listChats, listMessages, setLastActiveChatId } from '../lib/data';
 import { streamChat, VOICE_SYSTEM_PROMPT, type ChatMessage } from '../lib/ai';
-import { VOICE_STORAGE_KEY, getStoredVoiceId, setStoredVoiceId, loadVoices, pickVoice } from '../lib/voices';
+import { getStoredVoiceId, setStoredVoiceId, VOICE_STORAGE_KEY } from '../lib/voices';
 import { Markdown } from '../components/Markdown';
 import { ShareModal } from '../components/ShareModal';
 import { exportChatAsPDF, exportChatAsDocx, exportChatAsText } from '../lib/exportChat';
+import { getVoiceEngine } from '../lib/voice/VoiceEngine';
+import { adjustResponseForEmotion } from '../lib/voice/StreamingResponseHandler';
+import { VoiceSettings } from '../components/voice/VoiceSettings';
+import type { VoiceEvent, TranscriptEvent, EmotionData, Emotion, TTSConfig, VoicePreferences, InputMode } from '../lib/voice/types';
 import type { Chat } from '../lib/types';
 
 type HistoryEntry = { id?: string; role: 'user' | 'assistant'; content: string };
+
+type VoiceState = 'idle' | 'listening' | 'thinking' | 'speaking' | 'interrupted' | 'error' | 'reconnecting';
+
+const RECONNECT_DELAY_MS = 1500;
+const MAX_RECONNECT_ATTEMPTS = 5;
 
 function MessageActionButton({ title, onClick, danger, children }: { title: string; onClick: (e: React.MouseEvent) => void; danger?: boolean; children: React.ReactNode }) {
   return (
@@ -31,11 +40,6 @@ function MessageActionButton({ title, onClick, danger, children }: { title: stri
   );
 }
 
-type VoiceState = 'listening' | 'thinking' | 'speaking' | 'error' | 'reconnecting';
-
-const RECONNECT_DELAY_MS = 1500;
-const MAX_RECONNECT_ATTEMPTS = 5;
-
 // Helper to strip Markdown formatting so TTS does not crash or stay silent
 function stripMarkdown(text: string): string {
   return text
@@ -51,19 +55,44 @@ function stripMarkdown(text: string): string {
     .trim();
 }
 
-// Fast, offline parameter extraction used when the LLM parser is unavailable.
+// Emotion-aware speaking style: nudge rate/pitch relative to the user's prefs.
+function emotionToneAdjustment(emotion?: Emotion | null): { rate?: number; pitch?: number } {
+  switch (emotion) {
+    case 'happy': return { rate: 1.1, pitch: 1.05 };
+    case 'excited': return { rate: 1.15, pitch: 1.08 };
+    case 'sad': return { rate: 0.9, pitch: 0.95 };
+    case 'angry': return { rate: 0.9, pitch: 0.9 };
+    case 'calm': return { rate: 0.95, pitch: 1.0 };
+    case 'nervous': return { rate: 0.95, pitch: 1.02 };
+    case 'confused': return { rate: 0.95, pitch: 1.0 };
+    case 'professional': return { rate: 0.97, pitch: 0.98 };
+    case 'friendly': return { rate: 1.05, pitch: 1.03 };
+    default: return {};
+  }
+}
+
 export default function VoiceChat() {
   const nav = useNavigate();
   const loc = useLocation();
   const { chatId: routeChatId } = useParams<{ chatId?: string }>();
   const { resolvedTheme } = useTheme();
   const { profile } = useAuthContext();
-  const [state, setState] = useState<VoiceState>('listening');
+
+  const engine = useRef(getVoiceEngine()).current;
+  const isSpeechSupported = engine.isSupported();
+
+  const [state, setState] = useState<VoiceState>('idle');
   const [muted, setMuted] = useState(false);
   const [voiceLevel, setVoiceLevel] = useState(0);
   const [chatId, setChatId] = useState<string | null>(null);
   const [started, setStarted] = useState(false);
+  const [interimTranscript, setInterimTranscript] = useState('');
+  const [streamingText, setStreamingText] = useState('');
   const [aiResponseText, setAiResponseText] = useState('');
+  const [emotion, setEmotion] = useState<Emotion | null>(null);
+  const [latencyMs, setLatencyMs] = useState<number | null>(null);
+  const [inputMode, setInputMode] = useState<InputMode>(engine.getPreferences().inputMode);
+  const [showSettings, setShowSettings] = useState(false);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [shareChat, setShareChat] = useState<Chat | null>(null);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
@@ -74,54 +103,21 @@ export default function VoiceChat() {
   const [readingIndex, setReadingIndex] = useState<number | null>(null);
   const [loadingChat, setLoadingChat] = useState(false);
 
-  const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-  const isSpeechSupported = !!SpeechRecognition;
-
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const recognitionRef = useRef<any>(null);
   const abortRef = useRef<AbortController | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
-  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
   const conversationRef = useRef<ChatMessage[]>([]);
-  const stateRef = useRef<VoiceState>('listening');
+  const stateRef = useRef<VoiceState>('idle');
   const mutedRef = useRef(false);
-  const streamRef = useRef<MediaStream | null>(null);
-  const audioCtxRef = useRef<AudioContext | null>(null);
   const reconnectAttemptsRef = useRef(0);
   const exchangesRef = useRef(0);
   const totalTokensRef = useRef(0);
   const chatIdRef = useRef<string | null>(null);
   const startedRef = useRef(false);
   const processingRef = useRef(false);
+  const turnRef = useRef(0);
+  const emotionRef = useRef<EmotionData | null>(null);
   const transcriptRef = useRef<HTMLDivElement | null>(null);
-  const continueRef = useRef(false);
-  const selectedVoiceIdRef = useRef<string>(getStoredVoiceId());
   const readingIndexRef = useRef<number | null>(null);
-
-  // Continue mode = an existing chat was opened from the sidebar.
-  useEffect(() => { continueRef.current = !!routeChatId; }, [routeChatId]);
-
-  // Connect read-aloud + voice selection to the user's Settings preference.
-  useEffect(() => {
-    if (!profile?.id) return;
-    getSettings(profile.id).then((s) => {
-      const v = s?.preferences?.voice_id;
-      if (v) {
-        selectedVoiceIdRef.current = v;
-        setStoredVoiceId(v);
-      }
-      setReadAloudEnabled(s?.preferences?.read_aloud_enabled ?? true);
-    }).catch(() => {});
-  }, [profile?.id]);
-
-  // React live if the voice changes in another tab.
-  useEffect(() => {
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === VOICE_STORAGE_KEY) selectedVoiceIdRef.current = getStoredVoiceId();
-    };
-    window.addEventListener('storage', onStorage);
-    return () => window.removeEventListener('storage', onStorage);
-  }, []);
 
   // Sync state and muted to refs for the callbacks
   useEffect(() => { stateRef.current = state; }, [state]);
@@ -132,167 +128,71 @@ export default function VoiceChat() {
   const voiceLevelRef = useRef(0);
   useEffect(() => { voiceLevelRef.current = voiceLevel; }, [voiceLevel]);
 
-  // Get or create mic stream
-  const getMicStream = useCallback(async (): Promise<MediaStream> => {
-    if (streamRef.current && streamRef.current.active) return streamRef.current;
-    const stream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true,
-        channelCount: 1,
-      },
-    });
-    streamRef.current = stream;
-    return stream;
-  }, []);
-
-  // Voice level analyser
-  const startAnalyser = useCallback(async () => {
-    try {
-      const stream = await getMicStream();
-      if (!audioCtxRef.current || audioCtxRef.current.state === 'closed') {
-        audioCtxRef.current = new AudioContext();
+  // Connect read-aloud + voice selection to the user's Settings preference.
+  // Supabase is the source of truth for voice_id; mirror it into VoiceMemory.
+  useEffect(() => {
+    if (!profile?.id) return;
+    getSettings(profile.id).then((s) => {
+      const v = s?.preferences?.voice_id;
+      if (v) {
+        engine.updatePreferences({ voiceId: v });
+        setStoredVoiceId(v);
       }
-      const ctx = audioCtxRef.current;
-      if (ctx.state === 'suspended') await ctx.resume();
+      setReadAloudEnabled(s?.preferences?.read_aloud_enabled ?? true);
+    }).catch(() => {});
+  }, [profile?.id]);
 
-      const source = ctx.createMediaStreamSource(stream);
-      const analyser = ctx.createAnalyser();
-      analyser.fftSize = 256;
-      analyser.smoothingTimeConstant = 0.5;
-      source.connect(analyser);
-      analyserRef.current = analyser;
-    } catch (e) {
-      console.error('Mic permission denied or audio issue:', e);
-      stateRef.current = 'error';
-      setState('error');
-    }
-  }, [getMicStream]);
+  // React live if the voice changes in another tab.
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === VOICE_STORAGE_KEY) engine.updatePreferences({ voiceId: getStoredVoiceId() });
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, [engine]);
 
-  const stopAnalyser = useCallback(() => {
-    analyserRef.current = null;
-    setVoiceLevel(0);
-  }, []);
+  // Interrupt the assistant mid-speech (barge-in): cancel TTS + abort the AI
+  // request, invalidate the in-flight turn, and let the next utterance start.
+  const triggerBargeIn = useCallback(() => {
+    turnRef.current += 1;
+    processingRef.current = false;
+    engine.stopBargeInMonitoring();
+    engine.interrupt();
+    setInterimTranscript('');
+  }, [engine]);
 
-  // TTS with local service preference, queue unsticking, and safety timeout
-  const speak = useCallback(async (text: string, onWordBoundary?: (spokenText: string) => void): Promise<boolean> => {
-    if (!('speechSynthesis' in window)) return false;
-
-    // Stay silent while the user is in another tab/window — they only want to
-    // hear the assistant when this app is in front.
-    if (document.hidden || !document.hasFocus()) return false;
-
-    try { window.speechSynthesis.cancel(); } catch {}
-    try { window.speechSynthesis.resume(); } catch {} // Unpause Chrome's audio queue
-
-    // Browser voices load asynchronously; if none are ready yet, wait for them
-    // so we never fall back to a broken default voice.
-    const voices = await loadVoices();
-
-    const u = new SpeechSynthesisUtterance(text);
-    utteranceRef.current = u; // Prevent garbage collection
-
-    u.rate = continueRef.current ? 0.82 : 0.92;
-    u.pitch = 1.0;
-    u.volume = 0.9;
-
-    const preferred = pickVoice(selectedVoiceIdRef.current, voices);
-    if (preferred) {
-      u.voice = preferred;
-      console.log("TTS voice selected:", preferred.name, "LocalService:", preferred.localService);
-    }
-
-    return new Promise<boolean>((resolve) => {
-      let resolved = false;
-      const words = text.split(/\s+/).filter(Boolean);
-      let wordTimerId: number | undefined;
-      let boundaryFired = false;
-      const done = () => {
-        if (resolved) return;
-        resolved = true;
-        if (timeoutId) clearTimeout(timeoutId);
-        if (wordTimerId !== undefined) clearInterval(wordTimerId);
-        utteranceRef.current = null;
-        resolve(false);
-      };
-
-      u.onend = done;
-      u.onerror = done;
-
-      // Word-by-word subtitle reveal kept in exact sync with the audio. The
-      // utterance's boundary events fire in real time as each word is actually
-      // spoken, so subtitles never run ahead of or behind the voice.
-      if (onWordBoundary && words.length) {
-        const revealMs = Math.max(2500, words.length * 360);
-        const perWordMs = Math.max(100, revealMs / words.length);
-        let index = 0;
-
-        // Live sync: reveal everything spoken up to the boundary word.
-        u.onboundary = (e: SpeechSynthesisEvent) => {
-          if (resolved) return;
-          boundaryFired = true;
-          if (wordTimerId !== undefined) { clearInterval(wordTimerId); wordTimerId = undefined; }
-          const charIndex = e.charIndex ?? 0;
-          const charLength = e.charLength ?? 0;
-          const end = charIndex + (charLength > 0 ? charLength : 0);
-          const spaceIdx = text.indexOf(' ', end);
-          const shown = text.slice(0, spaceIdx === -1 ? text.length : spaceIdx + 1).trim();
-          onWordBoundary(shown || text.slice(0, charIndex).trim());
-        };
-
-        // Fallback revealer — only used if the chosen voice never emits
-        // boundary events. Starts instantly so subtitles appear right away.
-        onWordBoundary(words[0]);
-        wordTimerId = window.setInterval(() => {
-          if (boundaryFired) { if (wordTimerId !== undefined) clearInterval(wordTimerId); wordTimerId = undefined; return; }
-          index += 1;
-          onWordBoundary(words.slice(0, index).join(' '));
-          if (index >= words.length && wordTimerId !== undefined) {
-            clearInterval(wordTimerId);
-            wordTimerId = undefined;
-          }
-        }, perWordMs);
-      }
-
-      // Generous safety timeout so long answers are never cut off:
-      // 350ms per word + 8 seconds padding, min 15s.
-      const timeoutMs = Math.max(15000, words.length * 350 + 8000);
-      const timeoutId = setTimeout(() => {
-        console.warn("TTS speak timeout triggered");
-        try { window.speechSynthesis.cancel(); } catch {}
-        done();
-      }, timeoutMs);
-
-      window.speechSynthesis.speak(u);
-    });
-  }, []);
-
-  // Process user speech → AI → TTS → listen again
+  // Process user speech → AI (streaming, sentence-by-sentence TTS) → listen again
   const processUserSpeech = useCallback(async (text: string) => {
     if (processingRef.current) return;
     if (!text.trim()) return;
     processingRef.current = true;
+    const turn = ++turnRef.current;
+
+    // Stop recognizing so the mic doesn't hear the assistant's own voice, but
+    // keep VAD running so the user can still interrupt (barge-in).
+    engine.stopListening();
+    engine.startBargeInMonitoring();
 
     // Create the chat lazily on the first spoken message so an empty session
     // never leaves an empty chat behind.
     if (!chatIdRef.current) {
       const c = await createVoiceChat();
       if (!c) {
-        processingRef.current = false;
-        stateRef.current = 'listening';
-        setState('listening');
+        if (turn === turnRef.current) {
+          processingRef.current = false;
+          stateRef.current = 'listening';
+          setState('listening');
+        }
         return;
       }
       chatIdRef.current = c.id;
       setChatId(c.id);
       setLastActiveChatId(c.id);
+      const autoTitle = text.slice(0, 48) + (text.length > 48 ? '…' : '');
+      await updateChat(c.id, { title: autoTitle });
       window.dispatchEvent(new CustomEvent('ksemo-chats-updated'));
     }
-
-    stateRef.current = 'thinking';
-    setState('thinking');
-    try { recognitionRef.current?.stop(); } catch {}
+    if (turn !== turnRef.current) return;
 
     conversationRef.current.push({ role: 'user', content: text });
     const userMsg = await insertMessage({ chat_id: chatIdRef.current, role: 'user', content: text });
@@ -300,16 +200,107 @@ export default function VoiceChat() {
 
     const controller = new AbortController();
     abortRef.current = controller;
+    engine.setAbortController(controller);
+
+    setInterimTranscript('');
+    setStreamingText('');
+    setAiResponseText('');
+    stateRef.current = 'thinking';
+    setState('thinking');
+
+    const detectedEmotion = emotionRef.current?.emotion ?? null;
+    const systemPrompt = adjustResponseForEmotion(VOICE_SYSTEM_PROMPT, detectedEmotion ?? 'neutral');
+    const prefs = engine.getPreferences();
+    const tone = emotionToneAdjustment(detectedEmotion);
+    const ttsOverrides: Partial<TTSConfig> = {
+      rate: Math.min(2, Math.max(0.5, prefs.rate * (tone.rate ?? 1))),
+      pitch: Math.min(2, Math.max(0.5, prefs.pitch * (tone.pitch ?? 1))),
+    };
+
+    // Sentence-level streaming: speak each completed sentence as soon as it
+    // arrives so the voice starts before the full answer is done.
+    const sentences: string[] = [];
+    let buffer = '';
+    let pumpActive = false;
+    let drainResolve: (() => void) | null = null;
+    let drainPromise: Promise<void> | null = null;
+
+    const runPump = async () => {
+      while (sentences.length) {
+        if (turn !== turnRef.current) break;
+        if (mutedRef.current) break;
+        const sentence = sentences.shift()!;
+        stateRef.current = 'speaking';
+        setState('speaking');
+        const ok = await engine.speak(stripMarkdown(sentence), ttsOverrides, (revealed) => setAiResponseText(revealed));
+        if (!ok) break;
+        if (turn !== turnRef.current) break;
+      }
+      pumpActive = false;
+      if (drainResolve) {
+        const r = drainResolve;
+        drainResolve = null;
+        drainPromise = null;
+        r();
+      }
+    };
+
+    const enqueueSentence = (sentence: string) => {
+      sentences.push(sentence);
+      if (!drainPromise) {
+        drainPromise = new Promise<void>((res) => { drainResolve = res; });
+      }
+      if (!pumpActive) { pumpActive = true; runPump(); }
+    };
+
+    const flushSentences = () => {
+      const parts = buffer.split(/(?<=[.!?])\s+|\r?\n+/);
+      if (parts.length > 1) {
+        for (let i = 0; i < parts.length - 1; i++) {
+          const s = parts[i].trim();
+          if (s) enqueueSentence(s);
+        }
+        buffer = parts[parts.length - 1];
+      }
+    };
+
+    const resumeListening = async (turn: number) => {
+      if (mutedRef.current || !startedRef.current || turn !== turnRef.current) return;
+      // Brief pause so the mic doesn't snap back on the instant speech ends.
+      await new Promise((r) => setTimeout(r, 500));
+      if (mutedRef.current || !startedRef.current || turn !== turnRef.current) return;
+      if (stateRef.current === 'interrupted') return; // barge-in already restarted listening
+      const mode = engine.getPreferences().inputMode;
+      if (mode === 'wake_word') {
+        engine.stopListening();
+        engine.startWakeWordStandby();
+        stateRef.current = 'idle';
+        setState('idle');
+      } else if (mode === 'push_to_talk') {
+        engine.stopListening();
+        stateRef.current = 'idle';
+        setState('idle');
+      } else {
+        engine.startListening();
+        stateRef.current = 'listening';
+        setState('listening');
+      }
+    };
 
     try {
       const result = await streamChat({
         model: 'ksemo-pro',
-        messages: [{ role: 'system', content: VOICE_SYSTEM_PROMPT }, ...conversationRef.current.slice(-12)],
+        messages: [{ role: 'system', content: systemPrompt }, ...conversationRef.current.slice(-12)],
         signal: controller.signal,
-        onToken: () => {},
+        onToken: (token) => {
+          if (turn !== turnRef.current) return;
+          buffer += token;
+          setStreamingText((prev) => prev + token);
+          flushSentences();
+        },
       });
 
-      if (controller.signal.aborted) return;
+      if (turn !== turnRef.current) return;
 
       conversationRef.current.push({ role: 'assistant', content: result.content });
       exchangesRef.current += 1;
@@ -318,162 +309,150 @@ export default function VoiceChat() {
       const aiMsg = await insertMessage({ chat_id: chatIdRef.current, role: 'assistant', content: result.content, model: 'ksemo-pro', tokens: result.tokens });
       await logUsage('ksemo-pro', estimateTokens(text), result.tokens, result.latencyMs);
       setHistory((h) => [...h, { id: aiMsg?.id ?? undefined, role: 'assistant', content: result.content }]);
+      setLatencyMs(result.latencyMs);
 
-      stateRef.current = 'speaking';
-      setState('speaking');
-      setAiResponseText(''); // Start with empty subtitles
-      
-      const plainText = stripMarkdown(result.content);
-      await speak(plainText, (spokenText) => {
-        setAiResponseText(spokenText);
-      }); // Play audio and reveal text word-by-word
-      setAiResponseText(plainText); // Ensure full text is displayed when finished
+      if (buffer.trim()) { enqueueSentence(buffer.trim()); buffer = ''; }
+      await (drainPromise ?? Promise.resolve());
 
-      if (stateRef.current === 'speaking') {
-        stateRef.current = 'listening';
-        setState('listening');
-        setAiResponseText(''); // Clear subtitles when speaking completes
-        // Brief pause so the mic doesn't snap back on the instant speech ends.
-        await new Promise((r) => setTimeout(r, 900));
-        if (mutedRef.current || stateRef.current !== 'listening') return;
-        startRecognition();
-      }
+      if (turn !== turnRef.current) return;
+      setStreamingText('');
+      setAiResponseText('');
+      await resumeListening(turn);
     } catch (err) {
+      if (turn !== turnRef.current) return;
       if ((err as Error).name === 'AbortError') {
+        // Barge-in / mute already handled restarting listening.
         stateRef.current = 'listening';
         setState('listening');
-        await new Promise((r) => setTimeout(r, 500));
-        if (mutedRef.current || stateRef.current !== 'listening') return;
-        startRecognition();
         return;
       }
       console.error('Voice chat error:', err);
       const errMsg = (err as Error)?.message ?? '';
+      stateRef.current = 'error';
+      setState('error');
 
       // Invalid/expired API key: tell the user and keep listening.
       if (/invalid api key|unauthorized|user not found|api key is invalid/i.test(errMsg)) {
-        stateRef.current = 'error';
-        setState('error');
-        await speak("I couldn't reach the AI service because the Gemini API key is invalid or expired. Please update it in the environment file and refresh the app.");
-        stateRef.current = 'listening';
-        setState('listening');
-        await new Promise((r) => setTimeout(r, 500));
-        if (mutedRef.current || stateRef.current !== 'listening') return;
-        startRecognition();
+        await engine.speak("I couldn't reach the AI service because the Gemini API key is invalid or expired. Please update it in the environment file and refresh the app.");
+        await resumeListening(turn);
         return;
       }
 
       // Quota / rate limit: let the user know and keep the session running.
       if (/quota|rate limit|too many requests/i.test(errMsg)) {
-        stateRef.current = 'error';
-        setState('error');
-        await speak("The AI service is currently busy or out of quota. Please wait a moment and ask again.");
-        stateRef.current = 'listening';
-        setState('listening');
-        await new Promise((r) => setTimeout(r, 500));
-        if (mutedRef.current || stateRef.current !== 'listening') return;
-        startRecognition();
+        await engine.speak("The AI service is currently busy or out of quota. Please wait a moment and ask again.");
+        await resumeListening(turn);
         return;
       }
 
-      stateRef.current = 'error';
-      setState('error');
       await new Promise((r) => setTimeout(r, RECONNECT_DELAY_MS));
-      if (reconnectAttemptsRef.current < MAX_RECONNECT_ATTEMPTS) {
+      if (reconnectAttemptsRef.current < MAX_RECONNECT_ATTEMPTS && turn === turnRef.current) {
         reconnectAttemptsRef.current += 1;
         stateRef.current = 'reconnecting';
         setState('reconnecting');
         await new Promise((r) => setTimeout(r, 500));
+        await resumeListening(turn);
+      } else {
         stateRef.current = 'listening';
         setState('listening');
-        startRecognition();
+        await resumeListening(turn);
       }
     } finally {
-      processingRef.current = false;
+      if (turn === turnRef.current) processingRef.current = false;
+      if (turn === turnRef.current) engine.stopBargeInMonitoring();
     }
-  }, [speak]);
+  }, [engine]);
 
-  // Start speech recognition
-  const startRecognition = useCallback(() => {
-    if (!startedRef.current || mutedRef.current || stateRef.current !== 'listening' || !isSpeechSupported) return;
-
-    try { recognitionRef.current?.stop(); } catch { /* ok */ }
-
-    const recognition = new SpeechRecognition();
-    recognition.continuous = true;
-    recognition.interimResults = false;
-    recognition.lang = 'en-IN';
-    recognition.maxAlternatives = 3;
-
-    recognition.onstart = () => {
-      console.log("Speech recognition session started successfully");
+  // Engine event wiring (singleton listeners are removed on unmount).
+  useEffect(() => {
+    const onInterim = (ev: VoiceEvent) => {
+      setInterimTranscript((ev.data as TranscriptEvent)?.text ?? '');
     };
 
-    recognition.onresult = (event: any) => {
-      if (recognitionRef.current !== recognition) return; // Ignore events from old instances
-      let transcript = '';
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        if (event.results[i].isFinal) {
-          transcript += event.results[i][0].transcript;
-        }
-      }
-      const text = transcript.trim();
-      if (!text || processingRef.current) return;
+    const onFinal = (ev: VoiceEvent) => {
+      const t = ((ev.data as TranscriptEvent)?.text ?? '').trim();
+      setInterimTranscript('');
+      if (!t || processingRef.current || !startedRef.current || mutedRef.current) return;
       reconnectAttemptsRef.current = 0;
-      stateRef.current = 'thinking';
-      setState('thinking');
-      try { recognition.stop(); } catch { /* ok */ }
-      processUserSpeech(text);
+      processUserSpeech(t);
     };
 
-    recognition.onend = () => {
-      console.log("Speech recognition session ended. State:", stateRef.current);
-      if (startedRef.current && stateRef.current === 'listening' && !mutedRef.current && recognitionRef.current === recognition) {
-        try { recognition.start(); } catch { /* already started */ }
+    const onSpeechStarted = () => {
+      // Barge-in: the user started talking while the assistant was speaking/thinking.
+      if (!startedRef.current || mutedRef.current) return;
+      if (stateRef.current === 'speaking' || stateRef.current === 'thinking') {
+        triggerBargeIn();
       }
     };
 
-    recognition.onerror = (e: any) => {
-      console.error("Speech recognition error:", e.error, e.message);
-      if (e.error === 'not-allowed') {
+    const onEmotion = (ev: VoiceEvent) => {
+      const data = ev.data as EmotionData;
+      emotionRef.current = data;
+      setEmotion(data.emotion);
+    };
+
+    const onWakeWord = () => {
+      // Wake word heard → start listening for the actual command.
+      if (!startedRef.current || mutedRef.current) return;
+      engine.stopWakeWordStandby();
+      engine.startListening();
+      stateRef.current = 'listening';
+      setState('listening');
+      setInterimTranscript('');
+    };
+
+    const onPTTActivated = () => {
+      // Manual barge-in: user pressed to talk while the assistant was speaking.
+      if (!startedRef.current || mutedRef.current) return;
+      if (stateRef.current === 'speaking' || stateRef.current === 'thinking') {
+        triggerBargeIn();
+      }
+    };
+
+    const onEngineError = (ev: VoiceEvent) => {
+      const err = ev.data as { error?: string } | string;
+      const code = typeof err === 'object' && err ? (err.error ?? '') : (err ?? '');
+      if (code === 'not-allowed' || code === 'microphone_denied') {
         stateRef.current = 'error';
         setState('error');
-        return;
-      }
-      if (e.error === 'aborted') {
-        return; // Don't restart if aborted
-      }
-      if (startedRef.current && stateRef.current === 'listening' && !mutedRef.current && recognitionRef.current === recognition) {
-        setTimeout(() => {
-          if (startedRef.current && stateRef.current === 'listening' && !mutedRef.current && recognitionRef.current === recognition) {
-            try { recognition.start(); } catch { /* ok */ }
-          }
-        }, 250);
       }
     };
 
-    recognitionRef.current = recognition;
-    try { recognition.start(); } catch { /* ok */ }
-  }, [processUserSpeech, isSpeechSupported]);
+    const onPrefsChanged = (ev: VoiceEvent) => {
+      const p = ev.data as VoicePreferences;
+      setInputMode(p.inputMode === 'wake_word' && !p.wakeWordEnabled ? 'hands_free' : p.inputMode);
+    };
 
+    engine.on('transcript_interim', onInterim);
+    engine.on('transcript_final', onFinal);
+    engine.on('speech_started', onSpeechStarted);
+    engine.on('emotion_detected', onEmotion);
+    engine.on('wake_word_detected', onWakeWord);
+    engine.on('push_to_talk_activated', onPTTActivated);
+    engine.on('error', onEngineError);
+    engine.on('preferences_changed', onPrefsChanged);
+
+    return () => {
+      engine.off('transcript_interim', onInterim);
+      engine.off('transcript_final', onFinal);
+      engine.off('speech_started', onSpeechStarted);
+      engine.off('emotion_detected', onEmotion);
+      engine.off('wake_word_detected', onWakeWord);
+      engine.off('push_to_talk_activated', onPTTActivated);
+      engine.off('error', onEngineError);
+      engine.off('preferences_changed', onPrefsChanged);
+    };
+  }, [engine, processUserSpeech, triggerBargeIn]);
+
+  // Stop everything the engine is doing.
   const stopAll = useCallback(() => {
-    try { recognitionRef.current?.stop(); } catch { /* ok */ }
-    recognitionRef.current = null;
-    stopAnalyser();
-    window.speechSynthesis?.cancel();
+    engine.stopSession().catch(() => {});
+    engine.stopBargeInMonitoring();
     if (abortRef.current) { abortRef.current.abort(); abortRef.current = null; }
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((t) => t.stop());
-      streamRef.current = null;
-    }
-    if (audioCtxRef.current && audioCtxRef.current.state !== 'closed') {
-      audioCtxRef.current.close().catch(() => {});
-      audioCtxRef.current = null;
-    }
-  }, [stopAnalyser]);
+    try { window.speechSynthesis?.cancel(); } catch { /* ok */ }
+  }, [engine]);
 
   // Click gesture handler to boot up WebAudio and speech engine.
-  // The circle shows instantly; chat creation/reuse happens in the background.
   const startSessionFlow = async () => {
     if (startedRef.current) return;
     try {
@@ -486,13 +465,12 @@ export default function VoiceChat() {
       console.warn("Failed to unlock speech synthesis:", e);
     }
 
+    // Unlock WebAudio within the click gesture so the engine's AudioContext
+    // gets created already running (Chrome requires a user gesture).
     try {
-      if (!audioCtxRef.current || audioCtxRef.current.state === 'closed') {
-        audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-      }
-      if (audioCtxRef.current.state === 'suspended') {
-        await audioCtxRef.current.resume();
-      }
+      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      if (ctx.state === 'suspended') await ctx.resume();
+      ctx.close().catch(() => {});
     } catch (err) {
       console.error('AudioContext gesture initialize error:', err);
     }
@@ -500,8 +478,10 @@ export default function VoiceChat() {
     // Reveal the session UI right away so it never feels like it's "loading".
     startedRef.current = true;
     setStarted(true);
-    stateRef.current = 'listening';
-    setState('listening');
+    stateRef.current = 'idle';
+    setState('idle');
+    setLatencyMs(null);
+    setEmotion(null);
 
     if (!chatIdRef.current) {
       // Fresh session: the chat is created lazily on the first spoken message,
@@ -512,13 +492,28 @@ export default function VoiceChat() {
     exchangesRef.current = 0;
     totalTokensRef.current = 0;
     reconnectAttemptsRef.current = 0;
-    await startAnalyser();
-    startRecognition();
+
+    try {
+      await engine.startSession();
+      const mode = engine.getPreferences().inputMode;
+      if (mode === 'wake_word' || mode === 'push_to_talk') {
+        stateRef.current = 'idle';
+        setState('idle');
+      } else {
+        stateRef.current = 'listening';
+        setState('listening');
+      }
+    } catch (err) {
+      console.error('Failed to start voice engine:', err);
+      stateRef.current = 'error';
+      setState('error');
+    }
   };
 
   // Cleanup on unmount
   useEffect(() => {
     return () => { stopAll(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Stay silent when the user leaves this tab/window: cancel any speech in
@@ -542,15 +537,18 @@ export default function VoiceChat() {
   useEffect(() => {
     let cancelled = false;
     const setup = async () => {
-      stopAll();
+      await stopAll();
       startedRef.current = false;
       setStarted(false);
-      stateRef.current = 'listening';
-      setState('listening');
+      stateRef.current = 'idle';
+      setState('idle');
       setAiResponseText('');
+      setStreamingText('');
+      setInterimTranscript('');
       conversationRef.current = [];
       setHistory([]);
       setChatId(routeChatId ?? null);
+      chatIdRef.current = routeChatId ?? null;
       if (routeChatId) {
         setLoadingChat(true);
         setLastActiveChatId(routeChatId);
@@ -577,11 +575,10 @@ export default function VoiceChat() {
 
   // End session → save the conversation title, reset, and return to the normal voice chat screen.
   const endSession = useCallback(async () => {
-    stopAll();
+    await stopAll();
     startedRef.current = false;
-    stateRef.current = 'listening';
+    stateRef.current = 'idle';
     setStarted(false);
-
 
     if (chatIdRef.current && conversationRef.current.length > 0) {
       const firstUser = conversationRef.current.find((m) => m.role === 'user');
@@ -626,6 +623,168 @@ export default function VoiceChat() {
       nav('/app/voice-chat', { replace: true });
     }
   }, [nav, stopAll, loc.pathname, routeChatId]);
+
+  // Mute / Unmute handler. Only reacts to `muted` changes — session startup is
+  // handled by startSessionFlow, and an in-flight AI turn is left to finish so
+  // its transcript is still saved (only audio + listening are suspended).
+  useEffect(() => {
+    if (!startedRef.current) return;
+    if (muted) {
+      engine.stopListening();
+      engine.stopWakeWordStandby();
+      engine.stopBargeInMonitoring();
+      try { window.speechSynthesis.cancel(); } catch { /* ok */ }
+    } else {
+      const mode = engine.getPreferences().inputMode;
+      if (mode === 'wake_word') {
+        engine.startWakeWordStandby();
+        stateRef.current = 'idle';
+        setState('idle');
+      } else if (mode === 'push_to_talk') {
+        stateRef.current = 'idle';
+        setState('idle');
+      } else if (stateRef.current !== 'speaking' && stateRef.current !== 'thinking') {
+        engine.startListening();
+        stateRef.current = 'listening';
+        setState('listening');
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [muted]);
+
+  // Push-to-talk handlers
+  const handlePTTDown = useCallback(() => {
+    if (!startedRef.current || mutedRef.current) return;
+    engine.activatePushToTalk();
+    stateRef.current = 'listening';
+    setState('listening');
+  }, [engine]);
+
+  const handlePTTUp = useCallback(() => {
+    engine.deactivatePushToTalk();
+  }, [engine]);
+
+  // Hold Space to talk (push-to-talk mode)
+  useEffect(() => {
+    if (inputMode !== 'push_to_talk' || !started) return;
+    const isTyping = () => {
+      const el = document.activeElement;
+      return !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || (el as HTMLElement).isContentEditable);
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.code !== 'Space' || e.repeat || isTyping()) return;
+      e.preventDefault();
+      if (mutedRef.current) return;
+      engine.activatePushToTalk();
+      stateRef.current = 'listening';
+      setState('listening');
+    };
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.code !== 'Space') return;
+      engine.deactivatePushToTalk();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+    };
+  }, [inputMode, started, engine]);
+
+  // Real-time amplitude loop (drives the wobbly circle with the live mic level)
+  useEffect(() => {
+    let animFrame: number;
+    let time = 0;
+
+    const loop = () => {
+      time += 1;
+      let level = 0;
+
+      if (started) {
+        if (stateRef.current === 'listening') {
+          level = engine.getAudioLevel();
+        } else if (stateRef.current === 'speaking') {
+          const sim = 0.05 + Math.abs(Math.sin(time * 0.14) * Math.cos(time * 0.06)) * 0.38;
+          const isPause = Math.sin(time * 0.035) < -0.65;
+          level = isPause ? 0.01 : sim;
+        } else if (stateRef.current === 'thinking') {
+          level = 0.01 + Math.abs(Math.sin(time * 0.08)) * 0.03;
+        } else if (stateRef.current === 'idle') {
+          level = 0.01 + Math.abs(Math.sin(time * 0.03)) * 0.02;
+        }
+      }
+
+      setVoiceLevel(level);
+      animFrame = requestAnimationFrame(loop);
+    };
+
+    loop();
+    return () => cancelAnimationFrame(animFrame);
+  }, [started, engine]);
+
+  // Canvas Fluid Circle Renderer (fresh voice chat only)
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    let animFrame: number;
+    let time = 0;
+
+    const render = () => {
+      time += 1;
+      const level = voiceLevelRef.current;
+
+      // Resize canvas dynamically to match client size
+      const w = canvas.clientWidth;
+      const h = canvas.clientHeight;
+      if (canvas.width !== w || canvas.height !== h) {
+        canvas.width = w;
+        canvas.height = h;
+      }
+
+      ctx.clearRect(0, 0, w, h);
+
+      // Circle Base Sizing
+      let baseRadius = Math.min(w, h) * 0.38;
+      if (baseRadius < 110) baseRadius = 110;
+
+      // Draw the wobbly organic pure black circle (Fibbler edges)
+      const numPoints = 120;
+      ctx.beginPath();
+
+      for (let i = 0; i <= numPoints; i++) {
+        const theta = (i / numPoints) * Math.PI * 2;
+
+        // Multi-frequency wave layers for a liquid organic "wobble"
+        const w1 = Math.sin(theta * 4 + time * 0.04) * 5;
+        const w2 = Math.cos(theta * 7 - time * 0.10) * (3 + level * 28);
+        const w3 = Math.sin(theta * 13 + time * 0.07) * (1.5 + level * 14);
+
+        const r = baseRadius + w1 + w2 + w3;
+        const x = w / 2 + Math.cos(theta) * r;
+        const y = h / 2 + Math.sin(theta) * r;
+
+        if (i === 0) {
+          ctx.moveTo(x, y);
+        } else {
+          ctx.lineTo(x, y);
+        }
+      }
+
+      ctx.closePath();
+
+      // Pure black solid fill (no stroke border line)
+      ctx.fillStyle = resolvedTheme === 'light' ? '#2d2a27' : '#000000';
+      ctx.fill();
+
+      animFrame = requestAnimationFrame(render);
+    };
+
+    render();
+    return () => cancelAnimationFrame(animFrame);
+  }, [resolvedTheme, started]);
 
   // Share the currently active chat
   const handleShareActive = async () => {
@@ -675,7 +834,7 @@ export default function VoiceChat() {
     window.speechSynthesis?.cancel();
     readingIndexRef.current = index;
     setReadingIndex(index);
-    await speak(stripMarkdown(content));
+    await engine.speak(stripMarkdown(content));
     if (readingIndexRef.current === index) {
       readingIndexRef.current = null;
       setReadingIndex(null);
@@ -692,116 +851,6 @@ export default function VoiceChat() {
     conversationRef.current = next.map((m) => ({ role: m.role, content: m.content }));
     setMoreMenuIndex(null);
   };
-
-  // Mute / Unmute handler
-  useEffect(() => {
-    if (muted) {
-      try { recognitionRef.current?.stop(); } catch {}
-      window.speechSynthesis?.cancel();
-    } else {
-      if (stateRef.current === 'listening') {
-        startRecognition();
-      }
-    }
-  }, [muted, startRecognition]);
-
-  // Real-time amplitude loop (drives the wobbly circle with the live mic level)
-  useEffect(() => {
-    let animFrame: number;
-    let time = 0;
-    const dataArray = new Uint8Array(128);
-
-    const loop = () => {
-      time += 1;
-      let level = 0;
-
-      // Calculate the active sound amplitude level
-      if (started) {
-        if (stateRef.current === 'listening') {
-          if (analyserRef.current) {
-            analyserRef.current.getByteFrequencyData(dataArray);
-            level = dataArray.reduce((a, b) => a + b, 0) / dataArray.length / 255;
-          }
-        } else if (stateRef.current === 'speaking') {
-          const sim = 0.05 + Math.abs(Math.sin(time * 0.14) * Math.cos(time * 0.06)) * 0.38;
-          const isPause = Math.sin(time * 0.035) < -0.65;
-          level = isPause ? 0.01 : sim;
-        } else if (stateRef.current === 'thinking') {
-          level = 0.01 + Math.abs(Math.sin(time * 0.08)) * 0.03;
-        }
-      }
-
-      setVoiceLevel(level);
-      animFrame = requestAnimationFrame(loop);
-    };
-
-    loop();
-    return () => cancelAnimationFrame(animFrame);
-  }, [started]);
-
-  // Canvas Fluid Circle Renderer (fresh voice chat only)
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    let animFrame: number;
-    let time = 0;
-
-    const render = () => {
-      time += 1;
-      const level = voiceLevelRef.current;
-
-      // Resize canvas dynamically to match client size
-      const w = canvas.clientWidth;
-      const h = canvas.clientHeight;
-      if (canvas.width !== w || canvas.height !== h) {
-        canvas.width = w;
-        canvas.height = h;
-      }
-
-      ctx.clearRect(0, 0, w, h);
-
-      // Circle Base Sizing
-      let baseRadius = Math.min(w, h) * 0.38;
-      if (baseRadius < 110) baseRadius = 110;
-
-      // Draw the wobbly organic pure black circle (Fibbler edges)
-      const numPoints = 120;
-      ctx.beginPath();
-
-      for (let i = 0; i <= numPoints; i++) {
-        const theta = (i / numPoints) * Math.PI * 2;
-        
-        // Multi-frequency wave layers for a liquid organic "wobble"
-        const w1 = Math.sin(theta * 4 + time * 0.04) * 5;
-        const w2 = Math.cos(theta * 7 - time * 0.10) * (3 + level * 28);
-        const w3 = Math.sin(theta * 13 + time * 0.07) * (1.5 + level * 14);
-
-        const r = baseRadius + w1 + w2 + w3;
-        const x = w / 2 + Math.cos(theta) * r;
-        const y = h / 2 + Math.sin(theta) * r;
-
-        if (i === 0) {
-          ctx.moveTo(x, y);
-        } else {
-          ctx.lineTo(x, y);
-        }
-      }
-
-      ctx.closePath();
-      
-      // Pure black solid fill (no stroke border line)
-      ctx.fillStyle = resolvedTheme === 'light' ? '#2d2a27' : '#000000';
-      ctx.fill();
-
-      animFrame = requestAnimationFrame(render);
-    };
-
-    render();
-    return () => cancelAnimationFrame(animFrame);
-  }, [resolvedTheme, started]);
 
   const openMoreMenu = (e: React.MouseEvent, i: number) => {
     e.stopPropagation();
@@ -860,11 +909,22 @@ export default function VoiceChat() {
   return (
     <div className="h-full w-full bg-transparent flex flex-col items-center overflow-hidden py-6 px-4 sm:px-6 select-none animate-fade-in">
 
-      {/* Top bar with export + share buttons (top-right corner, navbar style) */}
+      {/* Top bar with settings + export + share buttons (top-right corner, navbar style) */}
       <div className="w-full flex items-center justify-end h-8 shrink-0 px-4 sm:px-6 relative">
+        {started && (
+          <button
+            onClick={() => setShowSettings(true)}
+            className="h-8 w-8 rounded-lg flex items-center justify-center text-ink-300 hover:text-white hover:bg-white/5 transition"
+            title="Voice settings"
+            aria-label="Voice settings"
+          >
+            <Settings size={16} />
+          </button>
+        )}
+
         {chatId && history.length > 0 && (
           <>
-            <div className="relative">
+            <div className="relative ml-1">
               <button
                 onClick={() => setExportOpen((o) => !o)}
                 className="h-8 w-8 rounded-lg flex items-center justify-center text-ink-300 hover:text-white hover:bg-white/5 transition"
@@ -950,14 +1010,56 @@ export default function VoiceChat() {
                     Web Speech API not supported in this browser
                   </p>
                 ) : state === 'speaking' ? (
-                  <p className="text-sm font-medium leading-relaxed text-ink-100 transition-all duration-300">
+                  <p className="text-sm font-medium leading-relaxed text-ink-100 transition-all duration-300 min-h-[1.5em]">
                     {aiResponseText}
                   </p>
                 ) : state === 'thinking' ? (
-                  <p className="text-xs font-semibold tracking-wider text-ink-400 uppercase animate-pulse-soft">
-                    Thinking…
+                  streamingText ? (
+                    <p className="text-sm font-medium leading-relaxed text-ink-100 transition-all duration-300 min-h-[1.5em]">
+                      {streamingText}
+                    </p>
+                  ) : (
+                    <p className="text-xs font-semibold tracking-wider text-ink-400 uppercase animate-pulse-soft">
+                      Thinking…
+                    </p>
+                  )
+                ) : state === 'listening' ? (
+                  interimTranscript ? (
+                    <p className="text-sm font-medium leading-relaxed text-ink-100">{interimTranscript}</p>
+                  ) : (
+                    <p className="text-xs font-semibold tracking-wider text-ink-400 uppercase animate-pulse-soft">
+                      I'm listening…
+                    </p>
+                  )
+                ) : state === 'idle' ? (
+                  inputMode === 'wake_word' ? (
+                    <p className="text-xs font-semibold tracking-wider text-ink-400 uppercase animate-pulse-soft">
+                      Say "{engine.getPreferences().wakeWord}" to talk
+                    </p>
+                  ) : inputMode === 'push_to_talk' ? (
+                    <p className="text-xs font-semibold tracking-wider text-ink-400 uppercase animate-pulse-soft">
+                      Hold the mic (or Space) to talk
+                    </p>
+                  ) : null
+                ) : state === 'error' ? (
+                  <p className="text-[13px] font-semibold text-red-400 uppercase">
+                    Microphone not available
                   </p>
                 ) : null}
+              </div>
+            )}
+
+            {/* Emotion + latency indicators */}
+            {started && (emotion || latencyMs !== null) && (
+              <div className="mt-3 flex items-center justify-center gap-3 text-[11px] text-ink-400">
+                {emotion && (
+                  <span className="px-2 py-0.5 rounded-full bg-white/5 border border-white/10 capitalize">{emotion}</span>
+                )}
+                {latencyMs !== null && (
+                  <span className="px-2 py-0.5 rounded-full bg-white/5 border border-white/10">
+                    {(latencyMs / 1000).toFixed(1)}s response
+                  </span>
+                )}
               </div>
             )}
           </div>
@@ -974,6 +1076,21 @@ export default function VoiceChat() {
               </button>
             ) : (
               <div className="flex items-center gap-6 animate-scale-in">
+                {/* Push to talk */}
+                {inputMode === 'push_to_talk' && (
+                  <button
+                    onPointerDown={handlePTTDown}
+                    onPointerUp={handlePTTUp}
+                    onPointerLeave={handlePTTUp}
+                    onPointerCancel={handlePTTUp}
+                    className="w-12 h-12 rounded-full border flex items-center justify-center transition-all shadow-soft active:scale-95 select-none touch-none bg-emerald-500/20 border-emerald-400/40 text-emerald-300 hover:bg-emerald-500/30"
+                    aria-label="Hold to talk"
+                    title="Hold to talk (or hold Space)"
+                  >
+                    <Mic size={20} />
+                  </button>
+                )}
+
                 {/* End Call / Close button */}
                 <button
                   onClick={endSession}
@@ -1041,6 +1158,10 @@ export default function VoiceChat() {
 
       {shareChat && (
         <ShareModal open={!!shareChat} onClose={() => setShareChat(null)} chat={shareChat} />
+      )}
+
+      {showSettings && (
+        <VoiceSettings onClose={() => setShowSettings(false)} />
       )}
     </div>
   );
