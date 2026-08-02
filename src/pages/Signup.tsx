@@ -95,7 +95,7 @@ export default function Signup() {
 
   return (
     <AuthLayout
-      title="Create your workspace"
+      title="Start your voice chat"
       subtitle="Start free. No credit card required."
       footer={<>Already have an account? <Link to="/login" className="text-white font-medium hover:underline">Sign in</Link></>}
     >

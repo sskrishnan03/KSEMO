@@ -5,14 +5,14 @@ export default function PrivacyPolicy() {
     <LegalLayout title="Privacy Policy" updated="August 2, 2026">
       <LegalSection>
         <p>
-          Ksemo ("we", "our", "us") is a voice-first AI workspace. This Privacy Policy explains what
+          Ksemo ("we", "our", "us") is an AI voice chat. This Privacy Policy explains what
           information we collect when you use Ksemo, how we use and protect it, and the choices you
           have. By using Ksemo, you agree to the collection and use of information as described here.
         </p>
       </LegalSection>
 
       <LegalSection heading="1. Information We Collect">
-        <p><strong>Account information.</strong> When you create an account, we collect your name, username, and email address so you can sign in and access your workspace.</p>
+        <p><strong>Account information.</strong> When you create an account, we collect your name, username, and email address so you can sign in and access your account.</p>
         <p><strong>Voice conversations.</strong> When you use Voice Chat, we record and store the transcripts of your conversations (what you say and the AI's responses) so you can search, revisit, and continue them later from Recent.</p>
         <p><strong>Google sign-in data.</strong> If you choose to sign in with Google, we receive your name and email address from Google to create and identify your account.</p>
         <p><strong>Usage information.</strong> We may collect basic technical information such as your browser type, device type, and the pages you visit to keep the service running and improve it.</p>

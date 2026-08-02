@@ -129,7 +129,7 @@ export default function SharedChatView() {
         </div>
 
         <Button size="sm" className="flex items-center gap-1.5 shrink-0" onClick={() => nav('/signup')}>
-          Create Workspace <ArrowUpRight size={12} />
+          Create an account <ArrowUpRight size={12} />
         </Button>
       </header>
 

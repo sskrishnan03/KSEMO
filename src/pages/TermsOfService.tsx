@@ -5,15 +5,15 @@ export default function TermsOfService() {
     <LegalLayout title="Terms of Service" updated="August 2, 2026">
       <LegalSection>
         <p>
-          These Terms of Service ("Terms") govern your access to and use of Ksemo, a voice-first AI
-          workspace. By creating an account or using Ksemo, you agree to be bound by these Terms. If
+          These Terms of Service ("Terms") govern your access to and use of Ksemo, an AI voice
+          chat. By creating an account or using Ksemo, you agree to be bound by these Terms. If
           you do not agree, please do not use the service.
         </p>
       </LegalSection>
 
       <LegalSection heading="1. The Service">
         <p>
-          Ksemo provides a voice-first AI workspace that lets you have spoken conversations with an
+          Ksemo provides an AI voice chat that lets you have spoken conversations with an
           AI assistant and search past conversations.
         </p>
       </LegalSection>

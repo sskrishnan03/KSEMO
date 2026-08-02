@@ -222,13 +222,7 @@ export default function VoiceChat() {
     setState('thinking');
 
     const detectedEmotion = emotionRef.current?.emotion ?? null;
-    // Personalize the replies: the AI knows the logged-in user's name and can
-    // address them naturally, the way a real person would.
-    const userName = profile?.full_name || profile?.username || '';
-    const basePrompt = userName
-      ? `${VOICE_SYSTEM_PROMPT}\n\nThe user's name is ${userName}. Address them by name now and then, naturally, like a real person — never force it into every sentence.`
-      : VOICE_SYSTEM_PROMPT;
-    const systemPrompt = adjustResponseForEmotion(basePrompt, detectedEmotion ?? 'neutral');
+    const systemPrompt = adjustResponseForEmotion(VOICE_SYSTEM_PROMPT, detectedEmotion ?? 'neutral');
     const prefs = engine.getPreferences();
     const tone = emotionToneAdjustment(detectedEmotion);
     const ttsOverrides: Partial<TTSConfig> = {
@@ -388,10 +382,10 @@ export default function VoiceChat() {
       if (turn === turnRef.current) processingRef.current = false;
       if (turn === turnRef.current) engine.stopBargeInMonitoring();
     }
-  }, [engine, profile]);
+  }, [engine]);
 
-  // Hang up — say a natural goodbye first, THEN end the session. Used both by
-  // the "hang up" voice command and the End (X) button, so it always speaks.
+  // Hang up — say a natural goodbye first, THEN end the session. Used by the
+  // "hang up" voice command, which always speaks the goodbye out loud.
   const handleHangUp = useCallback(async () => {
     if (!startedRef.current) return;
     turnRef.current += 1; // invalidate any in-flight AI turn
@@ -407,6 +401,17 @@ export default function VoiceChat() {
     stateRef.current = 'speaking';
     setState('speaking');
     await engine.speak("Alright, it was nice talking to you. Goodbye!", undefined, (revealed) => setAiResponseText(revealed));
+    endSessionRef.current();
+  }, [engine]);
+
+  // End (X) button — ends the session immediately, without speaking anything.
+  // Only the "hang up" voice command says a goodbye first.
+  const endSessionSilently = useCallback(() => {
+    turnRef.current += 1; // invalidate any in-flight AI turn
+    processingRef.current = false;
+    engine.stopBargeInMonitoring();
+    engine.stopListening();
+    if (abortRef.current) { abortRef.current.abort(); abortRef.current = null; }
     endSessionRef.current();
   }, [engine]);
 
@@ -1153,9 +1158,9 @@ export default function VoiceChat() {
                   </button>
                 )}
 
-                {/* End Call / Close button — speaks a goodbye first, then ends */}
+                {/* End Call / Close button — ends immediately, without speaking */}
                 <button
-                  onClick={handleHangUp}
+                  onClick={endSessionSilently}
                   className="w-12 h-12 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 active:scale-95 text-white flex items-center justify-center transition-all shadow-soft"
                   aria-label="End voice session"
                   title="End session"

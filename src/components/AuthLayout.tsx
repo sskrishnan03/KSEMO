@@ -17,13 +17,13 @@ export function AuthLayout({ children, title, subtitle, footer }: { children: Re
 
         <div className="relative my-auto">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/10 bg-white/5 text-[12px] text-ink-100 mb-5">
-            <Sparkles size={13} /> AI workspace
+            <Sparkles size={13} /> Voice Chat
           </div>
           <h2 className="text-4xl md:text-5xl font-bold tracking-tight leading-[1.15] text-white">
-            Your personal<br />AI workspace.
+            Your personal<br />AI voice chat.
           </h2>
           <p className="mt-4 text-[15px] text-ink-200 max-w-sm leading-relaxed">
-            A quiet place for your thoughts and conversations. Work with AI in a clean, focused charcoal interface.
+            A quiet place to talk. Just speak — Ksemo listens and answers out loud, hands-free.
           </p>
 
           <ul className="mt-8 space-y-4 text-[14px] text-ink-200">
@@ -31,7 +31,7 @@ export function AuthLayout({ children, title, subtitle, footer }: { children: Re
               <div className="h-9 w-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white shrink-0">
                 <Sparkles size={15} />
               </div>
-              <span>AI-powered chat and writing assistant</span>
+              <span>Hands-free spoken conversations</span>
             </li>
             <li className="flex items-center gap-3">
               <div className="h-9 w-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white shrink-0">

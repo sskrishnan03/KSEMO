@@ -99,7 +99,7 @@ function resetEmailHtml(resetUrl) {
   <tr><td style="padding:40px 40px 32px;">
     <h2 style="margin:0 0 16px;font-size:22px;font-weight:700;color:#ffffff;letter-spacing:-0.3px;">Reset your password</h2>
     <p style="margin:0 0 24px;font-size:14px;color:#9a9aad;line-height:1.7;">
-      We received a request to reset the password for your Ksemo workspace account. Click the button below to choose a new password.
+      We received a request to reset the password for your Ksemo account. Click the button below to choose a new password.
     </p>
     <table cellpadding="0" cellspacing="0" width="100%"><tr>
       <td align="center" style="padding:0 0 24px;">
@@ -116,7 +116,7 @@ function resetEmailHtml(resetUrl) {
     </p>
   </td></tr>
   <tr><td style="padding:20px 40px;border-top:1px solid rgba(255,255,255,0.06);">
-    <p style="margin:0;font-size:12px;color:#55556a;">Ksemo Workspace &mdash; Your personal AI workspace</p>
+    <p style="margin:0;font-size:12px;color:#55556a;">Ksemo &mdash; Your personal AI voice chat</p>
   </td></tr>
 </table>
 </td></tr></table>
@@ -165,7 +165,7 @@ app.post('/send-email', async (req, res) => {
   try {
     const { to, subject, body, from } = req.body;
     const mailOptions = {
-      from: from || `Ksemo Workspace <${SMTP_CONFIG.auth.user}>`,
+      from: from || `Ksemo Voice Chat <${SMTP_CONFIG.auth.user}>`,
       to,
       subject,
       text: body,
@@ -203,7 +203,7 @@ app.post('/forgot-password', async (req, res) => {
     const resetUrl = `${appUrl}/reset?token=${token}`;
 
     await transporter.sendMail({
-      from: `Ksemo Workspace <${SMTP_CONFIG.auth.user}>`,
+      from: `Ksemo Voice Chat <${SMTP_CONFIG.auth.user}>`,
       to: email,
       subject: 'Reset your Ksemo password',
       html: resetEmailHtml(resetUrl),

@@ -94,7 +94,7 @@ export function ShareModal({ open, onClose, chat }: ShareModalProps) {
       return;
     }
     const subject = `${chat.title} — shared with you on Ksemo`;
-    const body = `Hi,\n\nSomeone shared a Ksemo conversation with you: "${chat.title}".\n\nOpen it here: ${link}\n\n— Ksemo Workspace`;
+    const body = `Hi,\n\nSomeone shared a Ksemo conversation with you: "${chat.title}".\n\nOpen it here: ${link}\n\n— Ksemo Voice Chat`;
     try {
       await sendEmail(email.trim(), subject, body);
       setEmailSent(true);

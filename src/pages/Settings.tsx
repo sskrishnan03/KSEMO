@@ -81,7 +81,7 @@ export default function Settings() {
 
   // Help & Support chat
   const [helpMessages, setHelpMessages] = useState<{ role: 'user' | 'assistant'; content: string }[]>([
-    { role: 'assistant', content: "Hi! I'm the Ksemo assistant. Ask me anything about how to use the workspace — features, shortcuts, settings, or anything else." },
+    { role: 'assistant', content: "Hi! I'm the Ksemo assistant. Ask me anything about how to use Ksemo — voice chat, settings, or anything else." },
   ]);
   const [helpInput, setHelpInput] = useState('');
   const [helpLoading, setHelpLoading] = useState(false);
@@ -267,7 +267,7 @@ export default function Settings() {
     { q: /bug|report|issue|error/i, a: "Found a bug? Email us directly at **support@ksemo.com** with details about the issue. Include what happened, what you expected, and steps to reproduce if possible." },
     { q: /feedback|suggest|improve/i, a: "Go to **Settings > Feedback** to send general feedback, feature requests, or improvement suggestions." },
     { q: /admin|dashboard|usage/i, a: "The Admin panel is accessible from the sidebar (admin users only). It shows user management and usage analytics." },
-    { q: /help|what.*can|how.*use|getting.*start/i, a: "Welcome! Ksemo is an AI workspace. Key features:\n- **AI Chat** — streaming conversations with the AI\n- **Voice Chat** — hands-free voice conversations\n- **Smart Search** — find anything across your workspace\n\nUse the sidebar to navigate, or ask me anything specific!" },
+    { q: /help|what.*can|how.*use|getting.*start/i, a: "Welcome! Ksemo is an AI voice chat. Key features:\n- **Voice Chat** — hands-free spoken conversations\n- **AI Chat** — streaming text conversations\n- **Smart Search** — find anything across your chats\n\nUse the sidebar to navigate, or ask me anything specific!" },
   ];
 
   const sendHelpMessage = async () => {
@@ -496,7 +496,7 @@ export default function Settings() {
                   <Toggle label="Product news" desc="New features, improvements, and announcements" value={prefs.notifications_product ?? false} onChange={(v) => updatePref('notifications_product', v)} />
                 </div>
 
-                <SectionHeader icon={Info} title="In-app notifications" desc="Notifications inside the Ksemo workspace." />
+                <SectionHeader icon={Info} title="In-app notifications" desc="Notifications inside Ksemo." />
                 <div className="rounded-2xl bg-ink-850 border border-white/8 p-4 space-y-1">
                   <Toggle label="In-app notifications" desc="Show notification badges and toasts in the app" value={prefs.notifications_in_app ?? true} onChange={(v) => updatePref('notifications_in_app', v)} />
                   <Toggle label="Notification sounds" desc="Play a sound when a new notification arrives" value={prefs.notifications_sound ?? false} onChange={(v) => updatePref('notifications_sound', v)} />

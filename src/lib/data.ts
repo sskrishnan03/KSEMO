@@ -97,7 +97,7 @@ export async function createChat(patch?: Partial<Chat>): Promise<Chat | null> {
   const newChat: Chat = {
     id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2),
     user_id: 'local',
-    title: 'New chat',
+    title: 'New voice chat',
     model: 'ksemo-pro',
     temperature: 0.7,
     max_tokens: 2048,
@@ -488,7 +488,7 @@ async function sendEmailViaProxy(to: string, subject: string, body: string): Pro
         to,
         subject,
         body,
-        from: `Ksemo Workspace <noreply@ksemo.app>`
+        from: `Ksemo Voice Chat <noreply@ksemo.app>`
       })
     });
     
@@ -526,15 +526,15 @@ export function dispatchSimulatedEmail(email: string, fullName: string, type: 's
     fullName,
     type,
     subject: isSignup 
-      ? `Welcome to Ksemo! 🚀 Your creative AI workspace is ready.`
+      ? `Welcome to Ksemo! 🚀 Your voice chat is ready.`
       : isSignout
-        ? `Sign-Out Alert: Ksemo Workspace`
-        : `New Login Alert: Ksemo Workspace`,
+        ? `Sign-Out Alert: Ksemo`
+        : `New Login Alert: Ksemo`,
     body: isSignup
-      ? `Hello ${fullName || 'User'},\n\nThank you for choosing Ksemo, your ultimate workspace for AI chat and smart search. We are dedicated to providing you with a seamless and highly productive environment to build your ideas.\n\nLet's explore your workspace and start a chat to begin.\n\nBest regards,\nThe Ksemo Team`
+      ? `Hello ${fullName || 'User'},\n\nThank you for choosing Ksemo, the AI voice chat. We are dedicated to giving you seamless, hands-free conversations with an AI assistant.\n\nLet's start your first voice chat to begin.\n\nBest regards,\nThe Ksemo Team`
       : isSignout
-        ? `Hello ${fullName || 'User'},\n\nYou have successfully signed out of your Ksemo workspace on ${new Date().toLocaleString()}.\n\nIf this was you, no action is needed. If you did not authorize this, please log back in and check your account security.\n\nBest regards,\nThe Ksemo Team`
-        : `Hello ${fullName || 'User'},\n\nWe detected a new login to your Ksemo workspace on ${new Date().toLocaleString()}.\n\nIf this was you, you can safely ignore this message. If you did not authorize this login, please update your account settings immediately.\n\nBest regards,\nThe Ksemo Team`,
+        ? `Hello ${fullName || 'User'},\n\nYou have successfully signed out of Ksemo on ${new Date().toLocaleString()}.\n\nIf this was you, no action is needed. If you did not authorize this, please log back in and check your account security.\n\nBest regards,\nThe Ksemo Team`
+        : `Hello ${fullName || 'User'},\n\nWe detected a new login to your Ksemo account on ${new Date().toLocaleString()}.\n\nIf this was you, you can safely ignore this message. If you did not authorize this login, please update your account settings immediately.\n\nBest regards,\nThe Ksemo Team`,
     timestamp: new Date().toISOString()
   };
   localStorage.setItem(key, JSON.stringify([newEmail, ...existing]));

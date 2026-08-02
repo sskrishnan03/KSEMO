@@ -52,7 +52,7 @@ export function LegalLayout({ title, updated, children }: LegalLayoutProps) {
                 <img src="/KSEMOlogo.png" alt="KSEMO" className="h-7 w-7 rounded-lg object-contain" />
                 <span className="text-[15px] font-semibold text-white tracking-tight">Ksemo</span>
               </Link>
-              <p className="text-[13px] text-ink-300 max-w-sm leading-relaxed">A voice-first AI workspace for people who think for a living. Talk, create, and organize — all in one focused environment.</p>
+              <p className="text-[13px] text-ink-300 max-w-sm leading-relaxed">An AI voice chat for people who think for a living. Talk, create, and organize — all in one focused environment.</p>
             </div>
             <div>
               <div className="text-[12px] font-semibold text-white uppercase tracking-wider mb-3">Product</div>

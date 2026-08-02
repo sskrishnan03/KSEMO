@@ -38,6 +38,8 @@ How to talk:
 - Answer the question directly and keep it short — usually 2 to 4 sentences, unless the user asks for more detail.
 - Sound warm and conversational: use contractions like "I'll" and "that's", vary sentence length, and never use bullet points, lists, markdown, or anything that looks written for a screen.
 - Respond to exactly what was asked. Never repeat a scripted or canned answer.
+- When the user greets you, open with something fresh and casual. Never use the same greeting twice — vary it every time, the way a person would.
+- Never say the user's name out loud, and never ask what their name is. It feels too personal.
 - If you don't know something, say so honestly and offer to help find out.
 - End naturally, the way a person would, sometimes with a quick follow-up question.`;
 
@@ -190,22 +192,38 @@ async function localStream(opts: StreamOptions, start: number): Promise<StreamRe
   return { content: acc, tokens: estimateTokens(acc), latencyMs, fromEdge: false };
 }
 
+/** Varied, natural greetings for the local fallback so replies never repeat. */
+const GREETING_RESPONSES = [
+  "Hey! Great to talk to you. What are we working on today?",
+  "Well hello there! What's on your mind?",
+  "Hey, good to hear from you. What can I do for you?",
+  "Hello! Always nice to chat. What would you like to talk about?",
+  "Hey there! How's it going? What can I help you with?",
+  "Hi! I'm all ears — what do you want to talk about?",
+  "Hey, glad you're here. What shall we dive into?",
+  "Hello, good to have you here. What's on your mind today?",
+];
+let lastGreetingIndex = -1;
+
 /** High-quality deterministic local response generator. */
 function generateLocalResponse(prompt: string, history: ChatMessage[]): string {
   const p = prompt.toLowerCase();
   const userCount = history.filter((m) => m.role === 'user').length;
 
   if (!prompt.trim()) {
-    return "I'm Ksemo, your AI workspace. Ask me anything — to write, analyze, code, summarize, or brainstorm.";
+    return "I'm Ksemo, your voice assistant. Just ask me anything — I can write, analyze, code, summarize, or brainstorm.";
   }
 
   if (/^(hi|hello|hey|yo|sup|good (morning|afternoon|evening))/.test(p)) {
-    return `Hello — I'm **Ksemo**, your AI workspace assistant. I can help you write, analyze, code, summarize, or brainstorm. What would you like to work on?`;
+    let idx = Math.floor(Math.random() * GREETING_RESPONSES.length);
+    if (GREETING_RESPONSES.length > 1 && idx === lastGreetingIndex) idx = (idx + 1) % GREETING_RESPONSES.length;
+    lastGreetingIndex = idx;
+    return GREETING_RESPONSES[idx];
   }
 
   if (p.includes('who are you') || p.includes('what are you') || p.includes('what can you do')) {
     return [
-      "I'm **Ksemo**, a premium AI workspace assistant.",
+      "I'm **Ksemo**, a premium voice assistant.",
       '',
       'I can help you with:',
       '- **Writing & Editing** — emails, blogs, resumes, docs',

@@ -13,21 +13,21 @@ import { getStoredVoiceId, pickVoice } from '../lib/voices';
 /* ──────────────────── data ──────────────────── */
 
 const features = [
-  { icon: Mic, title: 'Voice-first conversations', desc: 'Just talk. Ksemo listens, thinks, and answers out loud — a natural hands-free back-and-forth with no typing at all.' },
+  { icon: Mic, title: 'Hands-free conversations', desc: 'Just talk. Ksemo listens, thinks, and answers out loud — a natural hands-free back-and-forth with no typing at all.' },
   { icon: AudioLines, title: 'Spoken answers, live subtitles', desc: 'Every reply is spoken word-by-word with real-time subtitles on screen. Mute anytime, or follow along in text.' },
-  { icon: Shield, title: 'Private by design', desc: 'Row-level security on every table, encrypted sessions, and your voice data never leaves your workspace.' },
+  { icon: Shield, title: 'Private by design', desc: 'Row-level security on every table, encrypted sessions, and your voice data never leaves your device.' },
   { icon: Search, title: 'Search every session', desc: 'All your voice conversations are saved. Full-text search finds any past talk instantly.' },
   { icon: Layers, title: 'Saved in Recent with a mic icon', desc: 'Every session lands in your Recent list with a mic icon. Reopen any conversation and keep talking from where you left off.' },
   { icon: Brain, title: 'Multi-model support', desc: 'Each voice session can use the best AI model for the job — coding, writing, or analysis — all spoken back to you.' },
 ];
 
 const faqs = [
-  { q: 'What is Ksemo?', a: 'Ksemo is a voice-first AI workspace. Instead of typing, you talk to your AI and it talks back — while every conversation is saved to your Recent list for later.' },
+  { q: 'What is Ksemo?', a: 'Ksemo is an AI voice chat. Instead of typing, you talk to your AI and it talks back — while every conversation is saved to your Recent list for later.' },
   { q: 'Is my data private?', a: 'Every table uses row-level security so you can only ever access your own data. Sessions are encrypted, and you can export or delete your data at any time from Settings.' },
   { q: 'Does it work offline?', a: 'Ksemo runs in the browser. The local engine produces responses even when no backend is connected, so the app is always usable.' },
   { q: 'Which AI models are supported?', a: 'Ksemo runs on Google\u2019s Gemini API, giving you fast, high-quality AI answers. You can switch models per voice session.' },
   { q: 'Can I cancel anytime?', a: 'Yes. Plans are month-to-month and you can cancel or downgrade from Settings at any time. Your data stays yours.' },
-  { q: 'How is this different from ChatGPT?', a: 'Ksemo is voice-first. You speak naturally and Ksemo answers out loud — no chat window to manage. Every talk is saved with a mic icon in Recent so you can pick it back up anytime.' },
+  { q: 'How is this different from ChatGPT?', a: 'Ksemo is made for voice. You speak naturally and Ksemo answers out loud — no chat window to manage. Every talk is saved with a mic icon in Recent so you can pick it back up anytime.' },
 ];
 
 /* ──────────────────── Demo voice conversation ──────────────────── */
@@ -430,7 +430,7 @@ export default function Landing() {
             {profile ? (
               <div className="flex items-center gap-4">
                 <span className="text-[13px] text-ink-300 font-medium">Hello, {profile.full_name || profile.username}</span>
-                <Link to="/app"><Button size="sm">Go to Workspace <ArrowRight size={14} /></Button></Link>
+                <Link to="/app"><Button size="sm">Go to Voice Chat <ArrowRight size={14} /></Button></Link>
               </div>
             ) : (
               <>
@@ -450,7 +450,7 @@ export default function Landing() {
             {profile ? (
               <div className="flex flex-col gap-2 pt-2">
                 <span className="text-[13px] text-ink-300 font-medium text-center mb-1">Hello, {profile.full_name || profile.username}</span>
-                <Link to="/app" className="w-full" onClick={() => setMenuOpen(false)}><Button size="sm" className="w-full">Go to Workspace</Button></Link>
+                <Link to="/app" className="w-full" onClick={() => setMenuOpen(false)}><Button size="sm" className="w-full">Go to Voice Chat</Button></Link>
               </div>
             ) : (
               <div className="flex gap-2 pt-2">
@@ -470,10 +470,10 @@ export default function Landing() {
         </div>
         <div className="relative max-w-5xl mx-auto text-center">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/10 bg-white/5 text-[12px] text-ink-100 mb-6 animate-fade-in">
-            <Mic size={13} /> A voice-first AI workspace
+            <Mic size={13} /> Voice Chat
           </div>
           <h1 className="text-5xl md:text-7xl font-semibold tracking-tight leading-[1.05] text-balance animate-slide-up">
-            Your AI voice workspace.
+            Your AI voice chat.
           </h1>
           <p className="mt-6 text-lg text-ink-200 max-w-2xl mx-auto text-balance animate-slide-up" style={{ animationDelay: '60ms' }}>
             Ksemo listens, thinks, and answers out loud. Just talk —
@@ -481,7 +481,7 @@ export default function Landing() {
           </p>
           <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3 animate-slide-up" style={{ animationDelay: '120ms' }}>
             {profile ? (
-              <Link to="/app"><Button size="lg">Go to Workspace <ArrowRight size={16} /></Button></Link>
+              <Link to="/app"><Button size="lg">Open Voice Chat <ArrowRight size={16} /></Button></Link>
             ) : (
               <Link to="/signup"><Button size="lg">Start free <ArrowRight size={16} /></Button></Link>
             )}
@@ -508,8 +508,8 @@ export default function Landing() {
         <div className="max-w-6xl mx-auto">
           <div className="text-center max-w-2xl mx-auto mb-14">
             <div className="text-[12px] uppercase tracking-wider text-ink-300 mb-3">Features</div>
-            <h2 className="text-3xl md:text-4xl font-semibold tracking-tight text-balance">Everything you need for voice-first AI</h2>
-            <p className="mt-4 text-ink-200">One calm, focused voice workspace — not a bag of features bolted together.</p>
+            <h2 className="text-3xl md:text-4xl font-semibold tracking-tight text-balance">Everything you need for AI voice chat</h2>
+            <p className="mt-4 text-ink-200">One calm, focused voice chat — not a bag of features bolted together.</p>
           </div>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
             {features.map((f, i) => (
@@ -631,13 +631,13 @@ export default function Landing() {
           <div className="relative">
             <VoiceVisual />
             <h2 className="text-3xl md:text-4xl font-semibold tracking-tight text-balance">Start talking to AI today</h2>
-            <p className="mt-4 text-ink-200 max-w-lg mx-auto">Join thousands of professionals using Ksemo as their primary voice-first AI workspace. Free to start, no credit card required.</p>
+            <p className="mt-4 text-ink-200 max-w-lg mx-auto">Join thousands of professionals using Ksemo as their primary AI voice chat. Free to start, no credit card required.</p>
             <div className="mt-8 flex flex-col sm:flex-row justify-center gap-3">
               {profile ? (
-                <Link to="/app"><Button size="lg">Go to Workspace <ArrowRight size={16} /></Button></Link>
+                <Link to="/app"><Button size="lg">Open Voice Chat <ArrowRight size={16} /></Button></Link>
               ) : (
                 <>
-                  <Link to="/signup"><Button size="lg">Create your workspace <ArrowRight size={16} /></Button></Link>
+                  <Link to="/signup"><Button size="lg">Start your voice chat <ArrowRight size={16} /></Button></Link>
                   <Link to="/login"><Button variant="outline" size="lg">Sign in</Button></Link>
                 </>
               )}
@@ -656,7 +656,7 @@ export default function Landing() {
                 <img src="/KSEMOlogo.png" alt="KSEMO" className="h-7 w-7 rounded-lg object-contain" />
                 <span className="text-[15px] font-semibold text-white tracking-tight">Ksemo</span>
               </Link>
-              <p className="text-[13px] text-ink-300 max-w-sm leading-relaxed">A voice-first AI workspace for people who think for a living. Talk, create, and organize — all in one focused environment.</p>
+              <p className="text-[13px] text-ink-300 max-w-sm leading-relaxed">An AI voice chat for people who think for a living. Talk, create, and organize — all in one focused environment.</p>
             </div>
             <div>
               <div className="text-[12px] font-semibold text-white uppercase tracking-wider mb-3">Product</div>
@@ -669,7 +669,7 @@ export default function Landing() {
               <div className="text-[12px] font-semibold text-white uppercase tracking-wider mb-3">Account</div>
               <div className="space-y-2">
                 {profile ? (
-                  <Link to="/app" className="block text-[13px] text-ink-300 hover:text-white transition">Workspace</Link>
+                  <Link to="/app" className="block text-[13px] text-ink-300 hover:text-white transition">Voice Chat</Link>
                 ) : (
                   <>
                     <Link to="/login" className="block text-[13px] text-ink-300 hover:text-white transition">Sign in</Link>

@@ -82,7 +82,7 @@ export default function Login() {
   return (
     <AuthLayout
       title="Welcome back"
-      subtitle="Sign in to your workspace"
+      subtitle="Sign in to keep talking"
       footer={<>Don't have an account? <Link to="/signup" className="text-white font-medium hover:underline">Sign up</Link></>}
     >
       <div className="space-y-3">

@@ -49,7 +49,7 @@ export default function Verify() {
             <Check size={18} className="text-white" />
           </div>
           <p className="text-[14px] text-white font-medium">Email verified</p>
-          <p className="mt-1.5 text-[13px] text-ink-300">Taking you to your workspace…</p>
+          <p className="mt-1.5 text-[13px] text-ink-300">Taking you to your voice chat…</p>
         </div>
       ) : (
         <form onSubmit={submit} className="space-y-4">

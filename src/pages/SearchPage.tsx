@@ -63,7 +63,7 @@ export default function SearchPage() {
       <div className="max-w-5xl mx-auto px-6 py-10">
         <div className="mb-8">
           <h1 className="text-2xl font-semibold tracking-tight text-white">Search</h1>
-          <p className="mt-2 text-ink-300">Search chats, messages, images, documents, and files across your workspace.</p>
+          <p className="mt-2 text-ink-300">Search chats, messages, images, documents, and files across your voice chats.</p>
         </div>
 
         <div className="relative mb-6">
