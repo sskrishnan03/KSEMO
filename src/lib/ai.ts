@@ -42,124 +42,9 @@ How to talk:
 - End naturally, the way a person would, sometimes with a quick follow-up question.`;
 
 
-// ---------- Live real-time context ----------
-// The model has no built-in clock or live weather, so we fetch the facts and
-// feed them into the request. This makes "what time is it" / "weather in
-// Bangalore" answers real instead of canned or hallucinated.
-
-export interface LiveContext {
-  date: string;
-  time: string;
-  timezone: string;
-  weather: string | null;
-  note: string;
-}
-
-function lastUserText(messages: ChatMessage[]): string {
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const m = messages[i];
-    if (m.role !== 'user') continue;
-    return typeof m.content === 'string' ? m.content : textFromContent(m.content);
-  }
-  return '';
-}
-
-function isWeatherQuery(p: string): boolean {
-  return /(weather|temperature|forecast|raining|rain (today|right now|outside)|humidity|wind speed|windy|like outside|outside like|degrees)/i.test(p);
-}
-
-function isTimeQuery(p: string): boolean {
-  return /(what time|what's the time|current time|time is it|the time right now|time now|time right now|tell me the time)/i.test(p);
-}
-
-function isDateQuery(p: string): boolean {
-  return /(what('s| is) the date|today'?s date|what day is (it|today)|current date|what date)/i.test(p);
-}
-
-function cleanCity(raw: string): string {
-  let c = raw.trim()
-    .replace(/[^a-zA-Z .'-]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-  c = c.replace(/(^|\s)(today|tomorrow|right now|now|here|my city|the city|the weather|what's|whats)(\s|$)/gi, ' ').trim();
-  return c;
-}
-
-function extractCity(prompt: string): string | null {
-  const isCityLike = (c: string | null): c is string => {
-    if (!c) return false;
-    // A real place name shouldn't be built from filler words ("how is the
-    // weather" must not extract "how is the").
-    return !/\b(how|is|the|it|like|outside|what|whats|do|does|in|for|here|today|now|around|there|out)\b/i.test(c);
-  };
-  let m = prompt.match(/\b(?:weather|temperature|forecast|raining|rain)\s+in\s+([A-Z][a-zA-Z .'-]+?)(?:\s+(?:today|tomorrow|right now|now|tonight|this\s+\w+)|[?,.\n]|$)/i);
-  if (m) {
-    const c = cleanCity(m[1]);
-    if (isCityLike(c)) return c;
-  }
-  m = prompt.match(/\b([A-Z][a-zA-Z .'-]+?)\s+(?:weather|forecast|temperature)\b/i);
-  if (m) {
-    const c = cleanCity(m[1]);
-    if (isCityLike(c)) return c;
-  }
-  return null;
-}
-
-// Live weather via wttr.in — free, no API key. Falls back to IP geolocation
-// when no city is given, so "how's the weather" answers for the user's area.
-async function fetchWeather(city: string | null): Promise<string | null> {
-  try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 5000);
-    const url = city
-      ? `https://wttr.in/${encodeURIComponent(city)}?format=j1`
-      : 'https://wttr.in/?format=j1';
-    const res = await fetch(url, { signal: controller.signal });
-    clearTimeout(timer);
-    if (!res.ok) return null;
-    const j = await res.json();
-    const cur = j.current_condition?.[0];
-    if (!cur) return null;
-    const place = j.nearest_area?.[0]?.areaName?.[0]?.value ?? (city ? cleanCity(city) : '');
-    const desc = (cur.weatherDesc?.[0]?.value ?? 'clear').toLowerCase();
-    return `${place ? place + ': ' : ''}${cur.temp_C}°C, feels like ${cur.FeelsLikeC}°C, ${desc}, humidity ${cur.humidity}%, wind ${cur.windspeedKmph} km/h.`;
-  } catch {
-    return null;
-  }
-}
-
-async function buildLiveContext(promptText: string): Promise<LiveContext> {
-  const now = new Date();
-  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'local time';
-  const date = now.toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: timezone });
-  const time = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: timezone });
-  let weather: string | null = null;
-  if (isWeatherQuery(promptText)) {
-    weather = await fetchWeather(extractCity(promptText));
-  }
-  const note = [
-    'LIVE FACTS (trust these, they are more current than your training data):',
-    `Today's date is ${date}. The current time is ${time} (${timezone}).`,
-    weather ? `Current weather: ${weather}` : null,
-  ].filter(Boolean).join(' ');
-  return { date, time, timezone, weather, note };
-}
-
-// Grounding with Google Search gives the model live web data for anything, not
-// just time/weather. Enabled by default when a Gemini key is present; override
-// with VITE_GEMINI_GROUNDING=false, or pick the model with
-// VITE_GEMINI_GROUNDING_MODEL.
-function groundingEnabled(): boolean {
-  const v = (import.meta.env as any).VITE_GEMINI_GROUNDING;
-  return v === undefined || v === '' ? true : v !== 'false';
-}
-
-function mapModelForGemini(modelName: string, grounding: boolean): string {
-  if (grounding) {
-    return (import.meta.env as any).VITE_GEMINI_GROUNDING_MODEL || 'gemini-2.5-flash-lite';
-  }
-  // gemini-flash-lite-latest is fast, cheap and non-thinking, which keeps
-  // voice replies quick and avoids burning free-tier quota on hidden thoughts.
+// gemini-flash-lite-latest is fast, cheap and non-thinking, which keeps
+// voice replies quick and avoids burning free-tier quota on hidden thoughts.
+function mapModelForGemini(modelName: string): string {
   const map: Record<string, string> = {
     'ksemo-pro': 'gemini-flash-lite-latest',
     'ksemo-max': 'gemini-flash-lite-latest',
@@ -180,8 +65,8 @@ function textFromContent(content: string | ContentPart[]): string {
     .join('\n');
 }
 
-async function geminiStream(opts: StreamOptions, apiKey: string, start: number, liveNote: string, grounding: boolean): Promise<StreamResult> {
-  const model = mapModelForGemini(opts.model, grounding);
+async function geminiStream(opts: StreamOptions, apiKey: string, start: number): Promise<StreamResult> {
+  const model = mapModelForGemini(opts.model);
   const systemText = opts.messages
     .filter((m) => m.role === 'system')
     .map((m) => textFromContent(m.content))
@@ -201,14 +86,7 @@ async function geminiStream(opts: StreamOptions, apiKey: string, start: number, 
     },
   };
   if (systemText) {
-    body.systemInstruction = { parts: [{ text: systemText + '\n\n' + liveNote }] };
-  } else if (liveNote) {
-    body.systemInstruction = { parts: [{ text: liveNote }] };
-  }
-  if (grounding) {
-    // Google Search grounding: the model searches the live web when its own
-    // knowledge isn't enough, so answers stay current.
-    body.tools = [{ googleSearch: {} }];
+    body.systemInstruction = { parts: [{ text: systemText }] };
   }
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${encodeURIComponent(apiKey)}`;
@@ -221,16 +99,11 @@ async function geminiStream(opts: StreamOptions, apiKey: string, start: number, 
 
   if (!res.ok) {
     const detail = await res.text();
-    if (res.status === 401) {
+    if (res.status === 400 || res.status === 401 || res.status === 403) {
       throw new Error(`Gemini API key is invalid or unauthorized (${res.status}). Please update your API key.`);
     }
     if (res.status === 429) {
       throw new Error(`Gemini API quota exceeded (${res.status}). Please try again later or check your billing.`);
-    }
-    // Model/tool availability issue (bad model name, no search access, etc.).
-    // Retry once on the fast non-grounded model so the app keeps working.
-    if (grounding && (res.status === 400 || res.status === 403 || res.status === 404)) {
-      return geminiStream(opts, apiKey, start, liveNote, false);
     }
     throw new Error(`Gemini ${res.status}: ${detail}`);
   }
@@ -282,10 +155,6 @@ async function geminiStream(opts: StreamOptions, apiKey: string, start: number, 
 
 export async function streamChat(opts: StreamOptions): Promise<StreamResult> {
   const start = performance.now();
-  // Build the live facts (current time/date + weather when asked) once so both
-  // the Gemini and local paths answer from real, current data.
-  const live = await buildLiveContext(lastUserText(opts.messages));
-
   // The Gemini API key comes only from the .env file (VITE_GEMINI_API_KEY).
   // When a key is configured, never silently fall back to canned local
   // responses: surface the real error so the user knows the key/service
@@ -293,16 +162,20 @@ export async function streamChat(opts: StreamOptions): Promise<StreamResult> {
   const geminiKey = import.meta.env.VITE_GEMINI_API_KEY;
 
   if (geminiKey) {
-    return await geminiStream(opts, geminiKey, start, live.note, groundingEnabled());
+    return await geminiStream(opts, geminiKey, start);
   }
 
-  return localStream(opts, start, live);
+  return localStream(opts, start);
 }
 
-async function localStream(opts: StreamOptions, start: number, live: LiveContext): Promise<StreamResult> {
-  const promptText = lastUserText(opts.messages);
-  const liveAnswer = localLiveAnswer(promptText, live);
-  const full = liveAnswer ?? generateLocalResponse(promptText, opts.messages as ChatMessage[]);
+async function localStream(opts: StreamOptions, start: number): Promise<StreamResult> {
+  const lastUser = [...opts.messages].reverse().find((m) => m.role === 'user');
+  const promptText = typeof lastUser?.content === 'string'
+    ? lastUser.content
+    : Array.isArray(lastUser?.content)
+      ? (lastUser!.content as ContentPart[]).filter((p): p is TextPart => p.type === 'text').map(p => p.text).join('\n')
+      : '';
+  const full = generateLocalResponse(promptText, opts.messages as ChatMessage[]);
   const tokens = full.split(/\s+/);
   let acc = '';
   for (let i = 0; i < tokens.length; i++) {
@@ -315,22 +188,6 @@ async function localStream(opts: StreamOptions, start: number, live: LiveContext
   const latencyMs = Math.round(performance.now() - start);
   opts.onDone?.(acc);
   return { content: acc, tokens: estimateTokens(acc), latencyMs, fromEdge: false };
-}
-
-// Direct, conversational answers for time/date/weather when running without a
-// Gemini key — never a canned reply for these.
-function localLiveAnswer(p: string, live: LiveContext): string | null {
-  if (isTimeQuery(p)) {
-    return `Right now it's ${live.time}.`;
-  }
-  if (isDateQuery(p)) {
-    return `Today is ${live.date}.`;
-  }
-  if (isWeatherQuery(p)) {
-    if (live.weather) return live.weather;
-    return `I couldn't fetch the live weather right now, but ask me again in a moment and I'll try once more.`;
-  }
-  return null;
 }
 
 /** High-quality deterministic local response generator. */
