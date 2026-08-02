@@ -4,7 +4,7 @@ import {
   User, Sliders, Database, Trash2, Check, AlertCircle,
   Download, LogOut, Bell, Sparkles, Palette, KeyRound,
   MonitorSmartphone, Mic, MessageSquare, Search, Info, RefreshCw,
-  Shield, HelpCircle, Volume2, AudioLines, Play,
+  Shield, HelpCircle, Volume2, AudioLines, Play, Pause, RotateCcw, Languages,
   Mail, Send, CheckCircle,
 } from 'lucide-react';
 import { Button, Input, Textarea, Modal, Badge } from '../components/ui';
@@ -18,6 +18,7 @@ import { downloadFile, cn } from '../lib/utils';
 import { supabase } from '../lib/supabase';
 import type { AppPreferences } from '../lib/types';
 import { DEFAULT_VOICE_ID, VOICE_PREVIEW_TEXT, setStoredVoiceId, loadVoices, pickVoice, detectVoices, type DetectedVoice } from '../lib/voices';
+import { getVoiceMemory, type VoicePreferences } from '../lib/voice/VoiceMemory';
 
 type Tab = 'account' | 'security' | 'preferences' | 'notifications' | 'appearance' | 'data' | 'feedback' | 'help';
 
@@ -26,6 +27,37 @@ const THEME_OPTIONS = [
   { value: 'light' as const, label: 'Light', desc: 'Light background' },
   { value: 'system' as const, label: 'System', desc: 'Follow OS setting' },
 ];
+
+const FALLBACK_LANGUAGES = [
+  { code: 'en-US', label: 'English (US)' },
+  { code: 'en-GB', label: 'English (UK)' },
+  { code: 'en-IN', label: 'English (India)' },
+  { code: 'hi-IN', label: 'Hindi' },
+  { code: 'es-ES', label: 'Spanish' },
+  { code: 'fr-FR', label: 'French' },
+  { code: 'de-DE', label: 'German' },
+  { code: 'zh-CN', label: 'Chinese (Simplified)' },
+];
+
+function langLabel(code: string): string {
+  const known: Record<string, string> = {
+    'en-US': 'English (US)', 'en-GB': 'English (UK)', 'en-IN': 'English (India)',
+    'en-AU': 'English (Australia)', 'en-CA': 'English (Canada)', 'en-IE': 'English (Ireland)',
+    'es-ES': 'Spanish', 'fr-FR': 'French', 'de-DE': 'German', 'it-IT': 'Italian',
+    'pt-BR': 'Portuguese (Brazil)', 'pt-PT': 'Portuguese', 'hi-IN': 'Hindi',
+    'zh-CN': 'Chinese (Simplified)', 'zh-TW': 'Chinese (Taiwan)', 'ja-JP': 'Japanese',
+    'ko-KR': 'Korean', 'ru-RU': 'Russian', 'ar-SA': 'Arabic', 'nl-NL': 'Dutch',
+    'sv-SE': 'Swedish', 'pl-PL': 'Polish', 'tr-TR': 'Turkish', 'da-DK': 'Danish',
+    'fi-FI': 'Finnish', 'nb-NO': 'Norwegian', 'cs-CZ': 'Czech', 'el-GR': 'Greek',
+    'th-TH': 'Thai', 'vi-VN': 'Vietnamese', 'id-ID': 'Indonesian',
+  };
+  if (known[code]) return known[code];
+  try {
+    return new Intl.DisplayNames(['en'], { type: 'language' }).of(code.split('-')[0]) ?? code;
+  } catch {
+    return code;
+  }
+}
 
 
 
@@ -56,6 +88,14 @@ export default function Settings() {
   const [savingPrefs, setSavingPrefs] = useState(false);
   const [savedPrefs, setSavedPrefs] = useState(false);
   const [voiceOptions, setVoiceOptions] = useState<DetectedVoice[] | null>(null);
+
+  // Voice engine preferences (mirror of VoiceMemory, persisted to Supabase too)
+  const voiceMemory = getVoiceMemory();
+  const [vp, setVp] = useState<VoicePreferences>(voiceMemory.getPreferences());
+  const [languages, setLanguages] = useState<{ code: string; label: string }[]>(FALLBACK_LANGUAGES);
+  const [langVoices, setLangVoices] = useState<DetectedVoice[]>([]);
+  const [previewingVoice, setPreviewingVoice] = useState<DetectedVoice | null>(null);
+  const [isPreviewing, setIsPreviewing] = useState(false);
 
   // Modals
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -105,6 +145,13 @@ export default function Settings() {
       setPrefs(p);
       if (p.theme) { setAppTheme(p.theme); localStorage.setItem('ksemo_theme_mode', JSON.stringify(p.theme)); }
       if (p.font_size) { setAppFontSize(p.font_size); localStorage.setItem('ksemo_font_size', JSON.stringify(p.font_size)); }
+      const cloudVp = p.voice_preferences;
+      if (cloudVp && Object.keys(cloudVp).length) {
+        const merged = { ...voiceMemory.getPreferences(), ...cloudVp };
+        if (p.voice_id) merged.voiceId = p.voice_id;
+        voiceMemory.updatePreferences(merged);
+        setVp(merged);
+      }
     }).catch(() => {});
   }, [user]);
 
@@ -126,6 +173,31 @@ export default function Settings() {
     };
   }, []);
 
+  // Build the language list from the voices actually installed on this device.
+  useEffect(() => {
+    let mounted = true;
+    loadVoices().then((voices) => {
+      if (!mounted) return;
+      const langs = Array.from(new Set(voices.map((v) => v.lang))).sort();
+      if (langs.length) setLanguages(langs.map((code) => ({ code, label: langLabel(code) })));
+    });
+    return () => { mounted = false; };
+  }, []);
+
+  // Voices available for the currently selected language (falls back to all).
+  useEffect(() => {
+    let mounted = true;
+    loadVoices().then((voices) => {
+      if (!mounted) return;
+      const target = vp.language.toLowerCase().replace('_', '-');
+      const filtered = voices.filter((v) => v.lang.toLowerCase().replace('_', '-') === target);
+      const pool = filtered.length ? filtered : voices;
+      setLangVoices(detectVoices(pool, 10));
+    });
+    return () => { mounted = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vp.language]);
+
   const updatePref = useCallback(<K extends keyof AppPreferences>(key: K, value: AppPreferences[K]) => {
     setPrefs((p) => ({ ...p, [key]: value }));
   }, []);
@@ -146,6 +218,52 @@ export default function Settings() {
     u.pitch = 1;
     u.volume = 1;
     window.speechSynthesis?.speak(u);
+  };
+
+  // Persist a voice-preferences change to VoiceMemory, local prefs state, and
+  // Supabase (so the VoiceChat page picks it up on its next mount).
+  const persistVp = useCallback((updated: VoicePreferences) => {
+    setVp(updated);
+    voiceMemory.updatePreferences(updated);
+    updatePref('voice_preferences', { ...updated });
+    updatePref('voice_id', updated.voiceId);
+    setStoredVoiceId(updated.voiceId);
+    if (user) upsertSettings(user.id, { ...prefs, voice_id: updated.voiceId, voice_preferences: { ...updated } }).catch(() => {});
+  }, [user, prefs, updatePref]);
+
+  const handleVpChange = <K extends keyof VoicePreferences>(key: K, value: VoicePreferences[K]) => {
+    persistVp({ ...vp, [key]: value });
+  };
+
+  const selectGridVoice = (id: string) => persistVp({ ...vp, voiceId: id });
+
+  const previewGridVoice = async (voice: DetectedVoice) => {
+    if (isPreviewing) {
+      try { window.speechSynthesis?.cancel(); } catch { /* ok */ }
+      setIsPreviewing(false);
+      setPreviewingVoice(null);
+      return;
+    }
+    setIsPreviewing(true);
+    setPreviewingVoice(voice);
+    const u = new SpeechSynthesisUtterance(VOICE_PREVIEW_TEXT);
+    u.voice = voice.voice;
+    u.rate = vp.rate;
+    u.pitch = vp.pitch;
+    u.volume = vp.volume;
+    u.onend = () => { setIsPreviewing(false); setPreviewingVoice(null); };
+    u.onerror = () => { setIsPreviewing(false); setPreviewingVoice(null); };
+    window.speechSynthesis.speak(u);
+  };
+
+  const resetVoiceDefaults = () => {
+    voiceMemory.resetToDefaults();
+    const d = voiceMemory.getPreferences();
+    setVp(d);
+    updatePref('voice_preferences', { ...d });
+    updatePref('voice_id', d.voiceId);
+    setStoredVoiceId(d.voiceId);
+    if (user) upsertSettings(user.id, { ...prefs, voice_id: d.voiceId, voice_preferences: { ...d } }).catch(() => {});
   };
 
   const saveProfile = async (e: FormEvent) => {
@@ -476,6 +594,193 @@ export default function Settings() {
                     )}
                   </div>
                 </div>
+
+                {/* Language */}
+                <SectionHeader icon={Languages} title="Language" desc="Used for speech recognition and the assistant's speaking voice." />
+                <div className="rounded-2xl bg-ink-850 border border-white/8 p-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-56 overflow-y-auto pr-1">
+                    {languages.map((lang) => (
+                      <button
+                        key={lang.code}
+                        onClick={() => handleVpChange('language', lang.code)}
+                        className={cn(
+                          'px-3 py-2.5 rounded-xl text-[13px] font-medium text-left transition',
+                          vp.language === lang.code ? 'bg-white text-ink-900' : 'bg-white/8 text-white hover:bg-white/15'
+                        )}
+                      >
+                        {lang.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Voices for the selected language */}
+                <SectionHeader icon={AudioLines} title="Voices for this language" desc="Voices that can speak the selected language. Tap one to use it, tap the play button to preview." />
+                <div className="rounded-2xl bg-ink-850 border border-white/8 p-4">
+                  {langVoices.length === 0 ? (
+                    <div className="py-4 text-center text-[12px] text-ink-300">Detecting voices for {langLabel(vp.language)}…</div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                      {langVoices.map((voice) => {
+                        const selected = vp.voiceId === voice.id;
+                        return (
+                          <button
+                            key={voice.id}
+                            onClick={() => selectGridVoice(voice.id)}
+                            className={cn(
+                              'rounded-xl border text-left p-3 transition',
+                              selected ? 'border-white/30 bg-white/10' : 'border-white/10 bg-white/5 hover:border-white/25'
+                            )}
+                          >
+                            <div className="flex items-start justify-between mb-2">
+                              <div className="min-w-0">
+                                <div className="text-[13px] font-medium text-white truncate">{voice.label}</div>
+                                <div className="text-[11px] text-ink-300">{voice.lang}</div>
+                              </div>
+                              <span
+                                role="button"
+                                tabIndex={0}
+                                onClick={(e) => { e.stopPropagation(); previewGridVoice(voice); }}
+                                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); previewGridVoice(voice); } }}
+                                className="h-7 w-7 rounded-full flex items-center justify-center bg-white/8 text-white hover:bg-white/15 transition shrink-0 ml-2"
+                                title="Preview"
+                                aria-label={`Preview ${voice.label}`}
+                              >
+                                {isPreviewing && previewingVoice?.id === voice.id ? <Pause size={13} /> : <Play size={13} />}
+                              </span>
+                            </div>
+                            <div className="flex gap-2">
+                              {voice.neural && <span className="text-[10px] bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded-full">Neural</span>}
+                              <span className="text-[10px] bg-white/10 text-ink-200 px-2 py-0.5 rounded-full capitalize">
+                                {voice.gender === 'female' ? 'Female' : voice.gender === 'male' ? 'Male' : 'Voice'}
+                              </span>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Voice sound: speed / pitch / volume */}
+                <SectionHeader icon={AudioLines} title="Voice sound" desc="Fine-tune how the assistant's voice sounds." />
+                <div className="rounded-2xl bg-ink-850 border border-white/8 p-4 space-y-5">
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[13px] text-white">Speaking speed</span>
+                      <span className="text-[13px] text-white">{vp.rate.toFixed(2)}x</span>
+                    </div>
+                    <input
+                      type="range" min="0.5" max="2" step="0.05" value={vp.rate}
+                      onChange={(e) => handleVpChange('rate', parseFloat(e.target.value))}
+                      className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-white"
+                    />
+                    <div className="flex justify-between text-[11px] text-ink-300 mt-1"><span>0.5x</span><span>1x</span><span>2x</span></div>
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[13px] text-white">Pitch</span>
+                      <span className="text-[13px] text-white">{vp.pitch.toFixed(2)}</span>
+                    </div>
+                    <input
+                      type="range" min="0.5" max="2" step="0.05" value={vp.pitch}
+                      onChange={(e) => handleVpChange('pitch', parseFloat(e.target.value))}
+                      className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-white"
+                    />
+                    <div className="flex justify-between text-[11px] text-ink-300 mt-1"><span>Low</span><span>Normal</span><span>High</span></div>
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[13px] text-white">Volume</span>
+                      <span className="text-[13px] text-white">{Math.round(vp.volume * 100)}%</span>
+                    </div>
+                    <input
+                      type="range" min="0" max="1" step="0.05" value={vp.volume}
+                      onChange={(e) => handleVpChange('volume', parseFloat(e.target.value))}
+                      className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-white"
+                    />
+                  </div>
+                </div>
+
+                {/* Input mode */}
+                <SectionHeader icon={Mic} title="Input mode" desc="How you start speaking to Ksemo." />
+                <div className="rounded-2xl bg-ink-850 border border-white/8 p-4">
+                  <div className="grid grid-cols-3 gap-2">
+                    {(['hands_free', 'push_to_talk', 'wake_word'] as const).map((mode) => (
+                      <button
+                        key={mode}
+                        onClick={() => handleVpChange('inputMode', mode)}
+                        className={cn(
+                          'px-3 py-3 rounded-xl text-[13px] font-medium transition',
+                          vp.inputMode === mode ? 'bg-white text-ink-900' : 'bg-white/8 text-white hover:bg-white/15'
+                        )}
+                      >
+                        {mode === 'hands_free' ? 'Hands Free' : mode === 'push_to_talk' ? 'Push to Talk' : 'Wake Word'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Wake word */}
+                {vp.inputMode === 'wake_word' && (
+                  <>
+                    <SectionHeader icon={AudioLines} title="Wake word" desc="The phrase that wakes Ksemo to listen." />
+                    <div className="rounded-2xl bg-ink-850 border border-white/8 p-4 space-y-4">
+                      <Toggle label="Enable wake word" desc="Respond when you say the wake word" value={vp.wakeWordEnabled} onChange={(v) => handleVpChange('wakeWordEnabled', v)} />
+                      <div>
+                        <label className="text-[11px] text-ink-300 block mb-1.5">Wake word(s) — separate multiple with commas</label>
+                        <input
+                          type="text"
+                          value={vp.wakeWord}
+                          onChange={(e) => handleVpChange('wakeWord', e.target.value)}
+                          placeholder="Hey KSEMO"
+                          className="w-full px-3 py-2 bg-ink-900 border border-white/10 rounded-xl text-white text-[13px] focus:outline-none focus:border-white/30"
+                        />
+                      </div>
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-[13px] text-white">Sensitivity</span>
+                          <span className="text-[13px] text-white">{vp.wakeWordSensitivity.toFixed(2)}</span>
+                        </div>
+                        <input
+                          type="range" min="0.1" max="1" step="0.05" value={vp.wakeWordSensitivity}
+                          onChange={(e) => handleVpChange('wakeWordSensitivity', parseFloat(e.target.value))}
+                          className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-white"
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* Silence detection */}
+                <SectionHeader icon={AudioLines} title="Silence detection" desc="How long Ksemo waits before deciding you finished speaking." />
+                <div className="rounded-2xl bg-ink-850 border border-white/8 p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[13px] text-white">Silence duration</span>
+                    <span className="text-[13px] text-white">{vp.silenceDuration}ms</span>
+                  </div>
+                  <input
+                    type="range" min="500" max="3000" step="100" value={vp.silenceDuration}
+                    onChange={(e) => handleVpChange('silenceDuration', parseInt(e.target.value))}
+                    className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-white"
+                  />
+                  <div className="flex justify-between text-[11px] text-ink-300 mt-1"><span>0.5s</span><span>2s</span><span>3s</span></div>
+                </div>
+
+                {/* Audio processing */}
+                <SectionHeader icon={AudioLines} title="Audio processing" desc="Microphone processing for clearer voice recognition." />
+                <div className="rounded-2xl bg-ink-850 border border-white/8 p-4 space-y-1">
+                  <Toggle label="Noise suppression" desc="Filter background noise while you speak" value={vp.noiseSuppression} onChange={(v) => handleVpChange('noiseSuppression', v)} />
+                  <Toggle label="Echo cancellation" desc="Prevent the assistant's voice from being heard back" value={vp.echoCancellation} onChange={(v) => handleVpChange('echoCancellation', v)} />
+                  <Toggle label="Auto gain control" desc="Automatically adjust microphone volume" value={vp.autoGainControl} onChange={(v) => handleVpChange('autoGainControl', v)} />
+                </div>
+
+                {/* Reset + save */}
+                <div className="rounded-2xl bg-ink-850 border border-white/8 p-4">
+                  <Button variant="outline" size="sm" onClick={resetVoiceDefaults}><RotateCcw size={14} /> Reset voice settings</Button>
+                </div>
+
+                <Button onClick={savePrefs} loading={savingPrefs}>{savedPrefs ? <Check size={15} /> : null} Save preferences</Button>
               </div>
             )}
 

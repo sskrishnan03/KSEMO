@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { Mic, MicOff, X, Share2, Copy, MoreHorizontal, Trash2, Volume2, Check, Download, FileDown, FileType, FileText, AudioWaveform, Settings } from 'lucide-react';
+import { Mic, MicOff, X, Share2, Copy, MoreHorizontal, Trash2, Volume2, Check, Download, FileDown, FileType, FileText, AudioWaveform } from 'lucide-react';
 import { cn, estimateTokens } from '../lib/utils';
 import { useTheme } from '../components/ThemeProvider';
 import { useAuthContext } from '../components/AuthProvider';
@@ -12,7 +12,6 @@ import { ShareModal } from '../components/ShareModal';
 import { exportChatAsPDF, exportChatAsDocx, exportChatAsText } from '../lib/exportChat';
 import { getVoiceEngine } from '../lib/voice/VoiceEngine';
 import { adjustResponseForEmotion } from '../lib/voice/StreamingResponseHandler';
-import { VoiceSettings } from '../components/voice/VoiceSettings';
 import type { VoiceEvent, TranscriptEvent, EmotionData, Emotion, TTSConfig, VoicePreferences, InputMode } from '../lib/voice/types';
 import type { Chat, AppPreferences } from '../lib/types';
 
@@ -86,13 +85,9 @@ export default function VoiceChat() {
   const [voiceLevel, setVoiceLevel] = useState(0);
   const [chatId, setChatId] = useState<string | null>(null);
   const [started, setStarted] = useState(false);
-  const [interimTranscript, setInterimTranscript] = useState('');
   const [streamingText, setStreamingText] = useState('');
   const [aiResponseText, setAiResponseText] = useState('');
-  const [emotion, setEmotion] = useState<Emotion | null>(null);
-  const [latencyMs, setLatencyMs] = useState<number | null>(null);
   const [inputMode, setInputMode] = useState<InputMode>(engine.getPreferences().inputMode);
-  const [showSettings, setShowSettings] = useState(false);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [shareChat, setShareChat] = useState<Chat | null>(null);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
@@ -194,7 +189,6 @@ export default function VoiceChat() {
     processingRef.current = false;
     engine.stopBargeInMonitoring();
     engine.interrupt();
-    setInterimTranscript('');
   }, [engine]);
 
   // Process user speech → AI (streaming, sentence-by-sentence TTS) → listen again
@@ -238,7 +232,6 @@ export default function VoiceChat() {
     abortRef.current = controller;
     engine.setAbortController(controller);
 
-    setInterimTranscript('');
     setStreamingText('');
     setAiResponseText('');
     stateRef.current = 'thinking';
@@ -345,7 +338,6 @@ export default function VoiceChat() {
       const aiMsg = await insertMessage({ chat_id: chatIdRef.current, role: 'assistant', content: result.content, model: 'ksemo-pro', tokens: result.tokens });
       await logUsage('ksemo-pro', estimateTokens(text), result.tokens, result.latencyMs);
       setHistory((h) => [...h, { id: aiMsg?.id ?? undefined, role: 'assistant', content: result.content }]);
-      setLatencyMs(result.latencyMs);
 
       if (buffer.trim()) { enqueueSentence(buffer.trim()); buffer = ''; }
       await (drainPromise ?? Promise.resolve());
@@ -401,13 +393,8 @@ export default function VoiceChat() {
 
   // Engine event wiring (singleton listeners are removed on unmount).
   useEffect(() => {
-    const onInterim = (ev: VoiceEvent) => {
-      setInterimTranscript((ev.data as TranscriptEvent)?.text ?? '');
-    };
-
     const onFinal = (ev: VoiceEvent) => {
       const t = ((ev.data as TranscriptEvent)?.text ?? '').trim();
-      setInterimTranscript('');
       if (!t || processingRef.current || !startedRef.current || mutedRef.current) return;
       reconnectAttemptsRef.current = 0;
       processUserSpeech(t);
@@ -422,9 +409,7 @@ export default function VoiceChat() {
     };
 
     const onEmotion = (ev: VoiceEvent) => {
-      const data = ev.data as EmotionData;
-      emotionRef.current = data;
-      setEmotion(data.emotion);
+      emotionRef.current = ev.data as EmotionData;
     };
 
     const onWakeWord = () => {
@@ -434,7 +419,6 @@ export default function VoiceChat() {
       engine.startListening();
       stateRef.current = 'listening';
       setState('listening');
-      setInterimTranscript('');
     };
 
     const onPTTActivated = () => {
@@ -460,7 +444,6 @@ export default function VoiceChat() {
       scheduleCloudPrefsWrite(p);
     };
 
-    engine.on('transcript_interim', onInterim);
     engine.on('transcript_final', onFinal);
     engine.on('speech_started', onSpeechStarted);
     engine.on('emotion_detected', onEmotion);
@@ -470,7 +453,6 @@ export default function VoiceChat() {
     engine.on('preferences_changed', onPrefsChanged);
 
     return () => {
-      engine.off('transcript_interim', onInterim);
       engine.off('transcript_final', onFinal);
       engine.off('speech_started', onSpeechStarted);
       engine.off('emotion_detected', onEmotion);
@@ -517,8 +499,6 @@ export default function VoiceChat() {
     setStarted(true);
     stateRef.current = 'idle';
     setState('idle');
-    setLatencyMs(null);
-    setEmotion(null);
 
     if (!chatIdRef.current) {
       // Fresh session: the chat is created lazily on the first spoken message,
@@ -582,9 +562,8 @@ export default function VoiceChat() {
       setStarted(false);
       stateRef.current = 'idle';
       setState('idle');
-      setAiResponseText('');
       setStreamingText('');
-      setInterimTranscript('');
+      setAiResponseText('');
       conversationRef.current = [];
       setHistory([]);
       setChatId(routeChatId ?? null);
@@ -949,19 +928,8 @@ export default function VoiceChat() {
   return (
     <div className="h-full w-full bg-transparent flex flex-col items-center overflow-hidden py-6 px-4 sm:px-6 select-none animate-fade-in">
 
-      {/* Top bar with settings + export + share buttons (top-right corner, navbar style) */}
+      {/* Top bar with export + share buttons (top-right corner, navbar style) */}
       <div className="w-full flex items-center justify-end h-8 shrink-0 px-4 sm:px-6 relative">
-        {started && (
-          <button
-            onClick={() => setShowSettings(true)}
-            className="h-8 w-8 rounded-lg flex items-center justify-center text-ink-300 hover:text-white hover:bg-white/5 transition"
-            title="Voice settings"
-            aria-label="Voice settings"
-          >
-            <Settings size={16} />
-          </button>
-        )}
-
         {chatId && history.length > 0 && (
           <>
             <div className="relative ml-1">
@@ -1042,7 +1010,7 @@ export default function VoiceChat() {
               <canvas ref={canvasRef} className="w-full h-full max-w-[450px] max-h-[450px] object-contain" />
             </div>
 
-            {/* Real-time Subtitles / Status Guide (Shown below the circle when started) */}
+            {/* AI's reply, live word-by-word. Your speech is never shown. */}
             {started && (
               <div className="mt-8 text-center animate-fade-in max-w-lg px-4 min-h-[52px]">
                 {!isSpeechSupported ? (
@@ -1063,43 +1031,11 @@ export default function VoiceChat() {
                       Thinking…
                     </p>
                   )
-                ) : state === 'listening' ? (
-                  interimTranscript ? (
-                    <p className="text-sm font-medium leading-relaxed text-ink-100">{interimTranscript}</p>
-                  ) : (
-                    <p className="text-xs font-semibold tracking-wider text-ink-400 uppercase animate-pulse-soft">
-                      I'm listening…
-                    </p>
-                  )
-                ) : state === 'idle' ? (
-                  inputMode === 'wake_word' ? (
-                    <p className="text-xs font-semibold tracking-wider text-ink-400 uppercase animate-pulse-soft">
-                      Say "{engine.getPreferences().wakeWord}" to talk
-                    </p>
-                  ) : inputMode === 'push_to_talk' ? (
-                    <p className="text-xs font-semibold tracking-wider text-ink-400 uppercase animate-pulse-soft">
-                      Hold the mic (or Space) to talk
-                    </p>
-                  ) : null
                 ) : state === 'error' ? (
                   <p className="text-[13px] font-semibold text-red-400 uppercase">
                     Microphone not available
                   </p>
                 ) : null}
-              </div>
-            )}
-
-            {/* Emotion + latency indicators */}
-            {started && (emotion || latencyMs !== null) && (
-              <div className="mt-3 flex items-center justify-center gap-3 text-[11px] text-ink-400">
-                {emotion && (
-                  <span className="px-2 py-0.5 rounded-full bg-white/5 border border-white/10 capitalize">{emotion}</span>
-                )}
-                {latencyMs !== null && (
-                  <span className="px-2 py-0.5 rounded-full bg-white/5 border border-white/10">
-                    {(latencyMs / 1000).toFixed(1)}s response
-                  </span>
-                )}
               </div>
             )}
           </div>
@@ -1198,10 +1134,6 @@ export default function VoiceChat() {
 
       {shareChat && (
         <ShareModal open={!!shareChat} onClose={() => setShareChat(null)} chat={shareChat} />
-      )}
-
-      {showSettings && (
-        <VoiceSettings onClose={() => setShowSettings(false)} />
       )}
     </div>
   );
