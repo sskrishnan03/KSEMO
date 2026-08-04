@@ -1,6 +1,6 @@
-import { TranscriptEvent, RecognitionConfig, VoiceEvent } from './types';
+import { TranscriptEvent, RecognitionConfig, VoiceEvent, STTProvider } from './types';
 
-export class SpeechRecognitionEngine {
+export class SpeechRecognitionEngine implements STTProvider {
   private recognition: any = null;
   private isListening = false;
   private isContinuous = false;
@@ -19,6 +19,10 @@ export class SpeechRecognitionEngine {
 
     this.recognition = new SpeechRecognition();
     this.setupRecognition();
+  }
+
+  getProviderId(): 'webspeech' {
+    return 'webspeech';
   }
 
   private setupRecognition(): void {

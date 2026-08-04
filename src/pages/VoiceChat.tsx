@@ -122,6 +122,7 @@ export default function VoiceChat() {
   const startSessionRef = useRef<() => void>(() => {});
   const endSessionRef = useRef<() => void | Promise<void>>(() => {});
   const warmNextRef = useRef(false);
+  const latestTranscriptRef = useRef('');
 
   // Sync state and muted to refs for the callbacks
   useEffect(() => { stateRef.current = state; }, [state]);
@@ -285,7 +286,7 @@ export default function VoiceChat() {
     const resumeListening = async (turn: number) => {
       if (mutedRef.current || !startedRef.current || turn !== turnRef.current) return;
       // Brief pause so the mic doesn't snap back on the instant speech ends.
-      await new Promise((r) => setTimeout(r, 500));
+      await new Promise((r) => setTimeout(r, 250));
       if (mutedRef.current || !startedRef.current || turn !== turnRef.current) return;
       if (stateRef.current === 'interrupted') return; // barge-in already restarted listening
       const mode = engine.getPreferences().inputMode;
@@ -308,7 +309,7 @@ export default function VoiceChat() {
     try {
       const result = await streamChat({
         model: 'ksemo-pro',
-        messages: [{ role: 'system', content: systemPrompt }, ...conversationRef.current.slice(-12)],
+        messages: [{ role: 'system', content: systemPrompt }, ...conversationRef.current.slice(-8)],
         signal: controller.signal,
         onToken: (token) => {
           if (turn !== turnRef.current) return;
@@ -316,7 +317,7 @@ export default function VoiceChat() {
           flushSentences();
           // Long runs without punctuation still start speaking quickly instead
           // of waiting for a whole sentence to arrive.
-          if (buffer.split(/\s+/).filter(Boolean).length >= 10) {
+          if (buffer.split(/\s+/).filter(Boolean).length >= 5) {
             enqueueSentence(buffer.trim());
             buffer = '';
           }
@@ -417,8 +418,10 @@ export default function VoiceChat() {
 
   // Engine event wiring (singleton listeners are removed on unmount).
   useEffect(() => {
-    const onFinal = (ev: VoiceEvent) => {
-      const t = ((ev.data as TranscriptEvent)?.text ?? '').trim();
+    // Route any recognized utterance (final OR low-latency interim) into the
+    // right flow: "start" command, "hang up" command, or a real question.
+    const handleUtterance = (raw: string) => {
+      const t = raw.trim();
       if (!t) return;
 
       // Not in a session yet — the mic listens for a "start" command.
@@ -436,6 +439,33 @@ export default function VoiceChat() {
       if (processingRef.current || mutedRef.current) return;
       reconnectAttemptsRef.current = 0;
       processUserSpeech(t);
+    };
+
+    const onFinal = (ev: VoiceEvent) => {
+      const t = ((ev.data as TranscriptEvent)?.text ?? '').trim();
+      if (!t) return;
+      latestTranscriptRef.current = t;
+      handleUtterance(t);
+    };
+
+    const onInterim = (ev: VoiceEvent) => {
+      const t = ((ev.data as TranscriptEvent)?.text ?? '').trim();
+      if (t) latestTranscriptRef.current = t;
+    };
+
+    // Low-latency acceleration (Deepgram only): start processing on VAD
+    // silence + the latest interim transcript instead of waiting ~1s+ for a
+    // "final" result. The brief settle delay lets the transcript catch up with
+    // the tail of the utterance. Web Speech keeps its final-only behavior.
+    const onSpeechEnded = () => {
+      if (mutedRef.current || processingRef.current) return;
+      if (!engine.isLowLatencySTT()) return;
+      if (!latestTranscriptRef.current.trim()) return;
+      window.setTimeout(() => {
+        if (mutedRef.current || processingRef.current) return;
+        const latest = latestTranscriptRef.current.trim();
+        if (latest) handleUtterance(latest);
+      }, 250);
     };
 
     const onSpeechStarted = () => {
@@ -488,7 +518,9 @@ export default function VoiceChat() {
     };
 
     engine.on('transcript_final', onFinal);
+    engine.on('transcript_interim', onInterim);
     engine.on('speech_started', onSpeechStarted);
+    engine.on('speech_ended', onSpeechEnded);
     engine.on('emotion_detected', onEmotion);
     engine.on('wake_word_detected', onWakeWord);
     engine.on('push_to_talk_activated', onPTTActivated);
@@ -497,7 +529,9 @@ export default function VoiceChat() {
 
     return () => {
       engine.off('transcript_final', onFinal);
+      engine.off('transcript_interim', onInterim);
       engine.off('speech_started', onSpeechStarted);
+      engine.off('speech_ended', onSpeechEnded);
       engine.off('emotion_detected', onEmotion);
       engine.off('wake_word_detected', onWakeWord);
       engine.off('push_to_talk_activated', onPTTActivated);
@@ -566,6 +600,9 @@ export default function VoiceChat() {
     exchangesRef.current = 0;
     totalTokensRef.current = 0;
     reconnectAttemptsRef.current = 0;
+
+    // Preload the selected voice so the first spoken reply starts instantly.
+    engine.primeVoice(engine.getPreferences().voiceId).catch(() => {});
 
     try {
       await engine.startSession();

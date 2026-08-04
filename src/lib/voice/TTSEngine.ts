@@ -5,10 +5,30 @@ export class TTSEngine {
   private isSpeaking = false;
   private eventListeners: Map<string, Set<(event: VoiceEvent) => void>> = new Map();
   private selectedVoice: SpeechSynthesisVoice | null = null;
+  private primedVoiceId: string | null = null;
 
   constructor() {
     // Initialize voices
     loadVoices().catch(console.error);
+  }
+
+  // Preload the voice for a given preference so the first `speak()` call in a
+  // session starts immediately instead of waiting for voice discovery.
+  async prime(voiceId: string): Promise<void> {
+    const config: TTSConfig = { voiceId, pitch: 1, rate: 1, volume: 1, language: undefined };
+    await this.resolveVoice(config);
+  }
+
+  private async resolveVoice(config: TTSConfig): Promise<SpeechSynthesisVoice | null> {
+    // Reuse the primed selection when the preference hasn't changed.
+    if (this.primedVoiceId === config.voiceId && this.selectedVoice) {
+      return this.selectedVoice;
+    }
+
+    const selectedVoice = await this.resolveVoice(config);
+    this.selectedVoice = selectedVoice;
+    this.primedVoiceId = config.voiceId;
+    return selectedVoice;
   }
 
   async speak(text: string, config: TTSConfig, onWordBoundary?: (spokenText: string) => void): Promise<boolean> {

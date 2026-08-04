@@ -605,6 +605,26 @@
 }
 
 /* ============================================
+   Landing page micro-animations
+   ============================================ */
+
+@keyframes float {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(0, -18px, 0); }
+}
+
+@keyframes pulseRing {
+  0% { transform: scale(0.75); opacity: 0.7; }
+  100% { transform: scale(1.8); opacity: 0; }
+}
+
+@layer utilities {
+  .animate-float { animation: float 9s ease-in-out infinite; }
+  .animate-float-delay { animation: float 11s ease-in-out 1.6s infinite; }
+  .animate-pulse-ring { animation: pulseRing 2.6s ease-out infinite; }
+}
+
+/* ============================================
    Voice Chat — Premium Canvas Interface
    ============================================ */
 

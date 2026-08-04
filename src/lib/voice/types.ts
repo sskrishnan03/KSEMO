@@ -67,3 +67,14 @@ export interface RecognitionConfig {
   interimResults: boolean;
   maxAlternatives: number;
 }
+
+export interface STTProvider {
+  start(config?: Partial<RecognitionConfig>): void;
+  stop(): void;
+  abort(): void;
+  isSupported(): boolean;
+  isActive(): boolean;
+  getProviderId(): 'deepgram' | 'webspeech';
+  on(event: string, listener: (event: VoiceEvent) => void): void;
+  off(event: string, listener: (event: VoiceEvent) => void): void;
+}

@@ -3,7 +3,9 @@ import { Link } from 'react-router-dom';
 import {
   ArrowRight, Layers, Shield, ChevronDown,
   Menu, X, Search, Zap, Brain,
-  Lock, Check, ArrowUpRight, Mic, AudioLines, Settings, LogOut,
+  Check, ArrowUpRight, Mic, AudioLines, Settings, LogOut,
+  Sparkles, Volume2, AudioWaveform, ShieldCheck, Download, Trash2,
+  Cpu, FileDown,
 } from 'lucide-react';
 import { Button } from '../components/ui';
 import { cn } from '../lib/utils';
@@ -12,28 +14,40 @@ import { getStoredVoiceId, pickVoice } from '../lib/voices';
 
 /* ──────────────────── data ──────────────────── */
 
-const features = [
-  { icon: Mic, title: 'Hands-free conversations', desc: 'Just talk. Ksemo listens, thinks, and answers out loud — a natural hands-free back-and-forth with no typing at all.' },
-  { icon: AudioLines, title: 'Spoken answers, live subtitles', desc: 'Every reply is spoken word-by-word with real-time subtitles on screen. Mute anytime, or follow along in text.' },
-  { icon: Shield, title: 'Private by design', desc: 'Row-level security on every table, encrypted sessions, and your voice data never leaves your device.' },
-  { icon: Search, title: 'Search every session', desc: 'All your voice conversations are saved. Full-text search finds any past talk instantly.' },
-  { icon: Layers, title: 'Saved in Recent with a mic icon', desc: 'Every session lands in your Recent list with a mic icon. Reopen any conversation and keep talking from where you left off.' },
-  { icon: Brain, title: 'Multi-model support', desc: 'Each voice session can use the best AI model for the job — coding, writing, or analysis — all spoken back to you.' },
+const faqs = [
+  { q: 'What is Ksemo?', a: 'Ksemo is an AI voice chat. Instead of typing, you talk to your AI and it answers out loud — with live subtitles. Every conversation is saved to your Recent list.' },
+  { q: 'How do I start a conversation?', a: 'Open Voice Chat and press Start — or, in hands-free mode, simply say "start" or "begin". You can also wake Ksemo with "Hey KSEMO", or hold Space in push-to-talk mode.' },
+  { q: 'Does it work offline?', a: 'Ksemo runs in your browser. When no API key is configured or the network drops, a built-in local engine keeps producing responses — so the app is always usable.' },
+  { q: 'Which AI powers Ksemo?', a: 'Ksemo runs on Google\u2019s Gemini API for fast, high-quality spoken answers, with a local fallback engine when the network isn\u2019t available.' },
+  { q: 'Is Ksemo free?', a: 'Yes. There are no plans, no billing, and no upgrade prompts — it\u2019s simply free. You can export or delete your data anytime from Settings.' },
+  { q: 'Is my data private?', a: 'Every table uses row-level security, so you can only ever access your own data. You can export or delete your data at any time from Settings.' },
+  { q: 'Can I share a conversation?', a: 'Yes. From any chat you can copy a private link, create a public link for anyone with the URL, or email the link to someone directly.' },
 ];
 
-const faqs = [
-  { q: 'What is Ksemo?', a: 'Ksemo is an AI voice chat. Instead of typing, you talk to your AI and it talks back — while every conversation is saved to your Recent list for later.' },
-  { q: 'Is my data private?', a: 'Every table uses row-level security so you can only ever access your own data. Sessions are encrypted, and you can export or delete your data at any time from Settings.' },
-  { q: 'Does it work offline?', a: 'Ksemo runs in the browser. The local engine produces responses even when no backend is connected, so the app is always usable.' },
-  { q: 'Which AI models are supported?', a: 'Ksemo runs on Google\u2019s Gemini API, giving you fast, high-quality AI answers. You can switch models per voice session.' },
-  { q: 'Can I cancel anytime?', a: 'Yes. Plans are month-to-month and you can cancel or downgrade from Settings at any time. Your data stays yours.' },
-  { q: 'How is this different from ChatGPT?', a: 'Ksemo is made for voice. You speak naturally and Ksemo answers out loud — no chat window to manage. Every talk is saved with a mic icon in Recent so you can pick it back up anytime.' },
+const privacyPoints = [
+  { icon: ShieldCheck, title: 'Row-level security', desc: 'Every table in the database is locked to your account. No one else can ever see your chats.' },
+  { icon: Download, title: 'Export your data', desc: 'Download everything — chats, messages, settings — as a single JSON file, anytime.' },
+  { icon: Trash2, title: 'Delete anything', desc: 'Remove one message, one chat, all chats, or your entire account. One click and it\u2019s gone.' },
+  { icon: Cpu, title: 'Offline-ready engine', desc: 'A built-in local engine keeps answers coming even when the network drops.' },
 ];
+
+const bento = [
+  { icon: AudioWaveform, span: 'md:col-span-3', number: '01', title: 'Control it with your voice', desc: 'Start with "start", end with "hang up", and wake Ksemo with "Hey KSEMO". Speak mid-answer and Ksemo stops to listen.', chips: ['“Hey KSEMO”', '“start”', '“hang up”', '“goodbye”'] },
+  { icon: Brain, span: 'md:col-span-3', number: '02', title: 'Replies that match your mood', desc: 'Ksemo reads your tone — happy, excited, calm, and more — and adjusts how it speaks back in real time.', chips: ['10 emotions', 'Tone-adjusted voice'], wave: true },
+  { icon: AudioLines, span: 'md:col-span-2', number: '03', title: 'Live subtitles', desc: 'Every spoken answer appears word-by-word on screen. Follow along, or mute the voice and read instead.' },
+  { icon: Volume2, span: 'md:col-span-2', number: '04', title: 'Pick your voice', desc: 'Choose from a curated top-5 of natural voices, or let Auto pick the best one. Preview instantly.' },
+  { icon: Search, span: 'md:col-span-2', number: '05', title: 'Search everything', desc: 'Find any session by title or by the words inside its messages — with tabs for chats and messages.' },
+  { icon: FileDown, span: 'md:col-span-3', number: '06', title: 'Export & share', desc: 'Save a chat as PDF, Word, or plain text. Share a private link, a public link, or send it straight to an inbox.', chips: ['PDF', 'Word', 'Text', 'Link', 'Email'] },
+  { icon: Layers, span: 'md:col-span-3', number: '07', title: 'Stay organized', desc: 'Every session lands in Recent with a mic icon. Rename, pin, archive, or filter by date — pick up any talk later.', chips: ['Rename', 'Pin', 'Archive', 'Date filters'] },
+];
+
+const emotions = ['Happy', 'Excited', 'Calm', 'Friendly', 'Professional', 'Neutral', 'Nervous', 'Confused', 'Sad', 'Angry'];
 
 /* ──────────────────── Demo voice conversation ──────────────────── */
 
 const demoLines = [
   { label: 'Greeting', text: "Hi, I'm Ksemo, your AI voice assistant. How can I help you today?" },
+  { label: 'Interrupt', text: "Sorry — go ahead, I'm listening." },
 ];
 
 const demoRecentChats = [
@@ -120,30 +134,129 @@ function VoiceDemo() {
 
   useEffect(() => { startedRef.current = started; }, [started]);
 
+  // ── Barge-in (interrupt) ──────────────────────────────────────────────────
+  // Mirrors the real app's VoiceEngine: while Ksemo is speaking, a lightweight
+  // VAD watches the mic. If the user talks over it for ~300ms, TTS stops at
+  // once and Ksemo acknowledges the interruption out loud. No buttons involved.
+  const aliveRef = useRef(true);
+  const activeLineRef = useRef(0);
+  const bargeInArmedRef = useRef(false);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const micStreamRef = useRef<MediaStream | null>(null);
+  const vadTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const stopInterruptMonitoring = useCallback(() => {
+    if (vadTimerRef.current !== null) {
+      clearInterval(vadTimerRef.current);
+      vadTimerRef.current = null;
+    }
+    if (audioCtxRef.current) {
+      try { audioCtxRef.current.close(); } catch { /* ok */ }
+      audioCtxRef.current = null;
+    }
+    if (micStreamRef.current) {
+      micStreamRef.current.getTracks().forEach((t) => t.stop());
+      micStreamRef.current = null;
+    }
+  }, []);
+
   const finishDemo = useCallback(() => {
     setStarted(false);
     setPhase('idle');
     setSpoken('');
+    bargeInArmedRef.current = false;
+    stopInterruptMonitoring();
     try { window.speechSynthesis.cancel(); } catch { /* ok */ }
-  }, []);
+  }, [stopInterruptMonitoring]);
 
-  // Speak the greeting out loud (real TTS) with live word-by-word subtitles
+  // React to the user talking over Ksemo: stop speaking, then acknowledge.
+  const interruptRef = useRef<() => void>(() => {});
+  useEffect(() => {
+    interruptRef.current = () => {
+      if (!bargeInArmedRef.current) return;
+      bargeInArmedRef.current = false;
+      stopInterruptMonitoring();
+      try { window.speechSynthesis.cancel(); } catch { /* ok */ }
+      speakLine(1);
+    };
+  });
+
+  // Watch the mic (frequency-level VAD, same threshold as the real engine) so
+  // the user can interrupt mid-speech just by talking over Ksemo.
+  const startInterruptMonitoring = useCallback(() => {
+    stopInterruptMonitoring();
+    if (!startedRef.current) return;
+    const webkitCtx = (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    const AudioCtx = window.AudioContext || webkitCtx;
+    if (!AudioCtx || !navigator.mediaDevices?.getUserMedia) return;
+
+    navigator.mediaDevices.getUserMedia({ audio: true })
+      .then((stream) => {
+        if (!aliveRef.current || !startedRef.current) {
+          stream.getTracks().forEach((t) => t.stop());
+          return;
+        }
+        const ctx = new AudioCtx();
+        const analyser = ctx.createAnalyser();
+        analyser.fftSize = 512;
+        ctx.createMediaStreamSource(stream).connect(analyser);
+        audioCtxRef.current = ctx;
+        micStreamRef.current = stream;
+
+        const data = new Uint8Array(analyser.frequencyBinCount);
+        let speechMs = 0;
+        vadTimerRef.current = setInterval(() => {
+          if (!bargeInArmedRef.current || !startedRef.current) return;
+          analyser.getByteFrequencyData(data);
+          const sum = data.reduce((a, b) => a + b, 0);
+          const level = sum / data.length / 255;
+          if (level > 0.3) {
+            speechMs += 50;
+            if (speechMs >= 300) {
+              speechMs = 0;
+              interruptRef.current();
+            }
+          } else {
+            speechMs = 0;
+          }
+        }, 50);
+      })
+      .catch(() => { /* mic denied — barge-in just stays off */ });
+  }, [stopInterruptMonitoring]);
+
+  // Speak a line out loud (real TTS) with live word-by-word subtitles
   const speakLine = useCallback((lineIdx: number) => {
     if (!startedRef.current) return;
 
     const l = demoLines[lineIdx % demoLines.length];
+    activeLineRef.current = lineIdx;
     setPhase('speaking');
     setSpoken('');
+
+    // Only the greeting is interruptible, so the acknowledgment plays cleanly.
+    if (lineIdx === 0) {
+      bargeInArmedRef.current = true;
+      startInterruptMonitoring();
+    } else {
+      bargeInArmedRef.current = false;
+    }
 
     const words = l.text.split(/\s+/).filter(Boolean);
     let wordTimer: ReturnType<typeof setInterval> | null = null;
     const stopWordTimer = () => { if (wordTimer) { clearInterval(wordTimer); wordTimer = null; } };
 
     if (!('speechSynthesis' in window)) {
+      const myLine = lineIdx;
       words.forEach((_, wi) => {
-        timers.current.push(setTimeout(() => setSpoken(words.slice(0, wi + 1).join(' ')), wi * 140));
+        timers.current.push(setTimeout(() => {
+          if (activeLineRef.current !== myLine) return;
+          setSpoken(words.slice(0, wi + 1).join(' '));
+        }, wi * 140));
       });
-      timers.current.push(setTimeout(finishDemo, words.length * 140 + 500));
+      timers.current.push(setTimeout(() => {
+        if (activeLineRef.current !== myLine) return;
+        finishDemo();
+      }, words.length * 140 + 500));
       return;
     }
 
@@ -174,24 +287,28 @@ function VoiceDemo() {
 
     u.onend = () => {
       stopWordTimer();
+      if (activeLineRef.current !== lineIdx) return; // superseded by a barge-in
       setSpoken(l.text);
       timers.current.push(setTimeout(finishDemo, 1200));
     };
 
     u.onerror = () => {
       stopWordTimer();
+      if (activeLineRef.current !== lineIdx) return; // superseded by a barge-in
       timers.current.push(setTimeout(finishDemo, 500));
     };
 
     window.speechSynthesis.speak(u);
-  }, [finishDemo]);
+  }, [finishDemo, startInterruptMonitoring]);
 
   // Cleanup on unmount
   useEffect(() => () => {
+    aliveRef.current = false;
     timers.current.forEach(clearTimeout);
     timers.current = [];
+    stopInterruptMonitoring();
     try { window.speechSynthesis.cancel(); } catch { /* ok */ }
-  }, []);
+  }, [stopInterruptMonitoring]);
 
   const startDemo = useCallback(() => {
     if (startedRef.current) return;
@@ -376,6 +493,12 @@ function VoiceDemo() {
                       </div>
                     )}
                   </div>
+
+                  {started && (
+                    <p className="mt-1 text-[11px] text-ink-400 animate-fade-in">
+                      While Ksemo is speaking, just say something — it stops and listens.
+                    </p>
+                  )}
                 </>
               )}
             </div>
@@ -399,6 +522,34 @@ function VoiceVisual() {
   );
 }
 
+/* ──────────────────── Small presentational helpers ──────────────────── */
+
+function Eyebrow({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-white/10 bg-white/[0.04] text-[12px] font-medium tracking-wide text-ink-100 animate-fade-in">
+      {children}
+    </div>
+  );
+}
+
+function SectionHeader({ eyebrow, title, desc }: { eyebrow: React.ReactNode; title: string; desc?: string }) {
+  return (
+    <div className="text-center max-w-2xl mx-auto mb-14">
+      <div className="flex justify-center"><Eyebrow>{eyebrow}</Eyebrow></div>
+      <h2 className="mt-5 text-3xl md:text-5xl font-semibold tracking-tight text-balance animate-slide-up">{title}</h2>
+      {desc && <p className="mt-4 text-ink-200 text-balance animate-slide-up" style={{ animationDelay: '60ms' }}>{desc}</p>}
+    </div>
+  );
+}
+
+function Chip({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-white/8 bg-white/[0.03] text-[12px] text-ink-200">
+      <Check size={11} className="text-white/60" /> {children}
+    </span>
+  );
+}
+
 /* ──────────────────── Main landing ──────────────────── */
 
 export default function Landing() {
@@ -408,30 +559,37 @@ export default function Landing() {
   const [openFaq, setOpenFaq] = useState<number | null>(0);
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 20);
+    const onScroll = () => setScrolled(window.scrollY > 16);
     window.addEventListener('scroll', onScroll);
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
+  const navLinks = [
+    { href: '#demo', label: 'Live demo' },
+    { href: '#features', label: 'Features' },
+    { href: '#how', label: 'How it works' },
+    { href: '#faq', label: 'FAQ' },
+  ];
+
   return (
-    <div className="min-h-screen bg-ink-900 text-white grain">
+    <div className="min-h-screen bg-ink-900 text-white grain overflow-x-hidden">
       {/* ── Nav ── */}
       <header className={cn('fixed top-0 inset-x-0 z-50 transition-all duration-300', scrolled ? 'glass-strong border-b border-white/8' : 'border-b border-transparent')}>
-        <nav className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2.5">
+        <nav className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between gap-4">
+          <Link to="/" className="flex items-center gap-2.5 shrink-0">
             <img src="/KSEMOlogo.png" alt="KSEMO" className="h-8 w-8 rounded-xl object-contain" />
             <span className="text-[17px] font-semibold tracking-tight">Ksemo</span>
           </Link>
-          <div className="hidden md:flex items-center gap-8 text-sm text-ink-200">
-            <a href="#features" className="hover:text-white transition">Features</a>
-            <a href="#faq" className="hover:text-white transition">FAQ</a>
+
+          <div className="hidden md:flex items-center gap-1 text-sm text-ink-200">
+            {navLinks.map((l) => (
+              <a key={l.href} href={l.href} className="px-3 py-1.5 rounded-lg hover:bg-white/5 hover:text-white transition">{l.label}</a>
+            ))}
           </div>
-          <div className="hidden md:flex items-center gap-2">
+
+          <div className="hidden md:flex items-center gap-2 shrink-0">
             {profile ? (
-              <div className="flex items-center gap-4">
-                <span className="text-[13px] text-ink-300 font-medium">Hello, {profile.full_name || profile.username}</span>
-                <Link to="/app"><Button size="sm">Go to Voice Chat <ArrowRight size={14} /></Button></Link>
-              </div>
+              <Link to="/app"><Button size="sm">Open Voice Chat <ArrowRight size={14} /></Button></Link>
             ) : (
               <>
                 <Link to="/login"><Button variant="ghost" size="sm">Sign in</Button></Link>
@@ -439,21 +597,21 @@ export default function Landing() {
               </>
             )}
           </div>
-          <button className="md:hidden h-9 w-9 rounded-lg flex items-center justify-center hover:bg-white/5" onClick={() => setMenuOpen((v) => !v)}>
+
+          <button className="md:hidden h-9 w-9 rounded-lg flex items-center justify-center hover:bg-white/5 transition" onClick={() => setMenuOpen((v) => !v)} aria-label="Menu">
             {menuOpen ? <X size={18} /> : <Menu size={18} />}
           </button>
         </nav>
+
         {menuOpen && (
-          <div className="md:hidden glass-strong border-t border-white/8 px-6 py-4 flex flex-col gap-3 animate-slide-down">
-            <a href="#features" onClick={() => setMenuOpen(false)} className="text-sm text-ink-100 py-1">Features</a>
-            <a href="#faq" onClick={() => setMenuOpen(false)} className="text-sm text-ink-100 py-1">FAQ</a>
+          <div className="md:hidden glass-strong border-t border-white/8 px-6 py-4 flex flex-col gap-1 animate-slide-down">
+            {navLinks.map((l) => (
+              <a key={l.href} href={l.href} onClick={() => setMenuOpen(false)} className="text-sm text-ink-100 py-2 rounded-lg hover:bg-white/5">{l.label}</a>
+            ))}
             {profile ? (
-              <div className="flex flex-col gap-2 pt-2">
-                <span className="text-[13px] text-ink-300 font-medium text-center mb-1">Hello, {profile.full_name || profile.username}</span>
-                <Link to="/app" className="w-full" onClick={() => setMenuOpen(false)}><Button size="sm" className="w-full">Go to Voice Chat</Button></Link>
-              </div>
+              <Link to="/app" className="w-full mt-2" onClick={() => setMenuOpen(false)}><Button size="sm" className="w-full">Open Voice Chat</Button></Link>
             ) : (
-              <div className="flex gap-2 pt-2">
+              <div className="flex gap-2 mt-2">
                 <Link to="/login" className="flex-1" onClick={() => setMenuOpen(false)}><Button variant="outline" size="sm" className="w-full">Sign in</Button></Link>
                 <Link to="/signup" className="flex-1" onClick={() => setMenuOpen(false)}><Button size="sm" className="w-full">Get started</Button></Link>
               </div>
@@ -462,91 +620,151 @@ export default function Landing() {
         )}
       </header>
 
-
       {/* ── Hero ── */}
-      <section className="relative pt-36 pb-20 px-6">
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-1/4 left-1/2 -translate-x-1/2 h-[500px] w-[800px] bg-white/[0.03] blur-[150px] rounded-full" />
+      <section className="relative pt-36 pb-14 px-6 overflow-hidden">
+        <div className="absolute inset-0 pointer-events-none" aria-hidden>
+          <div className="absolute -top-40 left-1/2 -translate-x-1/2 h-[560px] w-[900px] bg-white/[0.04] blur-[160px] rounded-full" />
+          <div className="absolute top-1/4 -left-32 h-80 w-80 bg-white/[0.025] blur-[120px] rounded-full animate-float" />
+          <div className="absolute top-1/3 -right-32 h-80 w-80 bg-white/[0.02] blur-[120px] rounded-full animate-float-delay" />
         </div>
+
         <div className="relative max-w-5xl mx-auto text-center">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/10 bg-white/5 text-[12px] text-ink-100 mb-6 animate-fade-in">
-            <Mic size={13} /> Voice Chat
+          <div className="flex justify-center mb-7 animate-fade-in">
+            <Eyebrow>
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white/50 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-white" />
+              </span>
+              Voice-first AI assistant · Free, no plans
+            </Eyebrow>
           </div>
-          <h1 className="text-5xl md:text-7xl font-semibold tracking-tight leading-[1.05] text-balance animate-slide-up">
-            Your AI voice chat.
+
+          <h1 className="text-5xl sm:text-6xl md:text-7xl font-semibold tracking-tight leading-[1.02] text-balance animate-slide-up">
+            Talk to your AI.{' '}
+            <span className="bg-gradient-to-b from-white via-white/85 to-white/35 bg-clip-text text-transparent">Out loud.</span>
           </h1>
+
           <p className="mt-6 text-lg text-ink-200 max-w-2xl mx-auto text-balance animate-slide-up" style={{ animationDelay: '60ms' }}>
-            Ksemo listens, thinks, and answers out loud. Just talk —
-            every conversation is saved to Recent so you can pick it up anytime.
+            Ksemo listens, thinks, and answers in natural speech — with live subtitles,
+            emotion-aware replies, and every conversation saved to Recent.
           </p>
-          <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3 animate-slide-up" style={{ animationDelay: '120ms' }}>
+
+          <div className="mt-9 flex flex-col sm:flex-row items-center justify-center gap-3 animate-slide-up" style={{ animationDelay: '120ms' }}>
             {profile ? (
               <Link to="/app"><Button size="lg">Open Voice Chat <ArrowRight size={16} /></Button></Link>
             ) : (
-              <Link to="/signup"><Button size="lg">Start free <ArrowRight size={16} /></Button></Link>
+              <Link to="/signup"><Button size="lg">Try it free <ArrowRight size={16} /></Button></Link>
             )}
-            <a href="#demo"><Button variant="outline" size="lg">Hear it in action</Button></a>
+            <a href="#demo"><Button variant="outline" size="lg">Hear it speak</Button></a>
           </div>
-          <p className="mt-4 text-[12px] text-ink-300 animate-fade-in">No credit card required · Free voice sessions daily</p>
+
+          <p className="mt-4 text-[12px] text-ink-300 animate-fade-in" style={{ animationDelay: '180ms' }}>
+            No credit card required · No plans · Works in your browser
+          </p>
+
+        </div>
+      </section>
+      <section id="demo" className="py-24 px-6">
+        <div className="max-w-5xl mx-auto">
+          <SectionHeader
+            eyebrow={<><AudioWaveform size={13} /> Live preview — it actually speaks</>}
+            title="Hear Ksemo in action"
+            desc="Real voice conversations — press start and Ksemo greets you out loud, with the same wobbly orb and sidebar you get in the app. Just speak mid-sentence and Ksemo stops to listen."
+          />
+          <div className="relative">
+            <div className="absolute -top-10 left-1/2 -translate-x-1/2 h-40 w-96 bg-white/[0.04] blur-[90px] rounded-full pointer-events-none" aria-hidden />
+            <VoiceDemo />
+          </div>
         </div>
       </section>
 
-
-      {/* ── Live Voice Demo ── */}
-      <section id="demo" className="py-16 px-6">
-        <div className="max-w-5xl mx-auto text-center mb-10">
-          <div className="text-[12px] uppercase tracking-wider text-ink-300 mb-3">Live preview</div>
-          <h2 className="text-3xl md:text-4xl font-semibold tracking-tight text-balance">Hear Ksemo in action</h2>
-          <p className="mt-4 text-ink-200 max-w-xl mx-auto">Real voice conversations — talk out loud and get natural, spoken answers, saved to Recent as you go.</p>
-        </div>
-        <VoiceDemo />
-      </section>
-
-
-      {/* ── Features ── */}
+      {/* ── Features bento ── */}
       <section id="features" className="py-24 px-6 border-t border-white/8">
         <div className="max-w-6xl mx-auto">
-          <div className="text-center max-w-2xl mx-auto mb-14">
-            <div className="text-[12px] uppercase tracking-wider text-ink-300 mb-3">Features</div>
-            <h2 className="text-3xl md:text-4xl font-semibold tracking-tight text-balance">Everything you need for AI voice chat</h2>
-            <p className="mt-4 text-ink-200">One calm, focused voice chat — not a bag of features bolted together.</p>
-          </div>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {features.map((f, i) => (
-              <div key={f.title} className="group rounded-2xl bg-ink-850 border border-white/8 p-6 hover:border-white/15 hover:shadow-lift transition-all duration-300 animate-slide-up" style={{ animationDelay: `${i * 40}ms` }}>
-                <div className="h-11 w-11 rounded-xl bg-ink-800 border border-white/10 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
-                  <f.icon size={20} className="text-white" />
+          <SectionHeader
+            eyebrow={<><Zap size={13} /> Features</>}
+            title="Built around your voice"
+            desc="Not a bag of bolted-on tools — one focused voice chat that handles the whole conversation."
+          />
+
+          <div className="grid md:grid-cols-6 gap-4">
+            {bento.map((f, i) => (
+              <div
+                key={f.title}
+                className={cn(
+                  'group relative rounded-3xl border border-white/8 bg-ink-850 p-7 overflow-hidden transition-all duration-300 hover:border-white/20 hover:shadow-lift animate-slide-up',
+                  f.span,
+                )}
+                style={{ animationDelay: `${i * 50}ms` }}
+              >
+                <div className="absolute -top-24 -right-24 h-48 w-48 rounded-full bg-white/[0.05] blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+                <div className="relative flex items-start justify-between mb-6">
+                  <div className="h-11 w-11 rounded-xl bg-gradient-to-b from-white/10 to-white/[0.02] border border-white/10 flex items-center justify-center group-hover:scale-105 transition-transform">
+                    <f.icon size={20} className="text-white" />
+                  </div>
+                  <span className="text-[12px] font-mono text-ink-400 select-none">{f.number}</span>
                 </div>
-                <h3 className="text-[16px] font-semibold text-white mb-1.5">{f.title}</h3>
+                <h3 className="text-[17px] font-semibold text-white mb-1.5">{f.title}</h3>
                 <p className="text-sm text-ink-300 leading-relaxed">{f.desc}</p>
+
+                {f.wave && (
+                  <div className="c-voice-waves text-white/40 mt-6" aria-hidden>
+                    <span className="c-voice-wave" /><span className="c-voice-wave" /><span className="c-voice-wave" /><span className="c-voice-wave" /><span className="c-voice-wave" />
+                  </div>
+                )}
+
+                {f.chips && (
+                  <div className="flex flex-wrap gap-2 mt-6">
+                    {f.chips.map((c) => (
+                      <Chip key={c}>{c}</Chip>
+                    ))}
+                  </div>
+                )}
               </div>
             ))}
           </div>
+
+          {/* emotions strip */}
+          <div className="mt-4 rounded-3xl border border-white/8 bg-ink-850 p-7 sm:p-8 overflow-hidden animate-slide-up" style={{ animationDelay: '360ms' }}>
+            <div className="flex flex-col md:flex-row md:items-center gap-6">
+              <div className="shrink-0">
+                <div className="text-[12px] uppercase tracking-wider text-ink-400 mb-2">Emotion engine</div>
+                <h3 className="text-lg font-semibold text-white">Ksemo feels how you feel</h3>
+                <p className="text-sm text-ink-300 mt-1 max-w-sm">Ten emotions, detected live from your voice — each one nudges how Ksemo speaks back.</p>
+              </div>
+              <div className="flex flex-wrap gap-2 md:ml-auto md:justify-end">
+                {emotions.map((e) => (
+                  <span key={e} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-white/8 bg-white/[0.03] text-[12px] text-ink-100">
+                    <span className="h-1.5 w-1.5 rounded-full bg-white/50" /> {e}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
-
-      {/* ── How it works ── */}
-      <section className="py-24 px-6 border-t border-white/8">
-        <div className="max-w-5xl mx-auto">
-          <div className="text-center max-w-2xl mx-auto mb-16">
-            <div className="text-[12px] uppercase tracking-wider text-ink-300 mb-3">How it works</div>
-            <h2 className="text-3xl md:text-4xl font-semibold tracking-tight text-balance">From thought to spoken answer in seconds</h2>
-            <p className="mt-4 text-ink-200">Three steps. No setup. No typing.</p>
-          </div>
-          <div className="grid md:grid-cols-3 gap-8">
+      {/* ── From thought to answer (steps) ── */}
+      <section id="how" className="py-24 px-6 border-t border-white/8">
+        <div className="max-w-6xl mx-auto">
+          <SectionHeader
+            eyebrow={<><Volume2 size={13} /> How it works</>}
+            title="From thought to spoken answer in seconds"
+            desc="No setup. No typing. Just talk."
+          />
+          <div className="grid md:grid-cols-3 gap-4">
             {[
-              { step: '01', icon: Mic, title: 'Start a voice session', desc: 'Open Voice Chat and press start. Ksemo begins listening instantly — just speak naturally.' },
-              { step: '02', icon: AudioLines, title: 'Get spoken answers', desc: 'Responses stream as natural speech with live subtitles. Mute anytime or follow along on screen.' },
-              { step: '03', icon: Layers, title: 'Saved in Recent', desc: 'Every session lands in Recent with a mic icon. Reopen any conversation and keep talking later.' },
+              { n: '01', icon: Mic, title: 'Press start — or just say "start"', desc: 'Open Voice Chat and the mic goes live. In hands-free mode, a spoken command gets you going instantly.' },
+              { n: '02', icon: AudioLines, title: 'Speak, and Ksemo answers out loud', desc: 'Your words go to Gemini and the reply streams back sentence by sentence — spoken, with subtitles on screen.' },
+              { n: '03', icon: Layers, title: 'Pick it back up in Recent', desc: 'Every session is saved with a mic icon. Search, rename, pin, archive, share, or export it anytime.' },
             ].map((item, i) => (
-              <div key={item.step} className="relative animate-slide-up" style={{ animationDelay: `${i * 80}ms` }}>
-                <div className="text-[64px] font-bold text-white/[0.04] absolute -top-8 -left-2 leading-none select-none">{item.step}</div>
-                <div className="relative pt-8">
-                  <div className="h-12 w-12 rounded-2xl bg-ink-800 border border-white/10 flex items-center justify-center mb-5">
-                    <item.icon size={22} className="text-white" />
+              <div key={item.n} className="relative rounded-3xl border border-white/8 bg-ink-850 p-7 hover:border-white/20 hover:shadow-lift transition-all duration-300 animate-slide-up" style={{ animationDelay: `${i * 70}ms` }}>
+                <span className="absolute top-6 right-6 text-[56px] font-bold text-white/[0.04] leading-none select-none">{item.n}</span>
+                <div className="relative">
+                  <div className="h-11 w-11 rounded-xl bg-gradient-to-b from-white/10 to-white/[0.02] border border-white/10 flex items-center justify-center mb-6">
+                    <item.icon size={20} className="text-white" />
                   </div>
-                  <h3 className="text-lg font-semibold text-white mb-2">{item.title}</h3>
+                  <h3 className="text-[17px] font-semibold text-white mb-2">{item.title}</h3>
                   <p className="text-sm text-ink-300 leading-relaxed">{item.desc}</p>
                 </div>
               </div>
@@ -555,64 +773,70 @@ export default function Landing() {
         </div>
       </section>
 
-
-      {/* ── Bento highlight ── */}
+      {/* ── Privacy ── */}
       <section className="py-24 px-6 border-t border-white/8">
         <div className="max-w-6xl mx-auto">
-          <div className="grid md:grid-cols-2 gap-4">
-            <div className="rounded-2xl bg-ink-850 border border-white/8 p-8 animate-slide-up">
-              <div className="h-11 w-11 rounded-xl bg-ink-800 border border-white/10 flex items-center justify-center mb-5">
-                <Lock size={20} className="text-white" />
+          <div className="rounded-[28px] p-px bg-gradient-to-b from-white/15 via-white/6 to-transparent">
+            <div className="relative rounded-[27px] bg-ink-850 px-6 py-14 md:p-14 overflow-hidden">
+              <div className="absolute inset-0 pointer-events-none" aria-hidden>
+                <div className="absolute -top-24 -left-24 h-64 w-64 bg-white/[0.04] blur-[90px] rounded-full animate-float" />
               </div>
-              <h3 className="text-xl font-semibold text-white mb-2">Private by default</h3>
-              <p className="text-sm text-ink-300 leading-relaxed mb-6">Every voice conversation is encrypted. Row-level security means even database admins can't see your data. Export or delete everything from Settings at any time.</p>
-              <div className="flex flex-wrap gap-2">
-                {['RLS on every table', 'Encrypted sessions', 'Full data export'].map((tag) => (
-                  <span key={tag} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/5 border border-white/8 text-[12px] text-ink-200">
-                    <Check size={11} className="text-white/60" /> {tag}
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            <div className="rounded-2xl bg-ink-850 border border-white/8 p-8 animate-slide-up" style={{ animationDelay: '60ms' }}>
-              <div className="h-11 w-11 rounded-xl bg-ink-800 border border-white/10 flex items-center justify-center mb-5">
-                <Zap size={20} className="text-white" />
-              </div>
-              <h3 className="text-xl font-semibold text-white mb-2">Built for speed</h3>
-              <p className="text-sm text-ink-300 leading-relaxed mb-6">Spoken responses stream in real time — no waiting for a full block of text. Start hearing the answer immediately.</p>
-              <div className="flex flex-wrap gap-2">
-                {['Realtime speech', 'Instant search', 'Live subtitles'].map((tag) => (
-                  <span key={tag} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/5 border border-white/8 text-[12px] text-ink-200">
-                    <Check size={11} className="text-white/60" /> {tag}
-                  </span>
-                ))}
+              <div className="relative">
+                <div className="text-center mb-12">
+                  <div className="flex justify-center"><Eyebrow><><Shield size={13} /> Private by design</></Eyebrow></div>
+                  <h2 className="mt-5 text-3xl md:text-5xl font-semibold tracking-tight text-balance">Your conversations are yours</h2>
+                  <p className="mt-4 text-ink-200 max-w-2xl mx-auto">Ksemo was built private-first — your chats are locked to your account and always under your control.</p>
+                </div>
+                <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {privacyPoints.map((p, i) => (
+                    <div key={p.title} className="rounded-2xl border border-white/8 bg-ink-900/60 p-6 hover:border-white/15 transition-all duration-300 animate-slide-up" style={{ animationDelay: `${i * 60}ms` }}>
+                      <div className="h-10 w-10 rounded-xl bg-gradient-to-b from-white/10 to-white/[0.02] border border-white/10 flex items-center justify-center mb-4">
+                        <p.icon size={18} className="text-white" />
+                      </div>
+                      <h3 className="text-[15px] font-semibold text-white mb-1.5">{p.title}</h3>
+                      <p className="text-[13px] text-ink-300 leading-relaxed">{p.desc}</p>
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-8 text-center text-[12px] text-ink-400">
+                  Built on Google’s Gemini API · Row-level security on every table · Runs in your browser
+                </p>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-
       {/* ── FAQ ── */}
       <section id="faq" className="py-24 px-6 border-t border-white/8">
         <div className="max-w-3xl mx-auto">
-          <div className="text-center mb-12">
-            <div className="text-[12px] uppercase tracking-wider text-ink-300 mb-3">FAQ</div>
-            <h2 className="text-3xl md:text-4xl font-semibold tracking-tight">Questions, answered</h2>
-          </div>
-          <div className="space-y-2">
+          <SectionHeader
+            eyebrow={<><Sparkles size={13} /> FAQ</>}
+            title="Questions, answered"
+          />
+          <div className="space-y-3">
             {faqs.map((f, i) => (
-              <div key={i} className="rounded-xl bg-ink-850 border border-white/8 overflow-hidden">
+              <div
+                key={i}
+                className={cn(
+                  'rounded-2xl border transition-all duration-300 animate-slide-up',
+                  openFaq === i ? 'border-white/15 bg-ink-850 shadow-lift' : 'border-white/8 bg-ink-850/50 hover:border-white/12',
+                )}
+                style={{ animationDelay: `${i * 40}ms` }}
+              >
                 <button
                   onClick={() => setOpenFaq(openFaq === i ? null : i)}
-                  className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-white/5 transition"
+                  className="w-full flex items-center justify-between gap-4 px-5 py-4 sm:px-6 text-left"
                 >
-                  <span className="text-[14px] font-medium text-white pr-4">{f.q}</span>
-                  <ChevronDown size={16} className={cn('text-ink-200 transition-transform shrink-0', openFaq === i && 'rotate-180')} />
+                  <span className="text-[15px] font-medium text-white">{f.q}</span>
+                  <span className={cn('h-7 w-7 shrink-0 rounded-lg border border-white/10 bg-white/[0.03] flex items-center justify-center transition-transform duration-300', openFaq === i && 'rotate-180')}>
+                    <ChevronDown size={15} className="text-ink-200" />
+                  </span>
                 </button>
                 {openFaq === i && (
-                  <div className="px-5 pb-4 text-[13px] text-ink-200 leading-relaxed animate-slide-down">{f.a}</div>
+                  <div className="px-5 sm:px-6 pb-5 text-[14px] text-ink-200 leading-relaxed animate-slide-down border-t border-white/8 pt-4 -mt-px">
+                    {f.a}
+                  </div>
                 )}
               </div>
             ))}
@@ -620,54 +844,66 @@ export default function Landing() {
         </div>
       </section>
 
-
       {/* ── CTA ── */}
       <section className="py-24 px-6">
-        <div className="max-w-4xl mx-auto rounded-3xl bg-ink-800 border border-white/10 p-12 md:p-16 text-center shadow-lift relative overflow-hidden">
-          <div className="absolute inset-0 pointer-events-none">
-            <div className="absolute -top-20 -right-20 h-60 w-60 bg-white/[0.03] blur-[80px] rounded-full" />
-            <div className="absolute -bottom-20 -left-20 h-60 w-60 bg-white/[0.02] blur-[80px] rounded-full" />
-          </div>
-          <div className="relative">
-            <VoiceVisual />
-            <h2 className="text-3xl md:text-4xl font-semibold tracking-tight text-balance">Start talking to AI today</h2>
-            <p className="mt-4 text-ink-200 max-w-lg mx-auto">Join thousands of professionals using Ksemo as their primary AI voice chat. Free to start, no credit card required.</p>
-            <div className="mt-8 flex flex-col sm:flex-row justify-center gap-3">
-              {profile ? (
-                <Link to="/app"><Button size="lg">Open Voice Chat <ArrowRight size={16} /></Button></Link>
-              ) : (
-                <>
-                  <Link to="/signup"><Button size="lg">Start your voice chat <ArrowRight size={16} /></Button></Link>
-                  <Link to="/login"><Button variant="outline" size="lg">Sign in</Button></Link>
-                </>
-              )}
+        <div className="max-w-4xl mx-auto">
+          <div className="rounded-[28px] p-px bg-gradient-to-b from-white/20 via-white/10 to-transparent">
+            <div className="relative rounded-[27px] bg-ink-850 px-6 py-14 md:p-16 text-center overflow-hidden">
+              <div className="absolute inset-0 pointer-events-none" aria-hidden>
+                <div className="absolute -top-20 -right-20 h-64 w-64 bg-white/[0.04] blur-[90px] rounded-full animate-float" />
+                <div className="absolute -bottom-20 -left-20 h-64 w-64 bg-white/[0.025] blur-[90px] rounded-full animate-float-delay" />
+              </div>
+              <div className="relative">
+                <div className="relative mb-6 inline-flex">
+                  <span className="absolute -inset-3 rounded-full bg-white/[0.05] blur-2xl animate-pulse-ring" aria-hidden />
+                  <VoiceVisual />
+                </div>
+                <h2 className="text-3xl md:text-5xl font-semibold tracking-tight text-balance">Start talking to your AI today</h2>
+                <p className="mt-4 text-ink-200 max-w-lg mx-auto">Free. No plans, no billing, no credit card. Just open Voice Chat and say the word.</p>
+                <div className="mt-8 flex flex-col sm:flex-row justify-center gap-3">
+                  {profile ? (
+                    <Link to="/app"><Button size="lg">Open Voice Chat <ArrowRight size={16} /></Button></Link>
+                  ) : (
+                    <>
+                      <Link to="/signup"><Button size="lg">Start free <ArrowRight size={16} /></Button></Link>
+                      <Link to="/login"><Button variant="outline" size="lg">Sign in</Button></Link>
+                    </>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </section>
 
-
       {/* ── Footer ── */}
-      <footer className="border-t border-white/8 py-10 px-6">
+      <footer className="border-t border-white/8 py-14 px-6">
         <div className="max-w-6xl mx-auto">
-          <div className="grid md:grid-cols-4 gap-8 mb-8">
+          <div className="grid md:grid-cols-4 gap-10 mb-10">
             <div className="md:col-span-2">
-              <Link to="/" className="flex items-center gap-2 mb-3">
-                <img src="/KSEMOlogo.png" alt="KSEMO" className="h-7 w-7 rounded-lg object-contain" />
-                <span className="text-[15px] font-semibold text-white tracking-tight">Ksemo</span>
+              <Link to="/" className="flex items-center gap-2.5 mb-4">
+                <img src="/KSEMOlogo.png" alt="KSEMO" className="h-8 w-8 rounded-xl object-contain" />
+                <span className="text-[16px] font-semibold text-white tracking-tight">Ksemo</span>
               </Link>
-              <p className="text-[13px] text-ink-300 max-w-sm leading-relaxed">An AI voice chat for people who think for a living. Talk, create, and organize — all in one focused environment.</p>
+              <p className="text-[13px] text-ink-300 max-w-sm leading-relaxed">An AI voice chat for people who think for a living. Talk, search, and revisit — all in one focused environment.</p>
+              <div className="flex flex-wrap gap-2 mt-5">
+                {(['Voice-first', 'Private by design', 'Works offline']).map((t) => (
+                  <Chip key={t}>{t}</Chip>
+                ))}
+              </div>
             </div>
             <div>
-              <div className="text-[12px] font-semibold text-white uppercase tracking-wider mb-3">Product</div>
-              <div className="space-y-2">
+              <div className="text-[12px] font-semibold text-white uppercase tracking-wider mb-4">Product</div>
+              <div className="space-y-2.5">
+                <a href="#demo" className="block text-[13px] text-ink-300 hover:text-white transition">Live demo</a>
                 <a href="#features" className="block text-[13px] text-ink-300 hover:text-white transition">Features</a>
+                <a href="#how" className="block text-[13px] text-ink-300 hover:text-white transition">How it works</a>
                 <a href="#faq" className="block text-[13px] text-ink-300 hover:text-white transition">FAQ</a>
               </div>
             </div>
             <div>
-              <div className="text-[12px] font-semibold text-white uppercase tracking-wider mb-3">Account</div>
-              <div className="space-y-2">
+              <div className="text-[12px] font-semibold text-white uppercase tracking-wider mb-4">Account</div>
+              <div className="space-y-2.5">
                 {profile ? (
                   <Link to="/app" className="block text-[13px] text-ink-300 hover:text-white transition">Voice Chat</Link>
                 ) : (

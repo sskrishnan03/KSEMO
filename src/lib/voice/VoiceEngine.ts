@@ -1,6 +1,7 @@
-import { VoiceState, VoicePreferences, TranscriptEvent, EmotionData, VoiceEvent, AudioConfig, TTSConfig, RecognitionConfig } from './types';
+import { VoiceState, VoicePreferences, TranscriptEvent, EmotionData, VoiceEvent, AudioConfig, TTSConfig, RecognitionConfig, STTProvider } from './types';
 import { AudioManager } from './AudioManager';
 import { SpeechRecognitionEngine } from './SpeechRecognitionEngine';
+import { DeepgramStreamingSTT } from './DeepgramStreamingSTT';
 import { TTSEngine } from './TTSEngine';
 import { EmotionDetector } from './EmotionDetector';
 import { VoiceActivityDetector } from './VoiceActivityDetector';
@@ -9,7 +10,7 @@ import { VoiceMemory, getVoiceMemory } from './VoiceMemory';
 
 export class VoiceEngine {
   private audioManager: AudioManager;
-  private recognition: SpeechRecognitionEngine;
+  private recognition: STTProvider;
   private tts: TTSEngine;
   private emotionDetector: EmotionDetector;
   private vad: VoiceActivityDetector;
@@ -21,9 +22,35 @@ export class VoiceEngine {
   private currentTranscript = '';
   private abortController: AbortController | null = null;
 
+  private readonly onTranscript = (event: VoiceEvent) => {
+    const transcriptEvent = event.data as TranscriptEvent;
+    this.currentTranscript = transcriptEvent.text;
+
+    if (transcriptEvent.isFinal) {
+      this.emit('transcript_final', transcriptEvent);
+    } else {
+      this.emit('transcript_interim', transcriptEvent);
+    }
+  };
+
+  private readonly onRecognitionError = (event: VoiceEvent) => {
+    const data = event.data as { error?: string } | undefined;
+    if (data && typeof data === 'object') {
+      // Non-recoverable failures: swap to Web Speech so voice keeps working.
+      if (data.error === 'deepgram_auth_failed' || data.error === 'audio_setup_failed') {
+        void this.fallbackToWebSpeech();
+      }
+    }
+    this.emit('error', event.data);
+  };
+
   constructor() {
     this.audioManager = new AudioManager();
-    this.recognition = new SpeechRecognitionEngine();
+    // Deepgram streaming STT when a key is configured (low-latency interim
+    // results), otherwise the free browser Web Speech engine.
+    this.recognition = DeepgramStreamingSTT.isSupported()
+      ? new DeepgramStreamingSTT({ getStream: () => this.audioManager.getStream() })
+      : new SpeechRecognitionEngine();
     this.tts = new TTSEngine();
     this.emotionDetector = new EmotionDetector();
     this.vad = new VoiceActivityDetector();
@@ -35,20 +62,9 @@ export class VoiceEngine {
 
   private setupEventListeners(): void {
     // Speech recognition events
-    this.recognition.on('transcript', (event) => {
-      const transcriptEvent = event.data as TranscriptEvent;
-      this.currentTranscript = transcriptEvent.text;
-      
-      if (transcriptEvent.isFinal) {
-        this.emit('transcript_final', transcriptEvent);
-      } else {
-        this.emit('transcript_interim', transcriptEvent);
-      }
-    });
+    this.recognition.on('transcript', this.onTranscript);
 
-    this.recognition.on('error', (event) => {
-      this.emit('error', event.data);
-    });
+    this.recognition.on('error', this.onRecognitionError);
 
     // VAD events
     this.vad.on('speech_started', (event) => {
@@ -84,6 +100,34 @@ export class VoiceEngine {
     this.voiceMemory.subscribe((prefs: VoicePreferences) => {
       this.emit('preferences_changed', prefs);
     });
+  }
+
+  // If the Deepgram connection fails (bad/expired key, no credits, network),
+  // swap to the free browser Web Speech engine and keep the session going so
+  // the voice feature never silently stops working.
+  private async fallbackToWebSpeech(): Promise<void> {
+    if (this.recognition.getProviderId() !== 'deepgram') return;
+    console.warn('Deepgram STT unavailable; switching to browser Web Speech.');
+
+    const wasListening = this.recognition.isActive() || this.state === 'listening';
+    this.recognition.stop();
+    this.recognition.off('transcript', this.onTranscript);
+    this.recognition.off('error', this.onRecognitionError);
+
+    this.recognition = new SpeechRecognitionEngine();
+    this.recognition.on('transcript', this.onTranscript);
+    this.recognition.on('error', this.onRecognitionError);
+
+    if (wasListening) {
+      const prefs = this.voiceMemory.getPreferences();
+      this.recognition.start({
+        language: prefs.language,
+        continuous: true,
+        interimResults: true,
+        maxAlternatives: 3,
+      });
+    }
+    this.emit('stt_fallback', { timestamp: Date.now() });
   }
 
   async initialize(): Promise<void> {
@@ -184,6 +228,19 @@ export class VoiceEngine {
     };
 
     return this.tts.speak(text, ttsConfig, onWordBoundary);
+  }
+
+  // Preload the chosen voice once per session so the first spoken sentence
+  // doesn't have to wait for voice discovery + selection to finish.
+  async primeVoice(voiceId: string): Promise<void> {
+    return this.tts.prime(voiceId);
+  }
+
+  // True when a low-latency streaming STT provider (Deepgram) is active, so
+  // the UI can safely react to VAD silence + interim transcripts instead of
+  // waiting for a slow "final" result.
+  isLowLatencySTT(): boolean {
+    return this.recognition.getProviderId() === 'deepgram';
   }
 
   interrupt(): void {
