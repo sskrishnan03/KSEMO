@@ -453,10 +453,8 @@ export default function VoiceChat() {
       if (t) latestTranscriptRef.current = t;
     };
 
-    // Low-latency acceleration (Deepgram only): start processing on VAD
-    // silence + the latest interim transcript instead of waiting ~1s+ for a
-    // "final" result. The brief settle delay lets the transcript catch up with
-    // the tail of the utterance. Web Speech keeps its final-only behavior.
+    // Web Speech only delivers final transcripts, so VAD-silence acceleration
+    // (used by the old streaming STT provider) is a no-op here.
     const onSpeechEnded = () => {
       if (mutedRef.current || processingRef.current) return;
       if (!engine.isLowLatencySTT()) return;

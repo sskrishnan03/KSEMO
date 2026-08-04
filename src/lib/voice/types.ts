@@ -74,7 +74,7 @@ export interface STTProvider {
   abort(): void;
   isSupported(): boolean;
   isActive(): boolean;
-  getProviderId(): 'deepgram' | 'webspeech';
+  getProviderId(): 'webspeech';
   on(event: string, listener: (event: VoiceEvent) => void): void;
   off(event: string, listener: (event: VoiceEvent) => void): void;
 }

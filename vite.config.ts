@@ -10,6 +10,8 @@ export default defineConfig({
       '/forgot-password': 'http://localhost:3001',
       '/reset-password': 'http://localhost:3001',
       '/api/web-search': 'http://localhost:3001',
+      '/api/news': 'http://localhost:3001',
+      '/api/hn-top': 'http://localhost:3001',
     },
   },
 });

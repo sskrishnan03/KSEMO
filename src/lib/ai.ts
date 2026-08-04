@@ -1,4 +1,5 @@
 import { estimateTokens } from './utils';
+import { tryAnswerRealtime, getRealtimeContext } from './realtime';
 
 export interface TextPart { type: 'text'; text: string }
 export interface ImagePart { type: 'image_url'; image_url: { url: string } }
@@ -114,7 +115,10 @@ async function geminiStream(opts: StreamOptions, apiKey: string, start: number):
   const systemText = opts.messages
     .filter((m) => m.role === 'system')
     .map((m) => textFromContent(m.content))
-    .join('\n');
+    .join('\n')
+    // Give the model the real current date/time so it never guesses about
+    // "today" from stale training data.
+    + `\n\nCurrent context:\n${getRealtimeContext()}`;
   const contents = opts.messages
     .filter((m) => m.role === 'user' || m.role === 'assistant')
     .map((m) => ({
@@ -205,6 +209,16 @@ export async function streamChat(opts: StreamOptions): Promise<StreamResult> {
   // needs attention.
   const geminiKey = import.meta.env.VITE_GEMINI_API_KEY;
 
+  // Real-time answers (time, date, math, weather) are computed locally so the
+  // AI never guesses about live data. These stream tokens just like a model
+  // response so voice + transcript flows work unchanged.
+  const lastUser = [...opts.messages].reverse().find((m) => m.role === 'user');
+  const lastText = textFromContent(lastUser?.content ?? '');
+  const realtime = await tryAnswerRealtime(lastText);
+  if (realtime) {
+    return streamText(opts, realtime, start);
+  }
+
   if (geminiKey) {
     return await geminiStream(opts, geminiKey, start);
   }
@@ -220,6 +234,12 @@ async function localStream(opts: StreamOptions, start: number): Promise<StreamRe
       ? (lastUser!.content as ContentPart[]).filter((p): p is TextPart => p.type === 'text').map(p => p.text).join('\n')
       : '';
   const full = generateLocalResponse(promptText, opts.messages as ChatMessage[]);
+  return streamText(opts, full, start);
+}
+
+// Stream a pre-computed string of text token-by-token so it behaves like a
+// model reply (used by the local fallback and real-time answers).
+async function streamText(opts: StreamOptions, full: string, start: number): Promise<StreamResult> {
   const tokens = full.split(/\s+/);
   let acc = '';
   for (let i = 0; i < tokens.length; i++) {

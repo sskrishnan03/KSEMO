@@ -158,6 +158,76 @@ app.get('/api/web-search', async (req, res) => {
   }
 });
 
+// ── News (Google News RSS + Hacker News) ──────────────────────────────
+function stripHtml(html) {
+  return html.replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").trim();
+}
+
+app.get('/api/news', async (req, res) => {
+  try {
+    const query = (req.query.q || '').trim();
+    const count = Math.min(parseInt(req.query.count, 10) || 10, 20);
+    const rssUrl = query
+      ? `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`
+      : 'https://news.google.com/rss?hl=en-US&gl=US&ceid=US:en';
+    const response = await fetch(rssUrl, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; KsemoNews/1.0)' },
+    });
+    if (!response.ok) throw new Error(`Google News RSS returned ${response.status}`);
+    const xml = await response.text();
+
+    const items = [];
+    const itemRegex = /<item>([\s\S]*?)<\/item>/g;
+    let match;
+    while ((match = itemRegex.exec(xml)) && items.length < count) {
+      const block = match[1];
+      const title = stripHtml((block.match(/<title>([\s\S]*?)<\/title>/) || [])[1] || '');
+      const pubDate = (block.match(/<pubDate>([\s\S]*?)<\/pubDate>/) || [])[1] || '';
+      const link = stripHtml((block.match(/<link>([\s\S]*?)<\/link>/) || [])[1] || '');
+      const source = stripHtml((block.match(/<source[^>]*>([\s\S]*?)<\/source>/) || [])[1] || '');
+      if (title) items.push({ title, pubDate, source, url: link });
+    }
+
+    res.json({ items, count: items.length, source: 'google-news' });
+  } catch (error) {
+    console.error('Google News RSS error:', error.message);
+    // Fallback to Hacker News
+    try {
+      const count = Math.min(parseInt(req.query.count, 10) || 10, 20);
+      const idsRes = await fetch('https://hacker-news.firebaseio.com/v0/topstories.json');
+      const ids = await idsRes.json();
+      const items = await Promise.all(
+        ids.slice(0, count).map(async (id) => {
+          const r = await fetch(`https://hacker-news.firebaseio.com/v0/item/${id}.json`);
+          return r.json();
+        })
+      );
+      res.json({ items: items.filter(Boolean), count: items.length, source: 'hacker-news' });
+    } catch (hnErr) {
+      console.error('HN fallback error:', hnErr.message);
+      res.status(500).json({ error: 'Failed to fetch news', items: [] });
+    }
+  }
+});
+
+app.get('/api/hn-top', async (req, res) => {
+  try {
+    const count = Math.min(parseInt(req.query.count, 10) || 10, 30);
+    const idsRes = await fetch('https://hacker-news.firebaseio.com/v0/topstories.json');
+    const ids = await idsRes.json();
+    const items = await Promise.all(
+      ids.slice(0, count).map(async (id) => {
+        const r = await fetch(`https://hacker-news.firebaseio.com/v0/item/${id}.json`);
+        return r.json();
+      })
+    );
+    res.json({ items: items.filter(Boolean), count: items.length });
+  } catch (error) {
+    console.error('HN error:', error);
+    res.status(500).json({ error: 'Failed to fetch Hacker News', items: [] });
+  }
+});
+
 // ── Routes ───────────────────────────────────────────────────────────
 
 // Generic email sender
