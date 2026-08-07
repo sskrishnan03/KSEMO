@@ -1,6 +1,7 @@
 import { VoiceState, VoicePreferences, TranscriptEvent, EmotionData, VoiceEvent, AudioConfig, TTSConfig, RecognitionConfig, STTProvider } from './types';
 import { AudioManager } from './AudioManager';
 import { SpeechRecognitionEngine } from './SpeechRecognitionEngine';
+import { MediaRecorderSTT } from './MediaRecorderSTT';
 import { TTSEngine } from './TTSEngine';
 import { EmotionDetector } from './EmotionDetector';
 import { VoiceActivityDetector } from './VoiceActivityDetector';
@@ -33,13 +34,22 @@ export class VoiceEngine {
   };
 
   private readonly onRecognitionError = (event: VoiceEvent) => {
+    const data = event.data as { error?: string } | string | undefined;
+    const code = typeof data === 'object' && data ? (data.error ?? '') : (data ?? '');
+    // Non-recoverable STT failures: swap to the browser's built-in Web Speech
+    // engine so voice keeps working without a server round-trip.
+    if (code === 'stt_unavailable' || code === 'recorder_failed' || code === 'no_microphone_stream') {
+      void this.fallbackToWebSpeech();
+    }
     this.emit('error', event.data);
   };
 
   constructor() {
     this.audioManager = new AudioManager();
-    // Free browser Web Speech engine for speech-to-text (no API key needed).
-    this.recognition = new SpeechRecognitionEngine();
+    // Primary STT uses MediaRecorder + the server's /api/transcribe endpoint
+    // (Deepgram) — works in every browser. The browser Web Speech engine
+    // stays as a last-resort fallback on platforms without MediaRecorder.
+    this.recognition = this.createSTTProvider();
     this.tts = new TTSEngine();
     this.emotionDetector = new EmotionDetector();
     this.vad = new VoiceActivityDetector();
@@ -47,6 +57,43 @@ export class VoiceEngine {
     this.voiceMemory = getVoiceMemory();
 
     this.setupEventListeners();
+  }
+
+  private createSTTProvider(): STTProvider {
+    const hasMediaRecorder = typeof MediaRecorder !== 'undefined';
+    const hasGetUserMedia = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+    if (hasMediaRecorder && hasGetUserMedia) {
+      return new MediaRecorderSTT();
+    }
+    return new SpeechRecognitionEngine();
+  }
+
+  // If the MediaRecorder + server STT path fails (missing endpoint, rejected
+  // audio, recorder errors), swap to the free browser Web Speech engine and
+  // keep the session going so the voice feature never silently stops working.
+  private async fallbackToWebSpeech(): Promise<void> {
+    if (this.recognition.getProviderId() !== 'mediarecorder') return;
+    console.warn('Server STT unavailable; switching to browser Web Speech.');
+
+    const wasListening = this.recognition.isActive() || this.state === 'listening';
+    this.recognition.stop();
+    this.recognition.off('transcript', this.onTranscript);
+    this.recognition.off('error', this.onRecognitionError);
+
+    this.recognition = new SpeechRecognitionEngine();
+    this.recognition.on('transcript', this.onTranscript);
+    this.recognition.on('error', this.onRecognitionError);
+
+    if (wasListening) {
+      const prefs = this.voiceMemory.getPreferences();
+      this.recognition.start({
+        language: prefs.language,
+        continuous: true,
+        interimResults: true,
+        maxAlternatives: 3,
+      });
+    }
+    this.emit('stt_fallback', { timestamp: Date.now() });
   }
 
   private setupEventListeners(): void {
@@ -62,6 +109,13 @@ export class VoiceEngine {
 
     this.vad.on('speech_ended', (event) => {
       this.emit('speech_ended', event.data);
+      // MediaRecorder STT captures raw audio, so silence means "flush it to
+      // the server for transcription". Web Speech already delivers its own
+      // final results — nothing to do.
+      if (this.recognition.getProviderId() === 'mediarecorder') {
+        console.log('[STT] speech ended, flushing audio');
+        this.recognition.flushPending?.();
+      }
     });
 
     // Emotion detection events
@@ -159,6 +213,9 @@ export class VoiceEngine {
       continuous: true,
       interimResults: true,
       maxAlternatives: 3,
+      // Reuse the mic stream already opened by AudioManager so the recorder
+      // doesn't need a second getUserMedia request.
+      stream: this.audioManager.getStream() ?? undefined,
     };
 
     this.recognition.start(recognitionConfig);
@@ -197,8 +254,10 @@ export class VoiceEngine {
     return this.tts.prime(voiceId);
   }
 
-  // False now that speech-to-text runs on the browser Web Speech engine,
-  // which only delivers final results (no low-latency interim acceleration).
+  // False: MediaRecorder STT delivers only final transcripts (after the
+  // server transcribes), so VAD-silence acceleration against a stale interim
+  // transcript is a no-op. The engine flushes audio on its own via
+  // flushPending().
   isLowLatencySTT(): boolean {
     return false;
   }

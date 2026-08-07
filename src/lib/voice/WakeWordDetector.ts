@@ -45,6 +45,16 @@ export class WakeWordDetector {
     this.recognition.onerror = (event: any) => {
       console.error('Wake word recognition error:', event.error);
     };
+
+    this.recognition.onend = () => {
+      if (this.isListening) {
+        try {
+          this.recognition.start();
+        } catch (e) {
+          // ignore error if already started
+        }
+      }
+    };
   }
 
   private handleResult(event: any): void {

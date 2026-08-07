@@ -1,3 +1,5 @@
+export type VoiceProvider = 'browser' | 'premium';
+
 export interface DetectedVoice {
   id: string;
   label: string;
@@ -5,13 +7,25 @@ export interface DetectedVoice {
   gender: 'female' | 'male' | 'unknown';
   neural: boolean;
   localService: boolean;
-  voice: SpeechSynthesisVoice;
+  provider: VoiceProvider;
+  voice?: SpeechSynthesisVoice;
 }
 
 export const VOICE_STORAGE_KEY = 'ksemo_voice_id';
 export const DEFAULT_VOICE_ID = 'auto';
 
 export const VOICE_PREVIEW_TEXT = "Hey, I'm Ksemo — this is my voice.";
+
+// Premium AI voices that work on the free plan. The API key lives
+// server-side; the client only ever needs the voice ID to speak these.
+// Shown in Settings ahead of the device voices.
+export const PREMIUM_VOICES: DetectedVoice[] = [
+  { id: 'pNInz6obpgDQGcFmaJgB', label: 'Adam', lang: 'en', gender: 'male', neural: true, localService: false, provider: 'premium' },
+  { id: 'ErXwobaYiN019PkySvjV', label: 'Antoni', lang: 'en', gender: 'male', neural: true, localService: false, provider: 'premium' },
+  { id: 'EXAVITQu4vr4xnSDxMaL', label: 'Bella', lang: 'en', gender: 'female', neural: true, localService: false, provider: 'premium' },
+  { id: 'VR6AewLTigWG4xSOukaG', label: 'Arnold', lang: 'en', gender: 'male', neural: true, localService: false, provider: 'premium' },
+  { id: 'N2lVS1w4EtoT3dr4eOWO', label: 'Callum', lang: 'en', gender: 'male', neural: true, localService: false, provider: 'premium' },
+];
 
 const FEMALE_RE = /aria|jenny|zira|samantha|karen|moira|tessa|michelle|natasha|susan|hazel|charlotte|emma|olivia|ava|google us english|google uk english female|google english india|indian english|हिन्दी|female/i;
 const MALE_RE = /guy|david|mark|daniel|christopher|alex|fred|james|thomas|ryan|eric|michael|brian|george|oliver|jack|mason|google uk english male|male/i;
@@ -71,7 +85,7 @@ function guessGender(v: SpeechSynthesisVoice): DetectedVoice['gender'] {
 // human-sounding ones first and keeping a male/female mix so each choice
 // genuinely sounds different.
 export function detectVoices(voices: SpeechSynthesisVoice[], count = 5): DetectedVoice[] {
-  const en = voices.filter((v) => v.lang.toLowerCase().startsWith('en'));
+  const en = voices.filter((v) => v.lang.toLowerCase().startsWith('en') && !/david|mark|zira/i.test(v.name));
   const score = (v: SpeechSynthesisVoice): number => {
     let s = 0;
     if (NEURAL_RE.test(v.name)) s += 100;
@@ -97,6 +111,7 @@ export function detectVoices(voices: SpeechSynthesisVoice[], count = 5): Detecte
       gender: g,
       neural: NEURAL_RE.test(v.name),
       localService: v.localService,
+      provider: 'browser',
       voice: v,
     });
     if (g === 'female' || g === 'male') counts[g]++;
@@ -131,7 +146,7 @@ export function pickVoice(storedId: string | undefined, voices: SpeechSynthesisV
 }
 
 function pickSmartVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null {
-  const enVoices = voices.filter((v) => v.lang.toLowerCase().startsWith('en'));
+  const enVoices = voices.filter((v) => v.lang.toLowerCase().startsWith('en') && !/david|mark|zira/i.test(v.name));
   const local = enVoices.filter((v) => v.localService);
   const candidates = local.length ? local : enVoices;
 

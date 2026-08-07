@@ -172,212 +172,219 @@ export default function VoiceChat() {
     processingRef.current = true;
     const turn = ++turnRef.current;
 
-    // Stop recognizing so the mic doesn't hear the assistant's own voice, but
-    // keep VAD running so the user can still interrupt (barge-in).
-    engine.stopListening();
-    engine.startBargeInMonitoring();
+    try {
+      // Stop recognizing so the mic doesn't hear the assistant's own voice, but
+      // keep VAD running so the user can still interrupt (barge-in).
+      engine.stopListening();
+      engine.startBargeInMonitoring();
 
-    // Create the chat lazily on the first spoken message so an empty session
-    // never leaves an empty chat behind.
-    if (!chatIdRef.current) {
-      const c = await createVoiceChat();
-      if (!c) {
-        if (turn === turnRef.current) {
-          processingRef.current = false;
+      // Create the chat lazily on the first spoken message so an empty session
+      // never leaves an empty chat behind.
+      if (!chatIdRef.current) {
+        const c = await createVoiceChat();
+        if (!c) {
+          if (turn === turnRef.current) {
+            stateRef.current = 'listening';
+            setState('listening');
+          }
+          return;
+        }
+        chatIdRef.current = c.id;
+        setChatId(c.id);
+        setLastActiveChatId(c.id);
+        const autoTitle = text.slice(0, 48) + (text.length > 48 ? '…' : '');
+        await updateChat(c.id, { title: autoTitle });
+        window.dispatchEvent(new CustomEvent('ksemo-chats-updated'));
+      }
+      if (turn !== turnRef.current) return;
+
+      conversationRef.current.push({ role: 'user', content: text });
+      // Save the user's message in the background so it doesn't delay the AI's
+      // first spoken words. The transcript bubble appears once it's stored.
+      insertMessage({ chat_id: chatIdRef.current, role: 'user', content: text })
+        .then((m) => {
+          if (turn === turnRef.current) {
+            setHistory((h) => [...h, { id: m?.id ?? undefined, role: 'user', content: text }]);
+          }
+        })
+        .catch(() => {
+          if (turn === turnRef.current) {
+            setHistory((h) => [...h, { id: undefined, role: 'user', content: text }]);
+          }
+        });
+
+      const controller = new AbortController();
+      abortRef.current = controller;
+      engine.setAbortController(controller);
+
+      setAiResponseText('');
+      spokenSoFarRef.current = '';
+      stateRef.current = 'thinking';
+      setState('thinking');
+
+      const detectedEmotion = emotionRef.current?.emotion ?? null;
+      const systemPrompt = adjustResponseForEmotion(VOICE_SYSTEM_PROMPT, detectedEmotion ?? 'neutral');
+      const prefs = engine.getPreferences();
+      const tone = emotionToneAdjustment(detectedEmotion);
+      const ttsOverrides: Partial<TTSConfig> = {
+        rate: Math.min(2, Math.max(0.5, prefs.rate * (tone.rate ?? 1))),
+        pitch: Math.min(2, Math.max(0.5, prefs.pitch * (tone.pitch ?? 1))),
+      };
+
+      // Sentence-level streaming: speak each completed sentence as soon as it
+      // arrives so the voice starts before the full answer is done.
+      const sentences: string[] = [];
+      let buffer = '';
+      let pumpActive = false;
+      let drainResolve: (() => void) | null = null;
+      let drainPromise: Promise<void> | null = null;
+
+      const runPump = async () => {
+        while (sentences.length) {
+          if (turn !== turnRef.current) break;
+          if (mutedRef.current) break;
+          const sentence = sentences.shift()!;
+          stateRef.current = 'speaking';
+          setState('speaking');
+          // Caption grows across sentences: already-spoken words stay visible
+          // while the current sentence reveals word-by-word, so the full reply
+          // is shown by the time speaking finishes.
+          const prefix = spokenSoFarRef.current;
+          const ok = await engine.speak(stripMarkdown(sentence), ttsOverrides, (revealed) => setAiResponseText(prefix ? `${prefix} ${revealed}` : revealed));
+          if (!ok) break;
+          if (turn !== turnRef.current) break;
+          spokenSoFarRef.current = prefix ? `${prefix} ${stripMarkdown(sentence)}` : stripMarkdown(sentence);
+        }
+        pumpActive = false;
+        if (drainResolve) {
+          const r = drainResolve;
+          drainResolve = null;
+          drainPromise = null;
+          r();
+        }
+      };
+
+      const enqueueSentence = (sentence: string) => {
+        sentences.push(sentence);
+        if (!drainPromise) {
+          drainPromise = new Promise<void>((res) => { drainResolve = res; });
+        }
+        if (!pumpActive) { pumpActive = true; runPump(); }
+      };
+
+      const flushSentences = () => {
+        const parts = buffer.split(/(?<=[.!?])\s+|\r?\n+|(?<=[,;:])\s+/);
+        if (parts.length > 1) {
+          for (let i = 0; i < parts.length - 1; i++) {
+            const s = parts[i].trim();
+            if (s) enqueueSentence(s);
+          }
+          buffer = parts[parts.length - 1];
+        }
+      };
+
+      const resumeListening = async (turn: number) => {
+        if (mutedRef.current || !startedRef.current || turn !== turnRef.current) return;
+        // Brief pause so the mic doesn't snap back on the instant speech ends.
+        await new Promise((r) => setTimeout(r, 250));
+        if (mutedRef.current || !startedRef.current || turn !== turnRef.current) return;
+        if (stateRef.current === 'interrupted') return; // barge-in already restarted listening
+        const mode = engine.getPreferences().inputMode;
+        if (mode === 'wake_word') {
+          engine.stopListening();
+          engine.startWakeWordStandby();
+          stateRef.current = 'idle';
+          setState('idle');
+        } else if (mode === 'push_to_talk') {
+          engine.stopListening();
+          stateRef.current = 'idle';
+          setState('idle');
+        } else {
+          engine.startListening();
           stateRef.current = 'listening';
           setState('listening');
         }
-        return;
-      }
-      chatIdRef.current = c.id;
-      setChatId(c.id);
-      setLastActiveChatId(c.id);
-      const autoTitle = text.slice(0, 48) + (text.length > 48 ? '…' : '');
-      await updateChat(c.id, { title: autoTitle });
-      window.dispatchEvent(new CustomEvent('ksemo-chats-updated'));
-    }
-    if (turn !== turnRef.current) return;
+      };
 
-    conversationRef.current.push({ role: 'user', content: text });
-    // Save the user's message in the background so it doesn't delay the AI's
-    // first spoken words. The transcript bubble appears once it's stored.
-    insertMessage({ chat_id: chatIdRef.current, role: 'user', content: text })
-      .then((m) => {
-        if (turn === turnRef.current) {
-          setHistory((h) => [...h, { id: m?.id ?? undefined, role: 'user', content: text }]);
+      try {
+        const result = await streamChat({
+          model: 'ksemo-pro',
+          messages: [{ role: 'system', content: systemPrompt }, ...conversationRef.current.slice(-8)],
+          signal: controller.signal,
+          onToken: (token) => {
+            if (turn !== turnRef.current) return;
+            buffer += token;
+            flushSentences();
+            // Long runs without punctuation still start speaking quickly instead
+            // of waiting for a whole sentence to arrive.
+            if (buffer.split(/\s+/).filter(Boolean).length >= 5) {
+              enqueueSentence(buffer.trim());
+              buffer = '';
+            }
+          },
+        });
+
+        if (turn !== turnRef.current) return;
+
+        conversationRef.current.push({ role: 'assistant', content: result.content });
+        exchangesRef.current += 1;
+        totalTokensRef.current += result.tokens;
+
+        const aiMsg = await insertMessage({ chat_id: chatIdRef.current, role: 'assistant', content: result.content, model: 'ksemo-pro', tokens: result.tokens });
+        await logUsage('ksemo-pro', estimateTokens(text), result.tokens, result.latencyMs);
+        setHistory((h) => [...h, { id: aiMsg?.id ?? undefined, role: 'assistant', content: result.content }]);
+
+        if (buffer.trim()) { enqueueSentence(buffer.trim()); buffer = ''; }
+        await (drainPromise ?? Promise.resolve());
+
+        if (turn !== turnRef.current) return;
+        setAiResponseText('');
+        await resumeListening(turn);
+      } catch (err) {
+        if (turn !== turnRef.current) return;
+        if ((err as Error).name === 'AbortError') {
+          // Barge-in / mute already handled restarting listening.
+          stateRef.current = 'listening';
+          setState('listening');
+          return;
         }
-      })
-      .catch(() => {
-        if (turn === turnRef.current) {
-          setHistory((h) => [...h, { id: undefined, role: 'user', content: text }]);
+        console.error('Voice chat error:', err);
+        const errMsg = (err as Error)?.message ?? '';
+        stateRef.current = 'error';
+        setState('error');
+
+        // Invalid/expired API key: tell the user and keep listening.
+        if (/invalid api key|unauthorized|user not found|api key is invalid/i.test(errMsg)) {
+          await engine.speak("I couldn't reach the AI service because the Gemini API key is invalid or expired. Please update it in the environment file and refresh the app.");
+          await resumeListening(turn);
+          return;
         }
-      });
 
-    const controller = new AbortController();
-    abortRef.current = controller;
-    engine.setAbortController(controller);
-
-    setAiResponseText('');
-    spokenSoFarRef.current = '';
-    stateRef.current = 'thinking';
-    setState('thinking');
-
-    const detectedEmotion = emotionRef.current?.emotion ?? null;
-    const systemPrompt = adjustResponseForEmotion(VOICE_SYSTEM_PROMPT, detectedEmotion ?? 'neutral');
-    const prefs = engine.getPreferences();
-    const tone = emotionToneAdjustment(detectedEmotion);
-    const ttsOverrides: Partial<TTSConfig> = {
-      rate: Math.min(2, Math.max(0.5, prefs.rate * (tone.rate ?? 1))),
-      pitch: Math.min(2, Math.max(0.5, prefs.pitch * (tone.pitch ?? 1))),
-    };
-
-    // Sentence-level streaming: speak each completed sentence as soon as it
-    // arrives so the voice starts before the full answer is done.
-    const sentences: string[] = [];
-    let buffer = '';
-    let pumpActive = false;
-    let drainResolve: (() => void) | null = null;
-    let drainPromise: Promise<void> | null = null;
-
-    const runPump = async () => {
-      while (sentences.length) {
-        if (turn !== turnRef.current) break;
-        if (mutedRef.current) break;
-        const sentence = sentences.shift()!;
-        stateRef.current = 'speaking';
-        setState('speaking');
-        // Caption grows across sentences: already-spoken words stay visible
-        // while the current sentence reveals word-by-word, so the full reply
-        // is shown by the time speaking finishes.
-        const prefix = spokenSoFarRef.current;
-        const ok = await engine.speak(stripMarkdown(sentence), ttsOverrides, (revealed) => setAiResponseText(prefix ? `${prefix} ${revealed}` : revealed));
-        if (!ok) break;
-        if (turn !== turnRef.current) break;
-        spokenSoFarRef.current = prefix ? `${prefix} ${stripMarkdown(sentence)}` : stripMarkdown(sentence);
-      }
-      pumpActive = false;
-      if (drainResolve) {
-        const r = drainResolve;
-        drainResolve = null;
-        drainPromise = null;
-        r();
-      }
-    };
-
-    const enqueueSentence = (sentence: string) => {
-      sentences.push(sentence);
-      if (!drainPromise) {
-        drainPromise = new Promise<void>((res) => { drainResolve = res; });
-      }
-      if (!pumpActive) { pumpActive = true; runPump(); }
-    };
-
-    const flushSentences = () => {
-      const parts = buffer.split(/(?<=[.!?])\s+|\r?\n+|(?<=[,;:])\s+/);
-      if (parts.length > 1) {
-        for (let i = 0; i < parts.length - 1; i++) {
-          const s = parts[i].trim();
-          if (s) enqueueSentence(s);
+        // Quota / rate limit: let the user know and keep the session running.
+        if (/quota|rate limit|too many requests/i.test(errMsg)) {
+          await engine.speak("The AI service is currently busy or out of quota. Please wait a moment and ask again.");
+          await resumeListening(turn);
+          return;
         }
-        buffer = parts[parts.length - 1];
-      }
-    };
 
-    const resumeListening = async (turn: number) => {
-      if (mutedRef.current || !startedRef.current || turn !== turnRef.current) return;
-      // Brief pause so the mic doesn't snap back on the instant speech ends.
-      await new Promise((r) => setTimeout(r, 250));
-      if (mutedRef.current || !startedRef.current || turn !== turnRef.current) return;
-      if (stateRef.current === 'interrupted') return; // barge-in already restarted listening
-      const mode = engine.getPreferences().inputMode;
-      if (mode === 'wake_word') {
-        engine.stopListening();
-        engine.startWakeWordStandby();
-        stateRef.current = 'idle';
-        setState('idle');
-      } else if (mode === 'push_to_talk') {
-        engine.stopListening();
-        stateRef.current = 'idle';
-        setState('idle');
-      } else {
-        engine.startListening();
+        await new Promise((r) => setTimeout(r, RECONNECT_DELAY_MS));
+        if (reconnectAttemptsRef.current < MAX_RECONNECT_ATTEMPTS && turn === turnRef.current) {
+          reconnectAttemptsRef.current += 1;
+          stateRef.current = 'reconnecting';
+          setState('reconnecting');
+          await new Promise((r) => setTimeout(r, 500));
+          await resumeListening(turn);
+        } else {
+          stateRef.current = 'listening';
+          setState('listening');
+          await resumeListening(turn);
+        }
+      }
+    } catch (outerErr) {
+      console.error('Outer processUserSpeech error:', outerErr);
+      if (turn === turnRef.current) {
         stateRef.current = 'listening';
         setState('listening');
-      }
-    };
-
-    try {
-      const result = await streamChat({
-        model: 'ksemo-pro',
-        messages: [{ role: 'system', content: systemPrompt }, ...conversationRef.current.slice(-8)],
-        signal: controller.signal,
-        onToken: (token) => {
-          if (turn !== turnRef.current) return;
-          buffer += token;
-          flushSentences();
-          // Long runs without punctuation still start speaking quickly instead
-          // of waiting for a whole sentence to arrive.
-          if (buffer.split(/\s+/).filter(Boolean).length >= 5) {
-            enqueueSentence(buffer.trim());
-            buffer = '';
-          }
-        },
-      });
-
-      if (turn !== turnRef.current) return;
-
-      conversationRef.current.push({ role: 'assistant', content: result.content });
-      exchangesRef.current += 1;
-      totalTokensRef.current += result.tokens;
-
-      const aiMsg = await insertMessage({ chat_id: chatIdRef.current, role: 'assistant', content: result.content, model: 'ksemo-pro', tokens: result.tokens });
-      await logUsage('ksemo-pro', estimateTokens(text), result.tokens, result.latencyMs);
-      setHistory((h) => [...h, { id: aiMsg?.id ?? undefined, role: 'assistant', content: result.content }]);
-
-      if (buffer.trim()) { enqueueSentence(buffer.trim()); buffer = ''; }
-      await (drainPromise ?? Promise.resolve());
-
-      if (turn !== turnRef.current) return;
-      setAiResponseText('');
-      await resumeListening(turn);
-    } catch (err) {
-      if (turn !== turnRef.current) return;
-      if ((err as Error).name === 'AbortError') {
-        // Barge-in / mute already handled restarting listening.
-        stateRef.current = 'listening';
-        setState('listening');
-        return;
-      }
-      console.error('Voice chat error:', err);
-      const errMsg = (err as Error)?.message ?? '';
-      stateRef.current = 'error';
-      setState('error');
-
-      // Invalid/expired API key: tell the user and keep listening.
-      if (/invalid api key|unauthorized|user not found|api key is invalid/i.test(errMsg)) {
-        await engine.speak("I couldn't reach the AI service because the Gemini API key is invalid or expired. Please update it in the environment file and refresh the app.");
-        await resumeListening(turn);
-        return;
-      }
-
-      // Quota / rate limit: let the user know and keep the session running.
-      if (/quota|rate limit|too many requests/i.test(errMsg)) {
-        await engine.speak("The AI service is currently busy or out of quota. Please wait a moment and ask again.");
-        await resumeListening(turn);
-        return;
-      }
-
-      await new Promise((r) => setTimeout(r, RECONNECT_DELAY_MS));
-      if (reconnectAttemptsRef.current < MAX_RECONNECT_ATTEMPTS && turn === turnRef.current) {
-        reconnectAttemptsRef.current += 1;
-        stateRef.current = 'reconnecting';
-        setState('reconnecting');
-        await new Promise((r) => setTimeout(r, 500));
-        await resumeListening(turn);
-      } else {
-        stateRef.current = 'listening';
-        setState('listening');
-        await resumeListening(turn);
       }
     } finally {
       if (turn === turnRef.current) processingRef.current = false;
@@ -1136,11 +1143,7 @@ export default function VoiceChat() {
                   <p className="text-sm font-medium leading-relaxed text-ink-100 transition-all duration-300 min-h-[1.5em]">
                     {aiResponseText}
                   </p>
-                ) : state === 'thinking' ? (
-                  <p className="text-xs font-semibold tracking-wider text-ink-400 uppercase animate-pulse-soft">
-                    Thinking…
-                  </p>
-                ) : state === 'idle' ? (
+                ) : state === 'thinking' ? null : state === 'idle' ? (
                   inputMode === 'wake_word' ? (
                     <p className="text-xs font-semibold tracking-wider text-ink-400 uppercase animate-pulse-soft">
                       Say "{engine.getPreferences().wakeWord}" to talk

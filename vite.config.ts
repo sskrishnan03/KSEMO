@@ -12,6 +12,8 @@ export default defineConfig({
       '/api/web-search': 'http://localhost:3001',
       '/api/news': 'http://localhost:3001',
       '/api/hn-top': 'http://localhost:3001',
+      '/api/transcribe': 'http://localhost:3001',
+      '/api/tts': 'http://localhost:3001',
     },
   },
 });

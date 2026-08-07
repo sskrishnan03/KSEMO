@@ -8,7 +8,7 @@ const DEFAULT_PREFERENCES: VoicePreferences = {
   voiceId: 'auto',
   pitch: 1.0,
   rate: 1.0,
-  volume: 0.9,
+  volume: 0.7,
   language: 'en-US',
   inputMode: 'hands_free',
   wakeWordEnabled: false,

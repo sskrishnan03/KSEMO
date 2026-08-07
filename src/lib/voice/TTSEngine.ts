@@ -1,11 +1,23 @@
 import { TTSConfig, VoiceEvent } from './types';
 import { loadVoices, pickVoice } from '../voices';
 
+// Text-to-speech with a two-tier strategy:
+//   1. Premium Voice (via server.cjs proxy → /api/tts). Streams an MP3 back,
+//      played through Web Audio so it works identically in every browser.
+//   2. Browser speechSynthesis — automatic fallback when /api/tts is
+//      unavailable (no API key configured) or the request fails.
+
+const PREMIUM_VOICE_RE = /^[a-zA-Z0-9_\-]{10,}$/;
+
 export class TTSEngine {
   private isSpeaking = false;
   private eventListeners: Map<string, Set<(event: VoiceEvent) => void>> = new Map();
   private selectedVoice: SpeechSynthesisVoice | null = null;
   private primedVoiceId: string | null = null;
+  private audioCtx: AudioContext | null = null;
+  private currentSource: AudioBufferSourceNode | null = null;
+  private currentGain: GainNode | null = null;
+  private premiumDisabled = false;
 
   constructor() {
     // Initialize voices
@@ -13,10 +25,28 @@ export class TTSEngine {
   }
 
   // Preload the voice for a given preference so the first `speak()` call in a
-  // session starts immediately instead of waiting for voice discovery.
+  // session starts immediately instead of waiting for voice discovery. Also
+  // creates/unlocks the Web Audio context inside the start gesture so Premium
+  // playback is never blocked by autoplay policies.
   async prime(voiceId: string): Promise<void> {
+    const ctx = this.ensureAudioContext();
+    if (ctx && ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
+    }
     const config: TTSConfig = { voiceId, pitch: 1, rate: 1, volume: 1, language: undefined };
     await this.resolveVoice(config);
+  }
+
+  private ensureAudioContext(): AudioContext | null {
+    if (this.audioCtx) return this.audioCtx;
+    try {
+      const Ctx = window.AudioContext || (window as any).webkitAudioContext;
+      this.audioCtx = new Ctx();
+    } catch (e) {
+      console.error('Failed to create AudioContext:', e);
+      this.audioCtx = null;
+    }
+    return this.audioCtx;
   }
 
   private async resolveVoice(config: TTSConfig): Promise<SpeechSynthesisVoice | null> {
@@ -25,13 +55,119 @@ export class TTSEngine {
       return this.selectedVoice;
     }
 
-    const selectedVoice = await this.resolveVoice(config);
+    const voices = await loadVoices();
+    const selectedVoice = pickVoice(config.voiceId, voices);
     this.selectedVoice = selectedVoice;
     this.primedVoiceId = config.voiceId;
     return selectedVoice;
   }
 
   async speak(text: string, config: TTSConfig, onWordBoundary?: (spokenText: string) => void): Promise<boolean> {
+    // Premium path (preferred — same high-quality voice in every browser).
+    if (!this.premiumDisabled) {
+      const audio = await this.tryPremium(text, config);
+      if (audio && audio.byteLength > 0) {
+        const ok = await this.playWebAudio(audio, text, config, onWordBoundary);
+        if (ok) return true;
+        // Fall through to browser synthesis if decoding/playback failed.
+      }
+    }
+    return this.speakBrowser(text, config, onWordBoundary);
+  }
+
+  private async tryPremium(text: string, config: TTSConfig): Promise<ArrayBuffer | null> {
+    try {
+      const voiceId = config.voiceId && PREMIUM_VOICE_RE.test(config.voiceId) ? config.voiceId : '';
+      const res = await fetch('/api/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, voiceId }),
+      });
+      if (!res.ok) {
+        // 400 = server has no voice key configured; stop retrying.
+        if (res.status === 400) this.premiumDisabled = true;
+        return null;
+      }
+      return await res.arrayBuffer();
+    } catch (e) {
+      console.warn('Premium request failed, falling back to browser TTS:', e);
+      return null;
+    }
+  }
+
+  private async playWebAudio(
+    audio: ArrayBuffer,
+    text: string,
+    config: TTSConfig,
+    onWordBoundary?: (spokenText: string) => void
+  ): Promise<boolean> {
+    const ctx = this.ensureAudioContext();
+    if (!ctx) return false;
+
+    try {
+      if (ctx.state === 'suspended') await ctx.resume();
+
+      const buffer = await ctx.decodeAudioData(audio.slice(0));
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+
+      const gain = ctx.createGain();
+      gain.gain.value = Math.min(1, Math.max(0, config.volume ?? 1));
+      source.connect(gain);
+      gain.connect(ctx.destination);
+
+      this.currentSource = source;
+      this.currentGain = gain;
+      this.isSpeaking = true;
+      this.emit('state_change', { state: 'speaking' });
+
+      const words = text.split(/\s+/).filter(Boolean);
+      let wordTimer: number | undefined;
+      let resolved = false;
+
+      const done = () => {
+        if (resolved) return;
+        resolved = true;
+        this.isSpeaking = false;
+        if (wordTimer !== undefined) {
+          clearInterval(wordTimer);
+          wordTimer = undefined;
+        }
+        if (onWordBoundary && words.length > 0) {
+          onWordBoundary(text.trim());
+        }
+        this.emit('state_change', { state: 'idle' });
+      };
+
+      if (onWordBoundary && words.length > 0) {
+        const revealMs = Math.max(2500, words.length * 360);
+        const perWordMs = Math.max(100, revealMs / words.length);
+        let index = 0;
+        onWordBoundary(words[0]);
+        wordTimer = window.setInterval(() => {
+          index += 1;
+          if (index < words.length) {
+            onWordBoundary(words.slice(0, index + 1).join(' '));
+          }
+        }, perWordMs);
+      }
+
+      return new Promise<boolean>((resolve) => {
+        source.onended = () => {
+          done();
+          resolve(true);
+        };
+        source.start();
+      });
+    } catch (e) {
+      console.warn('Web Audio playback failed, falling back to browser TTS:', e);
+      this.isSpeaking = false;
+      this.emit('state_change', { state: 'idle' });
+      return false;
+    }
+  }
+
+  private async speakBrowser(text: string, config: TTSConfig, onWordBoundary?: (spokenText: string) => void): Promise<boolean> {
     if (!('speechSynthesis' in window)) {
       console.error('Speech synthesis not supported');
       return false;
@@ -177,6 +313,24 @@ export class TTSEngine {
   }
 
   cancel(): void {
+    // Stop Web Audio (Premium) playback.
+    if (this.currentSource) {
+      try {
+        this.currentSource.stop();
+      } catch (e) {
+        // Ignore
+      }
+      this.currentSource = null;
+    }
+    if (this.currentGain) {
+      try {
+        this.currentGain.disconnect();
+      } catch (e) {
+        // Ignore
+      }
+      this.currentGain = null;
+    }
+    // Stop browser speech synthesis.
     try {
       window.speechSynthesis.cancel();
     } catch (e) {
@@ -232,8 +386,10 @@ export class TTSEngine {
     }
   }
 
+  // Web Audio is supported in every modern browser, so TTS is always available
+  // (Premium when configured, otherwise browser speechSynthesis).
   isSupported(): boolean {
-    return 'speechSynthesis' in window;
+    return true;
   }
 
   async getAvailableVoices(): Promise<SpeechSynthesisVoice[]> {

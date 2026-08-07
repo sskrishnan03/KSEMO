@@ -3,10 +3,13 @@ const express = require('express');
 const nodemailer = require('nodemailer');
 const cors = require('cors');
 const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+// 25MB so recorded audio (base64 in JSON) fits — Deepgram accepts it.
+app.use(express.json({ limit: '25mb' }));
 
 const PORT = process.env.PORT || 3001;
 
@@ -228,6 +231,144 @@ app.get('/api/hn-top', async (req, res) => {
   }
 });
 
+// ── Speech-to-Text (Deepgram) ─────────────────────────────────────────
+// Receives a base64 audio blob from the browser and transcribes it.
+// Deepgram is the free default (no card, $200/mo free credits) and the
+// key lives only on the server.
+
+function mimeToExt(mime = '') {
+  const map = {
+    'audio/webm': 'webm',
+    'audio/mp4': 'm4a',
+    'audio/x-m4a': 'm4a',
+    'audio/ogg': 'ogg',
+    'audio/wav': 'wav',
+    'audio/x-wav': 'wav',
+    'audio/mpeg': 'mp3',
+  };
+  return map[mime.split(';')[0].trim().toLowerCase()] || 'webm';
+}
+
+async function transcribeWithDeepgram(buffer, mime, language) {
+  // NOTE: Send the raw audio bytes as the request body. Multipart (FormData)
+  // with a Blob was corrupting the upload on Node; raw bytes always works.
+  const params = new URLSearchParams({
+    model: process.env.DEEPGRAM_MODEL || 'nova-3',
+    punctuate: 'true',
+    smart_format: 'true',
+  });
+  if (language) params.set('language', language);
+
+  // Pass the browser's exact MIME type (e.g. audio/webm;codecs=opus) directly to Deepgram if present.
+  // This lets Deepgram's container decoder know the exact format and codec, avoiding 400 Bad Request.
+  const contentType = mime || 'audio/webm';
+
+  const resp = await fetch(`https://api.deepgram.com/v1/listen?${params}`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Token ${process.env.DEEPGRAM_API_KEY}`,
+      'Content-Type': contentType,
+    },
+    body: buffer,
+  });
+  const data = await resp.json();
+  if (!resp.ok) {
+    return { error: data?.err_msg || `Deepgram ${resp.status}`, status: resp.status };
+  }
+  const text = data?.results?.channels?.[0]?.alternatives?.[0]?.transcript || '';
+  return { text: text.trim() };
+}
+
+app.post('/api/transcribe', async (req, res) => {
+  try {
+    const { audio, mime, language } = req.body || {};
+    if (!audio) return res.status(400).json({ error: 'audio (base64) is required.', text: '' });
+
+    const buffer = Buffer.from(audio, 'base64');
+    if (buffer.length === 0) return res.status(400).json({ error: 'audio is empty.', text: '' });
+
+    if (process.env.DEEPGRAM_API_KEY) {
+      const dg = await transcribeWithDeepgram(buffer, mime, language);
+      if (dg.text !== undefined) return res.json({ text: dg.text });
+      
+      // If it's a Bad Request (likely empty/short audio containing only headers),
+      // return a success response with empty text so the client session doesn't crash.
+      if (dg.status === 400) {
+        console.warn('Deepgram STT empty/short audio warning:', dg.error);
+        return res.json({ text: '', warning: dg.error });
+      }
+
+      console.error('Deepgram STT error:', dg.status, dg.error);
+      return res.status(502).json({ error: dg.error || 'Transcription failed', text: '' });
+    }
+
+    return res.status(400).json({ error: 'No STT provider configured (set DEEPGRAM_API_KEY).', text: '' });
+  } catch (err) {
+    console.error('Transcribe error:', err);
+    res.status(500).json({ error: 'Transcription failed', text: '' });
+  }
+});
+
+// ── Premium TTS ───────────────────────────────────────────────────
+// Receives text + optional voice id, streams audio back from the Premium API.
+// The API key lives only on the server (process.env.KSEMO_VOICE_API_KEY or ELEVENLABS_API_KEY).
+
+const DEFAULT_PREMIUM_VOICE = 'pNInz6obpgDQGcFmaJgB'; // "Adam" (free-plan accessible)
+// Voices that work on the free plan: Adam, Antoni, Bella, Arnold, Callum, Rachel, Nicole.
+const PREMIUM_VOICE_RE = /^[a-zA-Z0-9_\-]{10,}$/;
+
+app.post('/api/tts', async (req, res) => {
+  try {
+    const key = process.env.KSEMO_VOICE_API_KEY || process.env.ELEVENLABS_API_KEY;
+    if (!key) {
+      return res.status(400).json({ error: 'Voice API key is not configured on the server.' });
+    }
+    const { text, voiceId } = req.body || {};
+    if (!text || !text.trim()) return res.status(400).json({ error: 'text is required.' });
+
+    const voice = voiceId && PREMIUM_VOICE_RE.test(voiceId) ? voiceId : DEFAULT_PREMIUM_VOICE;
+    const modelId = process.env.KSEMO_VOICE_MODEL_ID || process.env.ELEVENLABS_MODEL_ID || 'eleven_multilingual_v2';
+
+    const body = {
+      text,
+      model_id: modelId,
+      voice_settings: {
+        stability: 0.5,
+        similarity_boost: 0.75,
+        style: 0.0,
+        use_speaker_boost: true,
+      },
+    };
+
+    const resp = await fetch(
+      `https://api.elevenlabs.io/v1/text-to-speech/${voice}/stream?output_format=mp3_44100_128`,
+      {
+        method: 'POST',
+        headers: {
+          'xi-api-key': key,
+          'Content-Type': 'application/json',
+          Accept: 'audio/mpeg',
+        },
+        body: JSON.stringify(body),
+      }
+    );
+
+    if (!resp.ok) {
+      const detail = await resp.text();
+      console.error('Premium TTS error:', resp.status, detail.slice(0, 300));
+      return res.status(502).json({ error: 'TTS failed' });
+    }
+
+    res.setHeader('Content-Type', resp.headers.get('content-type') || 'audio/mpeg');
+    res.setHeader('Cache-Control', 'no-cache');
+    const buf = Buffer.from(await resp.arrayBuffer());
+    res.send(buf);
+  } catch (err) {
+    console.error('TTS error:', err);
+    res.status(500).json({ error: 'TTS failed' });
+  }
+});
+
 // ── Routes ───────────────────────────────────────────────────────────
 
 // Generic email sender
@@ -325,6 +466,25 @@ app.post('/reset-password', async (req, res) => {
     res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 });
+
+// ── Static hosting (production) ────────────────────────────────────
+// In production the Express server also serves the built React app
+// (render.yaml runs `node server.cjs`). The `dist` folder is produced
+// by `npm run build`. All /api routes above take priority over the SPA
+// fallback because they are registered first.
+const distDir = path.join(__dirname, 'dist');
+if (fs.existsSync(distDir)) {
+  app.use(express.static(distDir));
+  // SPA fallback: any non-API GET returns index.html so client-side routing
+  // works when deep-linking to /app/... routes. API routes are registered
+  // above and take priority because they are matched first.
+  app.use((req, res, next) => {
+    if (req.method === 'GET' && !req.path.startsWith('/api/')) {
+      return res.sendFile(path.join(distDir, 'index.html'));
+    }
+    next();
+  });
+}
 
 app.listen(PORT, () => {
   console.log(`Ksemo Server running on port ${PORT}`);

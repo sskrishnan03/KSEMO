@@ -17,7 +17,7 @@ import {
 import { downloadFile, cn } from '../lib/utils';
 import { supabase } from '../lib/supabase';
 import type { AppPreferences } from '../lib/types';
-import { DEFAULT_VOICE_ID, VOICE_PREVIEW_TEXT, setStoredVoiceId, loadVoices, pickVoice, detectVoices, type DetectedVoice } from '../lib/voices';
+import { DEFAULT_VOICE_ID, VOICE_PREVIEW_TEXT, setStoredVoiceId, loadVoices, pickVoice, PREMIUM_VOICES, prettyName, type DetectedVoice } from '../lib/voices';
 import { getVoiceEngine } from '../lib/voice/VoiceEngine';
 
 type Tab = 'account' | 'security' | 'preferences' | 'notifications' | 'appearance' | 'data' | 'feedback' | 'help';
@@ -56,7 +56,7 @@ export default function Settings() {
   const [prefs, setPrefs] = useState<AppPreferences>({});
   const [savingPrefs, setSavingPrefs] = useState(false);
   const [savedPrefs, setSavedPrefs] = useState(false);
-  const [voiceOptions, setVoiceOptions] = useState<DetectedVoice[] | null>(null);
+  const [combinedVoices, setCombinedVoices] = useState<DetectedVoice[]>([]);
 
   // Modals
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -111,12 +111,47 @@ export default function Settings() {
 
   // Detect the real, distinct voices installed on this device and build the
   // Top-5 list from them (a male/female mix, ranked by how human they sound).
+  // Load and combine premium AI and browser/device voices, keeping exactly the best 7 voices
+  // and completely excluding robotic or unwanted voices.
   useEffect(() => {
     let mounted = true;
     const update = async () => {
       const voices = await loadVoices();
       if (!mounted) return;
-      setVoiceOptions(detectVoices(voices, 5));
+      
+      // Filter browser voices for the best English voices (excluding Mark, Zira, David, UK Male)
+      const allowedBrowser = voices.filter(
+        (v) =>
+          v.lang.toLowerCase().startsWith('en') &&
+          !/david|mark|zira/i.test(v.name) &&
+          !/google uk english male/i.test(v.name.toLowerCase())
+      );
+      // Sort allowedBrowser to prioritize Google US English and Google UK English Female
+      const score = (v: SpeechSynthesisVoice): number => {
+        const name = v.name.toLowerCase();
+        if (name.includes('google us english')) return 100;
+        if (name.includes('google uk english female')) return 90;
+        if (name.includes('google uk english') && !name.includes('male')) return 80;
+        if (v.localService) return 50;
+        return 10;
+      };
+      const sortedBrowser = allowedBrowser.sort((a, b) => score(b) - score(a));
+      
+      // Map to DetectedVoice
+      const mappedBrowser = sortedBrowser.slice(0, 2).map((v) => ({
+        id: `${v.name}|${v.lang}`,
+        label: prettyName(v.name),
+        lang: v.lang,
+        gender: (v.name.toLowerCase().includes('female') ? 'female' : 'male') as 'female' | 'male',
+        neural: /natural|online|neural|enhanced|premium/i.test(v.name),
+        localService: v.localService,
+        provider: 'browser' as const,
+        voice: v,
+      }));
+
+      // Combine PREMIUM_VOICES + best browser voices to get exactly 7 voices total
+      const combined = [...PREMIUM_VOICES, ...mappedBrowser].slice(0, 7);
+      setCombinedVoices(combined);
     };
     update();
     const onVoices = () => { update(); };
@@ -146,12 +181,19 @@ export default function Settings() {
   const previewVoice = async (id: string, voice?: SpeechSynthesisVoice) => {
     await selectVoice(id);
     try { window.speechSynthesis?.cancel(); } catch { /* ok */ }
+    const prefs = getVoiceEngine().getPreferences();
+    if (PREMIUM_VOICES.some((v) => v.id === id)) {
+      // Premium voices are spoken through the shared voice engine (it
+      // routes the id to /api/tts on the server).
+      getVoiceEngine().speak(VOICE_PREVIEW_TEXT, { voiceId: id, rate: prefs.rate, pitch: prefs.pitch, volume: prefs.volume }).catch(() => {});
+      return;
+    }
     const u = new SpeechSynthesisUtterance(VOICE_PREVIEW_TEXT);
     const v = voice ?? pickVoice(id, await loadVoices());
     if (v) u.voice = v;
-    u.rate = 0.92;
-    u.pitch = 1;
-    u.volume = 1;
+    u.rate = prefs.rate;
+    u.pitch = prefs.pitch;
+    u.volume = prefs.volume;
     window.speechSynthesis?.speak(u);
   };
 
@@ -410,18 +452,16 @@ export default function Settings() {
                   <Toggle label="Read aloud" desc="Show the read-aloud option on assistant messages" value={prefs.read_aloud_enabled ?? true} onChange={async (v) => { updatePref('read_aloud_enabled', v); if (user) await upsertSettings(user.id, { ...prefs, read_aloud_enabled: v }); }} />
                 </div>
 
-                <SectionHeader icon={Volume2} title="Voice" desc="Pick one of the top 5 voices found on this device — each one is a real, different voice." />
+                <SectionHeader icon={Volume2} title="Voice" desc="Pick one of the best voices available." />
                 <div className="rounded-2xl border border-white/8 bg-ink-850 overflow-hidden">
                   <div className="px-4 py-3 border-b border-white/8 flex items-center gap-2.5">
                     <span className="h-8 w-8 rounded-lg bg-white/8 flex items-center justify-center"><AudioLines size={15} className="text-white" /></span>
                     <div className="min-w-0">
-                      <div className="text-[13px] font-semibold text-white">Top 5 voices</div>
+                      <div className="text-[13px] font-semibold text-white">Available Voices</div>
                       <div className="text-[11px] text-ink-300">
-                        {voiceOptions === null
-                          ? 'Detecting your voices…'
-                          : voiceOptions.length > 0
-                            ? `${voiceOptions.length} real voices found on this device`
-                            : 'No voices found on this device'}
+                        {combinedVoices.length === 0
+                          ? 'Loading voices…'
+                          : `${combinedVoices.length} high-quality voices available`}
                       </div>
                     </div>
                   </div>
@@ -445,12 +485,10 @@ export default function Settings() {
 
                     <div className="h-px bg-white/5 mx-4 my-1" />
 
-                    {voiceOptions === null ? (
-                      <div className="px-4 py-6 text-center text-[12px] text-ink-300">Detecting your device's voices…</div>
-                    ) : voiceOptions.length === 0 ? (
-                      <div className="px-4 py-6 text-center text-[12px] text-ink-300">No voices found on this device.</div>
+                    {combinedVoices.length === 0 ? (
+                      <div className="px-4 py-6 text-center text-[12px] text-ink-300">Loading voices…</div>
                     ) : (
-                      voiceOptions.map((d, i) => {
+                      combinedVoices.map((d, i) => {
                         const selected = (prefs.voice_id ?? DEFAULT_VOICE_ID) === d.id;
                         return (
                           <div
@@ -465,7 +503,7 @@ export default function Settings() {
                                 {selected && <Check size={13} className="text-white shrink-0" />}
                               </span>
                               <span className="text-[11px] text-ink-300">
-                                {d.lang} · {d.gender === 'female' ? 'Female' : d.gender === 'male' ? 'Male' : 'Voice'}{d.neural ? ' · Neural' : ''}
+                                {d.provider === 'premium' ? 'Premium AI' : 'Device Voice'} · {d.gender === 'female' ? 'Female' : 'Male'}
                               </span>
                             </span>
                             <button
@@ -475,7 +513,7 @@ export default function Settings() {
                               aria-label={`Preview ${d.label}`}
                               className={cn('h-8 w-8 rounded-full flex items-center justify-center transition shrink-0', selected ? 'bg-white text-ink-900 hover:bg-white/90' : 'bg-white/8 text-white hover:bg-white/15')}
                             >
-                              <Play size={14} />
+                              <Play size={12} className={cn(selected ? 'text-ink-900' : 'text-white')} />
                             </button>
                           </div>
                         );

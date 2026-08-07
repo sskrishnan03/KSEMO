@@ -66,15 +66,19 @@ export interface RecognitionConfig {
   continuous: boolean;
   interimResults: boolean;
   maxAlternatives: number;
+  stream?: MediaStream;
 }
 
 export interface STTProvider {
   start(config?: Partial<RecognitionConfig>): void;
   stop(): void;
   abort(): void;
+  // Flush any pending recorded audio to the STT service and emit the
+  // resulting transcript (used on VAD silence in hands-free mode).
+  flushPending?(): void;
   isSupported(): boolean;
   isActive(): boolean;
-  getProviderId(): 'webspeech';
+  getProviderId(): 'webspeech' | 'mediarecorder';
   on(event: string, listener: (event: VoiceEvent) => void): void;
   off(event: string, listener: (event: VoiceEvent) => void): void;
 }
