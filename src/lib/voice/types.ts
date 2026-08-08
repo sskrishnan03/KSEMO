@@ -78,7 +78,7 @@ export interface STTProvider {
   flushPending?(): void;
   isSupported(): boolean;
   isActive(): boolean;
-  getProviderId(): 'webspeech' | 'mediarecorder';
+  getProviderId(): 'webspeech' | 'mediarecorder' | 'streaming';
   on(event: string, listener: (event: VoiceEvent) => void): void;
   off(event: string, listener: (event: VoiceEvent) => void): void;
 }

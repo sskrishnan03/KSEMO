@@ -3,6 +3,9 @@ import { VoicePreferences, InputMode } from './types';
 export type { VoicePreferences };
 
 const STORAGE_KEY = 'ksemo_voice_preferences';
+// Bumped whenever a stored preference's default changes so existing users get
+// the improved value instead of keeping the old default forever.
+const STORAGE_VERSION = 2;
 
 const DEFAULT_PREFERENCES: VoicePreferences = {
   voiceId: 'auto',
@@ -14,7 +17,9 @@ const DEFAULT_PREFERENCES: VoicePreferences = {
   wakeWordEnabled: false,
   wakeWord: 'Hey KSEMO',
   wakeWordSensitivity: 0.7,
-  silenceDuration: 1500,
+  // Snappy turn-around: transcribe as soon as ~0.7s of silence follows speech
+  // (was 1500ms, which made every reply feel sluggish).
+  silenceDuration: 700,
   noiseSuppression: true,
   echoCancellation: true,
   autoGainControl: true,
@@ -33,7 +38,14 @@ export class VoiceMemory {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
-        return { ...DEFAULT_PREFERENCES, ...JSON.parse(stored) };
+        const parsed = JSON.parse(stored) as Partial<VoicePreferences> & { version?: number };
+        const prefs: VoicePreferences = { ...DEFAULT_PREFERENCES, ...parsed };
+        // v2: adopt the shorter silence duration instead of the old 1.5s
+        // default that was saved before this change.
+        if (parsed.version !== STORAGE_VERSION) {
+          prefs.silenceDuration = DEFAULT_PREFERENCES.silenceDuration;
+        }
+        return prefs;
       }
     } catch (e) {
       console.warn('Failed to load voice preferences:', e);
@@ -43,7 +55,7 @@ export class VoiceMemory {
 
   private save(): void {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(this.preferences));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...this.preferences, version: STORAGE_VERSION }));
     } catch (e) {
       console.warn('Failed to save voice preferences:', e);
     }

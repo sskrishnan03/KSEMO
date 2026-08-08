@@ -17,6 +17,8 @@ export class TTSEngine {
   private audioCtx: AudioContext | null = null;
   private currentSource: AudioBufferSourceNode | null = null;
   private currentGain: GainNode | null = null;
+  private currentAudio: HTMLAudioElement | null = null;
+  private currentResolve: ((ok: boolean) => void) | null = null;
   private premiumDisabled = false;
 
   constructor() {
@@ -63,7 +65,13 @@ export class TTSEngine {
   }
 
   async speak(text: string, config: TTSConfig, onWordBoundary?: (spokenText: string) => void): Promise<boolean> {
-    // Premium path (preferred — same high-quality voice in every browser).
+    // Streaming premium path (fastest) — plays the first MP3 frames as soon as
+    // they arrive instead of waiting for the whole sentence to be generated.
+    if (!this.premiumDisabled) {
+      const ok = await this.playStreaming(text, config, onWordBoundary);
+      if (ok) return true;
+    }
+    // Buffered premium path (preferred — same high-quality voice in every browser).
     if (!this.premiumDisabled) {
       const audio = await this.tryPremium(text, config);
       if (audio && audio.byteLength > 0) {
@@ -73,6 +81,79 @@ export class TTSEngine {
       }
     }
     return this.speakBrowser(text, config, onWordBoundary);
+  }
+
+  // Progressive playback via a plain <audio> element pointed at the streaming
+  // /api/tts endpoint (GET). Audio starts the moment the first frames arrive,
+  // so the reply voice begins long before the full sentence is synthesized.
+  private playStreaming(text: string, config: TTSConfig, onWordBoundary?: (spokenText: string) => void): Promise<boolean> {
+    const voiceId = config.voiceId && PREMIUM_VOICE_RE.test(config.voiceId) ? config.voiceId : '';
+    const url = `/api/tts?text=${encodeURIComponent(text)}&voiceId=${encodeURIComponent(voiceId)}`;
+
+    let audio: HTMLAudioElement;
+    try {
+      audio = new Audio();
+      audio.preload = 'auto';
+      audio.volume = Math.min(1, Math.max(0, config.volume ?? 1));
+      this.currentAudio = audio;
+    } catch (e) {
+      console.warn('Streaming playback unavailable:', e);
+      return Promise.resolve(false);
+    }
+
+    const words = text.split(/\s+/).filter(Boolean);
+
+    return new Promise<boolean>((resolve) => {
+      let settled = false;
+      let wordTimerStarted = false;
+      let wordTimer: number | undefined;
+
+      const settle = (ok: boolean) => {
+        if (settled) return;
+        settled = true;
+        if (this.currentAudio === audio) this.currentAudio = null;
+        if (this.currentResolve) this.currentResolve = null;
+        if (wordTimer !== undefined) {
+          clearInterval(wordTimer);
+          wordTimer = undefined;
+        }
+        this.isSpeaking = false;
+        if (onWordBoundary && words.length > 0) {
+          onWordBoundary(text.trim());
+        }
+        this.emit('state_change', { state: 'idle' });
+        resolve(ok);
+      };
+      this.currentResolve = settle;
+
+      const startWordTimer = () => {
+        if (wordTimerStarted || !onWordBoundary || words.length === 0) return;
+        wordTimerStarted = true;
+        // Word-by-word caption reveal, timed to the estimated speech duration
+        // (same pacing as the Web Audio path).
+        const revealMs = Math.max(2500, words.length * 360);
+        const perWordMs = Math.max(100, revealMs / words.length);
+        let index = 0;
+        onWordBoundary(words[0]);
+        wordTimer = window.setInterval(() => {
+          index += 1;
+          if (index < words.length) {
+            onWordBoundary(words.slice(0, index + 1).join(' '));
+          }
+        }, perWordMs);
+      };
+
+      audio.onplay = () => {
+        this.isSpeaking = true;
+        this.emit('state_change', { state: 'speaking' });
+        startWordTimer();
+      };
+      audio.onerror = () => settle(false);
+      audio.onended = () => settle(true);
+
+      audio.src = url;
+      audio.play().catch(() => settle(false));
+    });
   }
 
   private async tryPremium(text: string, config: TTSConfig): Promise<ArrayBuffer | null> {
@@ -313,6 +394,26 @@ export class TTSEngine {
   }
 
   cancel(): void {
+    // Stop streaming (<audio>) playback and resolve its pending speak() so the
+    // turn pipeline doesn't hang waiting for an onended that never fires.
+    if (this.currentAudio) {
+      try {
+        this.currentAudio.onerror = null;
+        this.currentAudio.onplay = null;
+        this.currentAudio.onended = null;
+        this.currentAudio.pause();
+        this.currentAudio.removeAttribute('src');
+        this.currentAudio.load();
+      } catch {
+        // Ignore
+      }
+      this.currentAudio = null;
+    }
+    if (this.currentResolve) {
+      const r = this.currentResolve;
+      this.currentResolve = null;
+      r(false);
+    }
     // Stop Web Audio (Premium) playback.
     if (this.currentSource) {
       try {

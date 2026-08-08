@@ -491,10 +491,28 @@ async function sendEmailViaProxy(to: string, subject: string, body: string): Pro
         from: `Ksemo Voice Chat <noreply@ksemo.app>`
       })
     });
-    
-    const data = await response.json();
+
+    // The proxy can return an empty body (backend down, proxy 5xx) or a non-JSON
+    // payload (static host serving index.html for unknown paths). Parse defensively
+    // so this never throws a SyntaxError into the caller.
+    const text = await response.text();
+    if (!text) {
+      console.warn(`Email proxy returned ${response.status} with an empty body`);
+      return false;
+    }
+    let data: { success?: boolean; error?: string } | null = null;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      console.warn(`Email proxy returned non-JSON (${response.status}):`, text.slice(0, 120));
+      return false;
+    }
+    if (!response.ok) {
+      console.warn(`Email proxy returned ${response.status}:`, data?.error || '');
+      return false;
+    }
     console.log('Email proxy response:', data);
-    return data.success;
+    return data?.success === true;
   } catch (error) {
     console.error('Email proxy error:', error);
     return false;
@@ -549,13 +567,13 @@ export function dispatchSimulatedEmail(email: string, fullName: string, type: 's
   // Dispatch global window event
   window.dispatchEvent(new CustomEvent('ksemo-email-sent', { detail: newEmail }));
 
-  // Send REAL email using SMTP proxy with mailto fallback
+  // Send REAL email using SMTP proxy (no mailto popup — login/signout alerts
+  // should never hijack the user's mail client; the dispatch is informational).
   sendEmailViaProxy(email, newEmail.subject, newEmail.body).then((success) => {
     if (success) {
       console.log("Email sent successfully via SMTP proxy");
     } else {
-      console.log("SMTP proxy not available, opening mail client as fallback");
-      openMailtoLink(email, newEmail.subject, newEmail.body);
+      console.log("Email proxy not available; sign-in alert logged locally only");
     }
   });
 }

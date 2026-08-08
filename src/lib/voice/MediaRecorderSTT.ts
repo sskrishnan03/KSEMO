@@ -38,6 +38,67 @@ function blobToBase64(blob: Blob): Promise<string> {
   });
 }
 
+// Deepgram rejects MediaRecorder's raw WebM/opus output with "corrupt or
+// unsupported data" (it expects a properly-closed container with a known
+// duration). Decoding the blob to PCM and re-encoding it as a 16-bit WAV in
+// the browser gives Deepgram a format it always accepts. Falls back to the
+// original blob if decode fails (e.g. a browser that can't decode its own
+// capture, like some Safari mp4 cases).
+async function blobToWav(blob: Blob): Promise<Blob | null> {
+  try {
+    const arrayBuffer = await blob.arrayBuffer();
+    const w = window as Window & { webkitAudioContext?: typeof AudioContext };
+    const Ctor = window.AudioContext || w.webkitAudioContext;
+    if (!Ctor) return null;
+    const ctx = new Ctor();
+    const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+    await ctx.close();
+
+    const numChannels = Math.min(audioBuffer.numberOfChannels, 2);
+    const sampleRate = audioBuffer.sampleRate;
+    const numFrames = audioBuffer.length;
+    const bytesPerSample = 2;
+    const blockAlign = numChannels * bytesPerSample;
+    const dataSize = numFrames * blockAlign;
+    const buffer = new ArrayBuffer(44 + dataSize);
+    const view = new DataView(buffer);
+
+    const writeString = (offset: number, str: string) => {
+      for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
+    };
+
+    writeString(0, 'RIFF');
+    view.setUint32(4, 36 + dataSize, true);
+    writeString(8, 'WAVE');
+    writeString(12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, numChannels, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * blockAlign, true);
+    view.setUint16(32, blockAlign, true);
+    view.setUint16(34, bytesPerSample * 8, true);
+    writeString(36, 'data');
+    view.setUint32(40, dataSize, true);
+
+    const channels: Float32Array[] = [];
+    for (let ch = 0; ch < numChannels; ch++) channels.push(audioBuffer.getChannelData(ch));
+
+    let offset = 44;
+    for (let i = 0; i < numFrames; i++) {
+      for (let ch = 0; ch < numChannels; ch++) {
+        const sample = Math.max(-1, Math.min(1, channels[ch][i]));
+        view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
+        offset += 2;
+      }
+    }
+
+    return new Blob([buffer], { type: 'audio/wav' });
+  } catch {
+    return null;
+  }
+}
+
 export class MediaRecorderSTT implements STTProvider {
   private recorder: MediaRecorder | null = null;
   private chunks: Blob[] = [];
@@ -216,11 +277,14 @@ export class MediaRecorderSTT implements STTProvider {
 
   private async transcribe(blob: Blob): Promise<string> {
     try {
-      const audio = await blobToBase64(blob);
+      // Convert MediaRecorder WebM/opus to WAV — Deepgram rejects the raw
+      // WebM container. If conversion fails, send the original blob as-is.
+      const wav = await blobToWav(blob);
+      const audio = await blobToBase64(wav ?? blob);
       const res = await fetch('/api/transcribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ audio, mime: blob.type || this.mimeType, language: this.config.language }),
+        body: JSON.stringify({ audio, mime: wav ? 'audio/wav' : (blob.type || this.mimeType), language: this.config.language }),
       });
       // A static-only host (or an unconfigured server) can return HTML here;
       // parse JSON defensively and degrade to an empty transcript.

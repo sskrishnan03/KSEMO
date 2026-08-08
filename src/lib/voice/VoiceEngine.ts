@@ -2,6 +2,7 @@ import { VoiceState, VoicePreferences, TranscriptEvent, EmotionData, VoiceEvent,
 import { AudioManager } from './AudioManager';
 import { SpeechRecognitionEngine } from './SpeechRecognitionEngine';
 import { MediaRecorderSTT } from './MediaRecorderSTT';
+import { StreamingDeepgramSTT } from './StreamingDeepgramSTT';
 import { TTSEngine } from './TTSEngine';
 import { EmotionDetector } from './EmotionDetector';
 import { VoiceActivityDetector } from './VoiceActivityDetector';
@@ -60,10 +61,14 @@ export class VoiceEngine {
   }
 
   private createSTTProvider(): STTProvider {
-    const hasMediaRecorder = typeof MediaRecorder !== 'undefined';
     const hasGetUserMedia = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
-    if (hasMediaRecorder && hasGetUserMedia) {
-      return new MediaRecorderSTT();
+    if (hasGetUserMedia) {
+      // Streaming STT (fastest): transcribes while the user talks. Falls back
+      // to MediaRecorder + HTTP for browsers without websocket capture.
+      const streaming = new StreamingDeepgramSTT();
+      if (streaming.isSupported()) return streaming;
+      const media = new MediaRecorderSTT();
+      if (media.isSupported()) return media;
     }
     return new SpeechRecognitionEngine();
   }
@@ -72,7 +77,8 @@ export class VoiceEngine {
   // audio, recorder errors), swap to the free browser Web Speech engine and
   // keep the session going so the voice feature never silently stops working.
   private async fallbackToWebSpeech(): Promise<void> {
-    if (this.recognition.getProviderId() !== 'mediarecorder') return;
+    const providerId = this.recognition.getProviderId();
+    if (providerId !== 'mediarecorder' && providerId !== 'streaming') return;
     console.warn('Server STT unavailable; switching to browser Web Speech.');
 
     const wasListening = this.recognition.isActive() || this.state === 'listening';
@@ -110,8 +116,8 @@ export class VoiceEngine {
     this.vad.on('speech_ended', (event) => {
       this.emit('speech_ended', event.data);
       // MediaRecorder STT captures raw audio, so silence means "flush it to
-      // the server for transcription". Web Speech already delivers its own
-      // final results — nothing to do.
+      // the server for transcription". Streaming STT and Web Speech already
+      // deliver their own results in near real time — nothing to do.
       if (this.recognition.getProviderId() === 'mediarecorder') {
         console.log('[STT] speech ended, flushing audio');
         this.recognition.flushPending?.();
@@ -254,10 +260,9 @@ export class VoiceEngine {
     return this.tts.prime(voiceId);
   }
 
-  // False: MediaRecorder STT delivers only final transcripts (after the
-  // server transcribes), so VAD-silence acceleration against a stale interim
-  // transcript is a no-op. The engine flushes audio on its own via
-  // flushPending().
+  // Streaming STT and Web Speech deliver finals/interims in near real time,
+  // so the VAD-silence acceleration in VoiceChat is a no-op (Deepgram's
+  // endpointing final arrives first and drives the turn).
   isLowLatencySTT(): boolean {
     return false;
   }

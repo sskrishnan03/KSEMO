@@ -5,6 +5,8 @@ const cors = require('cors');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
+const { Readable } = require('stream');
+const { WebSocketServer, WebSocket } = require('ws');
 
 const app = express();
 app.use(cors());
@@ -309,6 +311,70 @@ app.post('/api/transcribe', async (req, res) => {
   }
 });
 
+// ── Streaming STT (Deepgram live) ──────────────────────────────────
+// The browser streams raw mic PCM over a WebSocket to /api/stt; this server
+// proxies it to Deepgram's live API and pipes transcripts back. Words are
+// transcribed WHILE the user is still talking, so a final result arrives
+// ~half a second after they stop — no blob upload round-trip.
+const sttWss = new WebSocketServer({ noServer: true });
+
+sttWss.on('connection', (clientWs) => {
+  const key = process.env.DEEPGRAM_API_KEY;
+  if (!key) {
+    clientWs.close(1011, 'Deepgram key not configured');
+    return;
+  }
+
+  const deepgramUrl =
+    'wss://api.deepgram.com/v1/listen' +
+    '?model=' + encodeURIComponent(process.env.DEEPGRAM_MODEL || 'nova-3') +
+    '&language=en-US' +
+    '&encoding=linear16&sample_rate=16000&channels=1' +
+    '&interim_results=true' +
+    // Finalize an utterance ~300ms after the user goes quiet so the AI starts
+    // almost as soon as you finish talking.
+    '&endpointing=300' +
+    '&punctuate=true&smart_format=true';
+
+  const dg = new WebSocket(deepgramUrl, {
+    headers: { Authorization: `Token ${key}` },
+  });
+
+  // Buffer audio that arrives before the Deepgram socket is open so the
+  // first words are never dropped.
+  const pending = [];
+
+  const closeBoth = () => {
+    try { clientWs.close(); } catch (e) { /* ignore */ }
+    try { dg.close(); } catch (e) { /* ignore */ }
+  };
+
+  dg.on('open', () => {
+    console.log('[STT] Deepgram live socket open');
+    while (pending.length) {
+      const chunk = pending.shift();
+      try { dg.send(chunk); } catch (e) { /* ignore */ }
+    }
+  });
+
+  clientWs.on('message', (data) => {
+    if (dg.readyState === WebSocket.OPEN) {
+      dg.send(data);
+    } else {
+      pending.push(data);
+    }
+  });
+
+  dg.on('message', (data) => {
+    if (clientWs.readyState === WebSocket.OPEN) clientWs.send(data);
+  });
+
+  dg.on('error', () => closeBoth());
+  dg.on('close', () => closeBoth());
+  clientWs.on('close', () => { try { dg.close(); } catch (e) { /* ignore */ } });
+  clientWs.on('error', () => { try { dg.close(); } catch (e) { /* ignore */ } });
+});
+
 // ── Premium TTS ───────────────────────────────────────────────────
 // Receives text + optional voice id, streams audio back from the Premium API.
 // The API key lives only on the server (process.env.KSEMO_VOICE_API_KEY or ELEVENLABS_API_KEY).
@@ -317,20 +383,23 @@ const DEFAULT_PREMIUM_VOICE = 'pNInz6obpgDQGcFmaJgB'; // "Adam" (free-plan acces
 // Voices that work on the free plan: Adam, Antoni, Bella, Arnold, Callum, Rachel, Nicole.
 const PREMIUM_VOICE_RE = /^[a-zA-Z0-9_\-]{10,}$/;
 
-app.post('/api/tts', async (req, res) => {
+async function handlePremiumTTS(req, res) {
   try {
     const key = process.env.KSEMO_VOICE_API_KEY || process.env.ELEVENLABS_API_KEY;
     if (!key) {
       return res.status(400).json({ error: 'Voice API key is not configured on the server.' });
     }
-    const { text, voiceId } = req.body || {};
-    if (!text || !text.trim()) return res.status(400).json({ error: 'text is required.' });
+    // POST (JSON body) is used by the buffered fallback; GET is used by the
+    // browser <audio> streaming path so playback can start as audio arrives.
+    const text = req.body?.text || req.query.text;
+    const voiceId = req.body?.voiceId || req.query.voiceId;
+    if (!text || !String(text).trim()) return res.status(400).json({ error: 'text is required.' });
 
-    const voice = voiceId && PREMIUM_VOICE_RE.test(voiceId) ? voiceId : DEFAULT_PREMIUM_VOICE;
+    const voice = voiceId && PREMIUM_VOICE_RE.test(String(voiceId)) ? String(voiceId) : DEFAULT_PREMIUM_VOICE;
     const modelId = process.env.KSEMO_VOICE_MODEL_ID || process.env.ELEVENLABS_MODEL_ID || 'eleven_multilingual_v2';
 
     const body = {
-      text,
+      text: String(text),
       model_id: modelId,
       voice_settings: {
         stability: 0.5,
@@ -361,13 +430,31 @@ app.post('/api/tts', async (req, res) => {
 
     res.setHeader('Content-Type', resp.headers.get('content-type') || 'audio/mpeg');
     res.setHeader('Cache-Control', 'no-cache');
-    const buf = Buffer.from(await resp.arrayBuffer());
-    res.send(buf);
+
+    // Stream audio back as ElevenLabs synthesizes it so the browser can start
+    // speaking as soon as the first MP3 frames arrive, instead of waiting for
+    // the whole sentence to be generated first.
+    if (resp.body && typeof Readable.fromWeb === 'function' && typeof res.flushHeaders === 'function') {
+      res.flushHeaders();
+      Readable.fromWeb(resp.body)
+        .on('error', () => res.end())
+        .pipe(res);
+    } else {
+      const buf = Buffer.from(await resp.arrayBuffer());
+      res.send(buf);
+    }
   } catch (err) {
     console.error('TTS error:', err);
-    res.status(500).json({ error: 'TTS failed' });
+    if (res.headersSent) {
+      res.end();
+    } else {
+      res.status(500).json({ error: 'TTS failed' });
+    }
   }
-});
+}
+
+app.post('/api/tts', handlePremiumTTS);
+app.get('/api/tts', handlePremiumTTS);
 
 // ── Routes ───────────────────────────────────────────────────────────
 
@@ -486,7 +573,19 @@ if (fs.existsSync(distDir)) {
   });
 }
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`Ksemo Server running on port ${PORT}`);
   console.log(`Using SMTP: ${SMTP_CONFIG.host}:${SMTP_CONFIG.port}`);
+});
+
+// Route WebSocket upgrades for the streaming STT endpoint. Everything else
+// falls through to normal HTTP handling.
+server.on('upgrade', (req, socket, head) => {
+  if (req.url && req.url.startsWith('/api/stt')) {
+    sttWss.handleUpgrade(req, socket, head, (ws) => {
+      sttWss.emit('connection', ws, req);
+    });
+  } else {
+    socket.destroy();
+  }
 });
