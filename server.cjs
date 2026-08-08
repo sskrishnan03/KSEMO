@@ -554,6 +554,13 @@ app.post('/reset-password', async (req, res) => {
   }
 });
 
+// ── Keep-alive ping ──────────────────────────────────────────────
+// Uptime monitors and the self-ping below hit this so the free Render
+// instance (which spins down after 15 min of idle traffic) stays warm.
+app.get('/api/ping', (req, res) => {
+  res.json({ ok: true, ts: Date.now() });
+});
+
 // ── Static hosting (production) ────────────────────────────────────
 // In production the Express server also serves the built React app
 // (render.yaml runs `node server.cjs`). The `dist` folder is produced
@@ -577,6 +584,24 @@ const server = app.listen(PORT, () => {
   console.log(`Ksemo Server running on port ${PORT}`);
   console.log(`Using SMTP: ${SMTP_CONFIG.host}:${SMTP_CONFIG.port}`);
 });
+
+// Free Render instances spin down after 15 minutes without inbound traffic.
+// Ping our own public URL every 5 minutes so the service stays warm. Render
+// sets RENDER_EXTERNAL_URL automatically; APP_URL is the fallback (also used
+// for password-reset links). Locally neither is set, so the ping is disabled.
+const selfUrl = process.env.RENDER_EXTERNAL_URL || process.env.APP_URL;
+if (selfUrl && typeof fetch === 'function') {
+  setInterval(() => {
+    fetch(`${selfUrl}/api/ping`)
+      .then((res) => {
+        if (!res.ok) console.warn(`Self-ping failed with ${res.status}`);
+      })
+      .catch((err) => console.warn('Self-ping error:', err.message));
+  }, 5 * 60 * 1000);
+  console.log(`Keep-alive enabled: ping ${selfUrl}/api/ping every 5 min`);
+} else {
+  console.log('Keep-alive disabled (no RENDER_EXTERNAL_URL/APP_URL set)');
+}
 
 // Route WebSocket upgrades for the streaming STT endpoint. Everything else
 // falls through to normal HTTP handling.
