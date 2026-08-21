@@ -1,0 +1,522 @@
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { filterLibraryItems } from "@/lib/ksemoInteraction";
+import {
+  ArrowUp,
+  AudioLines,
+  Check,
+  FileText,
+  FileUp,
+  Image,
+  Library,
+  Mic,
+  Plus,
+  Square,
+  X,
+} from "lucide-react";
+import React, {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+} from "react";
+
+export const librarySubmenuClass =
+  "absolute left-2 z-50 max-h-[calc(100dvh-2rem)] w-80 rounded-xl border border-border bg-popover p-0 text-popover-foreground shadow-xl max-sm:left-1/2 max-sm:-translate-x-1/2";
+
+export function ChatComposer({
+  onSend,
+  onCancel,
+  onVoice,
+  onVoiceChat,
+  onCancelRecording,
+  isGenerating,
+  isRecording,
+  isTranscribing,
+  recordingSeconds,
+  value,
+  onValueChange,
+  onAttachment,
+  attachmentNotice,
+  attachmentNotices,
+  onClearAttachment,
+  libraryFiles,
+  onLibraryFile,
+  initialLibraryOpen = false,
+  initialToolsOpen = false,
+  menuPlacement = "above",
+  compactBottomSpacing = false,
+  showSafetyNote = true,
+}: {
+  onSend: (content: string) => void;
+  onCancel: () => void;
+  onVoice: () => void;
+  onVoiceChat?: () => void;
+  onCancelRecording: () => void;
+  isGenerating: boolean;
+  isRecording: boolean;
+  isTranscribing: boolean;
+  recordingSeconds: number;
+  value: string;
+  onValueChange: (value: string) => void;
+  onAttachment?: (file: File) => void;
+  attachmentNotice?: { name: string; linked: boolean } | null;
+  attachmentNotices?: Array<{ fileId: string; name: string; linked: boolean }>;
+  onClearAttachment?: (fileId?: string) => void;
+  libraryFiles?: Array<{
+    id: string;
+    filename: string;
+    mimeType?: string;
+    sizeBytes?: number;
+    url?: string;
+  }>;
+  onLibraryFile?: (file: {
+    id: string;
+    filename: string;
+    mimeType?: string;
+    url?: string;
+  }) => void;
+  initialLibraryOpen?: boolean;
+  initialToolsOpen?: boolean;
+  menuPlacement?: "above" | "below";
+  compactBottomSpacing?: boolean;
+  showSafetyNote?: boolean;
+}) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const libraryPanelRef = useRef<HTMLDivElement>(null);
+  const [libraryOpen, setLibraryOpen] = useState(initialLibraryOpen);
+  const [toolsOpen, setToolsOpen] = useState(initialToolsOpen);
+  const [libraryQuery, setLibraryQuery] = useState("");
+  const displayedLibraryFiles = useMemo(
+    () => filterLibraryItems(libraryFiles, libraryQuery),
+    [libraryFiles, libraryQuery]
+  );
+  const visibleAttachmentNotices =
+    attachmentNotices ??
+    (attachmentNotice
+      ? [{ fileId: attachmentNotice.name, ...attachmentNotice }]
+      : []);
+
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    textarea.style.height = "0px";
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 180)}px`;
+  }, [value]);
+
+  useEffect(() => {
+    if (!libraryOpen) return;
+    const closeOutsidePanel = (event: PointerEvent) => {
+      if (!libraryPanelRef.current?.contains(event.target as Node))
+        setLibraryOpen(false);
+    };
+    document.addEventListener("pointerdown", closeOutsidePanel);
+    return () => document.removeEventListener("pointerdown", closeOutsidePanel);
+  }, [libraryOpen]);
+
+  function submit() {
+    const content = value.trim();
+    if (!content || isGenerating) return;
+    onSend(content);
+    onValueChange("");
+  }
+
+  function selectFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (file) onAttachment?.(file);
+  }
+
+  return (
+    <div
+      className={cn(
+        "mx-auto w-full max-w-3xl px-4 pt-3 sm:px-6",
+        compactBottomSpacing ? "pb-2 sm:pb-3" : "pb-5 sm:pb-7"
+      )}
+    >
+      <div className="relative rounded-[1.35rem] border border-border/90 bg-card p-2 shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-shadow focus-within:shadow-[0_12px_40px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.3)]">
+        {libraryOpen && (
+          <div
+            ref={libraryPanelRef}
+            className={cn(
+              librarySubmenuClass,
+              menuPlacement === "below"
+                ? "top-[calc(100%+0.5rem)]"
+                : "bottom-[calc(100%+0.5rem)]"
+            )}
+          >
+            <LibraryPickerContent
+              files={displayedLibraryFiles}
+              query={libraryQuery}
+              onQueryChange={setLibraryQuery}
+              onCancel={() => setLibraryOpen(false)}
+              onSelect={file => {
+                onLibraryFile?.(file);
+                setLibraryOpen(false);
+                setLibraryQuery("");
+              }}
+              listMaxHeightClass={
+                menuPlacement === "below" ? "max-h-32" : "max-h-48"
+              }
+            />
+          </div>
+        )}
+        <input
+          ref={fileInputRef}
+          type="file"
+          onChange={selectFile}
+          accept=".pdf,.txt,.md,.csv,.json,.png,.jpg,.jpeg,.webp,.docx"
+          className="sr-only"
+        />
+        {visibleAttachmentNotices.length > 0 && (
+          <div className="mx-2 mb-2 mt-1 flex flex-wrap gap-2">
+            {visibleAttachmentNotices.map(item => (
+              <div
+                key={item.fileId}
+                className="flex w-52 items-center gap-2 rounded-xl border border-border bg-muted/50 p-2 text-left shadow-sm"
+              >
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-background text-muted-foreground">
+                  {/(png|jpe?g|webp|gif)$/i.test(item.name) ? (
+                    <Image className="size-4" />
+                  ) : (
+                    <FileText className="size-4" />
+                  )}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-xs font-medium text-foreground">
+                    {item.name}
+                  </p>
+                  <p className="mt-0.5 text-[10px] leading-4 text-muted-foreground">
+                    {item.linked ? "Ready in this chat" : "Saved to Library"}
+                  </p>
+                </div>
+                {onClearAttachment && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => onClearAttachment(item.fileId)}
+                        className="size-7 shrink-0 rounded-lg"
+                        aria-label={
+                          attachmentNotices
+                            ? `Remove ${item.name}`
+                            : "Cancel selected upload"
+                        }
+                      >
+                        <X className="size-3.5" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">
+                      Remove selected file
+                    </TooltipContent>
+                  </Tooltip>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+        <Textarea
+          ref={textareaRef}
+          value={value}
+          onChange={event => onValueChange(event.target.value)}
+          onKeyDown={event => {
+            if (event.key === "Enter" && !event.shiftKey) {
+              event.preventDefault();
+              submit();
+            }
+          }}
+          disabled={isGenerating || isRecording || isTranscribing}
+          placeholder={
+            isRecording
+              ? "Listening…"
+              : isTranscribing
+                ? "Transcribing your recording…"
+                : "Ask KSEMO anything…"
+          }
+          className="min-h-12 max-h-44 resize-none border-0 bg-transparent px-3 pt-3 text-[15px] leading-6 shadow-none focus-visible:ring-0"
+          aria-label="Message KSEMO"
+        />
+        <div className="flex min-h-10 items-center justify-between px-1 pt-1">
+          {isRecording ? (
+            <div className="flex h-9 items-center gap-2 rounded-full border border-border bg-muted px-2">
+              <span
+                className="flex items-center gap-0.5 px-1"
+                aria-label={`Recording ${recordingSeconds} seconds`}
+              >
+                {[4, 8, 12, 7, 15, 9, 5, 11].map((height, index) => (
+                  <span
+                    key={index}
+                    className="w-px animate-pulse rounded-full bg-muted-foreground"
+                    style={{ height, animationDelay: `${index * 70}ms` }}
+                  />
+                ))}
+              </span>
+              <span className="text-[11px] font-medium tabular-nums text-muted-foreground">
+                {String(Math.floor(recordingSeconds / 60)).padStart(2, "0")}:
+                {String(recordingSeconds % 60).padStart(2, "0")}
+              </span>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={onCancelRecording}
+                    className="size-7 rounded-full"
+                    aria-label="Cancel recording"
+                  >
+                    <X className="size-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">Discard recording</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="icon"
+                    onClick={onVoice}
+                    className="size-7 rounded-full bg-foreground text-background hover:bg-foreground/90"
+                    aria-label="Finish recording"
+                  >
+                    <Check className="size-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  Transcribe recording
+                </TooltipContent>
+              </Tooltip>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1">
+              <DropdownMenu
+                open={toolsOpen && !libraryOpen}
+                onOpenChange={setToolsOpen}
+              >
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-9 rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground"
+                        aria-label="Open composer tools"
+                      >
+                        <Plus className="size-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    Add a file or browse Library
+                  </TooltipContent>
+                </Tooltip>
+                <DropdownMenuContent
+                  align="start"
+                  side={menuPlacement === "below" ? "bottom" : "top"}
+                  sideOffset={10}
+                  collisionPadding={12}
+                  className="w-56 rounded-xl"
+                >
+                  <DropdownMenuItem
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <FileUp className="mr-2 size-4" /> Add images and files
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      setLibraryOpen(true);
+                      setToolsOpen(false);
+                    }}
+                  >
+                    <Library className="mr-2 size-4" />
+                    Browse Library
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              {!isGenerating && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={onVoice}
+                      disabled={isTranscribing}
+                      className="size-9 rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground"
+                      aria-label="Use voice input"
+                    >
+                      <Mic className="size-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    Record a voice message
+                  </TooltipContent>
+                </Tooltip>
+              )}
+              {!isGenerating && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={onVoiceChat}
+                      disabled={isTranscribing || !onVoiceChat}
+                      className="size-9 rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground"
+                      aria-label="Start voice chat"
+                    >
+                      <AudioLines className="size-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    Start a live voice chat
+                  </TooltipContent>
+                </Tooltip>
+              )}
+            </div>
+          )}
+          <div className="ml-auto flex items-center">
+            {isGenerating ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    onClick={onCancel}
+                    size="icon"
+                    className="size-9 rounded-xl bg-foreground text-background hover:bg-foreground/90"
+                    aria-label="Stop generating"
+                  >
+                    <Square className="size-3.5 fill-current" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">Stop generating</TooltipContent>
+              </Tooltip>
+            ) : (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    onClick={submit}
+                    disabled={!value.trim() || isRecording || isTranscribing}
+                    size="icon"
+                    className="size-9 rounded-xl bg-foreground text-background hover:bg-foreground/90 disabled:bg-muted disabled:text-muted-foreground"
+                    aria-label="Send message"
+                  >
+                    <ArrowUp className="size-[18px]" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">Send message</TooltipContent>
+              </Tooltip>
+            )}
+          </div>
+        </div>
+      </div>
+      {showSafetyNote && (
+        <p className="mt-2 text-center text-[11px] text-muted-foreground">
+          KSEMO can make mistakes. Verify important details.
+        </p>
+      )}
+    </div>
+  );
+}
+
+export function LibraryPickerContent({
+  files,
+  query,
+  onQueryChange,
+  onSelect,
+  onCancel,
+  listMaxHeightClass = "max-h-48",
+}: {
+  files: Array<{
+    id: string;
+    filename: string;
+    mimeType?: string;
+    sizeBytes?: number;
+    url?: string;
+  }>;
+  query: string;
+  onQueryChange: (value: string) => void;
+  onSelect: (file: {
+    id: string;
+    filename: string;
+    mimeType?: string;
+    url?: string;
+  }) => void;
+  onCancel?: () => void;
+  listMaxHeightClass?: string;
+}) {
+  return (
+    <div className="space-y-2 p-2.5">
+      <div className="flex items-center gap-2 px-1">
+        <Library className="size-3.5 text-muted-foreground" />
+        <p className="flex-1 text-sm font-medium">Browse Library</p>
+        {onCancel && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onCancel}
+            className="h-6 rounded-lg px-2 text-[11px]"
+          >
+            Cancel
+          </Button>
+        )}
+      </div>
+      <Input
+        autoFocus
+        value={query}
+        onChange={event => onQueryChange(event.target.value)}
+        placeholder="Search your files and images"
+        className="h-9 rounded-xl bg-background text-sm"
+      />
+      <div
+        className={cn(listMaxHeightClass, "space-y-1.5 overflow-y-auto pr-1")}
+      >
+        {files.length ? (
+          files.map(file => (
+            <button
+              key={file.id}
+              onClick={() => onSelect(file)}
+              className="flex w-full items-center gap-2.5 rounded-xl border border-border bg-background p-2.5 text-left transition-colors hover:bg-muted"
+            >
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                {file.mimeType?.startsWith("image/") ? (
+                  <Image className="size-3.5" />
+                ) : (
+                  <FileText className="size-3.5" />
+                )}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-medium">
+                  {file.filename}
+                </span>
+                <span className="mt-0.5 block text-[11px] text-muted-foreground">
+                  {file.mimeType?.startsWith("image/") ? "Image" : "File"}
+                  {file.sizeBytes
+                    ? ` · ${Math.max(1, Math.round(file.sizeBytes / 1024))} KB`
+                    : ""}
+                </span>
+              </span>
+            </button>
+          ))
+        ) : (
+          <p className="px-3 py-6 text-center text-sm text-muted-foreground">
+            {query
+              ? "No Library items match that search."
+              : "Your Library is empty."}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
