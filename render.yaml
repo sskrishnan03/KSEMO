@@ -10,21 +10,21 @@ services:
         value: production
       # Using external Supabase database instead of Render database
       - key: DATABASE_URL
-        sync: false
+        value: postgresql://postgres:Kr1%24hnan_%232007_shin@db.xtlejhucvrjkbgcuotil.supabase.co:5432/postgres?sslmode=require&connect_timeout=10
       - key: SUPABASE_URL
-        sync: false
+        value: https://xtlejhucvrjkbgcuotil.supabase.co
       - key: SUPABASE_ANON_KEY
-        sync: false
+        value: sb_publishable_tohJXev8mQrppn3vbQ5SoQ_MSztN7LT
       - key: VITE_APP_ID
-        sync: false
+        value: ksemo-production
       - key: JWT_SECRET
-        generateValue: true
+        value: wAvS91+UVxYqpx8SY7R6zhMmad8Hgd8CtbX2sWXJFHpmqqWYIRgYNeX4moJaHDI3
       - key: OAUTH_SERVER_URL
         value: https://ksemo.onrender.com
       - key: OWNER_OPEN_ID
         sync: false
       - key: BUILT_IN_FORGE_API_URL
-        sync: false
+        value: https://generativelanguage.googleapis.com/v1beta/openai
       - key: BUILT_IN_FORGE_API_KEY
         sync: false
       # Google OAuth Configuration
@@ -36,23 +36,23 @@ services:
         value: https://ksemo.onrender.com/api/auth/google/callback
       # SMTP Configuration
       - key: SMTP_HOST
-        sync: false
+        value: smtp.gmail.com
       - key: SMTP_PORT
-        sync: false
+        value: 587
       - key: SMTP_USER
-        sync: false
+        value: sskrishnan03@gmail.com
       - key: SMTP_PASS
         sync: false
       - key: SMTP_FROM
-        sync: false
+        value: sskrishnan03@gmail.com
       # AI Configuration
       - key: LLM_BASE_URL
-        sync: false
+        value: https://generativelanguage.googleapis.com/v1beta/openai
       - key: GEMINI_API_KEY
         sync: false
       - key: AIML_API_KEY
         sync: false
       - key: AIML_MODEL
-        sync: false
+        value: openai/gpt-4o-mini
     healthCheckPath: /
     autoDeploy: false

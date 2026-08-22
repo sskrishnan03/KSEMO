@@ -152,6 +152,8 @@ export function registerGoogleOAuthRoutes(app: Express) {
 
       const openId = `google_${userInfo.sub}`;
       const displayName = userInfo.name || userInfo.email || "Google User";
+      console.log("[Google OAuth] User OpenID:", openId);
+      console.log("[Google OAuth] ⭐ SET THIS AS YOUR OWNER_OPEN_ID IN .env:", openId);
       console.log("[Google OAuth] Upserting user:", openId);
 
       await db.upsertUser({

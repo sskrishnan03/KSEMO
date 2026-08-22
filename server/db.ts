@@ -47,22 +47,42 @@ export async function upsertUser(user: InsertUser): Promise<void> {
   const db = await getDb();
   if (!db) throw new Error("Database connection failed - check DATABASE_URL");
 
-  const values: InsertUser = { openId: user.openId, lastSignedIn: new Date() };
-  const updateSet: Record<string, unknown> = { lastSignedIn: new Date() };
-  (["name", "email", "loginMethod", "passwordHash"] as const).forEach(field => {
-    if (user[field] !== undefined) {
-      values[field] = user[field] ?? null;
-      updateSet[field] = user[field] ?? null;
+  try {
+    const values: InsertUser = { openId: user.openId, lastSignedIn: new Date() };
+    const updateSet: Record<string, unknown> = { lastSignedIn: new Date() };
+    
+    // Only include fields that are provided
+    if (user.name !== undefined) {
+      values.name = user.name;
+      updateSet.name = user.name;
     }
-  });
-  values.role =
-    user.role ?? (user.openId === ENV.ownerOpenId ? "admin" : "user");
-  updateSet.role = values.role;
+    if (user.email !== undefined) {
+      values.email = user.email;
+      updateSet.email = user.email;
+    }
+    if (user.loginMethod !== undefined) {
+      values.loginMethod = user.loginMethod;
+      updateSet.loginMethod = user.loginMethod;
+    }
+    if (user.passwordHash !== undefined) {
+      values.passwordHash = user.passwordHash;
+      updateSet.passwordHash = user.passwordHash;
+    }
+    
+    // Set role based on owner or default to user
+    values.role = user.role ?? (user.openId === ENV.ownerOpenId ? "admin" : "user");
+    updateSet.role = values.role;
 
-  await db
-    .insert(users)
-    .values(values)
-    .onConflictDoUpdate({ target: users.openId, set: updateSet });
+    await db
+      .insert(users)
+      .values(values)
+      .onConflictDoUpdate({ target: users.openId, set: updateSet });
+      
+    console.log("[Database] User upserted successfully:", user.openId);
+  } catch (error) {
+    console.error("[Database] User upsert failed:", error);
+    throw new Error(`Failed to upsert user: ${error instanceof Error ? error.message : String(error)}`);
+  }
 }
 
 export async function getUserByOpenId(openId: string) {
