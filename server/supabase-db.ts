@@ -84,18 +84,57 @@ export async function upsertUser(user: InsertUser): Promise<void> {
   console.log("[Supabase] Attempting upsertUser with data:", JSON.stringify(dbValues));
   console.log("[Supabase] Using service role key:", !!process.env.SUPABASE_SERVICE_ROLE_KEY);
   
-  const { data, error } = await supabase
+  // First try to get existing user
+  const { data: existingUser, error: fetchError } = await supabase
     .from("users")
-    .upsert(dbValues)
-    .select()
+    .select("*")
+    .eq("open_id", dbValues.open_id)
     .single();
 
-  if (error) {
-    console.error("[Supabase] upsertUser error details:", JSON.stringify(error, null, 2));
-    handleSupabaseError(error, "upsertUser");
+  if (fetchError && fetchError.code !== "PGRST116") {
+    // Real error (not "not found")
+    console.error("[Supabase] Fetch user error:", JSON.stringify(fetchError, null, 2));
+    handleSupabaseError(fetchError, "fetchUser");
   }
-  
-  console.log("[Supabase] upsertUser succeeded:", data);
+
+  if (existingUser) {
+    // User exists - update them
+    console.log("[Supabase] User exists, updating:", existingUser.id);
+    const { data: updateData, error: updateError } = await supabase
+      .from("users")
+      .update({
+        name: dbValues.name ?? existingUser.name,
+        email: dbValues.email ?? existingUser.email,
+        login_method: dbValues.login_method ?? existingUser.login_method,
+        last_signed_in: dbValues.last_signed_in,
+        updated_at: new Date().toISOString()
+      })
+      .eq("id", existingUser.id)
+      .select()
+      .single();
+
+    if (updateError) {
+      console.error("[Supabase] Update user error:", JSON.stringify(updateError, null, 2));
+      handleSupabaseError(updateError, "updateUser");
+    }
+    
+    console.log("[Supabase] User updated successfully:", updateData);
+  } else {
+    // User doesn't exist - insert them
+    console.log("[Supabase] User doesn't exist, inserting new user");
+    const { data: insertData, error: insertError } = await supabase
+      .from("users")
+      .insert(dbValues)
+      .select()
+      .single();
+
+    if (insertError) {
+      console.error("[Supabase] Insert user error:", JSON.stringify(insertError, null, 2));
+      handleSupabaseError(insertError, "insertUser");
+    }
+    
+    console.log("[Supabase] User inserted successfully:", insertData);
+  }
 }
 
 export async function getUserByOpenId(openId: string): Promise<User | undefined> {
