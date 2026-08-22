@@ -2,7 +2,7 @@ import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 import axios from "axios";
 import type { Express, Request, Response } from "express";
 import { randomUUID } from "crypto";
-import * as db from "../db";
+import * as db from "../supabase-db";
 import { getSessionCookieOptions } from "./cookies";
 import { sdk } from "./sdk";
 
@@ -174,7 +174,7 @@ export function registerGoogleOAuthRoutes(app: Express) {
       const displayName = userInfo.name || userInfo.email || "Google User";
 
       await db.upsertUser({
-        openId,
+        openId: openId,
         name: userInfo.name || null,
         email: userInfo.email ?? null,
         loginMethod: "google",

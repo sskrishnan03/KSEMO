@@ -1,9 +1,13 @@
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
-import { getDb } from "../db";
+import { createClient } from "@supabase/supabase-js";
 import { storagePut } from "../storage";
 import { protectedProcedure, router } from "../_core/trpc";
+
+const supabaseUrl = process.env.SUPABASE_URL || "https://vauqtdjpjwlhfgixfrij.supabase.co";
+const supabaseKey = process.env.SUPABASE_ANON_KEY || "sb_publishable_wCv3g2jSb_qMbR7I3Fifbg_obIw1iuq";
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 const entityId = z.string().min(8).max(36);
 const projectInput = z.object({
@@ -19,22 +23,17 @@ const memoryInput = z.object({
   projectId: entityId.nullable().optional(),
 });
 
-async function dbOrThrow() {
-  const db = await getDb();
-  if (!db)
-    throw new TRPCError({
-      code: "INTERNAL_SERVER_ERROR",
-      message: "KSEMO storage is unavailable.",
-    });
-  return db;
-}
-
 async function ownedProject(projectId: string, userId: number) {
-  const storage = await dbOrThrow();
-  const project = storage.projects.get(projectId);
-  if (!project || project.userId !== userId)
+  const { data, error } = await supabase
+    .from("projects")
+    .select("*")
+    .eq("id", projectId)
+    .eq("user_id", userId)
+    .single();
+
+  if (error || !data)
     throw new TRPCError({ code: "NOT_FOUND", message: "Project not found." });
-  return project;
+  return data;
 }
 
 async function optionalOwnedProject(
@@ -68,150 +67,177 @@ const allowedMimeTypes = new Set([
 export const workspaceRouter = router({
   projects: router({
     list: protectedProcedure.query(async ({ ctx }) => {
-      const storage = await dbOrThrow();
-      return Array.from(storage.projects.values())
-        .filter(p => p.userId === ctx.user.id && !p.isArchived)
-        .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+      const { data, error } = await supabase
+        .from("projects")
+        .select("*")
+        .eq("user_id", ctx.user.id)
+        .eq("is_archived", false)
+        .order("updated_at", { ascending: false });
+
+      if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to fetch projects" });
+      return data || [];
     }),
     create: protectedProcedure
       .input(projectInput)
       .mutation(async ({ ctx, input }) => {
-        const storage = await dbOrThrow();
         const id = nanoid();
-        const now = new Date();
-        const project = {
+        const { data, error } = await supabase.from("projects").insert({
           id,
-          userId: ctx.user.id,
+          user_id: ctx.user.id,
           name: input.name,
           description: input.description ?? null,
           instructions: input.instructions ?? null,
-          isArchived: false,
-          createdAt: now,
-          updatedAt: now,
-        };
-        storage.projects.set(id, project);
-        return project;
+          is_archived: false,
+        }).select().single();
+
+        if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create project" });
+        return data;
       }),
     update: protectedProcedure
       .input(projectInput.partial().extend({ id: entityId }))
       .mutation(async ({ ctx, input }) => {
-        const storage = await dbOrThrow();
         await ownedProject(input.id, ctx.user.id);
         const { id, ...values } = input;
-        const project = storage.projects.get(id);
-        if (project) {
-          Object.assign(project, values, { updatedAt: new Date() });
-          storage.projects.set(id, project);
-        }
-        return project;
+        const { data, error } = await supabase
+          .from("projects")
+          .update(values)
+          .eq("id", id)
+          .select()
+          .single();
+
+        if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to update project" });
+        return data;
       }),
     archive: protectedProcedure
       .input(z.object({ id: entityId, isArchived: z.boolean() }))
       .mutation(async ({ ctx, input }) => {
-        const storage = await dbOrThrow();
         const project = await ownedProject(input.id, ctx.user.id);
-        project.isArchived = input.isArchived;
-        project.updatedAt = new Date();
-        storage.projects.set(input.id, project);
+        const { error } = await supabase
+          .from("projects")
+          .update({ is_archived: input.isArchived })
+          .eq("id", input.id);
+
+        if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to archive project" });
         return { success: true } as const;
       }),
     remove: protectedProcedure
       .input(z.object({ id: entityId }))
       .mutation(async ({ ctx, input }) => {
-        const storage = await dbOrThrow();
         await ownedProject(input.id, ctx.user.id);
-        storage.projects.delete(input.id);
+        const { error } = await supabase
+          .from("projects")
+          .delete()
+          .eq("id", input.id);
+
+        if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to delete project" });
         return { success: true } as const;
       }),
     conversations: protectedProcedure
       .input(z.object({ projectId: entityId }))
       .query(async ({ ctx, input }) => {
-        const storage = await dbOrThrow();
         await ownedProject(input.projectId, ctx.user.id);
-        return Array.from(storage.conversations.values())
-          .filter(
-            c =>
-              c.userId === ctx.user.id &&
-              c.projectId === input.projectId &&
-              c.deletedAt === null
-          )
-          .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+        const { data, error } = await supabase
+          .from("conversations")
+          .select("*")
+          .eq("user_id", ctx.user.id)
+          .eq("project_id", input.projectId)
+          .is("deleted_at", null)
+          .order("updated_at", { ascending: false });
+
+        if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to fetch conversations" });
+        return data || [];
       }),
     setConversation: protectedProcedure
       .input(
         z.object({ conversationId: entityId, projectId: entityId.nullable() })
       )
       .mutation(async ({ ctx, input }) => {
-        const storage = await dbOrThrow();
         await optionalOwnedProject(input.projectId, ctx.user.id);
-        const conversation = storage.conversations.get(input.conversationId);
-        if (!conversation || conversation.userId !== ctx.user.id)
+        const { data: conversation, error: findError } = await supabase
+          .from("conversations")
+          .select("*")
+          .eq("id", input.conversationId)
+          .eq("user_id", ctx.user.id)
+          .single();
+
+        if (findError || !conversation)
           throw new TRPCError({
             code: "NOT_FOUND",
             message: "Conversation not found.",
           });
-        conversation.projectId = input.projectId;
-        conversation.updatedAt = new Date();
-        storage.conversations.set(input.conversationId, conversation);
+
+        const { error: updateError } = await supabase
+          .from("conversations")
+          .update({ project_id: input.projectId })
+          .eq("id", input.conversationId);
+
+        if (updateError) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to set conversation project" });
         return { success: true } as const;
       }),
   }),
   memories: router({
     list: protectedProcedure.query(async ({ ctx }) => {
-      const storage = await dbOrThrow();
-      return Array.from(storage.memories.values())
-        .filter(m => m.userId === ctx.user.id)
-        .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+      const { data, error } = await supabase
+        .from("memories")
+        .select("*")
+        .eq("user_id", ctx.user.id)
+        .order("updated_at", { ascending: false });
+
+      if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to fetch memories" });
+      return data || [];
     }),
     create: protectedProcedure
       .input(memoryInput)
       .mutation(async ({ ctx, input }) => {
-        const storage = await dbOrThrow();
         await optionalOwnedProject(input.projectId, ctx.user.id);
         const id = nanoid();
-        const now = new Date();
-        const memory = {
+        const { data, error } = await supabase.from("memories").insert({
           id,
-          userId: ctx.user.id,
+          user_id: ctx.user.id,
           content: input.content,
           category: input.category,
-          projectId: input.projectId ?? null,
-          isActive: true,
-          createdAt: now,
-          updatedAt: now,
-        };
-        storage.memories.set(id, memory);
-        return memory;
+          project_id: input.projectId ?? null,
+          is_active: true,
+        }).select().single();
+
+        if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create memory" });
+        return data;
       }),
     setActive: protectedProcedure
       .input(z.object({ id: entityId, isActive: z.boolean() }))
       .mutation(async ({ ctx, input }) => {
-        const storage = await dbOrThrow();
-        const memory = storage.memories.get(input.id);
-        if (memory && memory.userId === ctx.user.id) {
-          memory.isActive = input.isActive;
-          memory.updatedAt = new Date();
-          storage.memories.set(input.id, memory);
-        }
+        const { error } = await supabase
+          .from("memories")
+          .update({ is_active: input.isActive })
+          .eq("id", input.id)
+          .eq("user_id", ctx.user.id);
+
+        if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to update memory" });
         return { success: true } as const;
       }),
     remove: protectedProcedure
       .input(z.object({ id: entityId }))
       .mutation(async ({ ctx, input }) => {
-        const storage = await dbOrThrow();
-        const memory = storage.memories.get(input.id);
-        if (memory && memory.userId === ctx.user.id) {
-          storage.memories.delete(input.id);
-        }
+        const { error } = await supabase
+          .from("memories")
+          .delete()
+          .eq("id", input.id)
+          .eq("user_id", ctx.user.id);
+
+        if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to delete memory" });
         return { success: true } as const;
       }),
   }),
   files: router({
     list: protectedProcedure.query(async ({ ctx }) => {
-      const storage = await dbOrThrow();
-      return Array.from(storage.files.values())
-        .filter(f => f.userId === ctx.user.id)
-        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      const { data, error } = await supabase
+        .from("files")
+        .select("*")
+        .eq("user_id", ctx.user.id)
+        .order("created_at", { ascending: false });
+
+      if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to fetch files" });
+      return data || [];
     }),
     upload: protectedProcedure
       .input(
@@ -235,83 +261,100 @@ export const workspaceRouter = router({
             message: "Files must be smaller than 8 MB.",
           });
         await optionalOwnedProject(input.projectId, ctx.user.id);
-        const storage = await dbOrThrow();
         const id = nanoid();
         const saved = await storagePut(
           `library/${ctx.user.id}/${id}-${safeFilename(input.filename)}`,
           buffer,
           input.mimeType
         );
-        const now = new Date();
-        const file = {
+        const { data, error } = await supabase.from("files").insert({
           id,
-          userId: ctx.user.id,
-          projectId: input.projectId ?? null,
-          storageKey: saved.key,
+          user_id: ctx.user.id,
+          project_id: input.projectId ?? null,
+          storage_key: saved.key,
           url: saved.url,
           filename: input.filename,
-          mimeType: input.mimeType,
-          sizeBytes: buffer.length,
-          status: "ready" as const,
-          createdAt: now,
-          updatedAt: now,
-        };
-        storage.files.set(id, file);
-        return file;
+          mime_type: input.mimeType,
+          size_bytes: buffer.length,
+          status: "ready",
+        }).select().single();
+
+        if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to upload file" });
+        return data;
       }),
     remove: protectedProcedure
       .input(z.object({ id: entityId }))
       .mutation(async ({ ctx, input }) => {
-        const storage = await dbOrThrow();
-        const file = storage.files.get(input.id);
-        if (file && file.userId === ctx.user.id) {
-          storage.files.delete(input.id);
-        }
+        const { error } = await supabase
+          .from("files")
+          .delete()
+          .eq("id", input.id)
+          .eq("user_id", ctx.user.id);
+
+        if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to delete file" });
         return { success: true } as const;
       }),
     attachToConversation: protectedProcedure
       .input(z.object({ fileId: entityId, conversationId: entityId }))
       .mutation(async ({ ctx, input }) => {
-        const storage = await dbOrThrow();
-        const file = storage.files.get(input.fileId);
-        if (!file || file.userId !== ctx.user.id)
+        const { data: file, error: fileError } = await supabase
+          .from("files")
+          .select("*")
+          .eq("id", input.fileId)
+          .eq("user_id", ctx.user.id)
+          .single();
+
+        if (fileError || !file)
           throw new TRPCError({
             code: "NOT_FOUND",
             message: "File not found.",
           });
-        const conversation = storage.conversations.get(input.conversationId);
-        if (!conversation || conversation.userId !== ctx.user.id)
+
+        const { data: conversation, error: convError } = await supabase
+          .from("conversations")
+          .select("*")
+          .eq("id", input.conversationId)
+          .eq("user_id", ctx.user.id)
+          .single();
+
+        if (convError || !conversation)
           throw new TRPCError({
             code: "NOT_FOUND",
             message: "Conversation not found.",
           });
-        const existing = Array.from(storage.attachments.values()).find(
-          a => a.fileId === file.id && a.conversationId === conversation.id
-        );
+
+        const { data: existing } = await supabase
+          .from("attachments")
+          .select("*")
+          .eq("file_id", file.id)
+          .eq("conversation_id", conversation.id)
+          .single();
+
         if (!existing) {
-          const attachment = {
+          const { error: insertError } = await supabase.from("attachments").insert({
             id: nanoid(),
-            fileId: file.id,
-            conversationId: conversation.id,
-            messageId: null,
-            createdAt: new Date(),
-          };
-          storage.attachments.set(attachment.id, attachment);
+            file_id: file.id,
+            conversation_id: conversation.id,
+            message_id: null,
+          });
+
+          if (insertError) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to attach file" });
         }
+
         return { success: true } as const;
       }),
   }),
   search: protectedProcedure
     .input(z.object({ query: z.string().trim().min(2).max(120) }))
     .query(async ({ ctx, input }) => {
-      const storage = await dbOrThrow();
-      const pattern = input.query.toLowerCase();
-      const memoryResults = Array.from(storage.memories.values())
-        .filter(
-          m =>
-            m.userId === ctx.user.id && m.content.toLowerCase().includes(pattern)
-        )
-        .slice(0, 8);
-      return { memories: memoryResults };
+      const { data, error } = await supabase
+        .from("memories")
+        .select("*")
+        .eq("user_id", ctx.user.id)
+        .ilike("content", `%${input.query}%`)
+        .limit(8);
+
+      if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to search" });
+      return { memories: data || [] };
     }),
 });

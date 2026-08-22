@@ -2,7 +2,7 @@ import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 import { TRPCError } from "@trpc/server";
 import { createHash, randomBytes, scryptSync, timingSafeEqual } from "crypto";
 import { z } from "zod";
-import * as db from "../db";
+import * as db from "../supabase-db";
 import { getSessionCookieOptions } from "../_core/cookies";
 import { isMailerConfigured, sendPasswordResetEmail } from "../_core/mailer";
 import { sdk } from "../_core/sdk";
@@ -64,9 +64,7 @@ async function issueSessionCookie(
 }
 
 async function findUserByEmail(email: string) {
-  const storage = await db.getDb();
-  const users = Array.from(storage.users.values());
-  return users.find(u => u.email === email);
+  return await db.getUserByEmail(email);
 }
 
 export const signUpProcedure = publicProcedure
@@ -89,7 +87,7 @@ export const signUpProcedure = publicProcedure
 
     const openId = emailOpenId(input.email);
     await db.upsertUser({
-      openId,
+      openId: openId,
       name: input.name,
       email: input.email,
       loginMethod: "password",
@@ -153,13 +151,18 @@ export const requestPasswordResetProcedure = publicProcedure
     const token = randomBytes(32).toString("base64url");
     const tokenHash = createHash("sha256").update(token).digest("hex");
 
-    const storage = await db.getDb();
-    const existingUser = storage.users.get(user.openId);
-    if (existingUser) {
-      existingUser.resetTokenHash = tokenHash;
-      existingUser.resetTokenExpiresAt = new Date(Date.now() + RESET_TOKEN_TTL_MS);
-      existingUser.updatedAt = new Date();
-      storage.users.set(existingUser.openId, existingUser);
+    // Update user with reset token in Supabase
+    const { error: updateError } = await (db as any).supabase
+      .from("users")
+      .update({
+        reset_token_hash: tokenHash,
+        reset_token_expires_at: new Date(Date.now() + RESET_TOKEN_TTL_MS).toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .eq("open_id", user.openId);
+
+    if (updateError) {
+      console.error("[Auth] Failed to set reset token:", updateError);
     }
 
     // Absolute link back into this deployment, derived from the incoming
@@ -209,29 +212,40 @@ export const resetPasswordProcedure = publicProcedure
     z.object({ token: z.string().min(20).max(128), password: passwordInput })
   )
   .mutation(async ({ input }) => {
-    const storage = await db.getDb();
     const tokenHash = createHash("sha256").update(input.token).digest("hex");
-    
-    const user = Array.from(storage.users.values()).find(
-      u => u.resetTokenHash === tokenHash
-    );
 
-    if (
-      !user ||
-      !user.resetTokenExpiresAt ||
-      user.resetTokenExpiresAt.getTime() < Date.now()
-    ) {
+    // Find user with valid reset token in Supabase
+    const { data: users, error: findError } = await (db as any).supabase
+      .from("users")
+      .select("*")
+      .eq("reset_token_hash", tokenHash)
+      .gt("reset_token_expires_at", new Date().toISOString())
+      .single();
+
+    if (findError || !users) {
       throw new TRPCError({
         code: "BAD_REQUEST",
         message: "This reset link is invalid or has expired.",
       });
     }
 
-    user.passwordHash = hashPassword(input.password);
-    user.resetTokenHash = null;
-    user.resetTokenExpiresAt = null;
-    user.updatedAt = new Date();
-    storage.users.set(user.openId, user);
+    // Update user password
+    const { error: updateError } = await (db as any).supabase
+      .from("users")
+      .update({
+        password_hash: hashPassword(input.password),
+        reset_token_hash: null,
+        reset_token_expires_at: null,
+        updated_at: new Date().toISOString()
+      })
+      .eq("open_id", users.open_id);
+
+    if (updateError) {
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: "Failed to reset password.",
+      });
+    }
 
     return { success: true as const };
   });

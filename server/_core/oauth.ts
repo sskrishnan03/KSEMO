@@ -6,7 +6,7 @@ import {
 } from "@shared/const";
 import { parse as parseCookieHeader } from "cookie";
 import type { Express, Request, Response } from "express";
-import * as db from "../db";
+import * as db from "../supabase-db";
 import { getSessionCookieOptions } from "./cookies";
 import { sdk } from "./sdk";
 

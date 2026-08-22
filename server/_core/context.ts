@@ -1,5 +1,5 @@
 import type { CreateExpressContextOptions } from "@trpc/server/adapters/express";
-import type { User } from "../db";
+import type { User } from "../supabase-db";
 import { sdk } from "./sdk";
 
 export type TrpcContext = {

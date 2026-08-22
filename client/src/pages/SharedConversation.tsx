@@ -43,7 +43,7 @@ export default function SharedConversation() {
           </h1>
         </div>
         <div className="space-y-6">
-          {shared.data.messages.map(message => (
+          {shared.data.messages.map((message: any) => (
             <article
               key={message.id}
               className={

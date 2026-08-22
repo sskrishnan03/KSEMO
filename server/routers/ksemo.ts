@@ -24,7 +24,7 @@ import {
   updateConversationForUser,
   upsertUserPreferences,
   updateVoiceSessionForUser,
-} from "../db";
+} from "../supabase-db";
 import { listLLMModels } from "../_core/llm";
 import { transcribeAudio } from "../_core/voiceTranscription";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
@@ -188,7 +188,7 @@ export const conversationRouter = router({
         : null;
       const updated = await updateConversationForUser(input.id, ctx.user.id, {
         isPublic: input.isPublic,
-        shareToken,
+        shareToken: shareToken,
       });
       return {
         isPublic: Boolean(updated?.isPublic),
@@ -207,17 +207,17 @@ export const conversationRouter = router({
       return {
         conversation: {
           title: shared.conversation.title,
-          createdAt: shared.conversation.createdAt,
+          createdAt: new Date(shared.conversation.created_at),
         },
         messages: shared.messages
           .filter(
-            message => message.role === "user" || message.role === "assistant"
+            (message: any) => message.role === "user" || message.role === "assistant"
           )
-          .map(message => ({
+          .map((message: any) => ({
             id: message.id,
             role: message.role,
             content: message.content,
-            createdAt: message.createdAt,
+            createdAt: new Date(message.created_at),
           })),
       };
     }),
@@ -229,7 +229,7 @@ export const conversationRouter = router({
         searchConversationTitles(ctx.user.id, input.query),
       ]);
       return {
-        chats: titleMatches.map(conversation => ({
+        chats: titleMatches.map((conversation: any) => ({
           conversationId: conversation.id,
           conversationTitle: conversation.title,
           createdAt: conversation.updatedAt,

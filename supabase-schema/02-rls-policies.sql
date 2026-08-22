@@ -323,7 +323,7 @@ CREATE POLICY "Users can insert own task activities"
 CREATE POLICY "Users can update own task activities"
     ON task_activities FOR UPDATE
     USING (user_id = (SELECT id FROM users WHERE open_id = auth.uid()::text LIMIT 1))
-    WITH CHECK (user_id = (SELECT id FROM users WHERE open_id::auth.uid()::text LIMIT 1));
+    WITH CHECK (user_id = (SELECT id FROM users WHERE open_id = auth.uid()::text LIMIT 1));
 
 -- ============================================
 -- HELPER FUNCTION FOR USER ID LOOKUP

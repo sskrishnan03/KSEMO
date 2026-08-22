@@ -9,8 +9,8 @@ import axios, { type AxiosInstance } from "axios";
 import { parse as parseCookieHeader } from "cookie";
 import type { Request } from "express";
 import { SignJWT, jwtVerify } from "jose";
-import type { User } from "../db";
-import * as db from "../db";
+import type { User } from "../supabase-db";
+import * as db from "../supabase-db";
 import { ENV } from "./env";
 import type {
   ExchangeTokenRequest,
@@ -373,7 +373,7 @@ function buildCronUser(
     lastSignedIn: now,
     taskUid: userInfo.taskUid ?? undefined,
     isCron: true,
-  } as AuthenticatedUser;
+  } as any;
 }
 
 export const sdk = new SDKServer();

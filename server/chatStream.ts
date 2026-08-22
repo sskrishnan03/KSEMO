@@ -11,7 +11,7 @@ import {
   removeFollowingAssistantDuplicatesForUser,
   updateConversationForUser,
   updateMessage,
-} from "./db";
+} from "./supabase-db";
 import { streamLLM, type Message } from "./_core/llm";
 import { sdk } from "./_core/sdk";
 import { storageGetSignedUrl } from "./storage";

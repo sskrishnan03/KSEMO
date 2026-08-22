@@ -19,10 +19,33 @@ import {
   dbToUser,
   dbToConversation,
   dbToMessage,
+  dbToUserPreference,
+  userToDb,
+  conversationToDb,
+  messageToDb,
   type DbUser,
   type DbConversation,
   type DbMessage,
+  type DbUserPreference,
 } from "../supabase-schema/04-types";
+
+// Re-export types for external use
+export type {
+  User,
+  InsertUser,
+  Conversation,
+  Message,
+  UserPreference,
+  VoiceSession,
+  MessageVersion,
+  MessageFeedback,
+  Project,
+  KsemoFile,
+  Attachment,
+  Memory,
+  Task,
+  TaskActivity,
+};
 
 const supabaseUrl = process.env.SUPABASE_URL || "https://vauqtdjpjwlhfgixfrij.supabase.co";
 const supabaseKey = process.env.SUPABASE_ANON_KEY || "sb_publishable_wCv3g2jSb_qMbR7I3Fifbg_obIw1iuq";
@@ -45,14 +68,13 @@ function toDate(dateString: string | null): Date | null {
 // ============================================
 
 export async function upsertUser(user: InsertUser): Promise<void> {
-  const { data, error } = await supabase.rpc("upsert_user", {
-    p_open_id: user.open_id,
-    p_name: user.name || null,
-    p_email: user.email || null,
-    p_login_method: user.login_method || null,
-    p_password_hash: user.password_hash || null,
-    p_last_signed_in: user.last_signed_in?.toISOString() || new Date().toISOString(),
-  });
+  const dbValues = userToDb(user);
+  
+  const { data, error } = await supabase
+    .from("users")
+    .upsert(dbValues)
+    .select()
+    .single();
 
   if (error) {
     handleSupabaseError(error, "upsertUser");
@@ -170,23 +192,23 @@ export async function updateConversationForUser(
     Pick<
       Conversation,
       | "title"
-      | "is_pinned"
-      | "is_archived"
-      | "is_public"
-      | "share_token"
-      | "conversation_type"
-      | "project_id"
+      | "isPinned"
+      | "isArchived"
+      | "isPublic"
+      | "shareToken"
+      | "conversationType"
+      | "projectId"
     >
   >
 ): Promise<Conversation | undefined> {
   const updateData: any = {};
   if (values.title !== undefined) updateData.title = values.title;
-  if (values.is_pinned !== undefined) updateData.is_pinned = values.is_pinned;
-  if (values.is_archived !== undefined) updateData.is_archived = values.is_archived;
-  if (values.is_public !== undefined) updateData.is_public = values.is_public;
-  if (values.share_token !== undefined) updateData.share_token = values.share_token;
-  if (values.conversation_type !== undefined) updateData.conversation_type = values.conversation_type;
-  if (values.project_id !== undefined) updateData.project_id = values.project_id;
+  if (values.isPinned !== undefined) updateData.is_pinned = values.isPinned;
+  if (values.isArchived !== undefined) updateData.is_archived = values.isArchived;
+  if (values.isPublic !== undefined) updateData.is_public = values.isPublic;
+  if (values.shareToken !== undefined) updateData.share_token = values.shareToken;
+  if (values.conversationType !== undefined) updateData.conversation_type = values.conversationType;
+  if (values.projectId !== undefined) updateData.project_id = values.projectId;
 
   const { data, error } = await supabase
     .from("conversations")
@@ -297,14 +319,8 @@ export async function listMessagesForConversation(conversationId: string): Promi
 }
 
 export async function createMessage(input: Message): Promise<void> {
-  const { error } = await supabase.from("messages").insert({
-    id: input.id,
-    conversation_id: input.conversation_id,
-    role: input.role,
-    content: input.content,
-    model: input.model,
-    status: input.status,
-  });
+  const dbValues = messageToDb(input);
+  const { error } = await supabase.from("messages").insert(dbValues);
 
   if (error) {
     handleSupabaseError(error, "createMessage");
@@ -360,6 +376,39 @@ export async function deleteMessageForUser(messageId: string, userId: number): P
   return true;
 }
 
+export async function removeFollowingAssistantDuplicatesForUser(
+  assistantMessageId: string,
+  userId: number
+) {
+  const assistant = await getMessageForUser(assistantMessageId, userId);
+  if (!assistant || assistant.role !== "assistant") return [];
+
+  const conversationMessages = await listMessagesForConversation(assistant.conversationId);
+  const index = conversationMessages.findIndex(m => m.id === assistant.id);
+  if (index < 0) return [];
+
+  const duplicateIds: string[] = [];
+  for (let cursor = index + 1; cursor < conversationMessages.length; cursor++) {
+    const message = conversationMessages[cursor];
+    if (message.role === "user") break;
+    if (message.role === "assistant") duplicateIds.push(message.id);
+  }
+
+  // Delete all duplicate messages
+  for (const id of duplicateIds) {
+    const { error } = await supabase
+      .from("messages")
+      .delete()
+      .eq("id", id);
+
+    if (error) {
+      console.error(`Failed to delete duplicate message ${id}:`, error);
+    }
+  }
+
+  return duplicateIds;
+}
+
 export async function editMessageForUser(input: {
   id: string;
   userId: number;
@@ -411,9 +460,9 @@ export async function listMessageVersionsForUser(messageId: string, userId: numb
 
   return (data || []).map((v: any) => ({
     id: v.id,
-    message_id: v.message_id,
+    messageId: v.message_id,
     content: v.content,
-    created_at: new Date(v.created_at),
+    createdAt: new Date(v.created_at),
   }));
 }
 
@@ -487,32 +536,28 @@ export async function getUserPreferences(userId: number): Promise<UserPreference
     handleSupabaseError(error, "getUserPreferences");
   }
 
-  return {
-    user_id: data.user_id,
-    selected_model: data.selected_model,
-    persona: data.persona,
-    custom_instructions: data.custom_instructions,
-    speech_rate: data.speech_rate,
-    auto_play_responses: data.auto_play_responses,
-    reduce_motion: data.reduce_motion,
-    created_at: new Date(data.created_at),
-    updated_at: new Date(data.updated_at),
-  };
+  return dbToUserPreference(data as DbUserPreference);
 }
 
 export async function upsertUserPreferences(
   userId: number,
-  values: Partial<Omit<UserPreference, "user_id" | "created_at" | "updated_at">>
+  values: Partial<Omit<UserPreference, "userId" | "createdAt" | "updatedAt">>
 ): Promise<UserPreference | undefined> {
-  const { error } = await supabase.rpc("upsert_user_preferences", {
-    p_user_id: userId,
-    p_selected_model: values.selected_model || null,
-    p_persona: values.persona || "balanced",
-    p_custom_instructions: values.custom_instructions || null,
-    p_speech_rate: values.speech_rate || 100,
-    p_auto_play_responses: values.auto_play_responses || false,
-    p_reduce_motion: values.reduce_motion || false,
-  });
+  const dbValues: any = {
+    user_id: userId,
+    selected_model: values.selectedModel || null,
+    persona: values.persona || "balanced",
+    custom_instructions: values.customInstructions || null,
+    speech_rate: values.speechRate || 100,
+    auto_play_responses: values.autoPlayResponses || false,
+    reduce_motion: values.reduceMotion || false,
+  };
+
+  const { error } = await supabase
+    .from("user_preferences")
+    .upsert(dbValues)
+    .select()
+    .single();
 
   if (error) {
     handleSupabaseError(error, "upsertUserPreferences");
@@ -543,11 +588,11 @@ export async function createVoiceSession(input: {
 
   return {
     id: data.id,
-    user_id: data.user_id,
-    conversation_id: data.conversation_id,
+    userId: data.user_id,
+    conversationId: data.conversation_id,
     status: data.status,
-    created_at: new Date(data.created_at),
-    updated_at: new Date(data.updated_at),
+    createdAt: new Date(data.created_at),
+    updatedAt: new Date(data.updated_at),
   };
 }
 
@@ -633,7 +678,7 @@ export async function attachFileToMessageForUser(input: {
     id: input.id,
     file_id: input.fileId,
     message_id: input.messageId,
-    conversation_id: message.conversation_id,
+    conversation_id: message.conversationId,
   });
 
   if (error) {
@@ -661,13 +706,13 @@ export async function listProjectsForUser(userId: number): Promise<Project[]> {
 
   return (data || []).map((p: any) => ({
     id: p.id,
-    user_id: p.user_id,
+    userId: p.user_id,
     name: p.name,
     description: p.description,
     instructions: p.instructions,
-    is_archived: p.is_archived,
-    created_at: new Date(p.created_at),
-    updated_at: new Date(p.updated_at),
+    isArchived: p.is_archived,
+    createdAt: new Date(p.created_at),
+    updatedAt: new Date(p.updated_at),
   }));
 }
 
@@ -693,13 +738,13 @@ export async function createProjectForUser(input: {
 
   return {
     id: data.id,
-    user_id: data.user_id,
+    userId: data.user_id,
     name: data.name,
     description: data.description,
     instructions: data.instructions,
-    is_archived: data.is_archived,
-    created_at: new Date(data.created_at),
-    updated_at: new Date(data.updated_at),
+    isArchived: data.is_archived,
+    createdAt: new Date(data.created_at),
+    updatedAt: new Date(data.updated_at),
   };
 }
 
@@ -720,13 +765,13 @@ export async function listMemoriesForUser(userId: number): Promise<Memory[]> {
 
   return (data || []).map((m: any) => ({
     id: m.id,
-    user_id: m.user_id,
-    project_id: m.project_id,
+    userId: m.user_id,
+    projectId: m.project_id,
     category: m.category,
     content: m.content,
-    is_active: m.is_active,
-    created_at: new Date(m.created_at),
-    updated_at: new Date(m.updated_at),
+    isActive: m.is_active,
+    createdAt: new Date(m.created_at),
+    updatedAt: new Date(m.updated_at),
   }));
 }
 
@@ -752,13 +797,13 @@ export async function createMemoryForUser(input: {
 
   return {
     id: data.id,
-    user_id: data.user_id,
-    project_id: data.project_id,
+    userId: data.user_id,
+    projectId: data.project_id,
     category: data.category,
     content: data.content,
-    is_active: data.is_active,
-    created_at: new Date(data.created_at),
-    updated_at: new Date(data.updated_at),
+    isActive: data.is_active,
+    createdAt: new Date(data.created_at),
+    updatedAt: new Date(data.updated_at),
   };
 }
 
@@ -794,17 +839,17 @@ export async function getTaskForUser(taskId: string, userId: number): Promise<Ta
 
   return {
     id: data.id,
-    user_id: data.user_id,
-    agent_id: data.agent_id,
-    project_id: data.project_id,
-    conversation_id: data.conversation_id,
+    userId: data.user_id,
+    agentId: data.agent_id,
+    projectId: data.project_id,
+    conversationId: data.conversation_id,
     title: data.title,
     details: data.details,
     status: data.status,
     priority: data.priority,
-    due_at: data.due_at ? new Date(data.due_at) : null,
-    created_at: new Date(data.created_at),
-    updated_at: new Date(data.updated_at),
+    dueAt: data.due_at ? new Date(data.due_at) : null,
+    createdAt: new Date(data.created_at),
+    updatedAt: new Date(data.updated_at),
   };
 }
 
@@ -822,15 +867,15 @@ export async function listTaskActivitiesForUser(taskId: string, userId: number) 
 
   return (data || []).map((a: any) => ({
     id: a.id,
-    user_id: a.user_id,
-    task_id: a.task_id,
+    userId: a.user_id,
+    taskId: a.task_id,
     status: a.status,
     summary: a.summary,
     detail: a.detail,
-    started_at: a.started_at ? new Date(a.started_at) : null,
-    completed_at: a.completed_at ? new Date(a.completed_at) : null,
-    created_at: new Date(a.created_at),
-    updated_at: new Date(a.updated_at),
+    startedAt: a.started_at ? new Date(a.started_at) : null,
+    completedAt: a.completed_at ? new Date(a.completed_at) : null,
+    createdAt: new Date(a.created_at),
+    updatedAt: new Date(a.updated_at),
   }));
 }
 
@@ -865,15 +910,15 @@ export async function createTaskActivityForUser(input: {
 
   return {
     id: data.id,
-    user_id: data.user_id,
-    task_id: data.task_id,
+    userId: data.user_id,
+    taskId: data.task_id,
     status: data.status,
     summary: data.summary,
     detail: data.detail,
-    started_at: data.started_at ? new Date(data.started_at) : null,
-    completed_at: data.completed_at ? new Date(data.completed_at) : null,
-    created_at: new Date(data.created_at),
-    updated_at: new Date(data.updated_at),
+    startedAt: data.started_at ? new Date(data.started_at) : null,
+    completedAt: data.completed_at ? new Date(data.completed_at) : null,
+    createdAt: new Date(data.created_at),
+    updatedAt: new Date(data.updated_at),
   };
 }
 
