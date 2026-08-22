@@ -29,8 +29,9 @@ export async function getDb() {
         ssl: process.env.DATABASE_URL.includes('sslmode=require') ? { rejectUnauthorized: false } : false
       });
       _db = drizzle(_pool);
+      console.log("[Database] Connected successfully");
     } catch (error) {
-      console.warn("[Database] Failed to connect:", error);
+      console.error("[Database] Failed to connect:", error);
       _db = null;
       if (_pool) {
         await _pool.end();
@@ -44,7 +45,7 @@ export async function getDb() {
 export async function upsertUser(user: InsertUser): Promise<void> {
   if (!user.openId) throw new Error("User openId is required for upsert");
   const db = await getDb();
-  if (!db) return;
+  if (!db) throw new Error("Database connection failed - check DATABASE_URL");
 
   const values: InsertUser = { openId: user.openId, lastSignedIn: new Date() };
   const updateSet: Record<string, unknown> = { lastSignedIn: new Date() };
@@ -66,7 +67,7 @@ export async function upsertUser(user: InsertUser): Promise<void> {
 
 export async function getUserByOpenId(openId: string) {
   const db = await getDb();
-  if (!db) return undefined;
+  if (!db) throw new Error("Database connection failed - check DATABASE_URL");
   const result = await db
     .select()
     .from(users)
@@ -118,7 +119,7 @@ export async function createConversationForUser(input: {
   conversationType?: "text" | "voice" | "mixed";
 }) {
   const db = await getDb();
-  if (!db) throw new Error("Database unavailable");
+  if (!db) throw new Error("Database connection failed - check DATABASE_URL");
   await db.insert(conversations).values({
     id: input.id,
     userId: input.userId,
@@ -145,7 +146,7 @@ export async function updateConversationForUser(
   >
 ) {
   const db = await getDb();
-  if (!db) throw new Error("Database unavailable");
+  if (!db) throw new Error("Database connection failed - check DATABASE_URL");
   await db
     .update(conversations)
     .set({ ...values, updatedAt: new Date() })
@@ -176,7 +177,7 @@ export async function getPublicConversationByToken(shareToken: string) {
 
 export async function deleteConversationForUser(id: string, userId: number) {
   const db = await getDb();
-  if (!db) throw new Error("Database unavailable");
+  if (!db) throw new Error("Database connection failed - check DATABASE_URL");
   await db
     .delete(conversations)
     .where(and(eq(conversations.id, id), eq(conversations.userId, userId)));
@@ -184,7 +185,7 @@ export async function deleteConversationForUser(id: string, userId: number) {
 
 export async function moveConversationToTrash(id: string, userId: number) {
   const db = await getDb();
-  if (!db) throw new Error("Database unavailable");
+  if (!db) throw new Error("Database connection failed - check DATABASE_URL");
   await db
     .update(conversations)
     .set({ deletedAt: new Date(), isPinned: false, updatedAt: new Date() })
@@ -194,7 +195,7 @@ export async function moveConversationToTrash(id: string, userId: number) {
 
 export async function restoreConversationForUser(id: string, userId: number) {
   const db = await getDb();
-  if (!db) throw new Error("Database unavailable");
+  if (!db) throw new Error("Database connection failed - check DATABASE_URL");
   await db
     .update(conversations)
     .set({ deletedAt: null, isArchived: false, updatedAt: new Date() })
@@ -246,7 +247,7 @@ export async function attachFileToMessageForUser(input: {
   userId: number;
 }) {
   const db = await getDb();
-  if (!db) throw new Error("Database unavailable");
+  if (!db) throw new Error("Database connection failed - check DATABASE_URL");
   const message = await getMessageForUser(input.messageId, input.userId);
   if (!message) return undefined;
   const [file] = await db
@@ -279,7 +280,7 @@ export async function attachFileToMessageForUser(input: {
 
 export async function createMessage(input: typeof messages.$inferInsert) {
   const db = await getDb();
-  if (!db) throw new Error("Database unavailable");
+  if (!db) throw new Error("Database connection failed - check DATABASE_URL");
   await db.insert(messages).values(input);
   await db
     .update(conversations)
@@ -294,7 +295,7 @@ export async function updateMessage(
   >
 ) {
   const db = await getDb();
-  if (!db) throw new Error("Database unavailable");
+  if (!db) throw new Error("Database connection failed - check DATABASE_URL");
   await db.update(messages).set(values).where(eq(messages.id, id));
 }
 
@@ -303,7 +304,7 @@ export async function removeFollowingAssistantDuplicatesForUser(
   userId: number
 ) {
   const db = await getDb();
-  if (!db) throw new Error("Database unavailable");
+  if (!db) throw new Error("Database connection failed - check DATABASE_URL");
   const assistant = await getMessageForUser(assistantMessageId, userId);
   if (!assistant || assistant.role !== "assistant") return [];
   const conversationMessages = await listMessagesForConversation(
@@ -342,7 +343,7 @@ export async function getMessageForUser(messageId: string, userId: number) {
 
 export async function deleteMessageForUser(messageId: string, userId: number) {
   const db = await getDb();
-  if (!db) throw new Error("Database unavailable");
+  if (!db) throw new Error("Database connection failed - check DATABASE_URL");
   const message = await getMessageForUser(messageId, userId);
   if (!message) return false;
   await db.delete(messages).where(eq(messages.id, message.id));
@@ -356,7 +357,7 @@ export async function editMessageForUser(input: {
   content: string;
 }) {
   const db = await getDb();
-  if (!db) throw new Error("Database unavailable");
+  if (!db) throw new Error("Database connection failed - check DATABASE_URL");
   const message = await getMessageForUser(input.id, input.userId);
   if (!message) return undefined;
   await db
@@ -395,7 +396,7 @@ export async function setMessageFeedbackForUser(input: {
   value: "up" | "down";
 }) {
   const db = await getDb();
-  if (!db) throw new Error("Database unavailable");
+  if (!db) throw new Error("Database connection failed - check DATABASE_URL");
   await db
     .insert(messageFeedback)
     .values({
@@ -513,7 +514,7 @@ export async function createTaskActivityForUser(input: {
   status?: "queued" | "running" | "completed" | "failed" | "cancelled";
 }) {
   const db = await getDb();
-  if (!db) throw new Error("Database unavailable");
+  if (!db) throw new Error("Database connection failed - check DATABASE_URL");
   const task = await getTaskForUser(input.taskId, input.userId);
   if (!task) return undefined;
   const status = input.status ?? "queued";
@@ -537,7 +538,7 @@ export async function updateTaskActivityForUser(input: {
   status?: "queued" | "running" | "completed" | "failed" | "cancelled";
 }) {
   const db = await getDb();
-  if (!db) throw new Error("Database unavailable");
+  if (!db) throw new Error("Database connection failed - check DATABASE_URL");
   const activity = await getTaskActivityForUser(input.id, input.userId);
   if (!activity) return undefined;
   const now = new Date();
@@ -581,7 +582,7 @@ export async function upsertUserPreferences(
   values: Partial<Omit<typeof userPreferences.$inferInsert, "userId">>
 ) {
   const db = await getDb();
-  if (!db) throw new Error("Database unavailable");
+  if (!db) throw new Error("Database connection failed - check DATABASE_URL");
   await db
     .insert(userPreferences)
     .values({ userId, ...values })
@@ -598,7 +599,7 @@ export async function createVoiceSession(input: {
   conversationId: string;
 }) {
   const db = await getDb();
-  if (!db) throw new Error("Database unavailable");
+  if (!db) throw new Error("Database connection failed - check DATABASE_URL");
   await db.insert(voiceSessions).values(input);
   const result = await db
     .select()
@@ -621,7 +622,7 @@ export async function updateVoiceSessionForUser(
     | "error"
 ) {
   const db = await getDb();
-  if (!db) throw new Error("Database unavailable");
+  if (!db) throw new Error("Database connection failed - check DATABASE_URL");
   await db
     .update(voiceSessions)
     .set({ status, updatedAt: new Date() })

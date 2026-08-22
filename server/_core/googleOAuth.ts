@@ -103,11 +103,13 @@ export function registerGoogleOAuthRoutes(app: Express) {
 
     const { clientId, clientSecret } = googleCredentials();
     if (!clientId || !clientSecret) {
+      console.error("[Google OAuth] Missing credentials");
       res.status(500).json({ error: "Google sign-in is not configured." });
       return;
     }
 
     try {
+      console.log("[Google OAuth] Exchanging code for token...");
       const { data: tokenData } = await axios.post<{ access_token?: string }>(
         GOOGLE_TOKEN_URL,
         new URLSearchParams({
@@ -124,9 +126,11 @@ export function registerGoogleOAuthRoutes(app: Express) {
       );
 
       if (!tokenData.access_token) {
+        console.error("[Google OAuth] No access token in response");
         throw new Error("access_token missing from Google token response");
       }
 
+      console.log("[Google OAuth] Fetching user info...");
       const { data: userInfo } = await axios.post<{
         sub?: string;
         name?: string;
@@ -141,12 +145,14 @@ export function registerGoogleOAuthRoutes(app: Express) {
       );
 
       if (!userInfo.sub) {
+        console.error("[Google OAuth] No sub in user info");
         res.status(400).json({ error: "sub missing from Google user info" });
         return;
       }
 
       const openId = `google_${userInfo.sub}`;
       const displayName = userInfo.name || userInfo.email || "Google User";
+      console.log("[Google OAuth] Upserting user:", openId);
 
       await db.upsertUser({
         openId,
@@ -156,12 +162,14 @@ export function registerGoogleOAuthRoutes(app: Express) {
         lastSignedIn: new Date(),
       });
 
+      console.log("[Google OAuth] Creating session token...");
       const sessionToken = await sdk.createSessionToken(openId, {
         name: displayName,
         expiresInMs: ONE_YEAR_MS,
       });
 
       const cookieOptions = getSessionCookieOptions(req);
+      console.log("[Google OAuth] Setting cookie and redirecting...");
       res.cookie(COOKIE_NAME, sessionToken, {
         ...cookieOptions,
         maxAge: ONE_YEAR_MS,
@@ -170,7 +178,13 @@ export function registerGoogleOAuthRoutes(app: Express) {
       res.redirect(302, "/");
     } catch (err) {
       console.error("[Google OAuth] Callback failed", err);
-      res.status(500).json({ error: "Google sign-in failed" });
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      console.error("[Google OAuth] Error details:", errorMessage);
+      res.status(500).json({ 
+        error: "Google sign-in failed", 
+        details: errorMessage,
+        hint: "Check server logs for more details"
+      });
     }
   });
 }
