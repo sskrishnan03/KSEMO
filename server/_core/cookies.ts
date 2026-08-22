@@ -25,19 +25,19 @@ export function getSessionCookieOptions(
   req: Request
 ): Pick<CookieOptions, "domain" | "httpOnly" | "path" | "sameSite" | "secure"> {
   const hostname = req.hostname;
-  const shouldSetDomain =
-    hostname &&
-    !LOCAL_HOSTS.has(hostname) &&
-    !isIpAddress(hostname) &&
-    hostname !== "127.0.0.1" &&
-    hostname !== "::1";
-
-  const domain =
-    shouldSetDomain && !hostname.startsWith(".")
-      ? `.${hostname}`
-      : shouldSetDomain
-        ? hostname
-        : undefined;
+  const isLocal = LOCAL_HOSTS.has(hostname) || 
+                  hostname === "127.0.0.1" || 
+                  hostname === "::1" ||
+                  isIpAddress(hostname);
+  
+  // Only set domain for non-local, non-IP hosts
+  const shouldSetDomain = hostname && !isLocal;
+  
+  const domain = shouldSetDomain && !hostname.startsWith(".")
+    ? `.${hostname}`
+    : shouldSetDomain
+      ? hostname
+      : undefined;
 
   const secure = isSecureRequest(req);
   return {

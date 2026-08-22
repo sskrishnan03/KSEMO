@@ -3,10 +3,13 @@
 ## Problem
 The "invalid oauth state" error occurred because the `google_oauth_state` cookie was not being sent back from the browser to the Render server during the OAuth callback. This was due to incorrect cookie configuration for production deployments.
 
+Additionally, users experienced a **login loop** where after successful authentication, they would be redirected back to the sign-in page. This was caused by the same cookie configuration issues - the session cookie wasn't being properly set or sent back to the server, so the app couldn't detect that the user was authenticated.
+
 ## Root Causes
 1. **Missing domain configuration**: The cookie domain setting was commented out in `cookies.ts`, causing cookies to not be properly scoped in production
 2. **Inconsistent cookie settings**: The Google OAuth cookie and session cookie had different configurations
-3. **Missing environment variables**: No clear documentation of required environment variables for Render deployment
+3. **__Host- prefix issues**: The `__Host-` prefix required Secure flag even in localhost, causing cookie setting failures
+4. **Missing environment variables**: No clear documentation of required environment variables for Render deployment
 
 ## Changes Made
 
@@ -14,21 +17,33 @@ The "invalid oauth state" error occurred because the `google_oauth_state` cookie
 - Uncommented and fixed the domain configuration logic
 - Added proper domain handling for production environments
 - Ensures cookies are set with the correct domain (e.g., `.your-app.onrender.com`)
+- Added IP address detection to avoid setting domain for IP-based deployments
 
 ### 2. Fixed Google OAuth Cookie (`server/_core/googleOAuth.ts`)
 - Added domain configuration to match session cookie settings
 - Ensured cookie clearing uses the same domain settings
+- Added IP address detection to avoid setting domain for IP-based deployments
 - Maintains consistency between cookie setting and clearing
 
-### 3. Fixed Client-side OAuth Cookie (`client/src/const.ts`)
-- Adjusted Secure and SameSite settings for `__Host-` prefix cookie
-- The `__Host-` prefix requires Secure flag even in localhost
+### 3. Fixed OAuth State Cookie (`shared/const.ts`)
+- **Removed `__Host-` prefix** from `OAUTH_STATE_COOKIE` to avoid Secure flag issues in localhost
+- Changed from `__Host-oauth_state` to `oauth_state`
+- This allows proper cookie setting in both localhost HTTP and production HTTPS
+
+### 4. Fixed Client-side OAuth Cookie (`client/src/const.ts`)
+- Adjusted Secure and SameSite settings to work without `__Host-` prefix
+- Added domain configuration for production environments
+- Added IP address detection to avoid setting domain for IP-based deployments
 - Properly handles local vs production environments
 
-### 4. Added Environment Configuration
-- Created `.env.example` with required environment variables
+### 5. Fixed OAuth Route Cookie Clearing (`server/_core/oauth.ts`)
+- Added domain configuration to match cookie setting
+- Ensured cookie clearing uses the same domain settings
+- Added IP address detection to avoid setting domain for IP-based deployments
+
+### 6. Added Environment Configuration
 - Created `render.yaml` for Render deployment configuration
-- Documented the `GOOGLE_OAUTH_REDIRECT_URI` requirement
+- Documented the `GOOGLE_OAUTH_REDIRECT_URI` requirement in `.env` file
 
 ## Required Steps for Render Deployment
 
@@ -73,10 +88,10 @@ By setting the domain to `.your-app.onrender.com` (with the leading dot), the co
 
 ## Additional Notes
 
-- The `__Host-` prefix in `OAUTH_STATE_COOKIE` has strict security requirements (Secure, Path=/, no Domain)
-- This is why we couldn't set a domain for that specific cookie
-- The Google OAuth state cookie (`google_oauth_state`) doesn't use the `__Host-` prefix, so we can set its domain
-- Session cookies now also get proper domain configuration for production
+- **Removed `__Host-` prefix**: Changed `OAUTH_STATE_COOKIE` from `__Host-oauth_state` to `oauth_state` to avoid Secure flag issues in localhost HTTP environments
+- **Domain configuration**: All cookies now properly set domain for production (`.your-app.onrender.com`) and skip domain for localhost/IP addresses
+- **Session cookies** now get proper domain configuration for production
+- **Consistent cookie handling**: All cookies (session, OAuth state, Google OAuth state) now use consistent domain and security settings
 
 ## Troubleshooting
 
@@ -87,3 +102,4 @@ If you still experience issues after deployment:
 3. **Check Google Console**: Make sure the redirect URI exactly matches your Render URL
 4. **Clear cookies**: Clear all cookies for your app domain and try again
 5. **Check Render logs**: Look for the debug output showing the expected vs received state
+6. **Cookie name change**: Note that `OAUTH_STATE_COOKIE` changed from `__Host-oauth_state` to `oauth_state` - ensure you clear old cookies

@@ -19,12 +19,17 @@ export const startLogin = () => {
 
   const nonce = crypto.randomUUID();
   const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+  const isSecure = window.location.protocol === "https:";
+  const isIpAddress = /^(\d{1,3}\.){3}\d{1,3}$/.test(window.location.hostname) || window.location.hostname.includes(":");
   
-  // For __Host- prefix, we need Secure flag even in localhost
-  // This will work in localhost if served over HTTPS or if browser allows it
+  // Set domain for production environments (only for valid domain names, not IPs)
+  const domain = (!isLocal && !isIpAddress) ? ` domain=.${window.location.hostname};` : "";
+  
+  // In production (HTTPS), always use Secure. In localhost HTTP, skip Secure flag
   const sameSite = isLocal ? "Lax" : "None";
+  const secure = !isLocal || isSecure; // Secure in production or HTTPS localhost
   
-  document.cookie = `${OAUTH_STATE_COOKIE}=${nonce}; Path=/; Max-Age=600; SameSite=${sameSite}; Secure;`;
+  document.cookie = `${OAUTH_STATE_COOKIE}=${nonce}; Path=/; Max-Age=600;${domain} SameSite=${sameSite}; ${secure ? "Secure;" : ""}`;
   const state = encodeOAuthState({ redirectUri, nonce });
 
   const url = new URL(`${oauthPortalUrl}/app-auth`);

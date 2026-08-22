@@ -37,10 +37,12 @@ export function registerOAuthRoutes(app: Express) {
       return;
     }
     const isLocal = req.hostname === "localhost" || req.hostname === "127.0.0.1";
+    const isIpAddress = /^(\d{1,3}\.){3}\d{1,3}$/.test(req.hostname) || req.hostname.includes(":");
+    const domain = (!isLocal && !isIpAddress) ? `.${req.hostname}` : undefined;
     
-    // __Host- prefix cookies cannot have a Domain attribute
     res.clearCookie(OAUTH_STATE_COOKIE, {
       path: "/",
+      domain,
       secure: !isLocal,
       sameSite: isLocal ? "lax" : "none",
     });
