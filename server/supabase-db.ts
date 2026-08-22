@@ -48,9 +48,20 @@ export type {
 };
 
 const supabaseUrl = process.env.SUPABASE_URL || "https://vauqtdjpjwlhfgixfrij.supabase.co";
-const supabaseKey = process.env.SUPABASE_ANON_KEY || "sb_publishable_wCv3g2jSb_qMbR7I3Fifbg_obIw1iuq";
+// Service role key is REQUIRED for backend operations to bypass RLS policies
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-const supabase = createClient(supabaseUrl, supabaseKey);
+if (!supabaseKey) {
+  console.error("[Supabase] ERROR: SUPABASE_SERVICE_ROLE_KEY environment variable is required for backend operations");
+  console.error("[Supabase] Using anon key as fallback - this will cause RLS policy violations");
+}
+
+const supabase = createClient(supabaseUrl, supabaseKey || process.env.SUPABASE_ANON_KEY || "", {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false
+  }
+});
 
 // Helper function to handle Supabase errors
 function handleSupabaseError(error: any, operation: string): never {
@@ -70,6 +81,9 @@ function toDate(dateString: string | null): Date | null {
 export async function upsertUser(user: InsertUser): Promise<void> {
   const dbValues = userToDb(user);
   
+  console.log("[Supabase] Attempting upsertUser with data:", JSON.stringify(dbValues));
+  console.log("[Supabase] Using service role key:", !!process.env.SUPABASE_SERVICE_ROLE_KEY);
+  
   const { data, error } = await supabase
     .from("users")
     .upsert(dbValues)
@@ -77,8 +91,11 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     .single();
 
   if (error) {
+    console.error("[Supabase] upsertUser error details:", JSON.stringify(error, null, 2));
     handleSupabaseError(error, "upsertUser");
   }
+  
+  console.log("[Supabase] upsertUser succeeded:", data);
 }
 
 export async function getUserByOpenId(openId: string): Promise<User | undefined> {

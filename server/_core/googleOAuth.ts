@@ -53,15 +53,11 @@ export function registerGoogleOAuthRoutes(app: Express) {
     // For local development, use less strict cookie settings
     const isLocal = req.hostname === "localhost" || req.hostname === "127.0.0.1";
     
-    // Set domain for production environments (only for valid domain names, not IPs)
-    const isIpAddress = /^(\d{1,3}\.){3}\d{1,3}$/.test(req.hostname) || req.hostname.includes(":");
-    const domain = (!isLocal && !isIpAddress) ? `.${req.hostname}` : undefined;
-    
+    // Simplified cookie settings for better compatibility
     res.cookie(STATE_COOKIE, nonce, {
       httpOnly: true,
       path: "/",
-      domain,
-      sameSite: isLocal ? "lax" : "none",
+      sameSite: "lax", // Use lax for better compatibility
       secure: !isLocal, // Only require secure for production
       maxAge: 10 * 60 * 1000,
     });
@@ -102,13 +98,10 @@ export function registerGoogleOAuthRoutes(app: Express) {
       .find(part => part.startsWith(`${STATE_COOKIE}=`))
       ?.slice(STATE_COOKIE.length + 1);
     const isLocal = req.hostname === "localhost" || req.hostname === "127.0.0.1";
-    const isIpAddress = /^(\d{1,3}\.){3}\d{1,3}$/.test(req.hostname) || req.hostname.includes(":");
-    const domain = (!isLocal && !isIpAddress) ? `.${req.hostname}` : undefined;
     
     res.clearCookie(STATE_COOKIE, { 
       path: "/",
-      domain,
-      sameSite: isLocal ? "lax" : "none",
+      sameSite: "lax",
       secure: !isLocal
     });
     
