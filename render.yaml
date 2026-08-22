@@ -15,5 +15,8 @@ services:
       - key: GOOGLE_CLIENT_SECRET
         sync: false
       - key: GOOGLE_OAUTH_REDIRECT_URI
-        value: https://YOUR-SERVICE-NAME.onrender.com/api/auth/google/callback
-        # IMPORTANT: Replace YOUR-SERVICE-NAME with your actual Render service name
+        value: https://ksemo.onrender.com/api/auth/google/callback
+      - key: VITE_APP_ID
+        value: ksemo-production
+      - key: JWT_SECRET
+        sync: false
