@@ -23,7 +23,13 @@ let _db: ReturnType<typeof drizzle> | null = null;
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
-      _db = drizzle(postgres(process.env.DATABASE_URL, { prepare: false }));
+      _db = drizzle(postgres(process.env.DATABASE_URL, { 
+        prepare: false,
+        connection: {
+          // Force IPv4 to avoid IPv6 connection issues on Render
+          family: 4
+        }
+      }));
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
       _db = null;
