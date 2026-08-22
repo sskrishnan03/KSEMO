@@ -28,7 +28,15 @@ export function isGoogleOAuthConfigured(): boolean {
 }
 
 function callbackUrl(req: Request): string {
-  return `${req.protocol}://${req.get("host")}/api/auth/google/callback`;
+  // Allow override via environment variable for Render/deployed environments
+  const override = process.env.GOOGLE_OAUTH_REDIRECT_URI;
+  if (override) {
+    console.log("[Google OAuth] Using override redirect URI:", override);
+    return override;
+  }
+  const url = `${req.protocol}://${req.get("host")}/api/auth/google/callback`;
+  console.log("[Google OAuth] Auto-detected redirect URI:", url);
+  return url;
 }
 
 export function registerGoogleOAuthRoutes(app: Express) {
