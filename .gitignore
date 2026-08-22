@@ -39,6 +39,10 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# KSEMO debug logs and local uploads
+.ksemo-logs/
+.ksemo-uploads/
+
 # Runtime data
 pids
 *.pid
@@ -110,6 +114,6 @@ temp/
 .webdev/
 
 # Runtime-generated version file (not part of source)
-client/public/__ksemo__/version.json
+client/public/__ksemo__/
 .project-config.json
 

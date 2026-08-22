@@ -24,11 +24,8 @@ let _pool: Pool | null = null;
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
-      // Use pg Pool with IPv4 forced
       _pool = new Pool({
         connectionString: process.env.DATABASE_URL,
-        // Force IPv4
-        family: 4,
         ssl: process.env.DATABASE_URL.includes('sslmode=require') ? { rejectUnauthorized: false } : false
       });
       _db = drizzle(_pool);
