@@ -10,13 +10,29 @@ services:
         value: production
       - key: PORT
         value: 3000
+      - key: VITE_APP_ID
+        value: ksemo-production
+      - key: JWT_SECRET
+        sync: false
       - key: GOOGLE_CLIENT_ID
         sync: false
       - key: GOOGLE_CLIENT_SECRET
         sync: false
       - key: GOOGLE_OAUTH_REDIRECT_URI
         value: https://ksemo.onrender.com/api/auth/google/callback
-      - key: VITE_APP_ID
-        value: ksemo-production
-      - key: JWT_SECRET
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: BUILT_IN_FORGE_API_KEY
+        sync: false
+      - key: BUILT_IN_FORGE_API_URL
+        value: https://generativelanguage.googleapis.com/v1beta/openai
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: OAUTH_SERVER_URL
+        sync: false
+      - key: OWNER_OPEN_ID
         sync: false

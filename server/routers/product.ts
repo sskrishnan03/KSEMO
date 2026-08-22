@@ -1,5 +1,4 @@
 import { TRPCError } from "@trpc/server";
-import { nanoid } from "nanoid";
 import { z } from "zod";
 import { createClient } from "@supabase/supabase-js";
 import { storagePut } from "../storage";
@@ -80,7 +79,7 @@ export const workspaceRouter = router({
     create: protectedProcedure
       .input(projectInput)
       .mutation(async ({ ctx, input }) => {
-        const id = nanoid();
+        const id = crypto.randomUUID();
         const { data, error } = await supabase.from("projects").insert({
           id,
           user_id: ctx.user.id,
@@ -190,7 +189,7 @@ export const workspaceRouter = router({
       .input(memoryInput)
       .mutation(async ({ ctx, input }) => {
         await optionalOwnedProject(input.projectId, ctx.user.id);
-        const id = nanoid();
+        const id = crypto.randomUUID();
         const { data, error } = await supabase.from("memories").insert({
           id,
           user_id: ctx.user.id,
@@ -261,7 +260,7 @@ export const workspaceRouter = router({
             message: "Files must be smaller than 8 MB.",
           });
         await optionalOwnedProject(input.projectId, ctx.user.id);
-        const id = nanoid();
+        const id = crypto.randomUUID();
         const saved = await storagePut(
           `library/${ctx.user.id}/${id}-${safeFilename(input.filename)}`,
           buffer,
@@ -332,7 +331,7 @@ export const workspaceRouter = router({
 
         if (!existing) {
           const { error: insertError } = await supabase.from("attachments").insert({
-            id: nanoid(),
+            id: crypto.randomUUID(),
             file_id: file.id,
             conversation_id: conversation.id,
             message_id: null,

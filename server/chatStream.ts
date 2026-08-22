@@ -1,5 +1,4 @@
 import type { Express, Request, Response } from "express";
-import { nanoid } from "nanoid";
 import {
   createConversationForUser,
   createMessage,
@@ -105,7 +104,7 @@ export function registerChatStream(app: Express) {
           return;
         }
         conversation = await createConversationForUser({
-          id: nanoid(),
+          id: crypto.randomUUID(),
           userId: user.id,
           title: createTitle(content),
         });
@@ -118,8 +117,8 @@ export function registerChatStream(app: Express) {
         });
       }
 
-      let userMessageId = nanoid();
-      const assistantMessageId = body.regenerateAssistantMessageId ?? nanoid();
+      let userMessageId = crypto.randomUUID();
+      const assistantMessageId = body.regenerateAssistantMessageId ?? crypto.randomUUID();
       let historyForContext;
       if (body.regenerateAssistantMessageId) {
         const existingMessages = await listMessagesForConversation(
@@ -164,7 +163,7 @@ export function registerChatStream(app: Express) {
           new Set(body.attachmentFileIds ?? [])
         ).slice(0, 6)) {
           const attached = await attachFileToMessageForUser({
-            id: nanoid(),
+            id: crypto.randomUUID(),
             fileId,
             messageId: userMessageId,
             userId: user.id,

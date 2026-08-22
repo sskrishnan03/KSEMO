@@ -1,5 +1,4 @@
 import { TRPCError } from "@trpc/server";
-import { nanoid } from "nanoid";
 import { z } from "zod";
 import {
   createConversationForUser,
@@ -71,7 +70,7 @@ export const conversationRouter = router({
     )
     .mutation(({ ctx, input }) =>
       createConversationForUser({
-        id: nanoid(),
+        id: crypto.randomUUID(),
         userId: ctx.user.id,
         conversationType: input.conversationType,
       })
@@ -147,7 +146,7 @@ export const conversationRouter = router({
     .mutation(async ({ ctx, input }) => {
       const original = await requireConversation(input.id, ctx.user.id);
       const duplicate = await createConversationForUser({
-        id: nanoid(),
+        id: crypto.randomUUID(),
         userId: ctx.user.id,
         title: `${original.title.slice(0, 105)} (copy)`,
         conversationType: original.conversationType,
@@ -160,7 +159,7 @@ export const conversationRouter = router({
       const originalMessages = await listMessagesForConversation(original.id);
       for (const message of originalMessages) {
         await createMessage({
-          id: nanoid(),
+          id: crypto.randomUUID(),
           conversationId: duplicate.id,
           role: message.role,
           content: message.content,
@@ -184,7 +183,7 @@ export const conversationRouter = router({
     .mutation(async ({ ctx, input }) => {
       const conversation = await requireConversation(input.id, ctx.user.id);
       const shareToken = input.isPublic
-        ? conversation.shareToken || nanoid(24)
+        ? conversation.shareToken || Array.from(crypto.getRandomValues(new Uint8Array(24))).map(b => b.toString(36).padStart(2, '0')).join('').slice(0, 24)
         : null;
       const updated = await updateConversationForUser(input.id, ctx.user.id, {
         isPublic: input.isPublic,
@@ -302,7 +301,7 @@ export const messageRouter = router({
       return editMessageForUser({
         id: input.id,
         userId: ctx.user.id,
-        versionId: nanoid(),
+        versionId: crypto.randomUUID(),
         content: input.content,
       });
     }),
@@ -346,7 +345,7 @@ export const messageRouter = router({
       return editMessageForUser({
         id: input.id,
         userId: ctx.user.id,
-        versionId: nanoid(),
+        versionId: crypto.randomUUID(),
         content: version.content,
       });
     }),
@@ -370,7 +369,7 @@ export const messageRouter = router({
           message: "Feedback is available for assistant responses only.",
         });
       await setMessageFeedbackForUser({
-        id: nanoid(),
+        id: crypto.randomUUID(),
         messageId: message.id,
         userId: ctx.user.id,
         value: input.value,
@@ -394,7 +393,7 @@ export const voiceRouter = router({
       let conversation = input.conversationId
         ? await requireConversation(input.conversationId, ctx.user.id)
         : await createConversationForUser({
-            id: nanoid(),
+            id: crypto.randomUUID(),
             userId: ctx.user.id,
             conversationType: "voice",
           });
@@ -418,7 +417,7 @@ export const voiceRouter = router({
           message: "Unable to update the conversation voice mode.",
         });
       const session = await createVoiceSession({
-        id: nanoid(),
+        id: crypto.randomUUID(),
         userId: ctx.user.id,
         conversationId: conversation.id,
       });
