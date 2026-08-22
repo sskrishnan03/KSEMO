@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, ilike, or } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/postgres-js";
-import postgres from "postgres";
+import { drizzle } from "drizzle-orm/node-postgres";
+import { Pool } from "pg";
 import { isNotNull, isNull } from "drizzle-orm";
 import {
   attachments,
@@ -19,20 +19,26 @@ import {
 import { ENV } from "./_core/env";
 
 let _db: ReturnType<typeof drizzle> | null = null;
+let _pool: Pool | null = null;
 
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
-      _db = drizzle(postgres(process.env.DATABASE_URL, { 
-        prepare: false,
-        connection: {
-          // Force IPv4 to avoid IPv6 connection issues on Render
-          family: 4
-        }
-      }));
+      // Use pg Pool with IPv4 forced
+      _pool = new Pool({
+        connectionString: process.env.DATABASE_URL,
+        // Force IPv4
+        family: 4,
+        ssl: process.env.DATABASE_URL.includes('sslmode=require') ? { rejectUnauthorized: false } : false
+      });
+      _db = drizzle(_pool);
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
       _db = null;
+      if (_pool) {
+        await _pool.end();
+        _pool = null;
+      }
     }
   }
   return _db;
