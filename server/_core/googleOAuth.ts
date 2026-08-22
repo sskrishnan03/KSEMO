@@ -52,9 +52,14 @@ export function registerGoogleOAuthRoutes(app: Express) {
     const nonce = randomUUID();
     // For local development, use less strict cookie settings
     const isLocal = req.hostname === "localhost" || req.hostname === "127.0.0.1";
+    
+    // Set domain for production environments
+    const domain = isLocal ? undefined : `.${req.hostname}`;
+    
     res.cookie(STATE_COOKIE, nonce, {
       httpOnly: true,
       path: "/",
+      domain,
       sameSite: isLocal ? "lax" : "none",
       secure: !isLocal, // Only require secure for production
       maxAge: 10 * 60 * 1000,
@@ -96,8 +101,11 @@ export function registerGoogleOAuthRoutes(app: Express) {
       .find(part => part.startsWith(`${STATE_COOKIE}=`))
       ?.slice(STATE_COOKIE.length + 1);
     const isLocal = req.hostname === "localhost" || req.hostname === "127.0.0.1";
+    const domain = isLocal ? undefined : `.${req.hostname}`;
+    
     res.clearCookie(STATE_COOKIE, { 
       path: "/",
+      domain,
       sameSite: isLocal ? "lax" : "none",
       secure: !isLocal
     });

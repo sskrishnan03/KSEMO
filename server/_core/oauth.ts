@@ -36,10 +36,13 @@ export function registerOAuthRoutes(app: Express) {
       res.status(403).json({ error: "invalid oauth state" });
       return;
     }
+    const isLocal = req.hostname === "localhost" || req.hostname === "127.0.0.1";
+    
+    // __Host- prefix cookies cannot have a Domain attribute
     res.clearCookie(OAUTH_STATE_COOKIE, {
       path: "/",
-      secure: true,
-      sameSite: "none",
+      secure: !isLocal,
+      sameSite: isLocal ? "lax" : "none",
     });
 
     try {
