@@ -31,11 +31,9 @@ function callbackUrl(req: Request): string {
   // Allow override via environment variable for Render/deployed environments
   const override = process.env.GOOGLE_OAUTH_REDIRECT_URI;
   if (override) {
-    console.log("[Google OAuth] Using override redirect URI:", override);
     return override;
   }
   const url = `${req.protocol}://${req.get("host")}/api/auth/google/callback`;
-  console.log("[Google OAuth] Auto-detected redirect URI:", url);
   return url;
 }
 
@@ -52,12 +50,13 @@ export function registerGoogleOAuthRoutes(app: Express) {
     }
 
     const nonce = randomUUID();
-    // SameSite=Lax so the cookie survives the top-level redirect back from Google.
+    // For local development, use less strict cookie settings
+    const isLocal = req.hostname === "localhost" || req.hostname === "127.0.0.1";
     res.cookie(STATE_COOKIE, nonce, {
       httpOnly: true,
       path: "/",
-      sameSite: "lax",
-      secure: req.protocol === "https",
+      sameSite: isLocal ? "lax" : "none",
+      secure: !isLocal, // Only require secure for production
       maxAge: 10 * 60 * 1000,
     });
 
@@ -90,14 +89,29 @@ export function registerGoogleOAuthRoutes(app: Express) {
     }
 
     // CSRF guard: `state` must match the one-time cookie set when login started.
-    const expectedState = (req.headers.cookie ?? "")
+    const cookies = req.headers.cookie ?? "";
+    const expectedState = cookies
       .split(";")
-      .map(part => part.trim())
+      .map(c => c.trim())
       .find(part => part.startsWith(`${STATE_COOKIE}=`))
       ?.slice(STATE_COOKIE.length + 1);
-    res.clearCookie(STATE_COOKIE, { path: "/" });
+    const isLocal = req.hostname === "localhost" || req.hostname === "127.0.0.1";
+    res.clearCookie(STATE_COOKIE, { 
+      path: "/",
+      sameSite: isLocal ? "lax" : "none",
+      secure: !isLocal
+    });
+    
     if (!expectedState || state !== expectedState) {
-      res.status(403).json({ error: "invalid oauth state" });
+      console.error("[Google OAuth] State mismatch - received:", state, "expected:", expectedState);
+      res.status(403).json({ 
+        error: "invalid oauth state",
+        debug: {
+          received: state,
+          expected: expectedState,
+          cookieHeader: cookies
+        }
+      });
       return;
     }
 
@@ -109,7 +123,6 @@ export function registerGoogleOAuthRoutes(app: Express) {
     }
 
     try {
-      console.log("[Google OAuth] Exchanging code for token...");
       const { data: tokenData } = await axios.post<{ access_token?: string }>(
         GOOGLE_TOKEN_URL,
         new URLSearchParams({
@@ -126,11 +139,9 @@ export function registerGoogleOAuthRoutes(app: Express) {
       );
 
       if (!tokenData.access_token) {
-        console.error("[Google OAuth] No access token in response");
         throw new Error("access_token missing from Google token response");
       }
 
-      console.log("[Google OAuth] Fetching user info...");
       const { data: userInfo } = await axios.post<{
         sub?: string;
         name?: string;
@@ -145,16 +156,12 @@ export function registerGoogleOAuthRoutes(app: Express) {
       );
 
       if (!userInfo.sub) {
-        console.error("[Google OAuth] No sub in user info");
         res.status(400).json({ error: "sub missing from Google user info" });
         return;
       }
 
       const openId = `google_${userInfo.sub}`;
       const displayName = userInfo.name || userInfo.email || "Google User";
-      console.log("[Google OAuth] User OpenID:", openId);
-      console.log("[Google OAuth] ⭐ SET THIS AS YOUR OWNER_OPEN_ID IN .env:", openId);
-      console.log("[Google OAuth] Upserting user:", openId);
 
       await db.upsertUser({
         openId,
@@ -164,14 +171,12 @@ export function registerGoogleOAuthRoutes(app: Express) {
         lastSignedIn: new Date(),
       });
 
-      console.log("[Google OAuth] Creating session token...");
       const sessionToken = await sdk.createSessionToken(openId, {
         name: displayName,
         expiresInMs: ONE_YEAR_MS,
       });
 
       const cookieOptions = getSessionCookieOptions(req);
-      console.log("[Google OAuth] Setting cookie and redirecting...");
       res.cookie(COOKIE_NAME, sessionToken, {
         ...cookieOptions,
         maxAge: ONE_YEAR_MS,

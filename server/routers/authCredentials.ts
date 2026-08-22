@@ -1,9 +1,7 @@
 import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 import { TRPCError } from "@trpc/server";
 import { createHash, randomBytes, scryptSync, timingSafeEqual } from "crypto";
-import { eq } from "drizzle-orm";
 import { z } from "zod";
-import { users } from "../../drizzle/schema";
 import * as db from "../db";
 import { getSessionCookieOptions } from "../_core/cookies";
 import { isMailerConfigured, sendPasswordResetEmail } from "../_core/mailer";
@@ -66,18 +64,9 @@ async function issueSessionCookie(
 }
 
 async function findUserByEmail(email: string) {
-  const database = await db.getDb();
-  if (!database)
-    throw new TRPCError({
-      code: "INTERNAL_SERVER_ERROR",
-      message: "Database is not available.",
-    });
-  const rows = await database
-    .select()
-    .from(users)
-    .where(eq(users.email, email))
-    .limit(1);
-  return rows[0];
+  const storage = await db.getDb();
+  const users = Array.from(storage.users.values());
+  return users.find(u => u.email === email);
 }
 
 export const signUpProcedure = publicProcedure
@@ -164,20 +153,14 @@ export const requestPasswordResetProcedure = publicProcedure
     const token = randomBytes(32).toString("base64url");
     const tokenHash = createHash("sha256").update(token).digest("hex");
 
-    const database = await db.getDb();
-    if (!database)
-      throw new TRPCError({
-        code: "INTERNAL_SERVER_ERROR",
-        message: "Database is not available.",
-      });
-    await database
-      .update(users)
-      .set({
-        resetTokenHash: tokenHash,
-        resetTokenExpiresAt: new Date(Date.now() + RESET_TOKEN_TTL_MS),
-        updatedAt: new Date(),
-      })
-      .where(eq(users.id, user.id));
+    const storage = await db.getDb();
+    const existingUser = storage.users.get(user.openId);
+    if (existingUser) {
+      existingUser.resetTokenHash = tokenHash;
+      existingUser.resetTokenExpiresAt = new Date(Date.now() + RESET_TOKEN_TTL_MS);
+      existingUser.updatedAt = new Date();
+      storage.users.set(existingUser.openId, existingUser);
+    }
 
     // Absolute link back into this deployment, derived from the incoming
     // request so it works on localhost and any deployed domain alike.
@@ -218,9 +201,6 @@ export const requestPasswordResetProcedure = publicProcedure
 
     // No mailer configured on this deployment — return the link so the flow
     // still completes end to end.
-    console.log(
-      `[Auth] Password reset requested for ${input.email}: ${resetUrl}`,
-    );
     return { success: true as const, delivered: "fallback" as const, resetUrl };
   });
 
@@ -229,19 +209,12 @@ export const resetPasswordProcedure = publicProcedure
     z.object({ token: z.string().min(20).max(128), password: passwordInput })
   )
   .mutation(async ({ input }) => {
-    const database = await db.getDb();
-    if (!database)
-      throw new TRPCError({
-        code: "INTERNAL_SERVER_ERROR",
-        message: "Database is not available.",
-      });
-
+    const storage = await db.getDb();
     const tokenHash = createHash("sha256").update(input.token).digest("hex");
-    const [user] = await database
-      .select()
-      .from(users)
-      .where(eq(users.resetTokenHash, tokenHash))
-      .limit(1);
+    
+    const user = Array.from(storage.users.values()).find(
+      u => u.resetTokenHash === tokenHash
+    );
 
     if (
       !user ||
@@ -254,15 +227,11 @@ export const resetPasswordProcedure = publicProcedure
       });
     }
 
-    await database
-      .update(users)
-      .set({
-        passwordHash: hashPassword(input.password),
-        resetTokenHash: null,
-        resetTokenExpiresAt: null,
-        updatedAt: new Date(),
-      })
-      .where(eq(users.id, user.id));
+    user.passwordHash = hashPassword(input.password);
+    user.resetTokenHash = null;
+    user.resetTokenExpiresAt = null;
+    user.updatedAt = new Date();
+    storage.users.set(user.openId, user);
 
     return { success: true as const };
   });

@@ -1,135 +1,246 @@
-import { and, asc, desc, eq, ilike, or } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/node-postgres";
-import { Pool } from "pg";
-import { isNotNull, isNull } from "drizzle-orm";
-import {
-  attachments,
-  conversations,
-  files,
-  InsertUser,
-  messageFeedback,
-  messageVersions,
-  messages,
-  taskActivities,
-  tasks,
-  userPreferences,
-  users,
-  voiceSessions,
-} from "../drizzle/schema";
+// In-memory storage implementation
 import { ENV } from "./_core/env";
 
-let _db: ReturnType<typeof drizzle> | null = null;
-let _pool: Pool | null = null;
+// Type definitions
+export type User = {
+  id: number;
+  openId: string;
+  name: string | null;
+  email: string | null;
+  loginMethod: string | null;
+  passwordHash: string | null;
+  resetTokenHash: string | null;
+  resetTokenExpiresAt: Date | null;
+  role: "user" | "admin";
+  createdAt: Date;
+  updatedAt: Date;
+  lastSignedIn: Date;
+};
+
+export type InsertUser = Partial<User> & { openId: string; lastSignedIn?: Date };
+
+export type Conversation = {
+  id: string;
+  userId: number;
+  projectId: string | null;
+  title: string;
+  conversationType: "text" | "voice" | "mixed";
+  isPinned: boolean;
+  isArchived: boolean;
+  isPublic: boolean;
+  shareToken: string | null;
+  deletedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type Message = {
+  id: string;
+  conversationId: string;
+  role: "user" | "assistant" | "system" | "tool";
+  content: string;
+  model: string | null;
+  status: "sending" | "streaming" | "completed" | "failed" | "cancelled";
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type UserPreference = {
+  userId: number;
+  selectedModel: string | null;
+  persona: "balanced" | "concise" | "creative" | "analytical";
+  customInstructions: string | null;
+  speechRate: number;
+  autoPlayResponses: boolean;
+  reduceMotion: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type VoiceSession = {
+  id: string;
+  userId: number;
+  conversationId: string;
+  status: "connecting" | "listening" | "speaking" | "processing" | "interrupted" | "ended" | "error";
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type MessageVersion = {
+  id: string;
+  messageId: string;
+  content: string;
+  createdAt: Date;
+};
+
+export type MessageFeedback = {
+  id: string;
+  messageId: string;
+  userId: number;
+  value: "up" | "down";
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type Project = {
+  id: string;
+  userId: number;
+  name: string;
+  description: string | null;
+  instructions: string | null;
+  isArchived: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type KsemoFile = {
+  id: string;
+  userId: number;
+  projectId: string | null;
+  storageKey: string;
+  url: string;
+  filename: string;
+  mimeType: string;
+  sizeBytes: number;
+  status: "ready" | "failed";
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type Attachment = {
+  id: string;
+  fileId: string;
+  conversationId: string | null;
+  messageId: string | null;
+  createdAt: Date;
+};
+
+export type Memory = {
+  id: string;
+  userId: number;
+  projectId: string | null;
+  category: "preference" | "fact" | "project" | "instruction";
+  content: string;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type Task = {
+  id: string;
+  userId: number;
+  agentId: string | null;
+  projectId: string | null;
+  conversationId: string | null;
+  title: string;
+  details: string | null;
+  status: "inbox" | "planned" | "in_progress" | "completed" | "cancelled";
+  priority: "low" | "medium" | "high";
+  dueAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type TaskActivity = {
+  id: string;
+  userId: number;
+  taskId: string;
+  status: "queued" | "running" | "completed" | "failed" | "cancelled";
+  summary: string;
+  detail: string | null;
+  startedAt: Date | null;
+  completedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+// In-memory storage
+const storage = {
+  users: new Map<string, User>(),
+  conversations: new Map<string, Conversation>(),
+  messages: new Map<string, Message>(),
+  userPreferences: new Map<number, UserPreference>(),
+  voiceSessions: new Map<string, VoiceSession>(),
+  messageVersions: new Map<string, MessageVersion>(),
+  messageFeedback: new Map<string, MessageFeedback>(),
+  projects: new Map<string, Project>(),
+  files: new Map<string, KsemoFile>(),
+  attachments: new Map<string, Attachment>(),
+  memories: new Map<string, Memory>(),
+  tasks: new Map<string, Task>(),
+  taskActivities: new Map<string, TaskActivity>(),
+  nextUserId: 1,
+};
+
+// Helper functions
+function now() {
+  return new Date();
+}
 
 export async function getDb() {
-  if (!_db && process.env.DATABASE_URL) {
-    try {
-      _pool = new Pool({
-        connectionString: process.env.DATABASE_URL,
-        ssl: process.env.DATABASE_URL.includes('sslmode=require') ? { rejectUnauthorized: false } : false
-      });
-      _db = drizzle(_pool);
-      console.log("[Database] Connected successfully");
-    } catch (error) {
-      console.error("[Database] Failed to connect:", error);
-      _db = null;
-      if (_pool) {
-        await _pool.end();
-        _pool = null;
-      }
-    }
-  }
-  return _db;
+  return storage; // Return storage directly for in-memory
 }
 
 export async function upsertUser(user: InsertUser): Promise<void> {
   if (!user.openId) throw new Error("User openId is required for upsert");
-  const db = await getDb();
-  if (!db) throw new Error("Database connection failed - check DATABASE_URL");
-
-  try {
-    const values: InsertUser = { openId: user.openId, lastSignedIn: new Date() };
-    const updateSet: Record<string, unknown> = { lastSignedIn: new Date() };
-    
-    // Only include fields that are provided
-    if (user.name !== undefined) {
-      values.name = user.name;
-      updateSet.name = user.name;
-    }
-    if (user.email !== undefined) {
-      values.email = user.email;
-      updateSet.email = user.email;
-    }
-    if (user.loginMethod !== undefined) {
-      values.loginMethod = user.loginMethod;
-      updateSet.loginMethod = user.loginMethod;
-    }
-    if (user.passwordHash !== undefined) {
-      values.passwordHash = user.passwordHash;
-      updateSet.passwordHash = user.passwordHash;
-    }
-    
-    // Set role based on owner or default to user
-    values.role = user.role ?? (user.openId === ENV.ownerOpenId ? "admin" : "user");
-    updateSet.role = values.role;
-
-    await db
-      .insert(users)
-      .values(values)
-      .onConflictDoUpdate({ target: users.openId, set: updateSet });
-      
-    console.log("[Database] User upserted successfully:", user.openId);
-  } catch (error) {
-    console.error("[Database] User upsert failed:", error);
-    throw new Error(`Failed to upsert user: ${error instanceof Error ? error.message : String(error)}`);
+  
+  const existing = storage.users.get(user.openId);
+  const nowDate = now();
+  
+  if (existing) {
+    // Update existing user
+    if (user.name !== undefined) existing.name = user.name;
+    if (user.email !== undefined) existing.email = user.email;
+    if (user.loginMethod !== undefined) existing.loginMethod = user.loginMethod;
+    if (user.passwordHash !== undefined) existing.passwordHash = user.passwordHash;
+    existing.lastSignedIn = user.lastSignedIn || nowDate;
+    existing.updatedAt = nowDate;
+    storage.users.set(existing.openId, existing);
+  } else {
+    // Create new user
+    const newUser: User = {
+      id: storage.nextUserId++,
+      role: user.role ?? (user.openId === ENV.ownerOpenId ? "admin" : "user"),
+      openId: user.openId,
+      name: user.name ?? null,
+      email: user.email ?? null,
+      loginMethod: user.loginMethod ?? null,
+      passwordHash: user.passwordHash ?? null,
+      resetTokenHash: null,
+      resetTokenExpiresAt: null,
+      createdAt: nowDate,
+      updatedAt: nowDate,
+      lastSignedIn: user.lastSignedIn || nowDate,
+    };
+    storage.users.set(newUser.openId, newUser);
   }
 }
 
 export async function getUserByOpenId(openId: string) {
-  const db = await getDb();
-  if (!db) throw new Error("Database connection failed - check DATABASE_URL");
-  const result = await db
-    .select()
-    .from(users)
-    .where(eq(users.openId, openId))
-    .limit(1);
-  return result[0];
+  return storage.users.get(openId);
 }
 
 export async function listConversationsForUser(
   userId: number,
   scope: "active" | "archived" | "trash" = "active"
 ) {
-  const db = await getDb();
-  if (!db) return [];
-  const scopeFilter =
-    scope === "trash"
-      ? isNotNull(conversations.deletedAt)
-      : scope === "archived"
-        ? and(
-            eq(conversations.isArchived, true),
-            isNull(conversations.deletedAt)
-          )
-        : and(
-            eq(conversations.isArchived, false),
-            isNull(conversations.deletedAt)
-          );
-  return db
-    .select()
-    .from(conversations)
-    .where(and(eq(conversations.userId, userId), scopeFilter))
-    .orderBy(desc(conversations.isPinned), desc(conversations.updatedAt));
+  const conversations = Array.from(storage.conversations.values())
+    .filter(conv => conv.userId === userId)
+    .filter(conv => {
+      if (scope === "trash") return conv.deletedAt !== null;
+      if (scope === "archived") return conv.isArchived && conv.deletedAt === null;
+      return !conv.isArchived && conv.deletedAt === null;
+    })
+    .sort((a, b) => {
+      if (a.isPinned !== b.isPinned) return b.isPinned ? 1 : -1;
+      return b.updatedAt.getTime() - a.updatedAt.getTime();
+    });
+  return conversations;
 }
 
 export async function getConversationForUser(id: string, userId: number) {
-  const db = await getDb();
-  if (!db) return undefined;
-  const result = await db
-    .select()
-    .from(conversations)
-    .where(and(eq(conversations.id, id), eq(conversations.userId, userId)))
-    .limit(1);
-  return result[0];
+  const conv = storage.conversations.get(id);
+  return conv && conv.userId === userId ? conv : undefined;
 }
 
 export async function createConversationForUser(input: {
@@ -138,15 +249,23 @@ export async function createConversationForUser(input: {
   title?: string;
   conversationType?: "text" | "voice" | "mixed";
 }) {
-  const db = await getDb();
-  if (!db) throw new Error("Database connection failed - check DATABASE_URL");
-  await db.insert(conversations).values({
+  const nowDate = now();
+  const conv: Conversation = {
     id: input.id,
     userId: input.userId,
+    projectId: null,
     title: input.title ?? "New conversation",
     conversationType: input.conversationType ?? "text",
-  });
-  return getConversationForUser(input.id, input.userId);
+    isPinned: false,
+    isArchived: false,
+    isPublic: false,
+    shareToken: null,
+    deletedAt: null,
+    createdAt: nowDate,
+    updatedAt: nowDate,
+  };
+  storage.conversations.set(conv.id, conv);
+  return conv;
 }
 
 export async function updateConversationForUser(
@@ -154,7 +273,7 @@ export async function updateConversationForUser(
   userId: number,
   values: Partial<
     Pick<
-      typeof conversations.$inferInsert,
+      Conversation,
       | "title"
       | "isPinned"
       | "isArchived"
@@ -165,99 +284,87 @@ export async function updateConversationForUser(
     >
   >
 ) {
-  const db = await getDb();
-  if (!db) throw new Error("Database connection failed - check DATABASE_URL");
-  await db
-    .update(conversations)
-    .set({ ...values, updatedAt: new Date() })
-    .where(and(eq(conversations.id, id), eq(conversations.userId, userId)));
-  return getConversationForUser(id, userId);
+  const conv = storage.conversations.get(id);
+  if (!conv || conv.userId !== userId) return undefined;
+  
+  Object.assign(conv, values, { updatedAt: now() });
+  storage.conversations.set(id, conv);
+  return conv;
 }
 
 export async function getPublicConversationByToken(shareToken: string) {
-  const db = await getDb();
-  if (!db) return null;
-  const [conversation] = await db
-    .select()
-    .from(conversations)
-    .where(
-      and(
-        eq(conversations.shareToken, shareToken),
-        eq(conversations.isPublic, true),
-        isNull(conversations.deletedAt)
-      )
-    )
-    .limit(1);
-  if (!conversation) return null;
+  const conv = Array.from(storage.conversations.values()).find(
+    c => c.shareToken === shareToken && c.isPublic && c.deletedAt === null
+  );
+  if (!conv) return null;
   return {
-    conversation,
-    messages: await listMessagesForConversation(conversation.id),
+    conversation: conv,
+    messages: await listMessagesForConversation(conv.id),
   };
 }
 
 export async function deleteConversationForUser(id: string, userId: number) {
-  const db = await getDb();
-  if (!db) throw new Error("Database connection failed - check DATABASE_URL");
-  await db
-    .delete(conversations)
-    .where(and(eq(conversations.id, id), eq(conversations.userId, userId)));
+  const conv = storage.conversations.get(id);
+  if (conv && conv.userId === userId) {
+    storage.conversations.delete(id);
+    // Also delete associated messages
+    Array.from(storage.messages.values())
+      .filter(m => m.conversationId === id)
+      .forEach(m => storage.messages.delete(m.id));
+  }
 }
 
 export async function moveConversationToTrash(id: string, userId: number) {
-  const db = await getDb();
-  if (!db) throw new Error("Database connection failed - check DATABASE_URL");
-  await db
-    .update(conversations)
-    .set({ deletedAt: new Date(), isPinned: false, updatedAt: new Date() })
-    .where(and(eq(conversations.id, id), eq(conversations.userId, userId)));
-  return getConversationForUser(id, userId);
+  const conv = storage.conversations.get(id);
+  if (conv && conv.userId === userId) {
+    conv.deletedAt = now();
+    conv.isPinned = false;
+    conv.updatedAt = now();
+    storage.conversations.set(id, conv);
+  }
+  return conv;
 }
 
 export async function restoreConversationForUser(id: string, userId: number) {
-  const db = await getDb();
-  if (!db) throw new Error("Database connection failed - check DATABASE_URL");
-  await db
-    .update(conversations)
-    .set({ deletedAt: null, isArchived: false, updatedAt: new Date() })
-    .where(and(eq(conversations.id, id), eq(conversations.userId, userId)));
-  return getConversationForUser(id, userId);
+  const conv = storage.conversations.get(id);
+  if (conv && conv.userId === userId) {
+    conv.deletedAt = null;
+    conv.isArchived = false;
+    conv.updatedAt = now();
+    storage.conversations.set(id, conv);
+  }
+  return conv;
 }
 
 export async function listMessagesForConversation(conversationId: string) {
-  const db = await getDb();
-  if (!db) return [];
-  return db
-    .select()
-    .from(messages)
-    .where(eq(messages.conversationId, conversationId))
-    .orderBy(asc(messages.createdAt));
+  return Array.from(storage.messages.values())
+    .filter(m => m.conversationId === conversationId)
+    .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
 }
 
 export async function listMessageFilesForUser(
   messageId: string,
   userId: number
 ) {
-  const db = await getDb();
-  if (!db) return [];
-  return db
-    .select({
-      id: files.id,
-      filename: files.filename,
-      mimeType: files.mimeType,
-      url: files.url,
-      storageKey: files.storageKey,
+  const message = storage.messages.get(messageId);
+  if (!message) return [];
+  
+  const conversation = storage.conversations.get(message.conversationId);
+  if (!conversation || conversation.userId !== userId) return [];
+  
+  return Array.from(storage.attachments.values())
+    .filter(a => a.messageId === messageId)
+    .map(a => {
+      const file = storage.files.get(a.fileId);
+      return file && file.userId === userId ? {
+        id: file.id,
+        filename: file.filename,
+        mimeType: file.mimeType,
+        url: file.url,
+        storageKey: file.storageKey,
+      } : null;
     })
-    .from(attachments)
-    .innerJoin(files, eq(attachments.fileId, files.id))
-    .innerJoin(messages, eq(attachments.messageId, messages.id))
-    .innerJoin(conversations, eq(messages.conversationId, conversations.id))
-    .where(
-      and(
-        eq(attachments.messageId, messageId),
-        eq(conversations.userId, userId),
-        eq(files.userId, userId)
-      )
-    );
+    .filter((f): f is NonNullable<typeof f> => f !== null);
 }
 
 export async function attachFileToMessageForUser(input: {
@@ -266,108 +373,89 @@ export async function attachFileToMessageForUser(input: {
   messageId: string;
   userId: number;
 }) {
-  const db = await getDb();
-  if (!db) throw new Error("Database connection failed - check DATABASE_URL");
-  const message = await getMessageForUser(input.messageId, input.userId);
+  const message = storage.messages.get(input.messageId);
   if (!message) return undefined;
-  const [file] = await db
-    .select()
-    .from(files)
-    .where(and(eq(files.id, input.fileId), eq(files.userId, input.userId)))
-    .limit(1);
-  if (!file) return undefined;
-  const [existing] = await db
-    .select()
-    .from(attachments)
-    .where(
-      and(
-        eq(attachments.fileId, input.fileId),
-        eq(attachments.messageId, input.messageId)
-      )
-    )
-    .limit(1);
-  if (!existing)
-    await db
-      .insert(attachments)
-      .values({
-        id: input.id,
-        fileId: input.fileId,
-        messageId: input.messageId,
-        conversationId: message.conversationId,
-      });
+  
+  const file = storage.files.get(input.fileId);
+  if (!file || file.userId !== input.userId) return undefined;
+  
+  const existing = Array.from(storage.attachments.values()).find(
+    a => a.fileId === input.fileId && a.messageId === input.messageId
+  );
+  
+  if (!existing) {
+    const attachment: Attachment = {
+      id: input.id,
+      fileId: input.fileId,
+      messageId: input.messageId,
+      conversationId: message.conversationId,
+      createdAt: now(),
+    };
+    storage.attachments.set(attachment.id, attachment);
+  }
+  
   return { messageId: input.messageId, fileId: input.fileId };
 }
 
-export async function createMessage(input: typeof messages.$inferInsert) {
-  const db = await getDb();
-  if (!db) throw new Error("Database connection failed - check DATABASE_URL");
-  await db.insert(messages).values(input);
-  await db
-    .update(conversations)
-    .set({ updatedAt: new Date() })
-    .where(eq(conversations.id, input.conversationId));
+export async function createMessage(input: Message) {
+  storage.messages.set(input.id, input);
+  
+  // Update conversation timestamp
+  const conv = storage.conversations.get(input.conversationId);
+  if (conv) {
+    conv.updatedAt = now();
+    storage.conversations.set(conv.id, conv);
+  }
 }
 
 export async function updateMessage(
   id: string,
-  values: Partial<
-    Pick<typeof messages.$inferInsert, "content" | "model" | "status">
-  >
+  values: Partial<Pick<Message, "content" | "model" | "status">>
 ) {
-  const db = await getDb();
-  if (!db) throw new Error("Database connection failed - check DATABASE_URL");
-  await db.update(messages).set(values).where(eq(messages.id, id));
+  const message = storage.messages.get(id);
+  if (message) {
+    Object.assign(message, values, { updatedAt: now() });
+    storage.messages.set(id, message);
+  }
 }
 
 export async function removeFollowingAssistantDuplicatesForUser(
   assistantMessageId: string,
   userId: number
 ) {
-  const db = await getDb();
-  if (!db) throw new Error("Database connection failed - check DATABASE_URL");
-  const assistant = await getMessageForUser(assistantMessageId, userId);
+  const assistant = storage.messages.get(assistantMessageId);
   if (!assistant || assistant.role !== "assistant") return [];
-  const conversationMessages = await listMessagesForConversation(
-    assistant.conversationId
-  );
-  const index = conversationMessages.findIndex(
-    message => message.id === assistant.id
-  );
+  
+  const conversationMessages = await listMessagesForConversation(assistant.conversationId);
+  const index = conversationMessages.findIndex(m => m.id === assistant.id);
   if (index < 0) return [];
+  
   const duplicateIds: string[] = [];
-  for (
-    let cursor = index + 1;
-    cursor < conversationMessages.length;
-    cursor += 1
-  ) {
+  for (let cursor = index + 1; cursor < conversationMessages.length; cursor++) {
     const message = conversationMessages[cursor];
     if (message.role === "user") break;
     if (message.role === "assistant") duplicateIds.push(message.id);
   }
-  for (const id of duplicateIds)
-    await db.delete(messages).where(eq(messages.id, id));
+  
+  duplicateIds.forEach(id => storage.messages.delete(id));
   return duplicateIds;
 }
 
 export async function getMessageForUser(messageId: string, userId: number) {
-  const db = await getDb();
-  if (!db) return undefined;
-  const result = await db
-    .select({ message: messages, conversation: conversations })
-    .from(messages)
-    .innerJoin(conversations, eq(messages.conversationId, conversations.id))
-    .where(and(eq(messages.id, messageId), eq(conversations.userId, userId)))
-    .limit(1);
-  return result[0]?.message;
+  const message = storage.messages.get(messageId);
+  if (!message) return undefined;
+  
+  const conversation = storage.conversations.get(message.conversationId);
+  return conversation && conversation.userId === userId ? message : undefined;
 }
 
 export async function deleteMessageForUser(messageId: string, userId: number) {
-  const db = await getDb();
-  if (!db) throw new Error("Database connection failed - check DATABASE_URL");
   const message = await getMessageForUser(messageId, userId);
-  if (!message) return false;
-  await db.delete(messages).where(eq(messages.id, message.id));
-  return true;
+  if (message) {
+    storage.messages.delete(messageId);
+    return true;
+  }
+  return false;
 }
 
 export async function editMessageForUser(input: {
@@ -376,37 +464,36 @@ export async function editMessageForUser(input: {
   versionId: string;
   content: string;
 }) {
-  const db = await getDb();
-  if (!db) throw new Error("Database connection failed - check DATABASE_URL");
   const message = await getMessageForUser(input.id, input.userId);
   if (!message) return undefined;
-  await db
-    .insert(messageVersions)
-    .values({
-      id: input.versionId,
-      messageId: message.id,
-      content: message.content,
-    });
-  await db
-    .update(messages)
-    .set({ content: input.content, updatedAt: new Date() })
-    .where(eq(messages.id, message.id));
-  return getMessageForUser(message.id, input.userId);
+  
+  // Save version
+  const version: MessageVersion = {
+    id: input.versionId,
+    messageId: message.id,
+    content: message.content,
+    createdAt: now(),
+  };
+  storage.messageVersions.set(version.id, version);
+  
+  // Update message
+  message.content = input.content;
+  message.updatedAt = now();
+  storage.messages.set(message.id, message);
+  
+  return message;
 }
 
 export async function listMessageVersionsForUser(
   messageId: string,
   userId: number
 ) {
-  const db = await getDb();
-  if (!db) return [];
   const message = await getMessageForUser(messageId, userId);
-  if (!message) return undefined;
-  return db
-    .select()
-    .from(messageVersions)
-    .where(eq(messageVersions.messageId, message.id))
-    .orderBy(desc(messageVersions.createdAt));
+  if (!message) return [];
+  
+  return Array.from(storage.messageVersions.values())
+    .filter(v => v.messageId === message.id)
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 }
 
 export async function setMessageFeedbackForUser(input: {
@@ -415,114 +502,92 @@ export async function setMessageFeedbackForUser(input: {
   userId: number;
   value: "up" | "down";
 }) {
-  const db = await getDb();
-  if (!db) throw new Error("Database connection failed - check DATABASE_URL");
-  await db
-    .insert(messageFeedback)
-    .values({
+  const existing = Array.from(storage.messageFeedback.values()).find(
+    f => f.messageId === input.messageId && f.userId === input.userId
+  );
+  
+  if (existing) {
+    existing.value = input.value;
+    existing.updatedAt = now();
+    storage.messageFeedback.set(existing.id, existing);
+  } else {
+    const feedback: MessageFeedback = {
       id: input.id,
       messageId: input.messageId,
       userId: input.userId,
       value: input.value,
-    })
-    .onConflictDoUpdate({
-      target: [messageFeedback.userId, messageFeedback.messageId],
-      set: { value: input.value, updatedAt: new Date() },
-    });
+      createdAt: now(),
+      updatedAt: now(),
+    };
+    storage.messageFeedback.set(feedback.id, feedback);
+  }
 }
 
 export async function searchConversationMessages(
   userId: number,
   query: string
 ) {
-  const db = await getDb();
-  if (!db) return [];
-  const pattern = `%${query.trim()}%`;
-  return db
-    .select({
-      conversationId: conversations.id,
-      conversationTitle: conversations.title,
-      messageId: messages.id,
-      content: messages.content,
-      role: messages.role,
-      createdAt: messages.createdAt,
-    })
-    .from(messages)
-    .innerJoin(conversations, eq(messages.conversationId, conversations.id))
-    .where(
-      and(
-        eq(conversations.userId, userId),
-        eq(conversations.isArchived, false),
-        ilike(messages.content, pattern)
-      )
-    )
-    .orderBy(desc(messages.createdAt))
-    .limit(30);
+  const pattern = query.trim().toLowerCase();
+  const results: Array<{
+    conversationId: string;
+    conversationTitle: string;
+    messageId: string;
+    content: string;
+    role: string;
+    createdAt: Date;
+  }> = [];
+  
+  const messages = Array.from(storage.messages.values());
+  for (const message of messages) {
+    const conv = storage.conversations.get(message.conversationId);
+    if (conv && conv.userId === userId && !conv.isArchived && message.content.toLowerCase().includes(pattern)) {
+      results.push({
+        conversationId: conv.id,
+        conversationTitle: conv.title,
+        messageId: message.id,
+        content: message.content,
+        role: message.role,
+        createdAt: message.createdAt,
+      });
+    }
+  }
+  
+  return results.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()).slice(0, 30);
 }
 
 export async function searchConversationTitles(userId: number, query: string) {
-  const db = await getDb();
-  if (!db) return [];
-  const pattern = `%${query.trim()}%`;
-  return db
-    .select({
-      id: conversations.id,
-      title: conversations.title,
-      updatedAt: conversations.updatedAt,
-    })
-    .from(conversations)
-    .where(
-      and(
-        eq(conversations.userId, userId),
-        eq(conversations.isArchived, false),
-        isNull(conversations.deletedAt),
-        ilike(conversations.title, pattern)
-      )
-    )
-    .orderBy(desc(conversations.updatedAt))
-    .limit(12);
+  const pattern = query.trim().toLowerCase();
+  return Array.from(storage.conversations.values())
+    .filter(c => c.userId === userId && !c.isArchived && c.deletedAt === null && c.title.toLowerCase().includes(pattern))
+    .map(c => ({
+      id: c.id,
+      title: c.title,
+      updatedAt: c.updatedAt,
+    }))
+    .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
+    .slice(0, 12);
 }
 
 export async function getTaskForUser(taskId: string, userId: number) {
-  const db = await getDb();
-  if (!db) return undefined;
-  const result = await db
-    .select()
-    .from(tasks)
-    .where(and(eq(tasks.id, taskId), eq(tasks.userId, userId)))
-    .limit(1);
-  return result[0];
+  const task = storage.tasks.get(taskId);
+  return task && task.userId === userId ? task : undefined;
 }
 
 export async function listTaskActivitiesForUser(
   taskId: string,
   userId: number
 ) {
-  const db = await getDb();
-  if (!db) return [];
-  return db
-    .select()
-    .from(taskActivities)
-    .where(
-      and(eq(taskActivities.taskId, taskId), eq(taskActivities.userId, userId))
-    )
-    .orderBy(desc(taskActivities.createdAt));
+  return Array.from(storage.taskActivities.values())
+    .filter(a => a.taskId === taskId && a.userId === userId)
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 }
 
 export async function getTaskActivityForUser(
   activityId: string,
   userId: number
 ) {
-  const db = await getDb();
-  if (!db) return undefined;
-  const result = await db
-    .select()
-    .from(taskActivities)
-    .where(
-      and(eq(taskActivities.id, activityId), eq(taskActivities.userId, userId))
-    )
-    .limit(1);
-  return result[0];
+  const activity = storage.taskActivities.get(activityId);
+  return activity && activity.userId === userId ? activity : undefined;
 }
 
 export async function createTaskActivityForUser(input: {
@@ -533,21 +598,25 @@ export async function createTaskActivityForUser(input: {
   detail?: string | null;
   status?: "queued" | "running" | "completed" | "failed" | "cancelled";
 }) {
-  const db = await getDb();
-  if (!db) throw new Error("Database connection failed - check DATABASE_URL");
   const task = await getTaskForUser(input.taskId, input.userId);
   if (!task) return undefined;
+  
   const status = input.status ?? "queued";
-  const now = new Date();
-  await db.insert(taskActivities).values({
-    ...input,
+  const nowDate = now();
+  const activity: TaskActivity = {
+    id: input.id,
+    userId: input.userId,
+    taskId: input.taskId,
     status,
-    startedAt: status === "running" ? now : null,
-    completedAt: ["completed", "failed", "cancelled"].includes(status)
-      ? now
-      : null,
-  });
-  return getTaskActivityForUser(input.id, input.userId);
+    summary: input.summary,
+    detail: input.detail ?? null,
+    startedAt: status === "running" ? nowDate : null,
+    completedAt: ["completed", "failed", "cancelled"].includes(status) ? nowDate : null,
+    createdAt: nowDate,
+    updatedAt: nowDate,
+  };
+  storage.taskActivities.set(activity.id, activity);
+  return activity;
 }
 
 export async function updateTaskActivityForUser(input: {
@@ -557,60 +626,55 @@ export async function updateTaskActivityForUser(input: {
   detail?: string | null;
   status?: "queued" | "running" | "completed" | "failed" | "cancelled";
 }) {
-  const db = await getDb();
-  if (!db) throw new Error("Database connection failed - check DATABASE_URL");
   const activity = await getTaskActivityForUser(input.id, input.userId);
   if (!activity) return undefined;
-  const now = new Date();
+  
+  const nowDate = now();
   const status = input.status;
-  await db
-    .update(taskActivities)
-    .set({
-      summary: input.summary,
-      detail: input.detail,
-      status,
-      startedAt:
-        status === "running" && !activity.startedAt ? now : activity.startedAt,
-      completedAt:
-        status && ["completed", "failed", "cancelled"].includes(status)
-          ? now
-          : activity.completedAt,
-      updatedAt: now,
-    })
-    .where(
-      and(
-        eq(taskActivities.id, input.id),
-        eq(taskActivities.userId, input.userId)
-      )
-    );
-  return getTaskActivityForUser(input.id, input.userId);
+  
+  if (input.summary !== undefined) activity.summary = input.summary;
+  if (input.detail !== undefined) activity.detail = input.detail;
+  if (status !== undefined) {
+    activity.status = status;
+    if (status === "running" && !activity.startedAt) activity.startedAt = nowDate;
+    if (["completed", "failed", "cancelled"].includes(status)) activity.completedAt = nowDate;
+  }
+  activity.updatedAt = nowDate;
+  
+  storage.taskActivities.set(activity.id, activity);
+  return activity;
 }
 
 export async function getUserPreferences(userId: number) {
-  const db = await getDb();
-  if (!db) return undefined;
-  const result = await db
-    .select()
-    .from(userPreferences)
-    .where(eq(userPreferences.userId, userId))
-    .limit(1);
-  return result[0];
+  return storage.userPreferences.get(userId);
 }
 
 export async function upsertUserPreferences(
   userId: number,
-  values: Partial<Omit<typeof userPreferences.$inferInsert, "userId">>
+  values: Partial<Omit<UserPreference, "userId" | "createdAt" | "updatedAt">>
 ) {
-  const db = await getDb();
-  if (!db) throw new Error("Database connection failed - check DATABASE_URL");
-  await db
-    .insert(userPreferences)
-    .values({ userId, ...values })
-    .onConflictDoUpdate({
-      target: userPreferences.userId,
-      set: { ...values, updatedAt: new Date() },
-    });
-  return getUserPreferences(userId);
+  const existing = storage.userPreferences.get(userId);
+  const nowDate = now();
+  
+  if (existing) {
+    Object.assign(existing, values, { updatedAt: nowDate });
+    storage.userPreferences.set(userId, existing);
+  } else {
+    const prefs: UserPreference = {
+      userId,
+      selectedModel: values.selectedModel ?? null,
+      persona: values.persona ?? "balanced",
+      customInstructions: values.customInstructions ?? null,
+      speechRate: values.speechRate ?? 100,
+      autoPlayResponses: values.autoPlayResponses ?? false,
+      reduceMotion: values.reduceMotion ?? false,
+      createdAt: nowDate,
+      updatedAt: nowDate,
+    };
+    storage.userPreferences.set(userId, prefs);
+  }
+  
+  return storage.userPreferences.get(userId);
 }
 
 export async function createVoiceSession(input: {
@@ -618,33 +682,28 @@ export async function createVoiceSession(input: {
   userId: number;
   conversationId: string;
 }) {
-  const db = await getDb();
-  if (!db) throw new Error("Database connection failed - check DATABASE_URL");
-  await db.insert(voiceSessions).values(input);
-  const result = await db
-    .select()
-    .from(voiceSessions)
-    .where(eq(voiceSessions.id, input.id))
-    .limit(1);
-  return result[0];
+  const nowDate = now();
+  const session: VoiceSession = {
+    id: input.id,
+    userId: input.userId,
+    conversationId: input.conversationId,
+    status: "connecting",
+    createdAt: nowDate,
+    updatedAt: nowDate,
+  };
+  storage.voiceSessions.set(session.id, session);
+  return session;
 }
 
 export async function updateVoiceSessionForUser(
   id: string,
   userId: number,
-  status:
-    | "connecting"
-    | "listening"
-    | "speaking"
-    | "processing"
-    | "interrupted"
-    | "ended"
-    | "error"
+  status: VoiceSession["status"]
 ) {
-  const db = await getDb();
-  if (!db) throw new Error("Database connection failed - check DATABASE_URL");
-  await db
-    .update(voiceSessions)
-    .set({ status, updatedAt: new Date() })
-    .where(and(eq(voiceSessions.id, id), eq(voiceSessions.userId, userId)));
+  const session = storage.voiceSessions.get(id);
+  if (session && session.userId === userId) {
+    session.status = status;
+    session.updatedAt = now();
+    storage.voiceSessions.set(id, session);
+  }
 }

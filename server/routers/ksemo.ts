@@ -166,6 +166,8 @@ export const conversationRouter = router({
           content: message.content,
           model: message.model,
           status: message.status === "streaming" ? "cancelled" : message.status,
+          createdAt: new Date(),
+          updatedAt: new Date(),
         });
       }
       return duplicate;
@@ -403,11 +405,12 @@ export const voiceRouter = router({
         });
       const nextType = typeAfterVoiceSession(conversation.conversationType);
       if (nextType !== conversation.conversationType) {
-        conversation = await updateConversationForUser(
+        const updated = await updateConversationForUser(
           conversation.id,
           ctx.user.id,
           { conversationType: nextType }
         );
+        if (updated) conversation = updated;
       }
       if (!conversation)
         throw new TRPCError({

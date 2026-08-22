@@ -1,14 +1,6 @@
 import { TRPCError } from "@trpc/server";
-import { and, desc, eq, ilike, isNull, or } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { z } from "zod";
-import {
-  attachments,
-  conversations,
-  files,
-  memories,
-  projects,
-} from "../../drizzle/schema";
 import { getDb } from "../db";
 import { storagePut } from "../storage";
 import { protectedProcedure, router } from "../_core/trpc";
@@ -38,15 +30,11 @@ async function dbOrThrow() {
 }
 
 async function ownedProject(projectId: string, userId: number) {
-  const db = await dbOrThrow();
-  const result = await db
-    .select()
-    .from(projects)
-    .where(and(eq(projects.id, projectId), eq(projects.userId, userId)))
-    .limit(1);
-  if (!result[0])
+  const storage = await dbOrThrow();
+  const project = storage.projects.get(projectId);
+  if (!project || project.userId !== userId)
     throw new TRPCError({ code: "NOT_FOUND", message: "Project not found." });
-  return result[0];
+  return project;
 }
 
 async function optionalOwnedProject(
@@ -80,160 +68,150 @@ const allowedMimeTypes = new Set([
 export const workspaceRouter = router({
   projects: router({
     list: protectedProcedure.query(async ({ ctx }) => {
-      const db = await dbOrThrow();
-      return db
-        .select()
-        .from(projects)
-        .where(
-          and(eq(projects.userId, ctx.user.id), eq(projects.isArchived, false))
-        )
-        .orderBy(desc(projects.updatedAt));
+      const storage = await dbOrThrow();
+      return Array.from(storage.projects.values())
+        .filter(p => p.userId === ctx.user.id && !p.isArchived)
+        .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
     }),
     create: protectedProcedure
       .input(projectInput)
       .mutation(async ({ ctx, input }) => {
-        const db = await dbOrThrow();
+        const storage = await dbOrThrow();
         const id = nanoid();
-        await db.insert(projects).values({ id, userId: ctx.user.id, ...input });
-        return (
-          await db.select().from(projects).where(eq(projects.id, id)).limit(1)
-        )[0];
+        const now = new Date();
+        const project = {
+          id,
+          userId: ctx.user.id,
+          name: input.name,
+          description: input.description ?? null,
+          instructions: input.instructions ?? null,
+          isArchived: false,
+          createdAt: now,
+          updatedAt: now,
+        };
+        storage.projects.set(id, project);
+        return project;
       }),
     update: protectedProcedure
       .input(projectInput.partial().extend({ id: entityId }))
       .mutation(async ({ ctx, input }) => {
-        const db = await dbOrThrow();
+        const storage = await dbOrThrow();
         await ownedProject(input.id, ctx.user.id);
         const { id, ...values } = input;
-        await db
-          .update(projects)
-          .set({ ...values, updatedAt: new Date() })
-          .where(and(eq(projects.id, id), eq(projects.userId, ctx.user.id)));
-        return (
-          await db.select().from(projects).where(eq(projects.id, id)).limit(1)
-        )[0];
+        const project = storage.projects.get(id);
+        if (project) {
+          Object.assign(project, values, { updatedAt: new Date() });
+          storage.projects.set(id, project);
+        }
+        return project;
       }),
     archive: protectedProcedure
       .input(z.object({ id: entityId, isArchived: z.boolean() }))
       .mutation(async ({ ctx, input }) => {
-        const db = await dbOrThrow();
-        await ownedProject(input.id, ctx.user.id);
-        await db
-          .update(projects)
-          .set({ isArchived: input.isArchived, updatedAt: new Date() })
-          .where(eq(projects.id, input.id));
+        const storage = await dbOrThrow();
+        const project = await ownedProject(input.id, ctx.user.id);
+        project.isArchived = input.isArchived;
+        project.updatedAt = new Date();
+        storage.projects.set(input.id, project);
         return { success: true } as const;
       }),
     remove: protectedProcedure
       .input(z.object({ id: entityId }))
       .mutation(async ({ ctx, input }) => {
-        const db = await dbOrThrow();
+        const storage = await dbOrThrow();
         await ownedProject(input.id, ctx.user.id);
-        await db
-          .delete(projects)
-          .where(
-            and(eq(projects.id, input.id), eq(projects.userId, ctx.user.id))
-          );
+        storage.projects.delete(input.id);
         return { success: true } as const;
       }),
     conversations: protectedProcedure
       .input(z.object({ projectId: entityId }))
       .query(async ({ ctx, input }) => {
-        const db = await dbOrThrow();
+        const storage = await dbOrThrow();
         await ownedProject(input.projectId, ctx.user.id);
-        return db
-          .select()
-          .from(conversations)
-          .where(
-            and(
-              eq(conversations.userId, ctx.user.id),
-              eq(conversations.projectId, input.projectId),
-              isNull(conversations.deletedAt)
-            )
+        return Array.from(storage.conversations.values())
+          .filter(
+            c =>
+              c.userId === ctx.user.id &&
+              c.projectId === input.projectId &&
+              c.deletedAt === null
           )
-          .orderBy(desc(conversations.updatedAt));
+          .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
       }),
     setConversation: protectedProcedure
       .input(
         z.object({ conversationId: entityId, projectId: entityId.nullable() })
       )
       .mutation(async ({ ctx, input }) => {
-        const db = await dbOrThrow();
+        const storage = await dbOrThrow();
         await optionalOwnedProject(input.projectId, ctx.user.id);
-        const conversation = await db
-          .select()
-          .from(conversations)
-          .where(
-            and(
-              eq(conversations.id, input.conversationId),
-              eq(conversations.userId, ctx.user.id)
-            )
-          )
-          .limit(1);
-        if (!conversation[0])
+        const conversation = storage.conversations.get(input.conversationId);
+        if (!conversation || conversation.userId !== ctx.user.id)
           throw new TRPCError({
             code: "NOT_FOUND",
             message: "Conversation not found.",
           });
-        await db
-          .update(conversations)
-          .set({ projectId: input.projectId, updatedAt: new Date() })
-          .where(eq(conversations.id, input.conversationId));
+        conversation.projectId = input.projectId;
+        conversation.updatedAt = new Date();
+        storage.conversations.set(input.conversationId, conversation);
         return { success: true } as const;
       }),
   }),
   memories: router({
     list: protectedProcedure.query(async ({ ctx }) => {
-      const db = await dbOrThrow();
-      return db
-        .select()
-        .from(memories)
-        .where(eq(memories.userId, ctx.user.id))
-        .orderBy(desc(memories.updatedAt));
+      const storage = await dbOrThrow();
+      return Array.from(storage.memories.values())
+        .filter(m => m.userId === ctx.user.id)
+        .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
     }),
     create: protectedProcedure
       .input(memoryInput)
       .mutation(async ({ ctx, input }) => {
-        const db = await dbOrThrow();
+        const storage = await dbOrThrow();
         await optionalOwnedProject(input.projectId, ctx.user.id);
         const id = nanoid();
-        await db.insert(memories).values({ id, userId: ctx.user.id, ...input });
-        return (
-          await db.select().from(memories).where(eq(memories.id, id)).limit(1)
-        )[0];
+        const now = new Date();
+        const memory = {
+          id,
+          userId: ctx.user.id,
+          content: input.content,
+          category: input.category,
+          projectId: input.projectId ?? null,
+          isActive: true,
+          createdAt: now,
+          updatedAt: now,
+        };
+        storage.memories.set(id, memory);
+        return memory;
       }),
     setActive: protectedProcedure
       .input(z.object({ id: entityId, isActive: z.boolean() }))
       .mutation(async ({ ctx, input }) => {
-        const db = await dbOrThrow();
-        await db
-          .update(memories)
-          .set({ isActive: input.isActive, updatedAt: new Date() })
-          .where(
-            and(eq(memories.id, input.id), eq(memories.userId, ctx.user.id))
-          );
+        const storage = await dbOrThrow();
+        const memory = storage.memories.get(input.id);
+        if (memory && memory.userId === ctx.user.id) {
+          memory.isActive = input.isActive;
+          memory.updatedAt = new Date();
+          storage.memories.set(input.id, memory);
+        }
         return { success: true } as const;
       }),
     remove: protectedProcedure
       .input(z.object({ id: entityId }))
       .mutation(async ({ ctx, input }) => {
-        const db = await dbOrThrow();
-        await db
-          .delete(memories)
-          .where(
-            and(eq(memories.id, input.id), eq(memories.userId, ctx.user.id))
-          );
+        const storage = await dbOrThrow();
+        const memory = storage.memories.get(input.id);
+        if (memory && memory.userId === ctx.user.id) {
+          storage.memories.delete(input.id);
+        }
         return { success: true } as const;
       }),
   }),
   files: router({
     list: protectedProcedure.query(async ({ ctx }) => {
-      const db = await dbOrThrow();
-      return db
-        .select()
-        .from(files)
-        .where(eq(files.userId, ctx.user.id))
-        .orderBy(desc(files.createdAt));
+      const storage = await dbOrThrow();
+      return Array.from(storage.files.values())
+        .filter(f => f.userId === ctx.user.id)
+        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
     }),
     upload: protectedProcedure
       .input(
@@ -257,100 +235,83 @@ export const workspaceRouter = router({
             message: "Files must be smaller than 8 MB.",
           });
         await optionalOwnedProject(input.projectId, ctx.user.id);
-        const db = await dbOrThrow();
+        const storage = await dbOrThrow();
         const id = nanoid();
         const saved = await storagePut(
           `library/${ctx.user.id}/${id}-${safeFilename(input.filename)}`,
           buffer,
           input.mimeType
         );
-        await db
-          .insert(files)
-          .values({
-            id,
-            userId: ctx.user.id,
-            projectId: input.projectId,
-            storageKey: saved.key,
-            url: saved.url,
-            filename: input.filename,
-            mimeType: input.mimeType,
-            sizeBytes: buffer.length,
-          });
-        return (
-          await db.select().from(files).where(eq(files.id, id)).limit(1)
-        )[0];
+        const now = new Date();
+        const file = {
+          id,
+          userId: ctx.user.id,
+          projectId: input.projectId ?? null,
+          storageKey: saved.key,
+          url: saved.url,
+          filename: input.filename,
+          mimeType: input.mimeType,
+          sizeBytes: buffer.length,
+          status: "ready" as const,
+          createdAt: now,
+          updatedAt: now,
+        };
+        storage.files.set(id, file);
+        return file;
       }),
     remove: protectedProcedure
       .input(z.object({ id: entityId }))
       .mutation(async ({ ctx, input }) => {
-        const db = await dbOrThrow();
-        await db
-          .delete(files)
-          .where(and(eq(files.id, input.id), eq(files.userId, ctx.user.id)));
+        const storage = await dbOrThrow();
+        const file = storage.files.get(input.id);
+        if (file && file.userId === ctx.user.id) {
+          storage.files.delete(input.id);
+        }
         return { success: true } as const;
       }),
     attachToConversation: protectedProcedure
       .input(z.object({ fileId: entityId, conversationId: entityId }))
       .mutation(async ({ ctx, input }) => {
-        const db = await dbOrThrow();
-        const [file] = await db
-          .select()
-          .from(files)
-          .where(and(eq(files.id, input.fileId), eq(files.userId, ctx.user.id)))
-          .limit(1);
-        if (!file)
+        const storage = await dbOrThrow();
+        const file = storage.files.get(input.fileId);
+        if (!file || file.userId !== ctx.user.id)
           throw new TRPCError({
             code: "NOT_FOUND",
             message: "File not found.",
           });
-        const [conversation] = await db
-          .select()
-          .from(conversations)
-          .where(
-            and(
-              eq(conversations.id, input.conversationId),
-              eq(conversations.userId, ctx.user.id)
-            )
-          )
-          .limit(1);
-        if (!conversation)
+        const conversation = storage.conversations.get(input.conversationId);
+        if (!conversation || conversation.userId !== ctx.user.id)
           throw new TRPCError({
             code: "NOT_FOUND",
             message: "Conversation not found.",
           });
-        const [existing] = await db
-          .select()
-          .from(attachments)
-          .where(
-            and(
-              eq(attachments.fileId, file.id),
-              eq(attachments.conversationId, conversation.id)
-            )
-          )
-          .limit(1);
-        if (!existing)
-          await db
-            .insert(attachments)
-            .values({
-              id: nanoid(),
-              fileId: file.id,
-              conversationId: conversation.id,
-            });
+        const existing = Array.from(storage.attachments.values()).find(
+          a => a.fileId === file.id && a.conversationId === conversation.id
+        );
+        if (!existing) {
+          const attachment = {
+            id: nanoid(),
+            fileId: file.id,
+            conversationId: conversation.id,
+            messageId: null,
+            createdAt: new Date(),
+          };
+          storage.attachments.set(attachment.id, attachment);
+        }
         return { success: true } as const;
       }),
   }),
   search: protectedProcedure
     .input(z.object({ query: z.string().trim().min(2).max(120) }))
     .query(async ({ ctx, input }) => {
-      const db = await dbOrThrow();
-      const phrase = `%${input.query}%`;
-      const memoryResults = await db
-        .select()
-        .from(memories)
-        .where(
-          and(eq(memories.userId, ctx.user.id), ilike(memories.content, phrase))
+      const storage = await dbOrThrow();
+      const pattern = input.query.toLowerCase();
+      const memoryResults = Array.from(storage.memories.values())
+        .filter(
+          m =>
+            m.userId === ctx.user.id && m.content.toLowerCase().includes(pattern)
         )
-        .limit(8);
+        .slice(0, 8);
       return { memories: memoryResults };
     }),
 });

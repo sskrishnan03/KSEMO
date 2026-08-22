@@ -155,7 +155,10 @@ export function registerChatStream(app: Express) {
           conversationId: conversation.id,
           role: "user",
           content: content!,
+          model: null,
           status: "completed",
+          createdAt: new Date(),
+          updatedAt: new Date(),
         });
         for (const fileId of Array.from(
           new Set(body.attachmentFileIds ?? [])
@@ -189,7 +192,10 @@ export function registerChatStream(app: Express) {
           conversationId: conversation.id,
           role: "assistant",
           content: "",
+          model: null,
           status: "streaming",
+          createdAt: new Date(),
+          updatedAt: new Date(),
         });
       }
 
