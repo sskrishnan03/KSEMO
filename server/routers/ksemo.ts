@@ -4,6 +4,7 @@ import {
   createConversationForUser,
   createMessage,
   createVoiceSession,
+  deleteAllConversationsForUser,
   deleteConversationForUser,
   deleteMessageForUser,
   editMessageForUser,
@@ -140,6 +141,11 @@ export const conversationRouter = router({
       await requireConversation(input.id, ctx.user.id);
       await deleteConversationForUser(input.id, ctx.user.id);
       return { success: true } as const;
+    }),
+  removeAll: protectedProcedure
+    .mutation(async ({ ctx }) => {
+      const removed = await deleteAllConversationsForUser(ctx.user.id);
+      return { success: true, removed } as const;
     }),
   duplicate: protectedProcedure
     .input(z.object({ id: conversationId }))

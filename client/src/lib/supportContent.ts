@@ -522,23 +522,44 @@ export const FAQ_ITEM_COUNT = FAQ_CATEGORIES.reduce(
   0
 );
 
-export function searchFaq(
-  query: string
-): Array<{ category: FaqCategory; items: FaqItem[] }> {
+export function searchFaq(query: string): Array<{
+  category: FaqCategory;
+  items: FaqItem[];
+  matchedCategory?: boolean;
+}> {
   const normalized = query.trim().toLowerCase();
   if (!normalized)
     return FAQ_CATEGORIES.map(category => ({
       category,
       items: category.items,
     }));
-  return FAQ_CATEGORIES.map(category => ({
-    category,
-    items: category.items.filter(item =>
-      `${item.question} ${item.answer} ${category.label}`
-        .toLowerCase()
-        .includes(normalized)
-    ),
-  })).filter(section => section.items.length > 0);
+  const tokens = normalized
+    .split(/\s+/)
+    .filter(token => token.length > 2 && !STOP_WORDS.has(token));
+  const meaningfulTokens = tokens.length ? tokens : [normalized];
+  // A question matching every searched word outranks one matching only some.
+  const requiredMatches =
+    meaningfulTokens.length <= 2 ? 1 : Math.ceil(meaningfulTokens.length / 2);
+  const matchesAll = (haystack: string) =>
+    haystack.includes(normalized) ||
+    meaningfulTokens.every(token => haystack.includes(token));
+  return FAQ_CATEGORIES.map(category => {
+    const matchedCategory = matchesAll(category.label.toLowerCase());
+    const items = matchedCategory
+      ? category.items
+      : category.items
+          .map(item => {
+            const haystack = `${item.question} ${item.answer}`.toLowerCase();
+            const score = meaningfulTokens.filter(token =>
+              haystack.includes(token)
+            ).length;
+            return { item, score };
+          })
+          .filter(entry => entry.score >= requiredMatches)
+          .sort((a, b) => b.score - a.score)
+          .map(entry => entry.item);
+    return { category, items, matchedCategory };
+  }).filter(section => section.items.length > 0);
 }
 
 const STOP_WORDS = new Set([

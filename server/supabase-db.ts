@@ -328,6 +328,20 @@ export async function deleteConversationForUser(id: string, userId: number): Pro
   }
 }
 
+export async function deleteAllConversationsForUser(userId: number): Promise<number> {
+  const { data, error } = await supabase
+    .from("conversations")
+    .delete()
+    .eq("user_id", userId)
+    .select("id");
+
+  if (error) {
+    handleSupabaseError(error, "deleteAllConversationsForUser");
+  }
+
+  return data?.length ?? 0;
+}
+
 export async function moveConversationToTrash(id: string, userId: number): Promise<Conversation | undefined> {
   const { data, error } = await supabase.rpc("move_conversation_to_trash", {
     p_conversation_id: id,

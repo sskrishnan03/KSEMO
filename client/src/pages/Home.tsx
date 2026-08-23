@@ -1186,6 +1186,10 @@ export default function Home() {
           setPrimaryWorkspace(section === "files" ? "library" : "memories");
         }}
         onOpenSupport={topic => setLocation(`/support/${topic}`)}
+        onAllChatsDeleted={() => {
+          setActiveConversationId(null);
+          utils.conversation.list.invalidate();
+        }}
       />
       <SearchDialog
         open={searchOpen || isSearchPreview}

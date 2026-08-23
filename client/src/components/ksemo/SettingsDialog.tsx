@@ -6,6 +6,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -19,13 +29,18 @@ import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { trpc } from "@/lib/trpc";
+import { toast } from "sonner";
 import {
+  Archive,
   Database,
   HelpCircle,
   MessageSquare,
+  RotateCcw,
   Settings2,
   ShieldCheck,
   SlidersHorizontal,
+  Trash2,
   UserRound,
 } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
@@ -178,6 +193,7 @@ export function SettingsDialog({
   onSignOut,
   onOpenWorkspace,
   onOpenSupport,
+  onAllChatsDeleted,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -189,6 +205,7 @@ export function SettingsDialog({
   onSignOut: () => void;
   onOpenWorkspace: (section: "files" | "memories") => void;
   onOpenSupport: (topic: "privacy" | "terms" | "faq") => void;
+  onAllChatsDeleted: () => void;
 }) {
   const [draft, setDraft] = useState<NonNullable<Preferences>>({
     persona: "balanced",
@@ -234,10 +251,10 @@ export function SettingsDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex h-[min(42rem,88dvh)] w-[calc(100%-1.5rem)] max-w-5xl flex-col gap-0 overflow-hidden rounded-2xl p-0 sm:!max-w-5xl">
-        <DialogHeader className="shrink-0 border-b border-border px-5 pb-4 pt-4">
+        <DialogHeader className="shrink-0 border-b border-border px-4 pb-3 pt-3.5 sm:px-5">
           <div className="flex items-center gap-2">
             <Settings2 className="size-4 text-muted-foreground" />
-            <DialogTitle className="text-xl font-semibold tracking-[-0.02em]">
+            <DialogTitle className="text-lg font-semibold tracking-[-0.02em]">
               Settings
             </DialogTitle>
           </div>
@@ -249,12 +266,12 @@ export function SettingsDialog({
             value={search}
             onChange={event => setSearch(event.target.value)}
             placeholder="Search settings…"
-            className="mt-3 h-10 max-w-sm rounded-xl"
+            className="mt-2 h-9 max-w-xs rounded-lg text-sm"
             aria-label="Search settings"
           />
         </DialogHeader>
-        <div className="min-h-0 flex-1 overflow-y-auto sm:grid sm:grid-cols-[12.5rem_minmax(0,1fr)] sm:overflow-hidden">
-          <nav className="flex gap-2 overflow-x-auto border-b border-border p-3 sm:block sm:space-y-1 sm:overflow-y-auto sm:border-b-0 sm:border-r">
+        <div className="min-h-0 flex-1 overflow-y-auto sm:grid sm:grid-cols-[12rem_minmax(0,1fr)] sm:overflow-hidden">
+          <nav className="flex gap-1 overflow-x-auto border-b border-border p-2 sm:block sm:space-y-0.5 sm:overflow-y-auto sm:border-b-0 sm:border-r sm:p-3">
             {visibleSections.map(section => {
               const Icon = section.icon;
               return (
@@ -262,13 +279,13 @@ export function SettingsDialog({
                   key={section.id}
                   onClick={() => setActiveSection(section.id)}
                   className={cn(
-                    "flex shrink-0 items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-left text-sm transition-colors sm:w-full",
+                    "flex shrink-0 items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[13px] transition-colors sm:w-full",
                     activeSection === section.id
                       ? "bg-muted font-medium text-foreground"
-                      : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
+                      : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
                   )}
                 >
-                  <Icon className="size-4" />
+                  <Icon className="size-3.5" />
                   {section.label}
                 </button>
               );
@@ -279,7 +296,7 @@ export function SettingsDialog({
               </p>
             )}
           </nav>
-          <section className="min-w-0 p-5 sm:overflow-y-auto sm:p-6">
+          <section className="min-w-0 p-4 sm:overflow-y-auto sm:p-5">
             {activeSection === "account" && <AccountPanel user={user} />}
             {activeSection === "security" && (
               <SecurityPanel onSignOut={onSignOut} />
@@ -295,28 +312,27 @@ export function SettingsDialog({
               <DataControlsPanel
                 onOpenWorkspace={openWorkspace}
                 onOpenSupport={openSupport}
+                onAllChatsDeleted={() => {
+                  onOpenChange(false);
+                  onAllChatsDeleted();
+                }}
               />
             )}
             {activeSection === "feedback" && <FeedbackPanel />}
           </section>
         </div>
-        {activeSection === "preferences" ? (
-          <div className="shrink-0 flex justify-end gap-2 border-t border-border px-5 py-4">
-            <Button variant="ghost" onClick={() => onOpenChange(false)}>
+        {activeSection === "preferences" && (
+          <div className="shrink-0 flex justify-end gap-2 border-t border-border px-4 py-2.5 sm:px-5">
+            <Button size="sm" variant="ghost" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
             <Button
+              size="sm"
               onClick={() => onSave(draft)}
               disabled={saving}
-              className="rounded-xl bg-foreground text-background hover:bg-foreground/90"
+              className="rounded-lg bg-foreground text-background hover:bg-foreground/90"
             >
               {saving ? "Saving…" : "Save preferences"}
-            </Button>
-          </div>
-        ) : (
-          <div className="shrink-0 flex justify-end border-t border-border px-5 py-4">
-            <Button variant="ghost" onClick={() => onOpenChange(false)}>
-              Close
             </Button>
           </div>
         )}
@@ -333,9 +349,9 @@ function SectionHeading({
   description: string;
 }) {
   return (
-    <div className="mb-5">
-      <h2 className="text-xl font-semibold tracking-[-0.025em]">{title}</h2>
-      <p className="mt-1.5 max-w-xl text-sm leading-6 text-muted-foreground">
+    <div className="mb-4">
+      <h2 className="text-lg font-semibold tracking-[-0.025em]">{title}</h2>
+      <p className="mt-1 max-w-xl text-sm leading-6 text-muted-foreground">
         {description}
       </p>
     </div>
@@ -549,10 +565,32 @@ function PreferencesPanel({
 function DataControlsPanel({
   onOpenWorkspace,
   onOpenSupport,
+  onAllChatsDeleted,
 }: {
   onOpenWorkspace: (section: "files" | "memories") => void;
   onOpenSupport: (topic: "privacy" | "terms" | "faq") => void;
+  onAllChatsDeleted: () => void;
 }) {
+  const [archivedOpen, setArchivedOpen] = useState(false);
+  const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
+  const utils = trpc.useUtils();
+  const removeAllMutation = trpc.conversation.removeAll.useMutation({
+    onSuccess: result => {
+      utils.conversation.list.invalidate();
+      toast.success(
+        result.removed === 1
+          ? "1 chat permanently deleted"
+          : `${result.removed} chats permanently deleted`
+      );
+      setConfirmDeleteAll(false);
+      onAllChatsDeleted();
+    },
+    onError: () => {
+      toast.error("KSEMO could not delete all chats.");
+      setConfirmDeleteAll(false);
+    },
+  });
+
   return (
     <>
       <SectionHeading
@@ -560,6 +598,22 @@ function DataControlsPanel({
         description="Review and manage the content you keep in KSEMO. You control what is saved, attached, shared, and remembered."
       />
       <div className="space-y-3">
+        <article className="rounded-2xl border border-border p-4">
+          <h3 className="text-sm font-medium">Archived chats</h3>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+            Archived conversations are hidden from your sidebar but kept safe.
+            Restore them or delete them permanently.
+          </p>
+          <Button
+            variant="outline"
+            size="sm"
+            className="mt-3 rounded-lg"
+            onClick={() => setArchivedOpen(true)}
+          >
+            <Archive className="size-3.5" />
+            Manage archived
+          </Button>
+        </article>
         <article className="rounded-2xl border border-border p-4">
           <h3 className="text-sm font-medium">Private Library</h3>
           <p className="mt-1 text-xs leading-5 text-muted-foreground">
@@ -590,6 +644,24 @@ function DataControlsPanel({
             Manage memories
           </Button>
         </article>
+        <article className="rounded-2xl border border-destructive/30 bg-destructive/5 p-4">
+          <h3 className="text-sm font-medium">Delete all chats</h3>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+            Permanently deletes every conversation — active, archived, and
+            trashed. Messages, versions, and attachments references cannot be
+            recovered.
+          </p>
+          <Button
+            variant="outline"
+            size="sm"
+            className="mt-3 border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
+            disabled={removeAllMutation.isPending}
+            onClick={() => setConfirmDeleteAll(true)}
+          >
+            <Trash2 className="size-3.5" />
+            {removeAllMutation.isPending ? "Deleting…" : "Delete all chats"}
+          </Button>
+        </article>
         <article className="rounded-2xl border border-border p-4">
           <h3 className="text-sm font-medium">Privacy and terms</h3>
           <p className="mt-1 text-xs leading-5 text-muted-foreground">
@@ -616,7 +688,151 @@ function DataControlsPanel({
           </div>
         </article>
       </div>
+
+      <ArchivedChatsDialog open={archivedOpen} onOpenChange={setArchivedOpen} />
+
+      <AlertDialog open={confirmDeleteAll} onOpenChange={setConfirmDeleteAll}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete all chats?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently removes every conversation in your account,
+              including archived ones. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-white hover:bg-destructive/90"
+              disabled={removeAllMutation.isPending}
+              onClick={event => {
+                event.preventDefault();
+                removeAllMutation.mutate();
+              }}
+            >
+              {removeAllMutation.isPending ? "Deleting…" : "Delete everything"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
+  );
+}
+
+function ArchivedChatsDialog({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const archivedQuery = trpc.conversation.list.useQuery(
+    { scope: "archived" },
+    { enabled: open }
+  );
+  const utils = trpc.useUtils();
+  const restoreMutation = trpc.conversation.setArchived.useMutation({
+    onSuccess: () => {
+      utils.conversation.list.invalidate();
+      toast.success("Chat restored");
+    },
+    onError: () => toast.error("KSEMO could not restore that chat."),
+  });
+  const deleteMutation = trpc.conversation.remove.useMutation({
+    onSuccess: () => {
+      utils.conversation.list.invalidate();
+      toast.success("Chat permanently deleted");
+    },
+    onError: () => toast.error("KSEMO could not delete that chat."),
+  });
+  const conversations = (archivedQuery.data ?? []) as Array<{
+    id: string;
+    title: string;
+    updatedAt?: Date | string | null;
+  }>;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="flex max-h-[32rem] w-[calc(100%-1.5rem)] max-w-lg flex-col gap-0 overflow-hidden rounded-2xl p-0 sm:!max-w-lg">
+        <DialogHeader className="shrink-0 border-b border-border px-4 pb-3 pt-4">
+          <DialogTitle className="text-base font-semibold tracking-[-0.02em]">
+            Archived chats
+          </DialogTitle>
+          <DialogDescription>
+            Restore chats back to your sidebar, or delete them forever.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="min-h-0 flex-1 overflow-y-auto p-3">
+          {archivedQuery.isLoading ? (
+            <p className="px-1 py-6 text-center text-sm text-muted-foreground">
+              Loading archived chats…
+            </p>
+          ) : !conversations.length ? (
+            <div className="px-1 py-8 text-center">
+              <Archive className="mx-auto size-6 text-muted-foreground" />
+              <p className="mt-3 text-sm font-medium">Nothing archived</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Chats you archive from the sidebar will appear here.
+              </p>
+            </div>
+          ) : (
+            <ul className="space-y-1.5">
+              {conversations.map(conversation => (
+                <li
+                  key={conversation.id}
+                  className="flex items-center gap-2 rounded-xl border border-border px-3 py-2"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[13px] font-medium">
+                      {conversation.title}
+                    </p>
+                    {conversation.updatedAt && (
+                      <p className="text-[11px] text-muted-foreground">
+                        Updated{" "}
+                        {new Date(conversation.updatedAt).toLocaleDateString()}
+                      </p>
+                    )}
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-7 shrink-0 rounded-lg"
+                    disabled={restoreMutation.isPending}
+                    aria-label={`Restore ${conversation.title}`}
+                    onClick={() =>
+                      restoreMutation.mutate({
+                        id: conversation.id,
+                        isArchived: false,
+                      })
+                    }
+                  >
+                    <RotateCcw className="size-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-7 shrink-0 rounded-lg text-destructive hover:bg-destructive/10 hover:text-destructive"
+                    disabled={deleteMutation.isPending}
+                    aria-label={`Delete ${conversation.title}`}
+                    onClick={() => {
+                      if (
+                        window.confirm(
+                          `Permanently delete “${conversation.title}”? This cannot be undone.`
+                        )
+                      ) {
+                        deleteMutation.mutate({ id: conversation.id });
+                      }
+                    }}
+                  >
+                    <Trash2 className="size-3.5" />
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 function FeedbackPanel() {
