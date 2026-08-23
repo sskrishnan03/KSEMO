@@ -414,7 +414,6 @@ export default function Home() {
     if (conversationQuery.data.length)
       setActiveConversationId(conversationQuery.data[0].id);
   }, [
-    conversationQuery.data,
     isFreshChatPreview,
     sharedConversationId,
     utils.conversation.get,
