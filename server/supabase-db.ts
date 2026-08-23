@@ -122,9 +122,17 @@ export async function upsertUser(user: InsertUser): Promise<void> {
   } else {
     // User doesn't exist - insert them
     console.log("[Supabase] User doesn't exist, inserting new user");
-    const { data: insertData, error: insertError } = await supabase
+    const insertData: any = {
+      open_id: dbValues.open_id,
+      name: dbValues.name,
+      email: dbValues.email,
+      login_method: dbValues.login_method,
+      last_signed_in: dbValues.last_signed_in,
+    };
+    
+    const { data: insertResult, error: insertError } = await supabase
       .from("users")
-      .insert(dbValues)
+      .insert(insertData)
       .select()
       .single();
 
@@ -133,7 +141,7 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       handleSupabaseError(insertError, "insertUser");
     }
     
-    console.log("[Supabase] User inserted successfully:", insertData);
+    console.log("[Supabase] User inserted successfully:", insertResult);
   }
 }
 
@@ -153,17 +161,19 @@ export async function getUserByOpenId(openId: string): Promise<User | undefined>
 }
 
 export async function getUserByEmail(email: string): Promise<User | undefined> {
-  const { data, error } = await supabase.rpc("get_user_by_email", {
-    p_email: email,
-  });
+  const { data, error } = await supabase
+    .from("users")
+    .select("*")
+    .eq("email", email)
+    .single();
 
   if (error) {
-    if (error.code === "PGRST116") return undefined;
+    if (error.code === "PGRST116") return undefined; // Not found
+    console.error("[Supabase] getUserByEmail error:", JSON.stringify(error, null, 2));
     handleSupabaseError(error, "getUserByEmail");
   }
 
-  if (!data || data.length === 0) return undefined;
-  return dbToUser(data[0] as DbUser);
+  return dbToUser(data as DbUser);
 }
 
 // ============================================

@@ -67,6 +67,32 @@ async function findUserByEmail(email: string) {
   return await db.getUserByEmail(email);
 }
 
+export const signInProcedure = publicProcedure
+  .input(
+    z.object({
+      email: emailInput,
+    })
+  )
+  .mutation(async ({ ctx, input }) => {
+    const user = await findUserByEmail(input.email);
+    
+    // For email-only sign in, if user exists, sign them in directly
+    if (!user) {
+      throw new TRPCError({
+        code: "UNAUTHORIZED",
+        message: "No account found with this email. Please create an account first.",
+      });
+    }
+
+    await db.upsertUser({ openId: user.openId, lastSignedIn: new Date() });
+    await issueSessionCookie(ctx, user.openId, user.name ?? "KSEMO user");
+
+    return {
+      success: true as const,
+      user: { id: user.id, name: user.name, email: user.email },
+    };
+  });
+
 export const signUpProcedure = publicProcedure
   .input(
     z.object({
@@ -101,33 +127,6 @@ export const signUpProcedure = publicProcedure
     return {
       success: true as const,
       user: user ? { id: user.id, name: user.name, email: user.email } : null,
-    };
-  });
-
-export const signInProcedure = publicProcedure
-  .input(
-    z.object({
-      email: emailInput,
-      password: z.string().min(1, "Enter your password."),
-    })
-  )
-  .mutation(async ({ ctx, input }) => {
-    const user = await findUserByEmail(input.email);
-    // Same generic message for unknown email and wrong password so the
-    // endpoint cannot be used to enumerate registered addresses.
-    if (!user || !verifyPassword(input.password, user.passwordHash)) {
-      throw new TRPCError({
-        code: "UNAUTHORIZED",
-        message: "Incorrect email or password.",
-      });
-    }
-
-    await db.upsertUser({ openId: user.openId, lastSignedIn: new Date() });
-    await issueSessionCookie(ctx, user.openId, user.name ?? "KSEMO user");
-
-    return {
-      success: true as const,
-      user: { id: user.id, name: user.name, email: user.email },
     };
   });
 

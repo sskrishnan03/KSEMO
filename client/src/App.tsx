@@ -10,18 +10,6 @@ import ResetPassword from "@/pages/ResetPassword";
 import SharedConversation from "./pages/SharedConversation";
 import { FaqPage, PrivacyPage, TermsPage } from "./pages/SupportPage";
 
-function SignInPage() {
-  return <AuthStage initialPanel="signin" />;
-}
-
-function SignUpPage() {
-  return <AuthStage initialPanel="signup" />;
-}
-
-function ForgotPasswordPage() {
-  return <AuthStage initialPanel="forgot" />;
-}
-
 function Router() {
   // make sure to consider if you need authentication for certain routes
   return (
@@ -31,9 +19,9 @@ function Router() {
       <Route path={"/support/faq"} component={FaqPage} />
       <Route path={"/support/privacy"} component={PrivacyPage} />
       <Route path={"/support/terms"} component={TermsPage} />
-      <Route path={"/signin"} component={SignInPage} />
-      <Route path={"/signup"} component={SignUpPage} />
-      <Route path={"/forgot-password"} component={ForgotPasswordPage} />
+      <Route path={"/signin"} component={AuthStage} />
+      <Route path={"/signup"} component={AuthStage} />
+      <Route path={"/forgot-password"} component={AuthStage} />
       <Route path={"/reset-password"} component={ResetPassword} />
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}

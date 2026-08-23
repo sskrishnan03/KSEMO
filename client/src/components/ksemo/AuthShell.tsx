@@ -17,8 +17,8 @@ export function GoogleIcon() {
 
 export function GoogleButton({ onClick, disabled }: { onClick: () => void; disabled?: boolean }) {
   return (
-    <Button onClick={onClick} variant="outline" disabled={disabled} className="h-12 w-full rounded-xl border-border bg-background text-[15px] font-medium hover:bg-accent">
-      <span className="inline-flex items-center gap-2.5">
+    <Button onClick={onClick} variant="outline" disabled={disabled} className="h-10 w-full rounded-lg border-border bg-background text-sm font-medium hover:bg-accent">
+      <span className="inline-flex items-center gap-2">
         <GoogleIcon />
         Continue with Google
       </span>
