@@ -116,3 +116,74 @@ export async function sendPasswordResetEmail({ to, name, resetUrl }: PasswordRes
     html,
   });
 }
+
+export type FeedbackEmailInput = {
+  fromName: string;
+  fromEmail: string;
+  category: string;
+  message: string;
+};
+
+// Delivers in-app user feedback to the team inbox, reply-addressed to the
+// sender so the conversation can continue over email.
+export async function sendFeedbackEmail({
+  fromName,
+  fromEmail,
+  category,
+  message,
+}: FeedbackEmailInput): Promise<void> {
+  const mailer = getTransporter();
+  if (!mailer) throw new Error("Mailer is not configured");
+
+  const { user } = gmailCredentials();
+  const safeCategory = escapeHtml(category);
+  const safeName = escapeHtml(fromName);
+  const safeEmail = escapeHtml(fromEmail || "(no email on account)");
+  const safeMessage = escapeHtml(message).replace(/\n/g, "<br />");
+  const plainReplyTo =
+    fromEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fromEmail)
+      ? fromEmail
+      : undefined;
+
+  const html = `<!doctype html>
+<html>
+  <body style="margin:0;padding:0;background-color:#f4f3f1;font-family:'DM Sans',Helvetica,Arial,sans-serif;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f3f1;padding:32px 16px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border-radius:20px;border:1px solid #e6e4e0;overflow:hidden;">
+            <tr>
+              <td style="padding:28px 32px 0;">
+                <p style="margin:0;font-size:11px;font-weight:600;letter-spacing:0.18em;text-transform:uppercase;color:#8a877f;">KSEMO Feedback</p>
+                <h1 style="margin:8px 0 0;font-family:Georgia,'Times New Roman',serif;font-size:22px;font-weight:500;letter-spacing:-0.02em;color:#191817;">${safeCategory}</h1>
+                <p style="margin:10px 0 0;font-size:13px;line-height:20px;color:#6d6a62;">From <strong>${safeName}</strong> &lt;${safeEmail}&gt;</p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:18px 32px 28px;">
+                <div style="border:1px solid #e6e4e0;border-radius:14px;padding:18px 20px;background:#faf9f7;">
+                  <p style="margin:0;font-size:14px;line-height:23px;color:#191817;white-space:pre-wrap;">${safeMessage}</p>
+                </div>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+
+  await mailer.sendMail({
+    from: `"KSEMO" <${user}>`,
+    to: user,
+    ...(plainReplyTo ? { replyTo: plainReplyTo } : {}),
+    subject: `[KSEMO feedback] ${category} — ${fromName}`,
+    text: [
+      `Category: ${category}`,
+      `From: ${fromName} <${fromEmail || "no email on account"}>`,
+      "",
+      message,
+    ].join("\n"),
+    html,
+  });
+}

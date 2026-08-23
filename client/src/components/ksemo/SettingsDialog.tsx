@@ -33,13 +33,18 @@ import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import {
   Archive,
+  Bug,
+  CheckCircle2,
   Database,
   HelpCircle,
+  Lightbulb,
   MessageSquare,
   RotateCcw,
+  Send,
   Settings2,
   ShieldCheck,
   SlidersHorizontal,
+  Sparkles,
   Trash2,
   UserRound,
 } from "lucide-react";
@@ -47,7 +52,6 @@ import React, { useEffect, useMemo, useState } from "react";
 
 type Preferences =
   | {
-      selectedModel?: string | null;
       persona?: "balanced" | "concise" | "creative" | "analytical";
       customInstructions?: string | null;
       speechRate?: number;
@@ -81,7 +85,7 @@ export const settingsSections: Array<{
     id: "preferences",
     label: "Preferences",
     icon: SlidersHorizontal,
-    keywords: "model voice style accessibility",
+    keywords: "voice style accessibility instructions",
   },
   {
     id: "data",
@@ -93,7 +97,7 @@ export const settingsSections: Array<{
     id: "feedback",
     label: "Feedback",
     icon: MessageSquare,
-    keywords: "feedback support bug idea",
+    keywords: "feedback support bug idea question praise report contact",
   },
 ];
 
@@ -186,7 +190,6 @@ export function SettingsDialog({
   open,
   onOpenChange,
   preferences,
-  models,
   onSave,
   saving,
   user,
@@ -198,7 +201,6 @@ export function SettingsDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   preferences: Preferences;
-  models: Array<{ id: string; label: string }>;
   onSave: (value: NonNullable<Preferences>) => void;
   saving: boolean;
   user: User;
@@ -210,7 +212,6 @@ export function SettingsDialog({
   const [draft, setDraft] = useState<NonNullable<Preferences>>({
     persona: "balanced",
     customInstructions: "",
-    selectedModel: null,
     speechRate: 100,
     autoPlayResponses: false,
     reduceMotion: false,
@@ -222,7 +223,6 @@ export function SettingsDialog({
       setDraft({
         persona: preferences?.persona ?? "balanced",
         customInstructions: preferences?.customInstructions ?? "",
-        selectedModel: preferences?.selectedModel ?? null,
         speechRate: preferences?.speechRate ?? 100,
         autoPlayResponses: preferences?.autoPlayResponses ?? false,
         reduceMotion: preferences?.reduceMotion ?? false,
@@ -302,11 +302,7 @@ export function SettingsDialog({
               <SecurityPanel onSignOut={onSignOut} />
             )}
             {activeSection === "preferences" && (
-              <PreferencesPanel
-                draft={draft}
-                setDraft={setDraft}
-                models={models}
-              />
+              <PreferencesPanel draft={draft} setDraft={setDraft} />
             )}
             {activeSection === "data" && (
               <DataControlsPanel
@@ -318,7 +314,7 @@ export function SettingsDialog({
                 }}
               />
             )}
-            {activeSection === "feedback" && <FeedbackPanel />}
+            {activeSection === "feedback" && <FeedbackPanel user={user} />}
           </section>
         </div>
         {activeSection === "preferences" && (
@@ -407,6 +403,22 @@ function SecurityPanel({ onSignOut }: { onSignOut: () => void }) {
           </p>
         </article>
         <article className="rounded-2xl border border-border p-5">
+          <h3 className="text-sm font-medium">Your Google account</h3>
+          <p className="mt-1.5 text-xs leading-5 text-muted-foreground">
+            Sign-in, password, and two-step verification are managed by
+            Google. Strengthening your Google account strengthens KSEMO too.
+          </p>
+          <Button asChild variant="outline" size="sm" className="mt-3 rounded-lg">
+            <a
+              href="https://myaccount.google.com/security"
+              target="_blank"
+              rel="noreferrer noopener"
+            >
+              Manage Google security
+            </a>
+          </Button>
+        </article>
+        <article className="rounded-2xl border border-border p-5">
           <h3 className="text-sm font-medium">Conversation sharing</h3>
           <p className="mt-1.5 text-xs leading-5 text-muted-foreground">
             Sharing is opt-in. Review every public share link and disable it
@@ -434,11 +446,9 @@ function SecurityPanel({ onSignOut }: { onSignOut: () => void }) {
 function PreferencesPanel({
   draft,
   setDraft,
-  models,
 }: {
   draft: NonNullable<Preferences>;
   setDraft: React.Dispatch<React.SetStateAction<NonNullable<Preferences>>>;
-  models: Array<{ id: string; label: string }>;
 }) {
   return (
     <>
@@ -468,33 +478,6 @@ function PreferencesPanel({
               <SelectItem value="analytical">Analytical</SelectItem>
             </SelectContent>
           </Select>
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="model">Model</Label>
-          <Select
-            value={draft.selectedModel ?? "auto"}
-            onValueChange={selectedModel =>
-              setDraft(current => ({
-                ...current,
-                selectedModel: selectedModel === "auto" ? null : selectedModel,
-              }))
-            }
-          >
-            <SelectTrigger id="model" className="h-10 rounded-xl">
-              <SelectValue placeholder="KSEMO Auto" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="auto">KSEMO Auto</SelectItem>
-              {models.map(model => (
-                <SelectItem key={model.id} value={model.id}>
-                  {model.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <p className="text-xs text-muted-foreground">
-            Models are provided by your configured server-side AI service.
-          </p>
         </div>
         <div className="space-y-2">
           <Label htmlFor="instructions">Custom instructions</Label>
@@ -562,6 +545,135 @@ function PreferencesPanel({
     </>
   );
 }
+function useWorkspaceStats() {
+  const active = trpc.conversation.list.useQuery({ scope: "active" });
+  const archived = trpc.conversation.list.useQuery({ scope: "archived" });
+  const trash = trpc.conversation.list.useQuery({ scope: "trash" });
+  const files = trpc.workspace.files.list.useQuery();
+  const memories = trpc.workspace.memories.list.useQuery();
+  return [
+    { label: "Chats", value: active.data?.length },
+    { label: "Archived", value: archived.data?.length },
+    { label: "In trash", value: trash.data?.length },
+    { label: "Library files", value: files.data?.length },
+    { label: "Memories", value: memories.data?.length },
+  ];
+}
+
+function TrashedChatsDialog({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const trashQuery = trpc.conversation.list.useQuery(
+    { scope: "trash" },
+    { enabled: open }
+  );
+  const utils = trpc.useUtils();
+  const restoreMutation = trpc.conversation.restore.useMutation({
+    onSuccess: () => {
+      utils.conversation.list.invalidate();
+      toast.success("Chat restored to your sidebar");
+    },
+    onError: () => toast.error("KSEMO could not restore that chat."),
+  });
+  const deleteMutation = trpc.conversation.remove.useMutation({
+    onSuccess: () => {
+      utils.conversation.list.invalidate();
+      toast.success("Chat permanently deleted");
+    },
+    onError: () => toast.error("KSEMO could not delete that chat."),
+  });
+  const conversations = (trashQuery.data ?? []) as Array<{
+    id: string;
+    title: string;
+    updatedAt?: Date | string | null;
+  }>;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="flex max-h-[32rem] w-[calc(100%-1.5rem)] max-w-lg flex-col gap-0 overflow-hidden rounded-2xl p-0 sm:!max-w-lg">
+        <DialogHeader className="shrink-0 border-b border-border px-4 pb-3 pt-4">
+          <DialogTitle className="text-base font-semibold tracking-[-0.02em]">
+            Trashed chats
+          </DialogTitle>
+          <DialogDescription>
+            Restore chats back to your sidebar, or delete them forever.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="min-h-0 flex-1 overflow-y-auto p-3">
+          {trashQuery.isLoading ? (
+            <p className="px-1 py-6 text-center text-sm text-muted-foreground">
+              Loading trashed chats…
+            </p>
+          ) : !conversations.length ? (
+            <div className="px-1 py-8 text-center">
+              <Trash2 className="mx-auto size-6 text-muted-foreground" />
+              <p className="mt-3 text-sm font-medium">Trash is empty</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Chats you move to trash will appear here until you remove them.
+              </p>
+            </div>
+          ) : (
+            <ul className="space-y-1.5">
+              {conversations.map(conversation => (
+                <li
+                  key={conversation.id}
+                  className="flex items-center gap-2 rounded-xl border border-border px-3 py-2"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[13px] font-medium">
+                      {conversation.title}
+                    </p>
+                    {conversation.updatedAt && (
+                      <p className="text-[11px] text-muted-foreground">
+                        Updated{" "}
+                        {new Date(conversation.updatedAt).toLocaleDateString()}
+                      </p>
+                    )}
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-7 shrink-0 rounded-lg"
+                    disabled={restoreMutation.isPending}
+                    aria-label={`Restore ${conversation.title}`}
+                    onClick={() =>
+                      restoreMutation.mutate({ id: conversation.id })
+                    }
+                  >
+                    <RotateCcw className="size-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-7 shrink-0 rounded-lg text-destructive hover:bg-destructive/10 hover:text-destructive"
+                    disabled={deleteMutation.isPending}
+                    aria-label={`Delete ${conversation.title}`}
+                    onClick={() => {
+                      if (
+                        window.confirm(
+                          `Permanently delete “${conversation.title}”? This cannot be undone.`
+                        )
+                      ) {
+                        deleteMutation.mutate({ id: conversation.id });
+                      }
+                    }}
+                  >
+                    <Trash2 className="size-3.5" />
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function DataControlsPanel({
   onOpenWorkspace,
   onOpenSupport,
@@ -572,8 +684,10 @@ function DataControlsPanel({
   onAllChatsDeleted: () => void;
 }) {
   const [archivedOpen, setArchivedOpen] = useState(false);
+  const [trashOpen, setTrashOpen] = useState(false);
   const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
   const utils = trpc.useUtils();
+  const stats = useWorkspaceStats();
   const removeAllMutation = trpc.conversation.removeAll.useMutation({
     onSuccess: result => {
       utils.conversation.list.invalidate();
@@ -597,7 +711,36 @@ function DataControlsPanel({
         title="Data controls"
         description="Review and manage the content you keep in KSEMO. You control what is saved, attached, shared, and remembered."
       />
+      <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-5" aria-label="Workspace data summary">
+        {stats.map(stat => (
+          <div
+            key={stat.label}
+            className="rounded-xl border border-border bg-muted/30 px-3 py-2.5"
+          >
+            <p className="text-lg font-semibold tabular-nums leading-6">
+              {stat.value ?? "…"}
+            </p>
+            <p className="text-[11px] text-muted-foreground">{stat.label}</p>
+          </div>
+        ))}
+      </div>
       <div className="space-y-3">
+        <article className="rounded-2xl border border-border p-4">
+          <h3 className="text-sm font-medium">Trashed chats</h3>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+            Chats you moved to trash wait here. Restore them or remove them
+            permanently.
+          </p>
+          <Button
+            variant="outline"
+            size="sm"
+            className="mt-3 rounded-lg"
+            onClick={() => setTrashOpen(true)}
+          >
+            <Trash2 className="size-3.5" />
+            Manage trash
+          </Button>
+        </article>
         <article className="rounded-2xl border border-border p-4">
           <h3 className="text-sm font-medium">Archived chats</h3>
           <p className="mt-1 text-xs leading-5 text-muted-foreground">
@@ -673,6 +816,14 @@ function DataControlsPanel({
               variant="outline"
               size="sm"
               className="rounded-lg"
+              onClick={() => onOpenSupport("faq")}
+            >
+              FAQ
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-lg"
               onClick={() => onOpenSupport("privacy")}
             >
               Privacy Policy
@@ -689,6 +840,7 @@ function DataControlsPanel({
         </article>
       </div>
 
+      <TrashedChatsDialog open={trashOpen} onOpenChange={setTrashOpen} />
       <ArchivedChatsDialog open={archivedOpen} onOpenChange={setArchivedOpen} />
 
       <AlertDialog open={confirmDeleteAll} onOpenChange={setConfirmDeleteAll}>
@@ -835,33 +987,188 @@ function ArchivedChatsDialog({
     </Dialog>
   );
 }
-function FeedbackPanel() {
+const FEEDBACK_CATEGORIES = [
+  {
+    id: "bug" as const,
+    label: "Bug report",
+    description: "Something broke or behaved oddly",
+    icon: Bug,
+  },
+  {
+    id: "idea" as const,
+    label: "Feature idea",
+    description: "What would make KSEMO more useful?",
+    icon: Lightbulb,
+  },
+  {
+    id: "question" as const,
+    label: "Question",
+    description: "Confused about a feature or setting",
+    icon: HelpCircle,
+  },
+  {
+    id: "praise" as const,
+    label: "Praise",
+    description: "Tell us what you love",
+    icon: Sparkles,
+  },
+];
+
+function FeedbackPanel({ user }: { user: User }) {
+  const [category, setCategory] = useState<
+    (typeof FEEDBACK_CATEGORIES)[number]["id"] | null
+  >(null);
+  const [message, setMessage] = useState("");
+  const [sent, setSent] = useState(false);
+  const sendMutation = trpc.feedback.send.useMutation({
+    onSuccess: () => {
+      toast.success("Thanks! Your feedback reached the KSEMO team.");
+      setSent(true);
+    },
+    onError: error => {
+      toast.error(
+        error.message || "KSEMO could not send that feedback right now."
+      );
+    },
+  });
+  const trimmedLength = message.trim().length;
+  const canSend =
+    category !== null && trimmedLength >= 10 && !sendMutation.isPending;
+
+  function submit() {
+    if (!canSend || category === null) return;
+    sendMutation.mutate({ category, message: message.trim() });
+  }
+
+  if (sent) {
+    return (
+      <>
+        <SectionHeading
+          title="Feedback"
+          description="Tell us what worked, what did not, or what would make KSEMO more useful."
+        />
+        <div className="rounded-2xl border border-border bg-muted/30 p-8 text-center">
+          <CheckCircle2 className="mx-auto size-7 text-foreground" />
+          <h3 className="mt-4 text-base font-medium">Feedback sent</h3>
+          <p className="mx-auto mt-1.5 max-w-sm text-sm leading-6 text-muted-foreground">
+            Thank you for helping improve KSEMO. We read every note, and we
+            may reply to {user.email || "your account email"} if we need more
+            detail.
+          </p>
+          <Button
+            variant="outline"
+            size="sm"
+            className="mt-5 rounded-lg"
+            onClick={() => {
+              setCategory(null);
+              setMessage("");
+              setSent(false);
+            }}
+          >
+            Send more feedback
+          </Button>
+        </div>
+      </>
+    );
+  }
+
   return (
     <>
       <SectionHeading
         title="Feedback"
-        description="Tell us what worked, what did not, or what would make KSEMO more useful."
+        description="Report a problem, share an idea, or tell us what is working well — it all goes straight to the KSEMO team."
       />
-      <div className="rounded-2xl border border-border p-5">
-        <MessageSquare className="size-5 text-muted-foreground" />
-        <h3 className="mt-4 text-base font-medium">Send feedback</h3>
-        <p className="mt-1 text-sm leading-6 text-muted-foreground">
-          Use your default email application to send a clear note about a
-          feature request, a confusing interaction, or a problem you
-          encountered.
-        </p>
-        <Button
-          asChild
-          className="mt-4 rounded-xl bg-foreground text-background hover:bg-foreground/90"
-        >
-          <a href="mailto:support@ksemo.app?subject=KSEMO%20feedback">
-            Write feedback
-          </a>
-        </Button>
-        <p className="mt-4 text-xs leading-5 text-muted-foreground">
-          For account-access help, see Help &amp; Support from your profile
-          menu.
-        </p>
+      <div className="space-y-5">
+        <fieldset className="space-y-2.5">
+          <legend className="text-sm font-medium">What is this about?</legend>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {FEEDBACK_CATEGORIES.map(item => {
+              const Icon = item.icon;
+              const selected = category === item.id;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  aria-pressed={selected}
+                  onClick={() => setCategory(item.id)}
+                  className={cn(
+                    "flex items-start gap-3 rounded-xl border p-3 text-left transition-colors",
+                    selected
+                      ? "border-foreground/60 bg-muted"
+                      : "border-border hover:border-muted-foreground/40 hover:bg-muted/40"
+                  )}
+                >
+                  <Icon
+                    className={cn(
+                      "mt-0.5 size-4 shrink-0",
+                      selected ? "text-foreground" : "text-muted-foreground"
+                    )}
+                  />
+                  <span className="min-w-0">
+                    <span className="block text-[13px] font-medium leading-5">
+                      {item.label}
+                    </span>
+                    <span className="mt-0.5 block text-xs leading-5 text-muted-foreground">
+                      {item.description}
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </fieldset>
+        <div className="space-y-2">
+          <Label htmlFor="feedback-message">Your message</Label>
+          <Textarea
+            id="feedback-message"
+            value={message}
+            onChange={event => setMessage(event.target.value)}
+            maxLength={4000}
+            className="min-h-32 resize-none rounded-xl"
+            placeholder={
+              category === "bug"
+                ? "What happened, and what did you expect instead? Any steps to reproduce help a lot."
+                : category === "idea"
+                  ? "Describe the improvement you have in mind and the problem it would solve."
+                  : category === "question"
+                    ? "Ask away — include which feature or setting the question is about."
+                    : "We would love to hear what KSEMO helps you do best."
+            }
+          />
+          <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+            <span>
+              {trimmedLength < 10
+                ? "A little more detail, please (at least 10 characters)."
+                : "Your name and account email are attached so we can reply."}
+            </span>
+            <span className="tabular-nums">{message.length}/4000</span>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <Button
+            onClick={submit}
+            disabled={!canSend}
+            className="rounded-xl bg-foreground text-background hover:bg-foreground/90 disabled:bg-muted disabled:text-muted-foreground"
+          >
+            {sendMutation.isPending ? (
+              "Sending…"
+            ) : (
+              <>
+                <Send className="size-3.5" />
+                Send feedback
+              </>
+            )}
+          </Button>
+          <span className="text-xs text-muted-foreground">
+            Prefer email?{" "}
+            <a
+              href={`mailto:support@ksemo.app?subject=KSEMO%20${encodeURIComponent(category ?? "feedback")}`}
+              className="underline underline-offset-2 hover:text-foreground"
+            >
+              support@ksemo.app
+            </a>
+          </span>
+        </div>
       </div>
     </>
   );

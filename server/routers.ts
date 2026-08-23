@@ -5,6 +5,7 @@ import { publicProcedure, router } from "./_core/trpc";
 import { authCredentialsRouterProcedures } from "./routers/authCredentials";
 import {
   conversationRouter,
+  feedbackRouter,
   messageRouter,
   preferenceRouter,
   voiceRouter,
@@ -27,6 +28,7 @@ export const appRouter = router({
     ...authCredentialsRouterProcedures,
   }),
   conversation: conversationRouter,
+  feedback: feedbackRouter,
   message: messageRouter,
   preferences: preferenceRouter,
   voice: voiceRouter,

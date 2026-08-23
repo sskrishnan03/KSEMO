@@ -27,6 +27,7 @@ import {
 } from "../supabase-db";
 import { listLLMModels } from "../_core/llm";
 import { transcribeAudio } from "../_core/voiceTranscription";
+import { isMailerConfigured, sendFeedbackEmail } from "../_core/mailer";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { typeAfterVoiceSession } from "../conversationTypes";
 
@@ -271,6 +272,39 @@ export const preferenceRouter = router({
       return [];
     }
   }),
+});
+
+export const feedbackRouter = router({
+  send: protectedProcedure
+    .input(
+      z.object({
+        category: z.enum(["bug", "idea", "question", "praise"]),
+        message: z.string().trim().min(10).max(4_000),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (!isMailerConfigured())
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message:
+            "Feedback delivery is not configured. Please email us instead.",
+        });
+      try {
+        await sendFeedbackEmail({
+          fromName: ctx.user.name?.trim() || "KSEMO user",
+          fromEmail: ctx.user.email ?? "",
+          category: input.category,
+          message: input.message,
+        });
+      } catch (error) {
+        console.error("[KSEMO] feedback delivery failed:", error);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "KSEMO could not send that feedback right now.",
+        });
+      }
+      return { success: true } as const;
+    }),
 });
 
 export const messageRouter = router({

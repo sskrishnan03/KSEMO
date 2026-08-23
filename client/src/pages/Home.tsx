@@ -187,9 +187,6 @@ export default function Home() {
   const preferencesQuery = trpc.preferences.get.useQuery(undefined, {
     enabled: Boolean(user),
   });
-  const modelsQuery = trpc.preferences.models.useQuery(undefined, {
-    enabled: Boolean(user),
-  });
   const effectiveSearchQuery = isSearchPreview
     ? searchPreviewQuery
     : searchQuery.trim();
@@ -1176,7 +1173,6 @@ export default function Home() {
         open={settingsOpen || isSettingsPreview}
         onOpenChange={setSettingsOpen}
         preferences={preferencesQuery.data}
-        models={modelsQuery.data ?? []}
         onSave={draft => preferenceMutation.mutate(draft)}
         saving={preferenceMutation.isPending}
         user={user}
