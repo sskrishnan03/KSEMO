@@ -13,7 +13,7 @@ import {
 } from "./supabase-db";
 import { streamLLM, type Message } from "./_core/llm";
 import { sdk } from "./_core/sdk";
-import { storageGetSignedUrl } from "./storage";
+import { storageGetSignedUrl, requestBaseUrl } from "./storage";
 
 const BASE_SYSTEM_INSTRUCTION =
   "You are KSEMO, a thoughtful and reliable AI assistant. Be clear, accurate, respectful, and practical. Use Markdown when it improves readability. Never claim to have completed work you cannot verify.";
@@ -117,7 +117,7 @@ export function registerChatStream(app: Express) {
         });
       }
 
-      let userMessageId = crypto.randomUUID();
+      let userMessageId: string = crypto.randomUUID();
       const assistantMessageId = body.regenerateAssistantMessageId ?? crypto.randomUUID();
       let historyForContext;
       if (body.regenerateAssistantMessageId) {
@@ -211,6 +211,7 @@ export function registerChatStream(app: Express) {
       });
 
       const preferences = await getUserPreferences(user.id);
+      const fileUrlBase = requestBaseUrl(req);
       const assistantContext = await Promise.all(
         historyForContext
           .filter(
@@ -240,7 +241,7 @@ export function registerChatStream(app: Express) {
                 contentParts.push({
                   type: "image_url",
                   image_url: {
-                    url: await storageGetSignedUrl(file.storageKey),
+                    url: await storageGetSignedUrl(file.storageKey, fileUrlBase),
                     detail: "auto",
                   },
                 });
@@ -248,7 +249,7 @@ export function registerChatStream(app: Express) {
                 contentParts.push({
                   type: "file_url",
                   file_url: {
-                    url: await storageGetSignedUrl(file.storageKey),
+                    url: await storageGetSignedUrl(file.storageKey, fileUrlBase),
                     mime_type: "application/pdf",
                   },
                 });

@@ -56,7 +56,34 @@ export async function storageGet(
   return { key, url: `/ksemo-storage/${key}` };
 }
 
-export async function storageGetSignedUrl(relKey: string): Promise<string> {
+/**
+ * Absolute URL for a stored file. External consumers (e.g. the LLM provider
+ * fetching image/PDF attachments) cannot resolve relative paths, so the
+ * origin of the incoming request is prepended.
+ */
+export async function storageGetSignedUrl(
+  relKey: string,
+  baseUrl?: string
+): Promise<string> {
   const { url } = await storageGet(relKey);
-  return url;
+  if (!baseUrl) return url;
+  return `${baseUrl.replace(/\/$/, "")}${url}`;
+}
+
+export function requestBaseUrl(req: {
+  protocol?: string;
+  headers: Record<string, unknown>;
+}): string {
+  const forwardedHost = req.headers["x-forwarded-host"];
+  const forwardedProto = req.headers["x-forwarded-proto"];
+  const host =
+    (typeof forwardedHost === "string" && forwardedHost) ||
+    (Array.isArray(forwardedHost) && forwardedHost[0]) ||
+    req.headers.host;
+  const proto =
+    (typeof forwardedProto === "string" && forwardedProto.split(",")[0]) ||
+    (Array.isArray(forwardedProto) && forwardedProto[0]) ||
+    req.protocol ||
+    "http";
+  return host ? `${proto}://${host}` : "";
 }

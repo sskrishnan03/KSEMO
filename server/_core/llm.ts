@@ -247,17 +247,30 @@ type RequestTarget = {
 // Used automatically when the primary provider request fails, e.g. free-tier quota exhaustion.
 const buildRequestTargets = (): RequestTarget[] => {
   const targets: RequestTarget[] = [];
+  const primaryUrl = resolveApiUrl();
 
-  const primaryKey = resolveApiKey();
-  if (primaryKey) {
-    const primaryUrl = resolveApiUrl();
-    targets.push({ name: "primary", url: primaryUrl, apiKey: primaryKey });
-    targets.push({
-      name: "primary-free",
-      url: primaryUrl,
-      apiKey: primaryKey,
-      model: PRIMARY_FREE_FALLBACK_MODEL,
-    });
+  // Try every distinct credential against the primary URL so one expired or
+  // invalid key cannot take down every request.
+  const primaryKeys: Array<{ name: string; apiKey: string }> = [];
+  if (ENV.forgeApiKey) primaryKeys.push({ name: "primary-forge", apiKey: ENV.forgeApiKey });
+  const openAiKey = process.env.OPENAI_API_KEY?.trim();
+  if (openAiKey) primaryKeys.push({ name: "primary-openai", apiKey: openAiKey });
+  const geminiKey = process.env.GEMINI_API_KEY?.trim();
+  if (geminiKey && !primaryKeys.some(entry => entry.apiKey === geminiKey)) {
+    primaryKeys.push({ name: "primary-gemini", apiKey: geminiKey });
+  }
+
+  for (let index = 0; index < primaryKeys.length; index++) {
+    const entry = primaryKeys[index];
+    targets.push({ name: entry.name, url: primaryUrl, apiKey: entry.apiKey });
+    if (index === primaryKeys.length - 1) {
+      targets.push({
+        name: `${entry.name}-free`,
+        url: primaryUrl,
+        apiKey: entry.apiKey,
+        model: PRIMARY_FREE_FALLBACK_MODEL,
+      });
+    }
   }
 
   const aimlKey = process.env.AIML_API_KEY?.trim();
@@ -357,6 +370,10 @@ const computeBackoffDelay = (
   return Math.min(Math.max(jittered, retryAfterMs ?? 0), RETRY_MAX_DELAY_MS);
 };
 
+// Statuses that cannot succeed on retry (bad key, bad request, missing model);
+// surface them immediately so the caller can fall through to the next provider.
+const NON_RETRYABLE_STATUSES = new Set([400, 401, 403, 404]);
+
 // Retries non-2xx responses and network errors with exponential backoff, then
 // returns the final Response so callers keep their existing error handling.
 const fetchWithBackoff = async (
@@ -368,7 +385,11 @@ const fetchWithBackoff = async (
   for (let attempt = 0; attempt <= RETRY_MAX_RETRIES; attempt++) {
     try {
       const response = await fetch(url, init);
-      if (response.ok || attempt === RETRY_MAX_RETRIES) {
+      if (
+        response.ok ||
+        attempt === RETRY_MAX_RETRIES ||
+        NON_RETRYABLE_STATUSES.has(response.status)
+      ) {
         return response;
       }
 
