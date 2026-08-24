@@ -3,6 +3,7 @@ import { TRPCError } from "@trpc/server";
 import { createHash, randomBytes, scryptSync, timingSafeEqual } from "crypto";
 import { z } from "zod";
 import * as db from "../supabase-db";
+import { supabase } from "../supabase-db";
 import { getSessionCookieOptions } from "../_core/cookies";
 import { isMailerConfigured, sendPasswordResetEmail } from "../_core/mailer";
 import { sdk } from "../_core/sdk";
@@ -151,7 +152,7 @@ export const requestPasswordResetProcedure = publicProcedure
     const tokenHash = createHash("sha256").update(token).digest("hex");
 
     // Update user with reset token in Supabase
-    const { error: updateError } = await (db as any).supabase
+    const { error: updateError } = await supabase
       .from("users")
       .update({
         reset_token_hash: tokenHash,
@@ -214,7 +215,7 @@ export const resetPasswordProcedure = publicProcedure
     const tokenHash = createHash("sha256").update(input.token).digest("hex");
 
     // Find user with valid reset token in Supabase
-    const { data: users, error: findError } = await (db as any).supabase
+    const { data: users, error: findError } = await supabase
       .from("users")
       .select("*")
       .eq("reset_token_hash", tokenHash)
@@ -229,7 +230,7 @@ export const resetPasswordProcedure = publicProcedure
     }
 
     // Update user password
-    const { error: updateError } = await (db as any).supabase
+    const { error: updateError } = await supabase
       .from("users")
       .update({
         password_hash: hashPassword(input.password),

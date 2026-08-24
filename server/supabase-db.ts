@@ -63,6 +63,9 @@ export type {
   TaskActivity,
 };
 
+// Export the supabase client for direct access when needed
+export { supabase };
+
 const supabaseUrl = process.env.SUPABASE_URL || "https://vauqtdjpjwlhfgixfrij.supabase.co";
 // Service role key is REQUIRED for backend operations to bypass RLS policies
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
