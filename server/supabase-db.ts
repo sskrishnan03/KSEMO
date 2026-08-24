@@ -56,7 +56,34 @@ if (!supabaseKey) {
   console.error("[Supabase] Using anon key as fallback - this will cause RLS policy violations");
 }
 
+// A stalled database call must never hang a request (or an open SSE stream)
+// forever. Every query is bounded; timeouts surface as normal errors that the
+// existing error handling already reports to the client.
+const SUPABASE_REQUEST_TIMEOUT_MS = 20_000;
+
+function createBoundedFetch(): typeof fetch {
+  return (input, init) => {
+    const controller = new AbortController();
+    const timer = setTimeout(
+      () => controller.abort(new Error(`Supabase request timed out after ${SUPABASE_REQUEST_TIMEOUT_MS}ms`)),
+      SUPABASE_REQUEST_TIMEOUT_MS
+    );
+    const upstreamSignal = init?.signal;
+    if (upstreamSignal) {
+      if (upstreamSignal.aborted) controller.abort(upstreamSignal.reason);
+      else
+        upstreamSignal.addEventListener("abort", () => controller.abort(upstreamSignal.reason), {
+          once: true,
+        });
+    }
+    return fetch(input, { ...init, signal: controller.signal }).finally(() => clearTimeout(timer));
+  };
+}
+
 const supabase = createClient(supabaseUrl, supabaseKey || process.env.SUPABASE_ANON_KEY || "", {
+  global: {
+    fetch: createBoundedFetch(),
+  },
   auth: {
     autoRefreshToken: false,
     persistSession: false

@@ -49,8 +49,8 @@ export function filterLibraryWorkspaceItems(
     file =>
       (filter === "all" ||
         (filter === "images"
-          ? file.mimeType.startsWith("image/")
-          : !file.mimeType.startsWith("image/"))) &&
+          ? file.mimeType?.startsWith("image/")
+          : !file.mimeType?.startsWith("image/"))) &&
       (!normalized || file.filename.toLowerCase().includes(normalized))
   );
 }
@@ -98,16 +98,17 @@ export function LibraryWorkspace({
   const [deleteTarget, setDeleteTarget] = useState<
     LibraryWorkspaceFile[] | null
   >(null);
+  const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const utils = trpc.useUtils();
   const filesQuery = trpc.workspace.files.list.useQuery();
   const uploadMutation = trpc.workspace.files.upload.useMutation({
     onSuccess: () => {
       utils.workspace.files.list.invalidate();
-      toast.success("File added to your Library");
     },
-    onError: error =>
-      toast.error(error.message || "KSEMO could not add that file."),
+    onError: (error) => {
+      toast.error(error.message || "KSEMO could not add that file.");
+    },
   });
   const removeMutation = trpc.workspace.files.remove.useMutation({
     onError: () => toast.error("KSEMO could not remove that file."),
@@ -125,25 +126,83 @@ export function LibraryWorkspace({
     files.length > 0 && files.every(file => selectedIds.has(file.id));
 
   async function uploadFile(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
+    const files = Array.from(event.target.files || []);
     event.target.value = "";
-    if (!file) return;
-    if (file.size > 8 * 1024 * 1024) {
-      toast.error("Files must be smaller than 8 MB.");
+    if (!files.length) return;
+
+    // Validate all files first
+    const invalidFiles = files.filter(file => file.size > 8 * 1024 * 1024);
+    if (invalidFiles.length > 0) {
+      toast.error(`${invalidFiles.length} file(s) exceed the 8 MB limit.`);
       return;
     }
-    if (!file.type) {
-      toast.error("Choose a supported file type.");
+
+    const unsupportedFiles = files.filter(file => !file.type);
+    if (unsupportedFiles.length > 0) {
+      toast.error(`${unsupportedFiles.length} file(s) have unsupported types.`);
       return;
     }
-    try {
-      uploadMutation.mutate({
-        filename: file.name,
-        mimeType: file.type,
-        dataBase64: await fileToBase64(file),
-      });
-    } catch {
-      toast.error("KSEMO could not read that file.");
+
+    // Upload files one by one
+    for (const file of files) {
+      try {
+        const dataBase64 = await fileToBase64(file);
+        uploadMutation.mutate({
+          filename: file.name,
+          mimeType: file.type,
+          dataBase64,
+        });
+      } catch {
+        toast.error(`Could not read ${file.name}`);
+      }
+    }
+  }
+
+  function handleDragOver(event: React.DragEvent) {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDragging(true);
+  }
+
+  function handleDragLeave(event: React.DragEvent) {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDragging(false);
+  }
+
+  async function handleDrop(event: React.DragEvent) {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDragging(false);
+
+    const droppedFiles = Array.from(event.dataTransfer.files);
+    if (droppedFiles.length === 0) return;
+
+    // Validate all files first
+    const invalidFiles = droppedFiles.filter(file => file.size > 8 * 1024 * 1024);
+    if (invalidFiles.length > 0) {
+      toast.error(`${invalidFiles.length} file(s) exceed the 8 MB limit.`);
+      return;
+    }
+
+    const unsupportedFiles = droppedFiles.filter(file => !file.type);
+    if (unsupportedFiles.length > 0) {
+      toast.error(`${unsupportedFiles.length} file(s) have unsupported types.`);
+      return;
+    }
+
+    // Upload files one by one
+    for (const file of droppedFiles) {
+      try {
+        const dataBase64 = await fileToBase64(file);
+        uploadMutation.mutate({
+          filename: file.name,
+          mimeType: file.type,
+          dataBase64,
+        });
+      } catch {
+        toast.error(`Could not read ${file.name}`);
+      }
     }
   }
 
@@ -187,14 +246,34 @@ export function LibraryWorkspace({
   }
 
   return (
-    <main className="min-h-0 flex-1 overflow-y-auto bg-background">
+    <main
+      className={cn(
+        "min-h-0 flex-1 overflow-y-auto bg-background transition-colors",
+        isDragging && "bg-muted/50"
+      )}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
       <input
         ref={fileInputRef}
         type="file"
         accept=".pdf,.txt,.md,.csv,.json,.png,.jpg,.jpeg,.webp,.docx"
+        multiple
         className="sr-only"
         onChange={uploadFile}
       />
+      {isDragging && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+          <div className="rounded-2xl border-2 border-dashed border-foreground/30 bg-card p-8 text-center">
+            <Upload className="mx-auto size-12 text-muted-foreground" />
+            <p className="mt-4 text-lg font-medium">Drop files to upload</p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Supported: PDF, documents, text, data, and images up to 8 MB each
+            </p>
+          </div>
+        </div>
+      )}
       <div className="mx-auto w-full max-w-6xl px-5 py-7 sm:px-8 sm:py-9">
         <header className="flex flex-col gap-5 border-b border-border pb-6 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -205,7 +284,7 @@ export function LibraryWorkspace({
               </h1>
             </div>
             <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
-              Your private space for files and images. Select one or more items
+              Your private space for files and images. Upload multiple files at once or drag and drop them here. Select one or more items
               to chat with them together.
             </p>
           </div>
@@ -223,7 +302,7 @@ export function LibraryWorkspace({
               disabled={uploadMutation.isPending}
             >
               <Upload className="mr-2 size-4" />
-              {uploadMutation.isPending ? "Uploading…" : "Upload"}
+              {uploadMutation.isPending ? "Uploading…" : "Upload files"}
             </Button>
           </div>
         </header>
@@ -285,8 +364,8 @@ export function LibraryWorkspace({
         <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
           <p className="text-xs text-muted-foreground">
             {files.length} {files.length === 1 ? "item" : "items"} shown · Tap
-            or click any item to select it. Supported: PDF, documents, text,
-            data, and images up to 8 MB.
+            or click any item to select it. Upload multiple files at once. Supported: PDF, documents, text,
+            data, and images up to 8 MB each.
           </p>
           <Button
             type="button"
@@ -499,12 +578,12 @@ function EmptyLibrary({
         <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-muted-foreground">
           {hasQuery
             ? "Try another search or choose a different filter."
-            : "Upload a private file or image to keep it ready for a future KSEMO conversation."}
+            : "Upload private files or images to keep them ready for future KSEMO conversations."}
         </p>
         {!hasQuery && (
           <Button onClick={onUpload} className="mt-5 rounded-xl">
             <Upload className="mr-2 size-4" />
-            Upload your first file
+            Upload your first files
           </Button>
         )}
       </div>
@@ -519,7 +598,7 @@ function FilePreview({
   file: LibraryWorkspaceFile;
   compact?: boolean;
 }) {
-  const image = file.mimeType.startsWith("image/");
+  const image = file.mimeType?.startsWith("image/");
   if (image)
     return (
       <img
@@ -554,7 +633,7 @@ function LibraryGridCard({
   onToggle: () => void;
   onRemove: () => void;
 }) {
-  const image = file.mimeType.startsWith("image/");
+  const image = file.mimeType?.startsWith("image/");
   const selectWithKeyboard = (event: React.KeyboardEvent<HTMLElement>) => {
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
@@ -652,7 +731,7 @@ function LibraryListRow({
   onToggle: () => void;
   onRemove: () => void;
 }) {
-  const image = file.mimeType.startsWith("image/");
+  const image = file.mimeType?.startsWith("image/");
   const selectWithKeyboard = (event: React.KeyboardEvent<HTMLElement>) => {
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();

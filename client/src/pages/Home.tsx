@@ -52,6 +52,20 @@ type StreamConversation = {
   userMessageId: string;
   assistantMessageId: string;
 };
+
+// Streaming safety limits. Without them a silent connection (stalled
+// provider, dropped socket behind a proxy) would spin the composer forever.
+const STREAM_IDLE_TIMEOUT_MS = 45_000;
+const STREAM_MAX_DURATION_MS = 300_000;
+const REFRESH_TIMEOUT_MS = 20_000;
+
+function withDeadline<T>(promise: Promise<T>, ms: number): Promise<T | null> {
+  return Promise.race([
+    promise,
+    new Promise<null>(resolve => window.setTimeout(() => resolve(null), ms)),
+  ]);
+}
+
 type SelectedAttachment = {
   fileId: string;
   name: string;
@@ -129,6 +143,9 @@ export default function Home() {
     null
   );
   const [isGenerating, setIsGenerating] = useState(false);
+  const [generatingMessageId, setGeneratingMessageId] = useState<string | null>(
+    null
+  );
   const [composerValue, setComposerValue] = useState("");
   const [attachmentNotices, setAttachmentNotices] = useState<
     SelectedAttachment[]
@@ -173,6 +190,10 @@ export default function Home() {
     title: string;
   } | null>(null);
   const streamAbortRef = useRef<AbortController | null>(null);
+  const generationSequenceRef = useRef(0);
+  // State does not update until React renders. This ref closes the small
+  // double-submit window between a click/Enter event and that render.
+  const generationActiveRef = useRef(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const initialConversationResolvedRef = useRef(false);
 
@@ -470,10 +491,12 @@ export default function Home() {
       replaceUserMessageId?: string;
     } = {}
   ) {
-    if (isGenerating) return;
+    if (generationActiveRef.current) return;
+    generationActiveRef.current = true;
     const conversationId = activeConversationId;
     const knownMessages = conversationId ? persistedMessages : [];
     const isRegeneration = Boolean(options.regenerateAssistantMessageId);
+    const draftNow = Date.now();
     setPendingConversationId(conversationId ?? "pending");
     const selectedAttachments = !isRegeneration ? attachmentNotices : [];
     setPendingMessages(
@@ -489,13 +512,41 @@ export default function Home() {
               url: file.url,
             }))
           : undefined,
+        now: draftNow,
       }) as KsemoMessage[]
     );
     if (selectedAttachments.length) setAttachmentNotices([]);
     setIsGenerating(true);
+    setGeneratingMessageId(
+      options.regenerateAssistantMessageId ?? `local-assistant-${draftNow}`
+    );
     const controller = new AbortController();
     streamAbortRef.current = controller;
+    const turnSequence = ++generationSequenceRef.current;
 
+    // Watchdog: the stream must always terminate. A silent connection (half
+    // -open socket, stalled provider, proxy drop) previously hung the composer
+    // forever with no error; now silence or an overlong run aborts the turn.
+    const startedAt = Date.now();
+    // Only real protocol events count as progress. SSE heartbeats keep the
+    // socket open, but they must not keep a stalled model generation alive.
+    let lastProgressAt = startedAt;
+    let stalled = false;
+    let userStopped = false;
+    let errorMessage: string | null = null;
+    const watchdog = window.setInterval(() => {
+      const now = Date.now();
+      if (
+        now - lastProgressAt > STREAM_IDLE_TIMEOUT_MS ||
+        now - startedAt > STREAM_MAX_DURATION_MS
+      ) {
+        stalled = true;
+        controller.abort();
+      }
+    }, 1_000);
+
+    let streamConversation: StreamConversation | null = null;
+    let responseText = "";
     try {
       const response = await fetch("/api/chat/stream", {
         method: "POST",
@@ -520,15 +571,8 @@ export default function Home() {
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
-      let streamConversation: StreamConversation | null = null;
-      let responseText = "";
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const events = buffer.split("\n\n");
-        buffer = events.pop() ?? "";
-        for (const rawEvent of events) {
+      const processEvents = (rawEvents: string[]) => {
+        for (const rawEvent of rawEvents) {
           const eventName = rawEvent
             .split("\n")
             .find(line => line.startsWith("event:"))
@@ -540,9 +584,16 @@ export default function Home() {
             ?.slice(5)
             .trim();
           if (!eventName || !rawData) continue;
-          const data = JSON.parse(rawData) as Record<string, string>;
+          let data: Record<string, string>;
+          try {
+            data = JSON.parse(rawData) as Record<string, string>;
+          } catch {
+            continue;
+          }
           if (eventName === "conversation") {
+            lastProgressAt = Date.now();
             streamConversation = data as StreamConversation;
+            setGeneratingMessageId(data.assistantMessageId);
             setActiveConversationId(data.conversationId);
             setPendingConversationId(data.conversationId);
             setPendingMessages(
@@ -556,8 +607,8 @@ export default function Home() {
                 ) ?? null
             );
             utils.conversation.list.invalidate();
-          }
-          if (eventName === "assistant.delta") {
+          } else if (eventName === "assistant.delta") {
+            lastProgressAt = Date.now();
             responseText += data.delta;
             setPendingMessages(
               current =>
@@ -567,50 +618,195 @@ export default function Home() {
                     : message
                 ) ?? null
             );
+          } else if (eventName === "assistant.completed") {
+            lastProgressAt = Date.now();
+          } else if (eventName === "assistant.error") {
+            lastProgressAt = Date.now();
+            errorMessage =
+              data.message || "KSEMO could not complete this response.";
           }
-          if (eventName === "assistant.error")
-            toast.error(
-              data.message || "KSEMO could not complete this response."
-            );
         }
-      }
-      if (streamConversation) {
-        await utils.conversation.get.fetch({
-          id: streamConversation.conversationId,
-        });
-        await utils.conversation.list.invalidate();
-        setPendingConversationId(null);
-        setPendingMessages(null);
-        if (preferencesQuery.data?.autoPlayResponses && responseText)
-          speak(responseText, streamConversation.assistantMessageId);
+      };
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) {
+          buffer += decoder.decode();
+          if (buffer.trim()) processEvents([buffer.replace(/\r\n/g, "\n")]);
+          break;
+        }
+        buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, "\n");
+        const events = buffer.split("\n\n");
+        buffer = events.pop() ?? "";
+        processEvents(events);
       }
     } catch (error) {
-      if ((error as Error).name !== "AbortError") {
-        setPendingMessages(
-          current =>
-            current?.map(message =>
-              message.role === "assistant" && message.status === "streaming"
-                ? { ...message, status: "failed" }
-                : message
-            ) ?? null
-        );
-        toast.error("KSEMO could not start a response. Your message was kept.");
-      }
+      if ((error as Error).name === "AbortError" && !stalled)
+        userStopped = true;
+      else if ((error as Error).name !== "AbortError")
+        errorMessage =
+          errorMessage ?? "KSEMO could not start a response. Your message was kept.";
     } finally {
-      setIsGenerating(false);
-      streamAbortRef.current = null;
-      if (activeConversationId) setPendingMessages(null);
+      clearInterval(watchdog);
     }
+
+    // Finalization always runs exactly once and every network step is
+    // time-bounded, so isGenerating can never stick on a hanging request.
+    if (generationSequenceRef.current !== turnSequence) return;
+    clearInterval(watchdog);
+    setIsGenerating(false);
+    setGeneratingMessageId(null);
+    generationActiveRef.current = false;
+    if (streamAbortRef.current === controller) streamAbortRef.current = null;
+
+    const failureMessage =
+      errorMessage ??
+      (stalled
+        ? responseText
+          ? "KSEMO stopped waiting because this response took too long."
+          : "KSEMO's response stalled. Please try again."
+        : null);
+    // The stream event handler assigns this asynchronously, which TypeScript
+    // cannot follow through the closure even though it is available at runtime.
+    const completedConversation = streamConversation as StreamConversation | null;
+
+    const persistTurnLocally = () => {
+      if (!completedConversation) return false;
+      return mergeTurnIntoConversationCache(completedConversation.conversationId, {
+        user: {
+          id: completedConversation.userMessageId,
+          role: "user",
+          content,
+          status: "completed",
+          attachments: selectedAttachments.length
+            ? selectedAttachments.map(file => ({
+                id: file.fileId,
+                filename: file.name,
+                mimeType: file.mimeType,
+                url: file.url,
+              }))
+            : undefined,
+        },
+        assistant: {
+          id: completedConversation.assistantMessageId,
+          role: "assistant",
+          content: responseText,
+          status: failureMessage ? "failed" : userStopped ? "cancelled" : "completed",
+        },
+      });
+    };
+
+    if (!completedConversation) {
+      // Nothing was saved server-side: give the text back to the composer.
+      setPendingMessages(null);
+      setPendingConversationId(null);
+      if (!userStopped) setComposerValue(current => (current ? current : content));
+      if (failureMessage) toast.error(failureMessage);
+      return;
+    }
+
+    if (failureMessage) {
+      markStreamingDraft("failed");
+      toast.error(failureMessage);
+      const synced = await syncConversationFromServer(
+        completedConversation.conversationId
+      );
+      if (generationSequenceRef.current !== turnSequence) return;
+      if (synced) clearPendingDrafts();
+      else if (!persistTurnLocally()) keepPendingDraftsVisible();
+      return;
+    }
+
+    if (userStopped) {
+      markStreamingDraft("cancelled");
+      const synced = await syncConversationFromServer(
+        completedConversation.conversationId
+      );
+      if (generationSequenceRef.current !== turnSequence) return;
+      if (synced || persistTurnLocally()) clearPendingDrafts();
+      return;
+    }
+
+    const synced = await syncConversationFromServer(
+      completedConversation.conversationId
+    );
+    if (generationSequenceRef.current !== turnSequence) return;
+    if (synced || persistTurnLocally()) clearPendingDrafts();
+    else keepPendingDraftsVisible();
+    if (preferencesQuery.data?.autoPlayResponses && responseText)
+      speak(responseText, completedConversation.assistantMessageId);
+  }
+
+  function markStreamingDraft(status: "failed" | "cancelled" | "completed") {
+    setPendingMessages(
+      current =>
+        current?.map(message =>
+          message.role === "assistant" && message.status === "streaming"
+            ? { ...message, status }
+            : message
+        ) ?? null
+    );
+  }
+
+  function clearPendingDrafts() {
+    setPendingMessages(null);
+    setPendingConversationId(null);
+  }
+
+  function keepPendingDraftsVisible() {
+    // Leave the streamed answer on screen; a later cache refresh replaces it.
+  }
+
+  async function syncConversationFromServer(targetId: string) {
+    const fresh = await withDeadline(
+      utils.conversation.get.fetch({ id: targetId }),
+      REFRESH_TIMEOUT_MS
+    );
+    return fresh !== null;
+  }
+
+  function mergeTurnIntoConversationCache(
+    targetId: string,
+    turn: { user: KsemoMessage; assistant: KsemoMessage }
+  ) {
+    const existing = utils.conversation.get.getData({ id: targetId });
+    if (!existing) return false;
+    const messages = [...existing.messages];
+    const upsert = (incoming: KsemoMessage) => {
+      const index = messages.findIndex(message => message.id === incoming.id);
+      if (index >= 0)
+        messages[index] = {
+          ...messages[index],
+          content: incoming.content,
+          status: incoming.status ?? "completed",
+        };
+      else
+        messages.push({
+          ...incoming,
+          attachments: incoming.attachments ?? [],
+        } as (typeof messages)[number]);
+    };
+    upsert(turn.user);
+    upsert(turn.assistant);
+    utils.conversation.get.setData({ id: targetId }, { ...existing, messages });
+    return true;
   }
 
   function stopGeneration() {
+    generationSequenceRef.current += 1;
     streamAbortRef.current?.abort();
+    streamAbortRef.current = null;
+    generationActiveRef.current = false;
     setIsGenerating(false);
+    setGeneratingMessageId(null);
   }
 
   function newChat() {
+    generationSequenceRef.current += 1;
     streamAbortRef.current?.abort();
+    streamAbortRef.current = null;
+    generationActiveRef.current = false;
     setIsGenerating(false);
+    setGeneratingMessageId(null);
     setPendingMessages(null);
     setPendingConversationId(null);
     setActiveConversationId(null);
@@ -1051,6 +1247,9 @@ export default function Home() {
                       onStop={stopSpeech}
                       isSpeaking={speakingMessageId === message.id}
                       speechState={speechState}
+                      isCurrentGeneration={
+                        isGenerating && generatingMessageId === message.id
+                      }
                       onEdit={editMessage}
                       onRegenerate={regenerateMessage}
                       onRetry={regenerateMessage}

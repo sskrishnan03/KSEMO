@@ -53,6 +53,7 @@ export function MessageContent({
   onStop,
   isSpeaking,
   speechState,
+  isCurrentGeneration = false,
   onEdit,
   onRegenerate,
   onRetry,
@@ -68,6 +69,7 @@ export function MessageContent({
   onStop: () => void;
   isSpeaking: boolean;
   speechState: "idle" | "playing" | "paused";
+  isCurrentGeneration?: boolean;
   onEdit?: (message: KsemoMessage) => void;
   onRegenerate?: (message: KsemoMessage) => void;
   onRetry?: (message: KsemoMessage) => void;
@@ -163,7 +165,7 @@ export function MessageContent({
             <div className="ksemo-markdown prose prose-neutral max-w-none text-[15px] leading-6 dark:prose-invert">
               <Streamdown>{message.content}</Streamdown>
             </div>
-          ) : message.status === "streaming" ? (
+          ) : message.status === "streaming" && isCurrentGeneration ? (
             <div
               className="flex h-7 items-center gap-1.5"
               aria-label="KSEMO is responding"
@@ -171,6 +173,20 @@ export function MessageContent({
               <span className="size-1.5 animate-pulse rounded-full bg-muted-foreground" />
               <span className="size-1.5 animate-pulse rounded-full bg-muted-foreground [animation-delay:150ms]" />
               <span className="size-1.5 animate-pulse rounded-full bg-muted-foreground [animation-delay:300ms]" />
+            </div>
+          ) : message.status === "streaming" ? (
+            <div className="flex items-center gap-3 text-muted-foreground">
+              <p>This response did not finish.</p>
+              {onRetry && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onRetry(message)}
+                  className="h-8 rounded-lg"
+                >
+                  Try again
+                </Button>
+              )}
             </div>
           ) : message.status === "failed" ? (
             <div className="flex items-center gap-3 text-destructive">

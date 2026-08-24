@@ -506,6 +506,20 @@ export function useVoiceSession(options: {
     let responseText = "";
     let serverError: string | null = null;
 
+    // Same contract as the text workspace: a silent or overlong stream is
+    // aborted instead of leaving the turn stuck in "processing" forever.
+    const startedAt = Date.now();
+    let lastActivityAt = startedAt;
+    const watchdog = window.setInterval(() => {
+      const now = Date.now();
+      if (
+        now - lastActivityAt > 45_000 ||
+        now - startedAt > 300_000
+      ) {
+        controller.abort();
+      }
+    }, 1_000);
+
     try {
       const activeConversationId = await ensureConversation();
       const response = await fetch("/api/chat/stream", {
@@ -522,6 +536,7 @@ export function useVoiceSession(options: {
           mode: "voice",
         }),
       });
+      lastActivityAt = Date.now();
       if (!response.ok || !response.body)
         throw new Error("The response stream could not be started.");
 
@@ -531,6 +546,7 @@ export function useVoiceSession(options: {
       let buffer = "";
       while (true) {
         const { done, value } = await reader.read();
+        lastActivityAt = Date.now();
         if (done) break;
         buffer += decoder.decode(value, { stream: true });
         const events = buffer.split("\n\n");
@@ -547,7 +563,12 @@ export function useVoiceSession(options: {
             ?.slice(5)
             .trim();
           if (!eventName || !rawData) continue;
-          const data = JSON.parse(rawData) as Record<string, string>;
+          let data: Record<string, string>;
+          try {
+            data = JSON.parse(rawData) as Record<string, string>;
+          } catch {
+            continue;
+          }
           if (eventName === "assistant.delta") {
             responseText += data.delta;
             fullReplyRef.current = responseText;
@@ -580,6 +601,7 @@ export function useVoiceSession(options: {
         );
       }
     } finally {
+      clearInterval(watchdog);
       abortRef.current = null;
       clearSubtitles();
       finishTurn();
