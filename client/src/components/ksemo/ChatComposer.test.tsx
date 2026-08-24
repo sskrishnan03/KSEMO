@@ -122,4 +122,31 @@ describe("ChatComposer recording state", () => {
     expect(voiceChatIndex).toBeGreaterThan(recordIndex);
     expect(sendIndex).toBeGreaterThan(voiceChatIndex);
   });
+
+  it("shows a cancellable web search pill next to the voice controls only while enabled", () => {
+    const off = renderToStaticMarkup(
+      createElement(ChatComposer, {
+        ...baseProps,
+        isRecording: false,
+        webSearchEnabled: false,
+        onToggleWebSearch: () => undefined,
+      })
+    );
+    expect(off).not.toContain('aria-label="Cancel web search"');
+
+    const on = renderToStaticMarkup(
+      createElement(ChatComposer, {
+        ...baseProps,
+        isRecording: false,
+        webSearchEnabled: true,
+        onToggleWebSearch: () => undefined,
+      })
+    );
+    expect(on).toContain(">Web search</span>");
+    expect(on).toContain('aria-label="Cancel web search"');
+    // The pill must sit after the voice chat control in the bottom row.
+    expect(on.indexOf('aria-label="Start voice chat"')).toBeLessThan(
+      on.indexOf('aria-label="Cancel web search"')
+    );
+  });
 });

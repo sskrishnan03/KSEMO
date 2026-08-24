@@ -1,4 +1,5 @@
 import { useAuth } from "@/_core/hooks/useAuth";
+import { keepPreviousData } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -195,14 +196,13 @@ export default function Home() {
   const [usedMemoriesByMessage, setUsedMemoriesByMessage] = useState<
     Record<string, Array<{ id: string; content: string }>>
   >({});
-  const [memoryWorkspaceFilter, setMemoryWorkspaceFilter] =
-    useState<StatusFilter | null>(null);
-  const [clearConversationMemoryTarget, setClearConversationMemoryTarget] =
-    useState<{
-      id: string;
-      title: string;
-    } | null>(null);
-  const streamAbortRef = useRef<AbortController | null>(null);
+  const [webSearchEnabled, setWebSearchEnabled] = useState(false);
+  const [webSourcesByMessage, setWebSourcesByMessage] = useState<
+    Record<string, Array<{ title: string; url: string }>>
+  >({});
+    const [memoryWorkspaceFilter, setMemoryWorkspaceFilter] =
+      useState<StatusFilter | null>(null);
+    const streamAbortRef = useRef<AbortController | null>(null);
   const generationSequenceRef = useRef(0);
   // State does not update until React renders. This ref closes the small
   // double-submit window between a click/Enter event and that render.
@@ -224,25 +224,39 @@ export default function Home() {
   const effectiveSearchQuery = isSearchPreview
     ? searchPreviewQuery
     : searchQuery.trim();
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(
+    effectiveSearchQuery
+  );
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(effectiveSearchQuery);
+    }, 120);
+    return () => clearTimeout(timer);
+  }, [effectiveSearchQuery]);
   const searchResults = trpc.conversation.search.useQuery(
-    { query: effectiveSearchQuery || "--" },
+    { query: debouncedSearchQuery || "--" },
     {
       enabled:
-        effectiveSearchQuery.length >= 2 && (searchOpen || isSearchPreview),
+        debouncedSearchQuery.length >= 1 && (searchOpen || isSearchPreview),
+      placeholderData: keepPreviousData,
     }
   );
   const workspaceSearchResults = trpc.workspace.search.useQuery(
-    { query: effectiveSearchQuery || "--" },
+    { query: debouncedSearchQuery || "--" },
     {
       enabled:
-        effectiveSearchQuery.length >= 2 &&
+        debouncedSearchQuery.length >= 1 &&
         searchFilter !== "chats" &&
         (searchOpen || isSearchPreview),
+      placeholderData: keepPreviousData,
     }
   );
-  const libraryFilesQuery = trpc.workspace.files.list.useQuery(undefined, {
-    enabled: Boolean(user),
-  });
+  const libraryFilesQuery = trpc.workspace.files.list.useQuery(
+    undefined,
+    {
+      enabled: Boolean(user),
+    }
+  );
   const preferenceMutation = trpc.preferences.update.useMutation({
     onSuccess: () => {
       utils.preferences.get.invalidate();
@@ -324,30 +338,12 @@ export default function Home() {
     onSuccess: () => {
       if (activeConversationId)
         utils.conversation.get.invalidate({ id: activeConversationId });
-      toast.success("Message permanently deleted");
-    },
-    onError: () => toast.error("KSEMO could not delete that message."),
-  });
-  const memoryPauseMutation =
-    trpc.memory.conversationControl.setPaused.useMutation({
-      onSuccess: (_data, variables) => {
-        utils.conversation.list.invalidate();
-        if (activeConversationId === variables.conversationId)
-          utils.conversation.get.invalidate({ id: activeConversationId });
+        toast.success("Message permanently deleted");
       },
-      onError: () => toast.error("KSEMO could not update memory for that chat."),
+      onError: () => toast.error("KSEMO could not delete that message."),
     });
-  const conversationMemoryClearMutation =
-    trpc.memory.conversationMemories.clearAll.useMutation({
-      onSuccess: () => {
-        toast.success("Conversation memory cleared");
-        if (activeConversationId)
-          utils.conversation.get.invalidate({ id: activeConversationId });
-      },
-      onError: () => toast.error("KSEMO could not clear that memory."),
-    });
-  const suggestionDismissMutation = trpc.memory.suggestions.dismiss.useMutation(
-    {
+    const suggestionDismissMutation = trpc.memory.suggestions.dismiss.useMutation(
+      {
       onSuccess: () => utils.memory.suggestions.list.invalidate(),
     }
   );
@@ -607,6 +603,8 @@ export default function Home() {
           attachmentFileIds: selectedAttachments.length
             ? selectedAttachments.map(file => file.fileId)
             : undefined,
+          webSearch:
+            webSearchEnabled && !isRegeneration ? true : undefined,
         }),
       });
       if (!response.ok || !response.body) {
@@ -668,6 +666,18 @@ export default function Home() {
             lastProgressAt = Date.now();
             errorMessage =
               data.message || "KSEMO could not complete this response.";
+          } else if (eventName === "web.sources") {
+            lastProgressAt = Date.now();
+            const payload = data as unknown as {
+              messageId: string;
+              sources?: Array<{ title: string; url: string }>;
+            };
+            if (payload.messageId && payload.sources?.length) {
+              setWebSourcesByMessage(current => ({
+                ...current,
+                [payload.messageId]: payload.sources ?? [],
+              }));
+            }
           } else if (eventName === "memory.used") {
             lastProgressAt = Date.now();
             const used = data as unknown as {
@@ -1280,18 +1290,6 @@ export default function Home() {
           setPrimaryWorkspace(section === "files" ? "library" : "memories");
           setSidebarOpen(false);
         }}
-        onToggleMemory={conversation =>
-          memoryPauseMutation.mutate({
-            conversationId: conversation.id,
-            paused: !conversation.memoryDisabled,
-          })
-        }
-        onClearConversationMemory={conversation =>
-          setClearConversationMemoryTarget({
-            id: conversation.id,
-            title: conversation.title,
-          })
-        }
         previewSupportOpen={isProfileSupportPreview}
         onSettings={() => setSettingsOpen(true)}
         onSupport={topic => setLocation(`/support/${topic}`)}
@@ -1377,6 +1375,7 @@ export default function Home() {
                         messageFeedbackMutation.mutate({ messageId, value })
                       }
                       usedMemories={usedMemoriesByMessage[message.id]}
+                      webSources={webSourcesByMessage[message.id]}
                     />
                   ))}
                   <div ref={messagesEndRef} />
@@ -1431,6 +1430,10 @@ export default function Home() {
                       initialToolsOpen={isLibraryPreview}
                       menuPlacement="below"
                       showSafetyNote={false}
+                      webSearchEnabled={webSearchEnabled}
+                      onToggleWebSearch={() =>
+                        setWebSearchEnabled(current => !current)
+                      }
                     />
                   }
                 />
@@ -1477,6 +1480,10 @@ export default function Home() {
                 initialLibraryOpen={isLibraryPreview}
                 compactBottomSpacing
                 showSafetyNote
+                webSearchEnabled={webSearchEnabled}
+                onToggleWebSearch={() =>
+                  setWebSearchEnabled(current => !current)
+                }
               />
             )}
           </>
@@ -1512,7 +1519,17 @@ export default function Home() {
         onFilterChange={setSearchFilter}
         results={searchResults.data}
         memories={workspaceSearchResults.data?.memories}
-        loading={searchResults.isLoading || workspaceSearchResults.isLoading}
+        recentChats={(conversationQuery.data ?? [])
+          .slice(0, 8)
+          .map(conversation => ({
+            conversationId: conversation.id,
+            conversationTitle: conversation.title,
+            createdAt: conversation.createdAt,
+          }))}
+        loading={
+          (searchResults.isLoading && !searchResults.data) ||
+          (workspaceSearchResults.isLoading && !workspaceSearchResults.data)
+        }
         onSelect={id => {
           selectConversation(id);
           setSearchOpen(false);
@@ -1639,22 +1656,6 @@ export default function Home() {
             if (activeConversationId === deleteTarget.id) newChat();
           } else messageRemoveMutation.mutate({ id: deleteTarget.id });
           setDeleteTarget(null);
-        }}
-      />
-      <KsemoConfirmDialog
-        open={Boolean(clearConversationMemoryTarget)}
-        onOpenChange={open => {
-          if (!open) setClearConversationMemoryTarget(null);
-        }}
-        title="Clear all memory from this conversation?"
-        description={`The chat messages will remain, but KSEMO will no longer use the stored conversation memory from “${clearConversationMemoryTarget?.title ?? "this chat"}”.`}
-        actionLabel="Clear Memory"
-        onAction={() => {
-          if (!clearConversationMemoryTarget) return;
-          conversationMemoryClearMutation.mutate({
-            conversationId: clearConversationMemoryTarget.id,
-          });
-          setClearConversationMemoryTarget(null);
         }}
       />
     </div>

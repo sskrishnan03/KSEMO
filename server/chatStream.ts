@@ -36,9 +36,16 @@ import {
   selectRelevantMemories,
 } from "./memory/memoryEngine";
 import { DEFAULT_MEMORY_SETTINGS, type UserMemory } from "../supabase-schema/04-types";
+import {
+  composeWebSearchContext,
+  performWebSearch,
+} from "./webSearch";
 
 const BASE_SYSTEM_INSTRUCTION =
   "You are KSEMO, a thoughtful and reliable AI assistant. Be clear, accurate, respectful, and practical. Use Markdown when it improves readability. Never claim to have completed work you cannot verify.";
+
+// Per-file cap on extracted document text injected into the model context.
+const FILE_TEXT_PER_FILE_CHARS = 12_000;
 
 const VOICE_STYLE_INSTRUCTION =
   "Your reply will be spoken aloud in a live voice conversation. Answer exactly what was asked, briefly and naturally — one to three short sentences for simple questions like greetings, a little more only when depth is genuinely required. No filler, no lists, no markdown formatting, no repeating the question back.";
@@ -327,6 +334,7 @@ export function registerChatStream(app: Express) {
       regenerateAssistantMessageId?: string;
       attachmentFileIds?: string[];
       mode?: string;
+      webSearch?: boolean;
     };
     let content = body.content?.trim();
     if (
@@ -650,6 +658,19 @@ export function registerChatStream(app: Express) {
                           mime_type: "application/pdf",
                         },
                       });
+                      if (file.contentText) {
+                        contentParts.push({
+                          type: "text",
+                          text: `Extracted text of ${file.filename}:\n\n${file.contentText.slice(0, FILE_TEXT_PER_FILE_CHARS)}`,
+                        });
+                      }
+                    } else if (file.contentText) {
+                      // Office/data/text files: the model reads the extracted
+                      // text directly instead of the raw bytes.
+                      contentParts.push({
+                        type: "text",
+                        text: `Attached file: ${file.filename} (${file.mimeType}). Content:\n\n${file.contentText.slice(0, FILE_TEXT_PER_FILE_CHARS)}`,
+                      });
                     } else {
                       contentParts.push({
                         type: "text",
@@ -678,10 +699,46 @@ export function registerChatStream(app: Express) {
           .filter(Boolean)
           .join("\n\n");
 
+        // WEB SEARCH: when the user toggled it on in the composer, retrieve
+        // fresh results for this turn and hand them to the model. Failures
+        // degrade silently to a normal answer.
+        let webSearchContext: string | null = null;
+        if (body.webSearch) {
+          const searchQuery =
+            (body.regenerateAssistantMessageId
+              ? [...historyForContext]
+                  .reverse()
+                  .find(message => message.role === "user")?.content
+              : content) ?? "";
+          if (searchQuery) {
+            const searchResults = await performWebSearch(searchQuery);
+            webSearchContext = composeWebSearchContext(
+              searchQuery,
+              searchResults
+            );
+            writeEvent(res, "web.sources", {
+              messageId: assistantMessageId,
+              query: searchQuery,
+              sources: searchResults.map(result => ({
+                title: result.title,
+                url: result.url,
+              })),
+            });
+          }
+        }
+
         let generationError: unknown = null;
         let usedFallbackModel = false;
         const chatMessages: Message[] = [
           { role: "system", content: systemInstruction },
+          ...(webSearchContext
+            ? [
+                {
+                  role: "system" as const,
+                  content: webSearchContext,
+                },
+              ]
+            : []),
           ...assistantContext,
         ];
         try {

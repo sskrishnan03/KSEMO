@@ -2,26 +2,41 @@ import nodemailer, { type Transporter } from "nodemailer";
 
 let transporter: Transporter | null = null;
 
-function gmailCredentials() {
-  const user = process.env.GMAIL_USER ?? process.env.VITE_GMAIL_USER ?? "";
-  const appPassword =
-    process.env.GMAIL_APP_PASSWORD ?? process.env.VITE_GMAIL_APP_PASSWORD ?? "";
-  return { user, appPassword: appPassword.replace(/\s+/g, "") };
+type MailCredentials = { user: string; pass: string; from: string };
+
+function smtpCredentials(): MailCredentials {
+  // Generic SMTP first (SMTP_USER/SMTP_PASS/SMTP_FROM), then legacy Gmail
+  // app-password variables.
+  const user =
+    process.env.SMTP_USER ||
+    process.env.GMAIL_USER ||
+    process.env.VITE_GMAIL_USER ||
+    "";
+  const rawPass =
+    process.env.SMTP_PASS ||
+    process.env.GMAIL_APP_PASSWORD ||
+    process.env.VITE_GMAIL_APP_PASSWORD ||
+    "";
+  const from = process.env.SMTP_FROM || process.env.MAIL_FROM || user;
+  return { user, pass: rawPass.replace(/\s+/g, ""), from };
 }
 
 export function isMailerConfigured(): boolean {
-  const { user, appPassword } = gmailCredentials();
-  return user.length > 0 && appPassword.length > 0;
+  const { user, pass } = smtpCredentials();
+  return user.length > 0 && pass.length > 0;
 }
 
 function getTransporter(): Transporter | null {
   if (!isMailerConfigured()) return null;
   if (!transporter) {
-    const { user, appPassword } = gmailCredentials();
-    transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: { user, pass: appPassword },
-    });
+    const { user, pass } = smtpCredentials();
+    const host = process.env.SMTP_HOST;
+    const port = process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : 465;
+    transporter = nodemailer.createTransport(
+      host
+        ? { host, port, secure: port === 465, auth: { user, pass } }
+        : { service: "gmail", auth: { user, pass } }
+    );
   }
   return transporter;
 }
@@ -57,7 +72,7 @@ export async function sendPasswordResetEmail({ to, name, resetUrl }: PasswordRes
   const mailer = getTransporter();
   if (!mailer) throw new Error("Mailer is not configured");
 
-  const { user } = gmailCredentials();
+  const { from } = smtpCredentials();
   const firstName = (name ?? "").trim().split(/\s+/)[0] || "there";
 
   const html = `<!doctype html>
@@ -99,7 +114,7 @@ export async function sendPasswordResetEmail({ to, name, resetUrl }: PasswordRes
 </html>`;
 
   await mailer.sendMail({
-    from: `"KSEMO" <${user}>`,
+    from: `"KSEMO" <${from}>`,
     to,
     subject: "Reset your KSEMO password",
     text: [
@@ -135,7 +150,7 @@ export async function sendFeedbackEmail({
   const mailer = getTransporter();
   if (!mailer) throw new Error("Mailer is not configured");
 
-  const { user } = gmailCredentials();
+  const { from } = smtpCredentials();
   const safeCategory = escapeHtml(category);
   const safeName = escapeHtml(fromName);
   const safeEmail = escapeHtml(fromEmail || "(no email on account)");
@@ -174,8 +189,8 @@ export async function sendFeedbackEmail({
 </html>`;
 
   await mailer.sendMail({
-    from: `"KSEMO" <${user}>`,
-    to: user,
+    from: `"KSEMO" <${from}>`,
+    to: from,
     ...(plainReplyTo ? { replyTo: plainReplyTo } : {}),
     subject: `[KSEMO feedback] ${category} — ${fromName}`,
     text: [

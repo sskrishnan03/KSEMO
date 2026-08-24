@@ -24,33 +24,37 @@ export function SearchResultGroups({
   memories,
   onSelect,
   onOpenMemories,
+  chatsLabel = "Chats",
 }: {
   chats: SearchChatResult[];
   messages: SearchMessageResult[];
   memories: SearchMemoryResult[];
   onSelect: (id: string) => void;
   onOpenMemories: () => void;
+  chatsLabel?: string;
 }) {
+  const renderChatButton = (chat: SearchChatResult) => (
+    <button
+      key={chat.conversationId}
+      onClick={() => onSelect(chat.conversationId)}
+      className="w-full rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      <p className="truncate text-sm font-medium">{chat.conversationTitle}</p>
+      <p className="mt-0.5 text-xs text-muted-foreground">
+        Conversation title match
+      </p>
+    </button>
+  );
   return (
     <>
-      {chats.length > 0 && (
-        <SearchGroup label="Chats" count={chats.length}>
-          {chats.map(chat => (
-            <button
-              key={chat.conversationId}
-              onClick={() => onSelect(chat.conversationId)}
-              className="w-full rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              <p className="truncate text-sm font-medium">
-                {chat.conversationTitle}
-              </p>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                Conversation title match
-              </p>
-            </button>
-          ))}
-        </SearchGroup>
-      )}
+      {chats.length > 0 &&
+        (chatsLabel ? (
+          <SearchGroup label={chatsLabel} count={chats.length}>
+            {chats.map(renderChatButton)}
+          </SearchGroup>
+        ) : (
+          <div className="space-y-0.5 pb-2">{chats.map(renderChatButton)}</div>
+        ))}
       {messages.length > 0 && (
         <SearchGroup label="Messages" count={messages.length}>
           {messages.map(message => (

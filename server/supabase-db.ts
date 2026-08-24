@@ -668,15 +668,15 @@ export async function upsertUserPreferences(
   userId: number,
   values: Partial<Omit<UserPreference, "userId" | "createdAt" | "updatedAt">>
 ): Promise<UserPreference | undefined> {
-  const dbValues: any = {
-    user_id: userId,
-    selected_model: values.selectedModel || null,
-    persona: values.persona || "balanced",
-    custom_instructions: values.customInstructions || null,
-    speech_rate: values.speechRate || 100,
-    auto_play_responses: values.autoPlayResponses || false,
-    reduce_motion: values.reduceMotion || false,
-  };
+    const dbValues: any = {
+      user_id: userId,
+      selected_model: values.selectedModel || null,
+      persona: values.persona || "balanced",
+      custom_instructions: values.customInstructions || null,
+      speech_rate: values.speechRate || 100,
+      auto_play_responses: values.autoPlayResponses || false,
+      reduce_motion: values.reduceMotion || false,
+    };
 
   const { error } = await supabase
     .from("user_preferences")
@@ -745,14 +745,28 @@ export async function listMessageFilesForUser(messageId: string, userId: number)
   const message = await getMessageForUser(messageId, userId);
   if (!message) return [];
 
-  const { data, error } = await supabase
+  // content_text exists only after 06-library-lite.sql has been applied.
+  let data: any[] | null = null;
+  let error: any = null;
+  ({ data, error } = await supabase
     .from("attachments")
     .select(`
       file_id,
-      files!inner(id, user_id, filename, mime_type, url, storage_key)
+      files!inner(id, user_id, filename, mime_type, url, storage_key, content_text)
     `)
     .eq("message_id", messageId)
-    .eq("files.user_id", userId);
+    .eq("files.user_id", userId));
+
+  if (error) {
+    ({ data, error } = await supabase
+      .from("attachments")
+      .select(`
+        file_id,
+        files!inner(id, user_id, filename, mime_type, url, storage_key)
+      `)
+      .eq("message_id", messageId)
+      .eq("files.user_id", userId));
+  }
 
   if (error) {
     handleSupabaseError(error, "listMessageFilesForUser");
@@ -764,6 +778,7 @@ export async function listMessageFilesForUser(messageId: string, userId: number)
     mimeType: row.files.mime_type,
     url: row.files.url,
     storageKey: row.files.storage_key,
+    contentText: (row.files.content_text as string | null) ?? null,
   }));
 }
 

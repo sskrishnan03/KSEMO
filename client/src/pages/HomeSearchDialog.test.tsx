@@ -33,7 +33,7 @@ describe("KSEMO grouped search results", () => {
     expect(markup).toContain('aria-label="1 memories results"');
   });
 
-  it("keeps Search focused on chats and memories after two characters", () => {
+  it("searches immediately from the first character typed", () => {
     const baseProps = {
       onQueryChange: () => undefined,
       filter: "all" as const,
@@ -68,8 +68,8 @@ describe("KSEMO grouped search results", () => {
       })
     );
 
-    expect(preSearchMarkup).toContain(
-      "Type at least two characters to search KSEMO."
+    expect(preSearchMarkup).not.toContain(
+      "Type to search your chats, messages, and memories."
     );
     expect(preSearchMarkup).not.toContain('aria-label="1 chats results"');
     expect(searchedMarkup).toContain('aria-label="1 chats results"');

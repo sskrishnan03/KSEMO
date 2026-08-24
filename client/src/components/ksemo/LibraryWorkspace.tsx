@@ -8,19 +8,23 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { trpc } from "@/lib/trpc";
+import {
+  extensionOfFilename,
+  fileVisualFor,
+  guessMimeType,
+  isSupportedUpload,
+} from "@/lib/fileIcons";
 import { cn } from "@/lib/utils";
 import {
   Check,
   CheckCircle2,
-  FileImage,
-  FileText,
   FolderOpen,
   Grid2X2,
-  Image,
   Library,
   List,
   MessageSquareText,
   Search,
+  Star,
   Trash2,
   Upload,
   X,
@@ -28,7 +32,7 @@ import {
 import React, { type ChangeEvent, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
-export type LibraryFilter = "all" | "images" | "files";
+export type LibraryFilter = "all" | "favorites" | "images" | "files";
 export type LibraryView = "grid" | "list";
 export type LibraryWorkspaceFile = {
   id: string;
@@ -37,7 +41,10 @@ export type LibraryWorkspaceFile = {
   sizeBytes: number;
   url: string;
   createdAt?: Date;
+  isFavorite?: boolean;
 };
+
+const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
 
 export function filterLibraryWorkspaceItems(
   files: LibraryWorkspaceFile[],
@@ -48,9 +55,11 @@ export function filterLibraryWorkspaceItems(
   return files.filter(
     file =>
       (filter === "all" ||
-        (filter === "images"
-          ? file.mimeType?.startsWith("image/")
-          : !file.mimeType?.startsWith("image/"))) &&
+        (filter === "favorites"
+          ? Boolean(file.isFavorite)
+          : filter === "images"
+            ? file.mimeType?.startsWith("image/")
+            : !file.mimeType?.startsWith("image/"))) &&
       (!normalized || file.filename.toLowerCase().includes(normalized))
   );
 }
@@ -101,14 +110,32 @@ export function LibraryWorkspace({
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const utils = trpc.useUtils();
+  const invalidateFiles = () => utils.workspace.files.list.invalidate();
   const filesQuery = trpc.workspace.files.list.useQuery();
   const uploadMutation = trpc.workspace.files.upload.useMutation({
-    onSuccess: () => {
-      utils.workspace.files.list.invalidate();
-    },
-    onError: (error) => {
+    onSuccess: invalidateFiles,
+    onError: error => {
       toast.error(error.message || "KSEMO could not add that file.");
     },
+  });
+  const favoriteMutation = trpc.workspace.files.setFavorite.useMutation({
+    // Optimistic: flip the star instantly, roll back only on failure.
+    onMutate: async ({ id, isFavorite }) => {
+      await utils.workspace.files.list.cancel();
+      const previous = utils.workspace.files.list.getData();
+      utils.workspace.files.list.setData(undefined, current =>
+        (current ?? []).map(file =>
+          file.id === id ? { ...file, isFavorite } : file
+        )
+      );
+      return { previous };
+    },
+    onError: (_error, _variables, context) => {
+      if (context?.previous)
+        utils.workspace.files.list.setData(undefined, context.previous);
+      toast.error("KSEMO could not update that favorite.");
+    },
+    onSettled: () => utils.workspace.files.list.invalidate(),
   });
   const removeMutation = trpc.workspace.files.remove.useMutation({
     onError: () => toast.error("KSEMO could not remove that file."),
@@ -125,37 +152,45 @@ export function LibraryWorkspace({
   const allVisibleSelected =
     files.length > 0 && files.every(file => selectedIds.has(file.id));
 
+  function queueUploads(picked: File[]) {
+    if (!picked.length) return;
+
+    const oversized = picked.filter(file => file.size > MAX_UPLOAD_BYTES);
+    if (oversized.length > 0) {
+      toast.error(
+        `${oversized.length} ${oversized.length === 1 ? "file exceeds" : "files exceed"} the 25 MB limit.`
+      );
+      return;
+    }
+
+    const unsupported = picked.filter(file => !isSupportedUpload(file));
+    if (unsupported.length > 0) {
+      toast.error(
+        `Unsupported: ${unsupported
+          .slice(0, 3)
+          .map(file => file.name)
+          .join(", ")}${unsupported.length > 3 ? "…" : ""}. PDF, Word, Excel, PowerPoint, text, data, and image files are supported.`
+      );
+      return;
+    }
+
+    for (const file of picked) {
+      void fileToBase64(file)
+        .then(dataBase64 =>
+          uploadMutation.mutate({
+            filename: file.name,
+            mimeType: file.type || guessMimeType(file.name),
+            dataBase64,
+          })
+        )
+        .catch(() => toast.error(`Could not read ${file.name}`));
+    }
+  }
+
   async function uploadFile(event: ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(event.target.files || []);
+    const picked = Array.from(event.target.files || []);
     event.target.value = "";
-    if (!files.length) return;
-
-    // Validate all files first
-    const invalidFiles = files.filter(file => file.size > 8 * 1024 * 1024);
-    if (invalidFiles.length > 0) {
-      toast.error(`${invalidFiles.length} file(s) exceed the 8 MB limit.`);
-      return;
-    }
-
-    const unsupportedFiles = files.filter(file => !file.type);
-    if (unsupportedFiles.length > 0) {
-      toast.error(`${unsupportedFiles.length} file(s) have unsupported types.`);
-      return;
-    }
-
-    // Upload files one by one
-    for (const file of files) {
-      try {
-        const dataBase64 = await fileToBase64(file);
-        uploadMutation.mutate({
-          filename: file.name,
-          mimeType: file.type,
-          dataBase64,
-        });
-      } catch {
-        toast.error(`Could not read ${file.name}`);
-      }
-    }
+    queueUploads(picked);
   }
 
   function handleDragOver(event: React.DragEvent) {
@@ -175,35 +210,9 @@ export function LibraryWorkspace({
     event.stopPropagation();
     setIsDragging(false);
 
-    const droppedFiles = Array.from(event.dataTransfer.files);
-    if (droppedFiles.length === 0) return;
-
-    // Validate all files first
-    const invalidFiles = droppedFiles.filter(file => file.size > 8 * 1024 * 1024);
-    if (invalidFiles.length > 0) {
-      toast.error(`${invalidFiles.length} file(s) exceed the 8 MB limit.`);
-      return;
-    }
-
-    const unsupportedFiles = droppedFiles.filter(file => !file.type);
-    if (unsupportedFiles.length > 0) {
-      toast.error(`${unsupportedFiles.length} file(s) have unsupported types.`);
-      return;
-    }
-
-    // Upload files one by one
-    for (const file of droppedFiles) {
-      try {
-        const dataBase64 = await fileToBase64(file);
-        uploadMutation.mutate({
-          filename: file.name,
-          mimeType: file.type,
-          dataBase64,
-        });
-      } catch {
-        toast.error(`Could not read ${file.name}`);
-      }
-    }
+    const dropped = Array.from(event.dataTransfer.files);
+    if (!dropped.length) return;
+    queueUploads(dropped);
   }
 
   function toggleFile(id: string) {
@@ -219,8 +228,9 @@ export function LibraryWorkspace({
     setSelectedIds(current => selectVisibleLibraryItems(current, files));
   }
 
-  async function removeFiles() {
+  async function confirmRemoval() {
     if (!deleteTarget?.length) return;
+    const count = deleteTarget.length;
     try {
       await Promise.all(
         deleteTarget.map(file => removeMutation.mutateAsync({ id: file.id }))
@@ -231,9 +241,9 @@ export function LibraryWorkspace({
         return next;
       });
       setDeleteTarget(null);
-      await utils.workspace.files.list.invalidate();
+      await invalidateFiles();
       toast.success(
-        `${deleteTarget.length} ${deleteTarget.length === 1 ? "Library item removed" : "Library items removed"}`
+        `${count} ${count === 1 ? "item permanently deleted" : "items permanently deleted"}`
       );
     } catch {
       // The mutation-level message provides the actionable error state.
@@ -258,7 +268,7 @@ export function LibraryWorkspace({
       <input
         ref={fileInputRef}
         type="file"
-        accept=".pdf,.txt,.md,.csv,.json,.png,.jpg,.jpeg,.webp,.docx"
+        accept=".pdf,.txt,.md,.markdown,.csv,.tsv,.json,.log,.xml,.yml,.yaml,.png,.jpg,.jpeg,.webp,.gif,.docx,.xlsx,.xls,.pptx"
         multiple
         className="sr-only"
         onChange={uploadFile}
@@ -269,7 +279,8 @@ export function LibraryWorkspace({
             <Upload className="mx-auto size-12 text-muted-foreground" />
             <p className="mt-4 text-lg font-medium">Drop files to upload</p>
             <p className="mt-2 text-sm text-muted-foreground">
-              Supported: PDF, documents, text, data, and images up to 8 MB each
+              Supported: PDF, Word, Excel, PowerPoint, text, data, and images up
+              to 25 MB each
             </p>
           </div>
         </div>
@@ -284,7 +295,8 @@ export function LibraryWorkspace({
               </h1>
             </div>
             <p className="mt-1.5 max-w-xl text-sm leading-6 text-muted-foreground">
-              Your private space for files and images. Upload multiple files at once or drag and drop them here. Select one or more items
+              Your private space for files and images. Documents are analyzed so
+              you can ask questions about them in chat. Select one or more items
               to chat with them together.
             </p>
           </div>
@@ -339,6 +351,11 @@ export function LibraryWorkspace({
                 active={filter === "files"}
                 onClick={() => setFilter("files")}
               />
+              <FilterButton
+                label="Favorites"
+                active={filter === "favorites"}
+                onClick={() => setFilter("favorites")}
+              />
             </div>
             <div
               className="flex rounded-xl border border-border bg-card p-1"
@@ -364,8 +381,8 @@ export function LibraryWorkspace({
         <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
           <p className="text-xs text-muted-foreground">
             {files.length} {files.length === 1 ? "item" : "items"} shown · Tap
-            or click any item to select it. Upload multiple files at once. Supported: PDF, documents, text,
-            data, and images up to 8 MB each.
+            or click any item to select it. Supported: PDF, Word, Excel,
+            PowerPoint, text, data, and images up to 25 MB each.
           </p>
           <Button
             type="button"
@@ -403,7 +420,7 @@ export function LibraryWorkspace({
               <Button
                 size="sm"
                 variant="outline"
-                className="rounded-lg"
+                className="rounded-lg hover:text-destructive"
                 onClick={() => setDeleteTarget(selectedFiles)}
               >
                 <Trash2 className="mr-1.5 size-3.5" />
@@ -438,7 +455,14 @@ export function LibraryWorkspace({
                     file={file}
                     selected={selectedIds.has(file.id)}
                     onToggle={() => toggleFile(file.id)}
-                    onRemove={() => setDeleteTarget([file])}
+                    isFavorite={Boolean(file.isFavorite)}
+                    onToggleFavorite={() =>
+                      favoriteMutation.mutate({
+                        id: file.id,
+                        isFavorite: !file.isFavorite,
+                      })
+                    }
+                    onDelete={() => setDeleteTarget([file])}
                   />
                 ))}
               </div>
@@ -450,7 +474,14 @@ export function LibraryWorkspace({
                     file={file}
                     selected={selectedIds.has(file.id)}
                     onToggle={() => toggleFile(file.id)}
-                    onRemove={() => setDeleteTarget([file])}
+                    isFavorite={Boolean(file.isFavorite)}
+                    onToggleFavorite={() =>
+                      favoriteMutation.mutate({
+                        id: file.id,
+                        isFavorite: !file.isFavorite,
+                      })
+                    }
+                    onDelete={() => setDeleteTarget([file])}
                   />
                 ))}
               </div>
@@ -473,12 +504,13 @@ export function LibraryWorkspace({
         <DialogContent className="rounded-2xl sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="text-xl font-semibold tracking-[-0.02em]">
-              Remove {deleteTarget?.length === 1 ? "file" : "selected files"}?
+              Delete{" "}
+              {deleteTarget?.length === 1 ? "this file" : "selected files"}?
             </DialogTitle>
             <DialogDescription>
               {deleteTarget?.length === 1
-                ? `“${deleteTarget[0]?.filename}” will be permanently removed from your private Library.`
-                : `${deleteTarget?.length ?? 0} selected items will be permanently removed from your private Library.`}
+                ? `“${deleteTarget[0]?.filename}” will be permanently removed from your private Library. This can't be undone.`
+                : `${deleteTarget?.length ?? 0} items will be permanently removed from your private Library. This can't be undone.`}
             </DialogDescription>
           </DialogHeader>
           <div className="flex justify-end gap-2">
@@ -487,10 +519,10 @@ export function LibraryWorkspace({
             </Button>
             <Button
               variant="destructive"
-              onClick={removeFiles}
+              onClick={confirmRemoval}
               disabled={removeMutation.isPending}
             >
-              {removeMutation.isPending ? "Removing…" : "Delete permanently"}
+              {removeMutation.isPending ? "Deleting…" : "Delete permanently"}
             </Button>
           </div>
         </DialogContent>
@@ -601,6 +633,7 @@ function FilePreview({
   compact?: boolean;
 }) {
   const image = file.mimeType?.startsWith("image/");
+  const visual = fileVisualFor(file.filename, file.mimeType);
   if (image)
     return (
       <img
@@ -615,11 +648,13 @@ function FilePreview({
   return (
     <span
       className={cn(
-        "flex items-center justify-center text-muted-foreground",
+        "flex items-center justify-center",
         compact ? "size-11 rounded-lg bg-muted" : "size-full bg-muted/45"
       )}
     >
-      <FileText className={compact ? "size-5" : "size-9"} />
+      <visual.Icon
+        className={cn(compact ? "size-5" : "size-9", visual.className)}
+      />
     </span>
   );
 }
@@ -628,14 +663,19 @@ function LibraryGridCard({
   file,
   selected,
   onToggle,
-  onRemove,
+  isFavorite = false,
+  onToggleFavorite,
+  onDelete,
 }: {
   file: LibraryWorkspaceFile;
   selected: boolean;
   onToggle: () => void;
-  onRemove: () => void;
+  isFavorite?: boolean;
+  onToggleFavorite: () => void;
+  onDelete: () => void;
 }) {
   const image = file.mimeType?.startsWith("image/");
+  const visual = fileVisualFor(file.filename, file.mimeType);
   const selectWithKeyboard = (event: React.KeyboardEvent<HTMLElement>) => {
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
@@ -683,12 +723,11 @@ function LibraryGridCard({
       </a>
       <div className="p-3">
         <div className="flex items-start gap-2">
-          <span className="mt-0.5 text-muted-foreground">
-            {image ? (
-              <FileImage className="size-3.5" />
-            ) : (
-              <FileText className="size-3.5" />
-            )}
+          <span className="mt-0.5">
+            <visual.Icon
+              className={cn("size-3.5", visual.className)}
+              aria-hidden
+            />
           </span>
           <a
             href={file.url}
@@ -701,21 +740,45 @@ function LibraryGridCard({
               {file.filename}
             </p>
             <p className="mt-0.5 text-[11px] text-muted-foreground">
-              {image ? "Image" : "File"} · {bytesLabel(file.sizeBytes)}
+              {image ? "Image" : kindLabel(file.filename)} ·{" "}
+              {bytesLabel(file.sizeBytes)}
             </p>
           </a>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={event => {
-              event.stopPropagation();
-              onRemove();
-            }}
-            className="size-7 rounded-lg text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 hover:text-destructive"
-            aria-label={`Remove ${file.filename}`}
-          >
-            <Trash2 className="size-3.5" />
-          </Button>
+          <div className="flex shrink-0 items-center gap-0.5">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={event => {
+                event.stopPropagation();
+                onToggleFavorite();
+              }}
+              className={cn(
+                "size-7 rounded-lg",
+                isFavorite
+                  ? "text-amber-500"
+                  : "text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+              )}
+              aria-label={
+                isFavorite
+                  ? `Remove ${file.filename} from favorites`
+                  : `Add ${file.filename} to favorites`
+              }
+            >
+              <Star className={cn("size-3.5", isFavorite && "fill-current")} />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={event => {
+                event.stopPropagation();
+                onDelete();
+              }}
+              className="size-7 rounded-lg text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 hover:text-destructive"
+              aria-label={`Delete ${file.filename}`}
+            >
+              <Trash2 className="size-3.5" />
+            </Button>
+          </div>
         </div>
       </div>
     </article>
@@ -726,14 +789,19 @@ function LibraryListRow({
   file,
   selected,
   onToggle,
-  onRemove,
+  isFavorite = false,
+  onToggleFavorite,
+  onDelete,
 }: {
   file: LibraryWorkspaceFile;
   selected: boolean;
   onToggle: () => void;
-  onRemove: () => void;
+  isFavorite?: boolean;
+  onToggleFavorite: () => void;
+  onDelete: () => void;
 }) {
   const image = file.mimeType?.startsWith("image/");
+  const visual = fileVisualFor(file.filename, file.mimeType);
   const selectWithKeyboard = (event: React.KeyboardEvent<HTMLElement>) => {
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
@@ -788,22 +856,67 @@ function LibraryListRow({
           {file.filename}
         </p>
         <p className="mt-0.5 text-xs text-muted-foreground">
-          {image ? "Image" : "File"} · {file.mimeType} ·{" "}
+          {image ? "Image" : kindLabel(file.filename)} · {file.mimeType} ·{" "}
           {bytesLabel(file.sizeBytes)}
         </p>
       </a>
-      <Button
-        variant="ghost"
-        size="icon"
-        onClick={event => {
-          event.stopPropagation();
-          onRemove();
-        }}
-        className="size-8 rounded-lg text-muted-foreground hover:text-destructive"
-        aria-label={`Remove ${file.filename}`}
-      >
-        <Trash2 className="size-3.5" />
-      </Button>
+      <div className="flex shrink-0 items-center gap-0.5">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={event => {
+            event.stopPropagation();
+            onToggleFavorite();
+          }}
+          className={cn(
+            "size-8 rounded-lg",
+            isFavorite ? "text-amber-500" : "text-muted-foreground"
+          )}
+          aria-label={
+            isFavorite
+              ? `Remove ${file.filename} from favorites`
+              : `Add ${file.filename} to favorites`
+          }
+        >
+          <Star className={cn("size-3.5", isFavorite && "fill-current")} />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={event => {
+            event.stopPropagation();
+            onDelete();
+          }}
+          className="size-8 rounded-lg text-muted-foreground hover:text-destructive"
+          aria-label={`Delete ${file.filename}`}
+        >
+          <Trash2 className="size-3.5" />
+        </Button>
+      </div>
     </article>
   );
+}
+
+const KIND_LABELS: Record<string, string> = {
+  pdf: "PDF",
+  doc: "Document",
+  docx: "Document",
+  xls: "Spreadsheet",
+  xlsx: "Spreadsheet",
+  csv: "Data",
+  tsv: "Data",
+  ppt: "Presentation",
+  pptx: "Presentation",
+  json: "JSON",
+  xml: "XML",
+  yml: "Config",
+  yaml: "Config",
+  txt: "Text",
+  md: "Markdown",
+  markdown: "Markdown",
+  log: "Log",
+};
+
+function kindLabel(filename: string) {
+  return KIND_LABELS[extensionOfFilename(filename)] ?? "File";
 }

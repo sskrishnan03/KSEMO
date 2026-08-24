@@ -19,6 +19,7 @@ import {
   Copy,
   Ellipsis,
   FileText,
+  Globe,
   History,
   Image,
   Pencil,
@@ -33,6 +34,7 @@ import {
 import React from "react";
 import { useState } from "react";
 import { Streamdown } from "streamdown";
+import { KsemoMarkdownCode } from "./code-block";
 
 type KsemoMessage = {
   id: string;
@@ -64,6 +66,7 @@ export function MessageContent({
   onDelete,
   onViewHistory,
   usedMemories,
+  webSources,
 }: {
   message: KsemoMessage;
   onSpeak: (text: string, messageId: string) => void;
@@ -81,6 +84,7 @@ export function MessageContent({
   onDelete?: (message: KsemoMessage) => void;
   onViewHistory?: (message: KsemoMessage) => void;
   usedMemories?: Array<{ id: string; content: string }>;
+  webSources?: Array<{ title: string; url: string }>;
 }) {
   const [copied, setCopied] = useState(false);
   const isUser = message.role === "user";
@@ -167,7 +171,9 @@ export function MessageContent({
             <p className="whitespace-pre-wrap">{message.content}</p>
           ) : message.content ? (
             <div className="ksemo-markdown prose prose-neutral max-w-none text-[15px] leading-6 dark:prose-invert">
-              <Streamdown>{message.content}</Streamdown>
+              <Streamdown components={{ code: KsemoMarkdownCode }}>
+                {message.content}
+              </Streamdown>
             </div>
           ) : message.status === "streaming" && isCurrentGeneration ? (
             <div
@@ -237,6 +243,22 @@ export function MessageContent({
         )}
         {!isUser && usedMemories?.length ? (
           <UsedMemoriesChip memories={usedMemories} />
+        ) : null}
+        {!isUser && webSources?.length ? (
+          <div className="mb-1 flex flex-wrap gap-1.5">
+            {webSources.slice(0, 5).map((source, index) => (
+              <a
+                key={`${source.url}-${index}`}
+                href={source.url}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex max-w-[15rem] items-center gap-1 rounded-full border border-border bg-muted/60 px-2 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              >
+                <Globe className="size-3 shrink-0" />
+                <span className="truncate">{source.title}</span>
+              </a>
+            ))}
+          </div>
         ) : null}
         {!isUser && (message.content || message.status === "failed") && (
           <div className="mt-1.5 flex items-center gap-1">

@@ -25,6 +25,7 @@ type SearchDialogBodyProps = {
   onFilterChange: (filter: SearchFilter) => void;
   results?: SearchResults;
   memories?: SearchMemoryResult[];
+  recentChats?: SearchChatResult[];
   loading: boolean;
   onSelect: (id: string) => void;
   onOpenMemories: () => void;
@@ -57,11 +58,12 @@ export function SearchDialogBody({
   onFilterChange,
   results,
   memories = [],
+  recentChats = [],
   loading,
   onSelect,
   onOpenMemories,
 }: SearchDialogBodyProps) {
-  const canSearch = query.trim().length >= 2;
+  const canSearch = query.trim().length >= 1;
   const chats = results?.chats ?? [];
   const messages = results?.messages ?? [];
   const available =
@@ -103,9 +105,19 @@ export function SearchDialogBody({
       )}
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-2 pr-1">
         {!canSearch ? (
-          <p className="px-3 py-8 text-center text-sm text-muted-foreground">
-            Type at least two characters to search KSEMO.
-          </p>
+          recentChats.length > 0 ? (
+            <SearchResultGroups
+              chats={recentChats}
+              messages={[]}
+              memories={[]}
+              onSelect={onSelect}
+              onOpenMemories={onOpenMemories}
+            />
+          ) : (
+            <p className="px-3 py-8 text-center text-sm text-muted-foreground">
+              Type to search your chats, messages, and memories.
+            </p>
+          )
         ) : loading ? (
           <p className="px-3 py-8 text-center text-sm text-muted-foreground">
             Searching KSEMO…

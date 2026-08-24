@@ -11,7 +11,8 @@ describe("KSEMO auth stage", () => {
     const markup = renderToStaticMarkup(
       createElement(Router, { hook: staticLocationHook, children: createElement(AuthStage) })
     );
-    expect(markup).toContain("Welcome to KSEMO");
+    expect(markup).toContain("Welcome back");
+    expect(markup).toContain("KSEMO");
     expect(markup).toContain("Continue with Google");
     expect(markup).toContain("Sign in");
     expect(markup).toContain("Create account");

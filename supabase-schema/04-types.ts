@@ -23,16 +23,16 @@ export type InsertUser = Partial<Omit<User, "id" | "createdAt" | "updatedAt">> &
 };
 
 export type UserPreference = {
-  userId: number;
-  selectedModel: string | null;
-  persona: "balanced" | "concise" | "creative" | "analytical";
-  customInstructions: string | null;
-  speechRate: number;
-  autoPlayResponses: boolean;
-  reduceMotion: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-};
+    userId: number;
+    selectedModel: string | null;
+    persona: "balanced" | "concise" | "creative" | "analytical";
+    customInstructions: string | null;
+    speechRate: number;
+    autoPlayResponses: boolean;
+    reduceMotion: boolean;
+    createdAt: Date;
+    updatedAt: Date;
+  };
 
 export type InsertUserPreference = Partial<
   Omit<UserPreference, "userId" | "createdAt" | "updatedAt">
@@ -293,17 +293,17 @@ export type DbMessage = {
   updated_at: string;
 };
 
-export type DbUserPreference = {
-  user_id: number;
-  selected_model: string | null;
-  persona: "balanced" | "concise" | "creative" | "analytical";
-  custom_instructions: string | null;
-  speech_rate: number;
-  auto_play_responses: boolean;
-  reduce_motion: boolean;
-  created_at: string;
-  updated_at: string;
-};
+  export type DbUserPreference = {
+    user_id: number;
+    selected_model: string | null;
+    persona: "balanced" | "concise" | "creative" | "analytical";
+    custom_instructions: string | null;
+    speech_rate: number;
+    auto_play_responses: boolean;
+    reduce_motion: boolean;
+    created_at: string;
+    updated_at: string;
+  };
 
 // Helper function to convert DB row to app type
 export function dbToUser(db: DbUser): User {
@@ -357,18 +357,18 @@ export function dbToMessage(db: DbMessage): Message {
 }
 
 export function dbToUserPreference(db: DbUserPreference): UserPreference {
-  return {
-    userId: db.user_id,
-    selectedModel: db.selected_model,
-    persona: db.persona,
-    customInstructions: db.custom_instructions,
-    speechRate: db.speech_rate,
-    autoPlayResponses: db.auto_play_responses,
-    reduceMotion: db.reduce_motion,
-    createdAt: new Date(db.created_at),
-    updatedAt: new Date(db.updated_at),
-  };
-}
+    return {
+      userId: db.user_id,
+      selectedModel: db.selected_model,
+      persona: db.persona,
+      customInstructions: db.custom_instructions,
+      speechRate: db.speech_rate,
+      autoPlayResponses: db.auto_play_responses,
+      reduceMotion: db.reduce_motion,
+      createdAt: new Date(db.created_at),
+      updatedAt: new Date(db.updated_at),
+    };
+  }
 
 // Helper function to convert app type to DB format
 export function userToDb(user: Partial<User>): Partial<DbUser> {

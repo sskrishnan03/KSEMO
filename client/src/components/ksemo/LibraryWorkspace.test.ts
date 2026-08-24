@@ -18,12 +18,16 @@ const files = [
     mimeType: "application/pdf",
     sizeBytes: 2200,
     url: "/brief",
+    isFavorite: true,
   },
 ];
 
 describe("KSEMO dedicated Library workspace filters", () => {
-  it("filters private items by search text and All, Images, and Files views", () => {
+  it("filters private items by search text and All, Favorites, Images, and Files views", () => {
     expect(filterLibraryWorkspaceItems(files, "", "all")).toHaveLength(2);
+    expect(
+      filterLibraryWorkspaceItems(files, "", "favorites").map(file => file.id)
+    ).toEqual(["file-doc"]);
     expect(
       filterLibraryWorkspaceItems(files, "", "images").map(file => file.id)
     ).toEqual(["file-image"]);

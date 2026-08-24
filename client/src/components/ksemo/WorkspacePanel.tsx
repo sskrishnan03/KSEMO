@@ -10,10 +10,14 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
 import {
+  fileVisualFor,
+  guessMimeType,
+  isSupportedUpload,
+} from "@/lib/fileIcons";
+import {
   Archive,
   Brain,
   Check,
-  FileText,
   Library,
   Link2,
   Plus,
@@ -117,18 +121,20 @@ export function WorkspacePanel({
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
-    if (file.size > 8 * 1024 * 1024) {
-      toast.error("Files must be smaller than 8 MB.");
+    if (file.size > 25 * 1024 * 1024) {
+      toast.error("Files must be smaller than 25 MB.");
       return;
     }
-    if (!file.type) {
-      toast.error("KSEMO needs a recognized file type for Library uploads.");
+    if (!isSupportedUpload(file)) {
+      toast.error(
+        "Supported: PDF, Word, Excel, PowerPoint, text, data, and image files."
+      );
       return;
     }
     try {
       fileUpload.mutate({
         filename: file.name,
-        mimeType: file.type,
+        mimeType: file.type || guessMimeType(file.name),
         dataBase64: await fileToBase64(file),
       });
     } catch {
@@ -167,7 +173,7 @@ export function WorkspacePanel({
                   onChange={uploadFile}
                   type="file"
                   className="sr-only"
-                  accept=".pdf,.txt,.md,.csv,.json,.png,.jpg,.jpeg,.webp,.docx"
+                  accept=".pdf,.txt,.md,.markdown,.csv,.tsv,.json,.log,.xml,.yml,.yaml,.png,.jpg,.jpeg,.webp,.gif,.docx,.xlsx,.xls,.pptx"
                 />
                 <Button
                   onClick={() => fileInputRef.current?.click()}
@@ -180,8 +186,8 @@ export function WorkspacePanel({
                     : "Add file to Library"}
                 </Button>
                 <p className="mt-2 text-xs leading-5 text-muted-foreground">
-                  PDF, text, Markdown, CSV, JSON, images, and DOCX up to 8 MB.
-                  Files stay private until you attach them to a conversation.
+                  PDF, Word, Excel, PowerPoint, text, data, and image files up
+                  to 25 MB. Documents are analyzed so you can chat with them.
                 </p>
                 <Input
                   value={libraryQuery}
@@ -197,7 +203,18 @@ export function WorkspacePanel({
                         key={file.id}
                         className="flex items-center gap-3 rounded-xl border border-border p-3"
                       >
-                        <FileText className="size-4 text-muted-foreground" />
+                        {(() => {
+                          const visual = fileVisualFor(
+                            file.filename,
+                            file.mimeType
+                          );
+                          return (
+                            <visual.Icon
+                              className={`size-4 ${visual.className}`}
+                              aria-hidden
+                            />
+                          );
+                        })()}
                         <a
                           href={file.url}
                           target="_blank"

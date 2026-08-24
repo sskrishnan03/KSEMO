@@ -9,11 +9,6 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import {
   Archive,
@@ -25,7 +20,6 @@ import {
   Copy,
   Download,
   Ellipsis,
-  Eraser,
   ExternalLink,
   FileText,
   HelpCircle,
@@ -72,8 +66,6 @@ export function ConversationSidebar({
   onDelete,
   onSearch,
   onWorkspace,
-  onToggleMemory,
-  onClearConversationMemory,
   onSettings,
   onSupport,
   onLogout,
@@ -97,8 +89,6 @@ export function ConversationSidebar({
   onDelete: (conversation: Conversation) => void;
   onSearch: () => void;
   onWorkspace: (section: "files" | "memories") => void;
-  onToggleMemory?: (conversation: Conversation) => void;
-  onClearConversationMemory?: (conversation: Conversation) => void;
   onSettings: () => void;
   onSupport: (topic: "faq" | "privacy" | "terms") => void;
   onLogout: () => void;
@@ -119,17 +109,26 @@ export function ConversationSidebar({
       Memory:
         "group-hover:scale-110 group-hover:-rotate-3 group-active:rotate-0",
     })[label] ?? "group-hover:scale-105";
+  const railTip = (label: string) =>
+    compact ? (
+      <span
+        aria-hidden
+        className="pointer-events-none absolute left-full top-1/2 z-[70] ml-2 -translate-y-1/2 whitespace-nowrap rounded-md bg-foreground px-2 py-1 text-xs font-medium text-background opacity-0 shadow-md transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100 motion-reduce:transition-none"
+      >
+        {label}
+      </span>
+    ) : null;
   const utility = (
     label: string,
     icon: React.ReactNode,
     action: () => void
   ) => {
-    const button = (
+    return (
       <Button
         onClick={action}
         variant="ghost"
         className={cn(
-          "group h-9 rounded-lg text-foreground/90 transition-[color,background-color,transform] duration-150 hover:bg-muted hover:text-foreground active:scale-[0.97]",
+          "group relative h-9 rounded-lg text-foreground/90 transition-[color,background-color,transform] duration-150 hover:bg-muted hover:text-foreground active:scale-[0.97]",
           compact ? "w-10 px-0" : "w-full justify-start gap-2 px-2"
         )}
       >
@@ -144,15 +143,8 @@ export function ConversationSidebar({
         <span className={compact ? "sr-only" : "text-sm font-semibold"}>
           {label}
         </span>
+        {railTip(label)}
       </Button>
-    );
-    return compact ? (
-      <Tooltip>
-        <TooltipTrigger asChild>{button}</TooltipTrigger>
-        <TooltipContent side="right">{label}</TooltipContent>
-      </Tooltip>
-    ) : (
-      button
     );
   };
 
@@ -187,22 +179,21 @@ export function ConversationSidebar({
                   className="size-full object-cover"
                 />
               </div>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={onToggleCollapsed}
-                    className="absolute inset-0 size-8 rounded-xl opacity-0 transition-all duration-150 group-hover/brand:scale-100 group-hover/brand:opacity-100 group-focus-within/brand:scale-100 group-focus-within/brand:opacity-100 hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring active:scale-95"
-                    aria-label="Expand sidebar"
-                  >
-                    <ChevronsRight className="size-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="right" sideOffset={10}>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onToggleCollapsed}
+                className="absolute inset-0 size-8 rounded-xl opacity-0 transition-all duration-150 group-hover/brand:scale-100 group-hover/brand:opacity-100 group-focus-within/brand:scale-100 group-focus-within/brand:opacity-100 hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring active:scale-95"
+                aria-label="Expand sidebar"
+              >
+                <ChevronsRight className="size-4" />
+                <span
+                  aria-hidden
+                  className="pointer-events-none absolute left-full top-1/2 z-[70] ml-2 -translate-y-1/2 whitespace-nowrap rounded-md bg-foreground px-2 py-1 text-xs font-medium text-background opacity-0 shadow-md transition-opacity duration-150 group-hover/brand:opacity-100 group-focus-within/brand:opacity-100 motion-reduce:transition-none"
+                >
                   Expand sidebar
-                </TooltipContent>
-              </Tooltip>
+                </span>
+              </Button>
             </div>
           ) : (
             <div className="flex min-w-0 items-center gap-2.5">
@@ -270,8 +261,6 @@ export function ConversationSidebar({
                   onShare={onShare}
                   onExport={onExport}
                   onDelete={onDelete}
-                  onToggleMemory={onToggleMemory}
-                  onClearConversationMemory={onClearConversationMemory}
                 />
               )}
               <ConversationGroup
@@ -286,8 +275,6 @@ export function ConversationSidebar({
                 onShare={onShare}
                 onExport={onExport}
                 onDelete={onDelete}
-                onToggleMemory={onToggleMemory}
-                onClearConversationMemory={onClearConversationMemory}
                 emptyText="Your conversations will appear here."
               />
             </>
@@ -298,7 +285,7 @@ export function ConversationSidebar({
             <DropdownMenuTrigger asChild>
               <button
                 className={cn(
-                  "flex w-full items-center rounded-xl py-2 text-left transition-colors hover:bg-muted",
+                  "group relative flex w-full items-center rounded-xl py-2 text-left transition-colors hover:bg-muted",
                   compact ? "justify-center" : "gap-2.5 px-2"
                 )}
                 aria-label="Open profile menu"
@@ -314,6 +301,7 @@ export function ConversationSidebar({
                     {user.email || "Signed in"}
                   </span>
                 </span>
+                {railTip("Account")}
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent
@@ -389,8 +377,6 @@ function ConversationGroup({
   onShare,
   onExport,
   onDelete,
-  onToggleMemory,
-  onClearConversationMemory,
   emptyText,
 }: {
   label: string;
@@ -404,8 +390,6 @@ function ConversationGroup({
   onShare: (conversation: Conversation) => void;
   onExport: (conversation: Conversation, format: "pdf" | "word") => void;
   onDelete: (conversation: Conversation) => void;
-  onToggleMemory?: (conversation: Conversation) => void;
-  onClearConversationMemory?: (conversation: Conversation) => void;
   emptyText?: string;
 }) {
   const [expanded, setExpanded] = useState(true);
@@ -497,22 +481,6 @@ function ConversationGroup({
                       </DropdownMenuItem>
                     </DropdownMenuSubContent>
                   </DropdownMenuSub>
-                  {onToggleMemory && (
-                    <DropdownMenuItem onClick={() => onToggleMemory(conversation)}>
-                      <Brain className="mr-2 size-3.5" />
-                      {conversation.memoryDisabled
-                        ? "Use memory for this chat"
-                        : "Don't use memory for this chat"}
-                    </DropdownMenuItem>
-                  )}
-                  {onClearConversationMemory && (
-                    <DropdownMenuItem
-                      onClick={() => onClearConversationMemory(conversation)}
-                    >
-                      <Eraser className="mr-2 size-3.5" />
-                      Delete conversation memory
-                    </DropdownMenuItem>
-                  )}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     onClick={() => onDelete(conversation)}

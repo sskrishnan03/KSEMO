@@ -24,19 +24,22 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNowStrict } from "date-fns";
 import {
   Brain,
-  Clock3,
   Ellipsis,
   Eye,
-  Globe2,
   HelpCircle,
-  MessageSquare,
   Pencil,
   Plus,
+  Power,
   Search,
   Settings2,
   Sparkles,
@@ -350,12 +353,6 @@ export function MemoryWorkspace({
     [allConversationMemories, query]
   );
 
-  const stats = {
-    user: allUserMemories.length,
-    conversation: allConversationMemories.length,
-    suggestions: pendingSuggestions.length,
-  };
-
   function openResolutionDialog(suggestion: SuggestionItem) {
     const kind = suggestion.meta?.kind ?? "new";
     if ((kind === "conflict" || kind === "duplicate") && suggestion.meta?.similarTo?.length) {
@@ -405,58 +402,9 @@ export function MemoryWorkspace({
           </div>
         </header>
 
-        {/* Stats */}
-        <section className="mt-6 grid grid-cols-1 gap-2.5 sm:grid-cols-3">
-          <StatCard label="User Memories" value={stats.user} icon={<Globe2 className="size-4" />} active={tab === "user"} onClick={() => { setTab("user"); setStatusFilter("all"); }} />
-          <StatCard
-            label="Conversation Memories"
-            value={stats.conversation}
-            icon={<MessageSquare className="size-4" />}
-            active={tab === "conversation"}
-            onClick={() => setTab("conversation")}
-          />
-          <StatCard
-            label="Suggestions"
-            value={stats.suggestions}
-            icon={<Sparkles className="size-4" />}
-            active={statusFilter === "suggestions"}
-            onClick={() => {
-              setTab("user");
-              setStatusFilter(statusFilter === "suggestions" ? "all" : "suggestions");
-            }}
-          />
-        </section>
-
-        {/* Tabs */}
-        <section className="mt-6 flex flex-wrap items-center justify-between gap-3">
-          <div
-            className="flex rounded-xl border border-border bg-card p-1"
-            role="tablist"
-            aria-label="Memory type"
-          >
-            <TabButton
-              label="User Memory"
-              active={tab === "user"}
-              onClick={() => setTab("user")}
-            />
-            <TabButton
-              label="Conversation Memory"
-              active={tab === "conversation"}
-              onClick={() => setTab("conversation")}
-            />
-          </div>
-          <p className="max-w-xs text-right text-[11px] leading-4 text-muted-foreground">
-            {tab === "user"
-              ? "Remembered across every conversation."
-              : activeConversationId
-                ? "Belongs to the conversation you have open right now."
-                : "Open or start a conversation to see its memory."}
-          </p>
-        </section>
-
-        {/* Search + filters */}
-        <section className="mt-4 space-y-3">
-          <div className="relative w-full xl:max-w-md">
+        {/* Toolbar: search, then one consolidated control bar */}
+        <section className="mt-6 space-y-3">
+          <div className="relative w-full lg:max-w-md">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={query}
@@ -466,54 +414,75 @@ export function MemoryWorkspace({
               aria-label="Search memories"
             />
           </div>
-          {tab === "user" && (
-            <div className="flex flex-wrap items-center gap-2">
-              <div
-                className="flex rounded-xl border border-border bg-card p-1"
-                role="group"
-                aria-label="Filter memories by status"
-              >
-                {(["all", "active", "disabled", "suggestions"] as const).map(
-                  value => (
-                    <FilterButton
-                      key={value}
-                      label={
-                        value === "all"
-                          ? "All"
-                          : value === "active"
-                            ? "Active"
-                            : value === "disabled"
-                              ? "Disabled"
-                              : `Suggestions${stats.suggestions ? ` (${stats.suggestions})` : ""}`
-                      }
-                      active={statusFilter === value}
-                      onClick={() => setStatusFilter(value)}
-                    />
-                  )
-                )}
-              </div>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            <div
+              className="flex rounded-xl border border-border bg-card p-1"
+              role="tablist"
+              aria-label="Memory type"
+            >
+              <TabButton
+                label="User Memory"
+                active={tab === "user"}
+                onClick={() => setTab("user")}
+              />
+              <TabButton
+                label="Conversation Memory"
+                active={tab === "conversation"}
+                onClick={() => setTab("conversation")}
+              />
             </div>
-          )}
-          {tab === "user" && statusFilter !== "suggestions" && (
-            <div className="flex flex-wrap items-center gap-1.5">
-              {CATEGORY_FILTERS.map(item => (
-                <button
-                  key={item.value}
-                  type="button"
-                  onClick={() => setCategoryFilter(item.value)}
-                  aria-pressed={categoryFilter === item.value}
-                  className={cn(
-                    "rounded-lg border px-2.5 py-1 text-[11px] font-medium transition-colors",
-                    categoryFilter === item.value
-                      ? "border-foreground bg-foreground text-background"
-                      : "border-border text-muted-foreground hover:bg-muted hover:text-foreground"
-                  )}
+            {tab === "user" && (
+              <>
+                <div
+                  className="flex rounded-xl border border-border bg-card p-1"
+                  role="group"
+                  aria-label="Filter memories by status"
                 >
-                  {item.label}
-                </button>
-              ))}
-            </div>
-          )}
+                  {(["all", "active", "disabled", "suggestions"] as const).map(
+                    value => (
+                      <FilterButton
+                        key={value}
+                        label={
+                          value === "all"
+                            ? "All"
+                            : value === "active"
+                              ? "Active"
+                              : value === "disabled"
+                                ? "Disabled"
+                                : "Suggestions"
+                        }
+                        active={statusFilter === value}
+                        onClick={() => setStatusFilter(value)}
+                      />
+                    )
+                  )}
+                </div>
+                {statusFilter !== "suggestions" && (
+                  <Select
+                    value={categoryFilter}
+                    onValueChange={value =>
+                      setCategoryFilter(value as UserMemoryCategory | "all")
+                    }
+                  >
+                    <SelectTrigger
+                      className="h-9 w-[170px] rounded-xl text-xs"
+                      aria-label="Filter memories by category"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All categories</SelectItem>
+                      {CATEGORY_FILTERS.map(item => (
+                        <SelectItem key={item.value} value={item.value}>
+                          {item.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </>
+            )}
+          </div>
         </section>
 
         {/* Content */}
@@ -566,8 +535,7 @@ export function MemoryWorkspace({
             <>
               <div className="mb-3 flex items-center justify-between gap-3">
                 <p className="text-xs text-muted-foreground">
-                  💬 Current conversation · {visibleConversationMemories.length}{" "}
-                  {visibleConversationMemories.length === 1 ? "memory" : "memories"}
+                  Current conversation
                 </p>
                 {allConversationMemories.length > 0 && (
                   <Button
@@ -768,10 +736,10 @@ export function MemoryWorkspace({
             <DialogTitle className="text-xl font-semibold tracking-[-0.02em]">
               Forget everything you remember about me?
             </DialogTitle>
-            <DialogDescription>
-              All {stats.user} long-term memories will be permanently deleted.
-              Your chats are not affected.
-            </DialogDescription>
+              <DialogDescription>
+                All long-term memories will be permanently deleted.
+                Your chats are not affected.
+              </DialogDescription>
           </DialogHeader>
           <div className="flex justify-end gap-2">
             <Button
@@ -865,11 +833,11 @@ export function MemoryWorkspace({
                 variant="outline"
                 size="sm"
                 className="w-full rounded-lg text-destructive hover:bg-destructive/10 hover:text-destructive"
-                disabled={!stats.user}
-                onClick={() => {
-                  setSettingsOpen(false);
-                  setClearAllEverythingConfirm(true);
-                }}
+                disabled={!allUserMemories.length}
+                  onClick={() => {
+                    setSettingsOpen(false);
+                    setClearAllEverythingConfirm(true);
+                  }}
               >
                 <Trash2 className="mr-2 size-3.5" />
                 Forget everything you remember about me
@@ -885,43 +853,6 @@ export function MemoryWorkspace({
 // ============================================
 // Small building blocks
 // ============================================
-
-function StatCard({
-  label,
-  value,
-  icon,
-  active,
-  onClick,
-}: {
-  label: string;
-  value: number;
-  icon: React.ReactNode;
-  active?: boolean;
-  onClick?: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "flex items-center gap-3 rounded-2xl border bg-card px-4 py-3 text-left transition-colors",
-        active ? "border-foreground/40" : "border-border hover:border-foreground/20"
-      )}
-    >
-      <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
-        {icon}
-      </span>
-      <span>
-        <span className="block text-lg font-semibold leading-6 tabular-nums">
-          {value}
-        </span>
-        <span className="block text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
-          {label}
-        </span>
-      </span>
-    </button>
-  );
-}
 
 function TabButton({
   label,
@@ -1070,18 +1001,20 @@ function UserMemoryList({
       />
     );
   return (
-    <div className="grid grid-cols-1 gap-2.5 lg:grid-cols-2">
+    <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
       {memories.map(memory => (
         <article
-          key={memory.id}
-          className={cn(
-            "group relative rounded-2xl border bg-card px-4 py-3.5 transition-colors",
-            memory.status === "active" ? "border-border" : "border-border bg-muted/30"
-          )}
+            key={memory.id}
+            className={cn(
+              "group relative flex flex-col rounded-2xl border bg-card p-3 transition-colors",
+              memory.status === "active"
+                ? "border-border hover:border-foreground/25"
+                : "border-border bg-muted/30 opacity-80"
+            )}
         >
-          <div className="flex items-start justify-between gap-2">
-            <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-              <span className="rounded-md bg-muted px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+          <div className="flex items-start justify-between gap-1.5">
+            <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
+              <span className="text-[9px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                 {CATEGORY_LABELS[memory.category]}
               </span>
               <ImportanceBadge importance={memory.importance} />
@@ -1134,41 +1067,56 @@ function UserMemoryList({
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
-          <p
-            className={cn(
-              "mt-2 whitespace-pre-wrap break-words text-[13px] leading-5",
-              memory.status === "active" ? "text-foreground" : "text-muted-foreground"
-            )}
-          >
-            {memory.content}
-          </p>
-          <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
-            <span>Created {formatDate(memory.createdAt)}</span>
-            {memory.lastUsedAt && <span>Last used {formatDate(memory.lastUsedAt)}</span>}
-            {memory.expiresAt && <span>Expires {formatDate(memory.expiresAt)}</span>}
-            <span>
-              Used {memory.usageCount} {memory.usageCount === 1 ? "time" : "times"}
-            </span>
-          </div>
-          <div className="mt-3 flex gap-1.5">
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 rounded-lg px-2.5 text-xs"
-              onClick={() => onEdit(memory)}
+            <p
+              className={cn(
+                "mt-2 max-h-20 overflow-y-auto whitespace-pre-wrap break-words text-[13px] leading-5",
+                memory.status === "active" ? "text-foreground" : "text-muted-foreground"
+              )}
             >
-              <Pencil className="mr-1.5 size-3" /> Edit
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 rounded-lg px-2.5 text-xs"
-              disabled={toggling}
-              onClick={() => onToggle(memory)}
-            >
-              {memory.status === "active" ? "Disable" : "Enable"}
-            </Button>
-          </div>
+              {memory.content}
+            </p>
+            <div className="mt-auto pt-1.5 flex items-center gap-x-3 gap-y-0.5 text-[10px] text-muted-foreground">
+              <span className="min-w-0 truncate">
+                Created {formatDate(memory.createdAt)}
+                {memory.lastUsedAt && ` · Used ${formatDate(memory.lastUsedAt)}`}
+                {memory.expiresAt && ` · Expires ${formatDate(memory.expiresAt)}`}
+              </span>
+              <span className="ml-auto flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-7 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
+                      onClick={() => onEdit(memory)}
+                      aria-label="Edit memory"
+                    >
+                      <Pencil className="size-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">Edit</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-7 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
+                      disabled={toggling}
+                      onClick={() => onToggle(memory)}
+                      aria-label={
+                        memory.status === "active" ? "Disable memory" : "Enable memory"
+                      }
+                    >
+                      <Power className="size-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    {memory.status === "active" ? "Disable" : "Enable"}
+                  </TooltipContent>
+                </Tooltip>
+              </span>
+            </div>
         </article>
       ))}
     </div>
@@ -1205,51 +1153,68 @@ function ConversationMemoryList({
         }
       />
     );
-  return (
-    <div className="space-y-2.5">
-      {memories.map(memory => (
-        <article
-          key={memory.id}
-          className="group rounded-2xl border border-border bg-card px-4 py-3.5 transition-colors"
-        >
-          <div className="flex items-start justify-between gap-2">
-            <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-              <span className="rounded-md bg-muted px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                {CATEGORY_LABELS[memory.category]}
-              </span>
-              <ImportanceBadge importance={memory.importance} />
+    return (
+      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
+        {memories.map(memory => (
+          <article
+            key={memory.id}
+            className="group relative flex flex-col rounded-2xl border border-border bg-card p-3 transition-colors hover:border-foreground/25"
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
+                <span
+                  aria-hidden
+                  className="size-1.5 shrink-0 rounded-full bg-sky-500/70"
+                />
+                <span className="text-[9px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                  {CATEGORY_LABELS[memory.category]}
+                </span>
+                <ImportanceBadge importance={memory.importance} />
+              </div>
             </div>
-          </div>
-          <p className="mt-2 whitespace-pre-wrap break-words text-[13px] leading-5">
-            {memory.content}
-          </p>
-          <div className="mt-2.5 flex items-center gap-x-3 text-[10px] text-muted-foreground">
-            <Clock3 className="size-3" />
-            <span>Added {formatRelative(memory.createdAt)}</span>
-          </div>
-          <div className="mt-3 flex gap-1.5">
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 rounded-lg px-2.5 text-xs"
-              onClick={() => onEdit(memory)}
-            >
-              <Pencil className="mr-1.5 size-3" /> Edit
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 rounded-lg px-2.5 text-xs"
-              onClick={() => onForget(memory)}
-            >
-              Forget
-            </Button>
-          </div>
-        </article>
-      ))}
-    </div>
-  );
-}
+            <p className="mt-2 max-h-20 overflow-y-auto whitespace-pre-wrap break-words text-[13px] leading-5">
+              {memory.content}
+            </p>
+            <div className="mt-auto flex items-center gap-x-3 pt-1.5 text-[10px] text-muted-foreground">
+              <span className="min-w-0 truncate">
+                Added {formatRelative(memory.createdAt)}
+              </span>
+              <span className="ml-auto flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-7 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
+                      onClick={() => onEdit(memory)}
+                      aria-label="Edit memory"
+                    >
+                      <Pencil className="size-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">Edit</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-7 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                      onClick={() => onForget(memory)}
+                      aria-label="Forget memory"
+                    >
+                      <Trash2 className="size-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">Forget</TooltipContent>
+                </Tooltip>
+              </span>
+            </div>
+          </article>
+        ))}
+      </div>
+    );
+  }
 
 function SuggestionList({
   suggestions,
@@ -1436,7 +1401,7 @@ function AddMemoryDialog({
             Write something you want KSEMO to remember.
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-4">
+        <div className="space-y-3">
           {conversationId && (
             <div className="flex rounded-xl border border-border bg-card p-1">
               <FilterButton
@@ -1451,23 +1416,21 @@ function AddMemoryDialog({
               />
             </div>
           )}
-          <div className="space-y-2">
-            <Label htmlFor="memory-content">Memory</Label>
-            <Textarea
-              id="memory-content"
-              value={content}
-              onChange={event => setContent(event.target.value)}
+          <Textarea
+            id="memory-content"
+            value={content}
+            onChange={event => setContent(event.target.value)}
               maxLength={2000}
-              className="min-h-24 resize-none rounded-xl"
+              className="max-h-40 min-h-[68px] resize-none overflow-y-auto rounded-xl"
               placeholder="For example: I prefer concise answers with practical examples."
-              autoFocus
-            />
-          </div>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label>Category</Label>
+            autoFocus
+            aria-label="Memory"
+          />
+          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Category</Label>
               <Select value={category} onValueChange={value => setCategory(value as UserMemoryCategory)}>
-                <SelectTrigger className="w-full rounded-xl">
+                <SelectTrigger className="h-9 w-full rounded-xl">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -1479,13 +1442,13 @@ function AddMemoryDialog({
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label>Importance</Label>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Importance</Label>
               <Select
                 value={importance}
                 onValueChange={value => setImportance(value as MemoryImportance)}
               >
-                <SelectTrigger className="w-full rounded-xl">
+                <SelectTrigger className="h-9 w-full rounded-xl">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -1495,24 +1458,24 @@ function AddMemoryDialog({
                 </SelectContent>
               </Select>
             </div>
+            {scope === "user" && (
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Expiration</Label>
+                <Select value={expiry} onValueChange={setExpiry}>
+                  <SelectTrigger className="h-9 w-full rounded-xl">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {EXPIRY_OPTIONS.map(option => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
-          {scope === "user" && (
-            <div className="space-y-2">
-              <Label>Expiration</Label>
-              <Select value={expiry} onValueChange={setExpiry}>
-                <SelectTrigger className="w-full rounded-xl">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {EXPIRY_OPTIONS.map(option => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={() => onOpenChange(false)}>
               Cancel
@@ -1602,11 +1565,11 @@ function EditUserMemoryDialog({
           <div className="space-y-2">
             <Label htmlFor="edit-memory-content">Memory</Label>
             <Textarea
-              id="edit-memory-content"
-              value={content}
-              onChange={event => setContent(event.target.value)}
-              maxLength={2000}
-              className="min-h-20 resize-none rounded-xl"
+                id="edit-memory-content"
+                value={content}
+                onChange={event => setContent(event.target.value)}
+                maxLength={2000}
+                className="max-h-40 min-h-20 resize-none overflow-y-auto rounded-xl"
             />
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -1705,20 +1668,13 @@ function EditUserMemoryDialog({
               <dt className="font-medium uppercase tracking-[0.06em]">Created</dt>
               <dd className="mt-0.5">{formatDate(memory?.createdAt)}</dd>
             </div>
-            <div>
-              <dt className="font-medium uppercase tracking-[0.06em]">Last used</dt>
-              <dd className="mt-0.5">
-                {memory?.lastUsedAt ? formatDate(memory.lastUsedAt) : "Never"}
-              </dd>
-            </div>
-            <div>
-              <dt className="font-medium uppercase tracking-[0.06em]">Usage</dt>
-              <dd className="mt-0.5">
-                {memory?.usageCount ?? 0}{" "}
-                {(memory?.usageCount ?? 0) === 1 ? "time" : "times"}
-              </dd>
-            </div>
-          </dl>
+              <div>
+                <dt className="font-medium uppercase tracking-[0.06em]">Last used</dt>
+                <dd className="mt-0.5">
+                  {memory?.lastUsedAt ? formatDate(memory.lastUsedAt) : "Never"}
+                </dd>
+              </div>
+            </dl>
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={onClose}>
               Cancel
@@ -1795,11 +1751,11 @@ function EditConversationMemoryDialog({
           <div className="space-y-2">
             <Label htmlFor="edit-conversation-memory-content">Memory</Label>
             <Textarea
-              id="edit-conversation-memory-content"
-              value={content}
-              onChange={event => setContent(event.target.value)}
-              maxLength={2000}
-              className="min-h-20 resize-none rounded-xl"
+                id="edit-conversation-memory-content"
+                value={content}
+                onChange={event => setContent(event.target.value)}
+                maxLength={2000}
+                className="max-h-40 min-h-20 resize-none overflow-y-auto rounded-xl"
             />
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -1918,9 +1874,9 @@ function ResolveSuggestionDialog({
               id="merge-memory"
               value={mergeDraft}
               onChange={event => onMergeDraftChange(event.target.value)}
-              maxLength={2000}
-              className="min-h-24 resize-none rounded-xl"
-              autoFocus
+                maxLength={2000}
+                className="max-h-40 min-h-24 resize-none overflow-y-auto rounded-xl"
+                autoFocus
             />
             <div className="flex justify-end gap-2">
               <Button variant="ghost" onClick={() => setMergeMode(false)}>

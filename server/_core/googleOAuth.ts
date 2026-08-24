@@ -182,14 +182,14 @@ export function registerGoogleOAuthRoutes(app: Express) {
       console.log("[Google OAuth] Created session token for:", openId, "name:", displayName);
       console.log("[Google OAuth] Cookie options:", getSessionCookieOptions(req));
 
-      const cookieOptions = getSessionCookieOptions(req);
-      res.cookie(COOKIE_NAME, sessionToken, {
-        ...cookieOptions,
-        maxAge: ONE_YEAR_MS,
-      });
+        const cookieOptions = getSessionCookieOptions(req);
+        res.cookie(COOKIE_NAME, sessionToken, {
+          ...cookieOptions,
+          maxAge: ONE_YEAR_MS,
+        });
 
-      console.log("[Google OAuth] Set cookie and redirecting to /");
-      res.redirect(302, "/");
+        console.log("[Google OAuth] Set cookie and redirecting to /");
+        res.redirect(302, "/");
     } catch (err) {
       console.error("[Google OAuth] Callback failed", err);
       const errorMessage = err instanceof Error ? err.message : String(err);

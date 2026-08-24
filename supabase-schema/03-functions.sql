@@ -5,7 +5,9 @@
 -- SEARCH FUNCTIONS
 -- ============================================
 
--- Full-text search for messages
+-- Prefix-aware, partially-typed-friendly message search.
+-- Each whitespace-separated term matches as a word prefix (term:*) or a
+-- substring (ILIKE), so results refine live as every character is typed.
 CREATE OR REPLACE FUNCTION search_messages(
     p_user_id INTEGER,
     p_query TEXT
@@ -18,9 +20,20 @@ RETURNS TABLE (
     role TEXT,
     created_at TIMESTAMPTZ
 ) AS $$
+DECLARE
+    terms TEXT[];
+    tsq TEXT;
 BEGIN
+    terms := array_remove(
+        split(regexp_replace(lower(trim(p_query)), '[^[:alnum:]_]+', ' ', 'g'), ' '),
+        ''
+    );
+    SELECT string_agg(quote_literal(t) || ':*', ' & ')
+      INTO tsq
+      FROM unnest(terms) AS t;
+
     RETURN QUERY
-    SELECT 
+    SELECT
         c.id AS conversation_id,
         c.title AS conversation_title,
         m.id AS message_id,
@@ -32,13 +45,22 @@ BEGIN
     WHERE c.user_id = p_user_id
         AND c.is_archived = FALSE
         AND c.deleted_at IS NULL
-        AND to_tsvector('english', m.content) @@ plainto_tsquery('english', p_query)
-    ORDER BY m.created_at DESC
+        AND (
+            (tsq IS NOT NULL AND to_tsvector('english', m.content) @@ to_tsquery('english', tsq))
+            OR EXISTS (
+                SELECT 1 FROM unnest(terms) AS t
+                WHERE position(t IN lower(m.content)) > 0
+            )
+        )
+    ORDER BY
+        CASE WHEN position(lower(trim(p_query)) IN lower(m.content)) > 0 THEN 0 ELSE 1 END,
+        m.created_at DESC
     LIMIT 30;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Search conversation titles
+-- Prefix-aware, ranked conversation-title search:
+-- exact match > starts-with > word-boundary prefix > substring, then recency.
 CREATE OR REPLACE FUNCTION search_conversation_titles(
     p_user_id INTEGER,
     p_query TEXT
@@ -48,9 +70,20 @@ RETURNS TABLE (
     title TEXT,
     updated_at TIMESTAMPTZ
 ) AS $$
+DECLARE
+    terms TEXT[];
+    tsq TEXT;
 BEGIN
+    terms := array_remove(
+        split(regexp_replace(lower(trim(p_query)), '[^[:alnum:]_]+', ' ', 'g'), ' '),
+        ''
+    );
+    SELECT string_agg(quote_literal(t) || ':*', ' & ')
+      INTO tsq
+      FROM unnest(terms) AS t;
+
     RETURN QUERY
-    SELECT 
+    SELECT
         c.id,
         c.title,
         c.updated_at
@@ -58,8 +91,21 @@ BEGIN
     WHERE c.user_id = p_user_id
         AND c.is_archived = FALSE
         AND c.deleted_at IS NULL
-        AND to_tsvector('english', c.title) @@ plainto_tsquery('english', p_query)
-    ORDER BY c.updated_at DESC
+        AND (
+            (tsq IS NOT NULL AND to_tsvector('english', c.title) @@ to_tsquery('english', tsq))
+            OR EXISTS (
+                SELECT 1 FROM unnest(terms) AS t
+                WHERE position(t IN lower(c.title)) > 0
+            )
+        )
+    ORDER BY
+        CASE
+            WHEN lower(c.title) = lower(trim(p_query)) THEN 0
+            WHEN position(lower(trim(p_query)) IN lower(c.title)) = 1 THEN 1
+            WHEN c.title ILIKE '%' || trim(p_query) || '%' THEN 2
+            ELSE 3
+        END,
+        c.updated_at DESC
     LIMIT 12;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

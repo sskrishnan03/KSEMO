@@ -209,13 +209,13 @@ export function SettingsDialog({
   onOpenSupport: (topic: "privacy" | "terms" | "faq") => void;
   onAllChatsDeleted: () => void;
 }) {
-  const [draft, setDraft] = useState<NonNullable<Preferences>>({
-    persona: "balanced",
-    customInstructions: "",
-    speechRate: 100,
-    autoPlayResponses: false,
-    reduceMotion: false,
-  });
+      const [draft, setDraft] = useState<NonNullable<Preferences>>({
+        persona: "balanced",
+        customInstructions: "",
+        speechRate: 100,
+        autoPlayResponses: false,
+        reduceMotion: false,
+      });
   const [activeSection, setActiveSection] = useState<Section>("account");
   const [search, setSearch] = useState("");
   useEffect(() => {
@@ -225,8 +225,8 @@ export function SettingsDialog({
         customInstructions: preferences?.customInstructions ?? "",
         speechRate: preferences?.speechRate ?? 100,
         autoPlayResponses: preferences?.autoPlayResponses ?? false,
-        reduceMotion: preferences?.reduceMotion ?? false,
-      });
+          reduceMotion: preferences?.reduceMotion ?? false,
+        });
       setActiveSection("account");
       setSearch("");
     }
@@ -525,14 +525,14 @@ function PreferencesPanel({
               Read KSEMO responses aloud after they finish.
             </p>
           </div>
-          <Switch
-            id="autoplay"
-            checked={draft.autoPlayResponses}
-            onCheckedChange={autoPlayResponses =>
-              setDraft(current => ({ ...current, autoPlayResponses }))
-            }
-          />
-        </div>
+            <Switch
+              id="autoplay"
+              checked={draft.autoPlayResponses}
+              onCheckedChange={autoPlayResponses =>
+                setDraft(current => ({ ...current, autoPlayResponses }))
+              }
+            />
+          </div>
         <SettingsAccessibilityPanel
           reduceMotion={Boolean(draft.reduceMotion)}
           onReduceMotionChange={reduceMotion =>

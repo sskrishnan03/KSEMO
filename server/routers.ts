@@ -18,14 +18,13 @@ export const appRouter = router({
   system: systemRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
-    logout: publicProcedure.mutation(({ ctx }) => {
-      const cookieOptions = getSessionCookieOptions(ctx.req);
-      console.log("[Auth] Logout - clearing cookie with options:", cookieOptions);
-      ctx.res.clearCookie(COOKIE_NAME, cookieOptions);
-      return {
-        success: true,
-      } as const;
-    }),
+      logout: publicProcedure.mutation(({ ctx }) => {
+        const cookieOptions = getSessionCookieOptions(ctx.req);
+        ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
+        return {
+          success: true,
+        } as const;
+      }),
     ...authCredentialsRouterProcedures,
   }),
   conversation: conversationRouter,

@@ -33,13 +33,13 @@ import { typeAfterVoiceSession } from "../conversationTypes";
 
 const conversationId = z.string().min(8).max(36);
 const preferenceInput = z.object({
-  selectedModel: z.string().max(160).nullable().optional(),
-  persona: z.enum(["balanced", "concise", "creative", "analytical"]).optional(),
-  customInstructions: z.string().max(2_000).nullable().optional(),
-  speechRate: z.number().int().min(60).max(180).optional(),
-  autoPlayResponses: z.boolean().optional(),
-  reduceMotion: z.boolean().optional(),
-});
+    selectedModel: z.string().max(160).nullable().optional(),
+    persona: z.enum(["balanced", "concise", "creative", "analytical"]).optional(),
+    customInstructions: z.string().max(2_000).nullable().optional(),
+    speechRate: z.number().int().min(60).max(180).optional(),
+    autoPlayResponses: z.boolean().optional(),
+    reduceMotion: z.boolean().optional(),
+  });
 
 function requireConversation(id: string, userId: number) {
   return getConversationForUser(id, userId).then(conversation => {
@@ -228,7 +228,7 @@ export const conversationRouter = router({
       };
     }),
   search: protectedProcedure
-    .input(z.object({ query: z.string().trim().min(2).max(120) }))
+    .input(z.object({ query: z.string().trim().min(1).max(120) }))
     .query(async ({ ctx, input }) => {
       const [messageMatches, titleMatches] = await Promise.all([
         searchConversationMessages(ctx.user.id, input.query),

@@ -20,6 +20,7 @@ import {
   Check,
   FileText,
   FileUp,
+  Globe,
   Image,
   Library,
   Mic,
@@ -61,6 +62,8 @@ export function ChatComposer({
   menuPlacement = "above",
   compactBottomSpacing = false,
   showSafetyNote = true,
+  webSearchEnabled = false,
+  onToggleWebSearch,
 }: {
   onSend: (content: string) => void;
   onCancel: () => void;
@@ -95,6 +98,8 @@ export function ChatComposer({
   menuPlacement?: "above" | "below";
   compactBottomSpacing?: boolean;
   showSafetyNote?: boolean;
+  webSearchEnabled?: boolean;
+  onToggleWebSearch?: () => void;
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -345,6 +350,17 @@ export function ChatComposer({
                     <Library className="mr-2 size-4" />
                     Browse Library
                   </DropdownMenuItem>
+                  {onToggleWebSearch && (
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      onToggleWebSearch();
+                      setToolsOpen(false);
+                    }}
+                  >
+                    <Globe className="mr-2 size-4" />
+                    Web search
+                  </DropdownMenuItem>
+                  )}
                 </DropdownMenuContent>
               </DropdownMenu>
               {!isGenerating && (
@@ -384,6 +400,32 @@ export function ChatComposer({
                     Start a live voice chat
                   </TooltipContent>
                 </Tooltip>
+              )}
+              {webSearchEnabled && (
+                <div className="flex h-9 items-center gap-1.5 rounded-xl border border-border bg-muted pl-2.5 pr-1.5">
+                  <Globe className="size-3.5 text-muted-foreground" />
+                  <span className="text-xs font-medium text-foreground">
+                    Web search
+                  </span>
+                  {onToggleWebSearch && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={onToggleWebSearch}
+                          className="size-6 rounded-lg text-muted-foreground hover:bg-background hover:text-foreground"
+                          aria-label="Cancel web search"
+                        >
+                          <X className="size-3" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom">
+                        Cancel web search
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
+                </div>
               )}
             </div>
           )}

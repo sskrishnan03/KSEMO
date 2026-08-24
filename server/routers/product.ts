@@ -2,6 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createClient } from "@supabase/supabase-js";
 import { storagePut } from "../storage";
+import { extractFileText, extensionOf } from "../fileExtract";
 import { protectedProcedure, router } from "../_core/trpc";
 
 // The anon key cannot be used here: RLS policies require a Supabase Auth
@@ -64,6 +65,26 @@ function safeFilename(name: string) {
   );
 }
 
+const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
+
+// Favorites rely on the optional is_favorite column added by
+// supabase-schema/06-library-lite.sql; chat-with-file relies on content_text
+// from the same migration. Both degrade gracefully when it hasn't run yet.
+let liteSchemaChecked = false;
+let liteSchemaReady = false;
+
+async function ensureLiteSchema(): Promise<boolean> {
+  if (!liteSchemaChecked) {
+    const { error } = await supabase
+      .from("files")
+      .select("is_favorite,content_text")
+      .limit(1);
+    liteSchemaReady = !error;
+    liteSchemaChecked = true;
+  }
+  return liteSchemaReady;
+}
+
 const allowedMimeTypes = new Set([
   "application/pdf",
   "text/plain",
@@ -73,7 +94,36 @@ const allowedMimeTypes = new Set([
   "image/png",
   "image/jpeg",
   "image/webp",
+  "image/gif",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+]);
+
+// Browsers often send octet-stream or generic Office MIME types, so the
+// extension is trusted as a fallback. Anything on this list can be stored;
+// text-bearing formats additionally get content extraction for chat.
+const allowedExtensions = new Set([
+  "pdf",
+  "txt",
+  "md",
+  "markdown",
+  "csv",
+  "tsv",
+  "json",
+  "log",
+  "xml",
+  "yml",
+  "yaml",
+  "png",
+  "jpg",
+  "jpeg",
+  "webp",
+  "gif",
+  "docx",
+  "xlsx",
+  "xls",
+  "pptx",
 ]);
 
 export const workspaceRouter = router({
@@ -242,15 +292,55 @@ export const workspaceRouter = router({
   }),
   files: router({
     list: protectedProcedure.query(async ({ ctx }) => {
+      // Exclude content_text from listings — it can be large and is only
+      // needed server-side when chatting with files.
+      const ready = await ensureLiteSchema();
+      const columns = ready
+        ? "id,user_id,project_id,storage_key,url,filename,mime_type,size_bytes,status,created_at,updated_at,is_favorite"
+        : "id,user_id,project_id,storage_key,url,filename,mime_type,size_bytes,status,created_at,updated_at";
       const { data, error } = await supabase
         .from("files")
-        .select("*")
+        .select(columns)
         .eq("user_id", ctx.user.id)
         .order("created_at", { ascending: false });
 
       if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to fetch files" });
-      return data || [];
+      // Map to plain objects with a stable shape — the raw Supabase builder
+      // types don't play well with conditional select columns + tRPC.
+      const rows = (data || []) as unknown as Array<Record<string, unknown>>;
+      return rows.map(row => ({
+        id: String(row.id),
+        userId: Number(row.user_id),
+        projectId: (row.project_id as string | null) ?? null,
+        storageKey: String(row.storage_key),
+        url: String(row.url),
+        filename: String(row.filename),
+        mimeType: String(row.mime_type),
+        sizeBytes: Number(row.size_bytes),
+        status: String(row.status) === "failed" ? ("failed" as const) : ("ready" as const),
+        createdAt: row.created_at ? new Date(String(row.created_at)) : new Date(),
+        updatedAt: row.updated_at ? new Date(String(row.updated_at)) : new Date(),
+        isFavorite: ready ? Boolean(row.is_favorite) : false,
+      }));
     }),
+    setFavorite: protectedProcedure
+      .input(z.object({ id: entityId, isFavorite: z.boolean() }))
+      .mutation(async ({ ctx, input }) => {
+        if (!(await ensureLiteSchema()))
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message:
+              "Favorites aren't set up yet. Run supabase-schema/06-library-lite.sql in your Supabase SQL editor, then reload.",
+          });
+        const { error } = await supabase
+          .from("files")
+          .update({ is_favorite: input.isFavorite })
+          .eq("id", input.id)
+          .eq("user_id", ctx.user.id);
+
+        if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to update file" });
+        return { success: true } as const;
+      }),
     upload: protectedProcedure
       .input(
         z.object({
@@ -261,16 +351,18 @@ export const workspaceRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        if (!allowedMimeTypes.has(input.mimeType))
+        const extension = extensionOf(input.filename);
+        if (!allowedMimeTypes.has(input.mimeType) && !allowedExtensions.has(extension))
           throw new TRPCError({
             code: "BAD_REQUEST",
-            message: "This file type is not supported in the KSEMO library.",
+            message:
+              "This file type is not supported in the KSEMO library. Supported: PDF, Word, Excel, PowerPoint, text, data files, and images.",
           });
         const buffer = Buffer.from(input.dataBase64, "base64");
-        if (!buffer.length || buffer.length > 8 * 1024 * 1024)
+        if (!buffer.length || buffer.length > MAX_UPLOAD_BYTES)
           throw new TRPCError({
             code: "PAYLOAD_TOO_LARGE",
-            message: "Files must be smaller than 8 MB.",
+            message: "Files must be smaller than 25 MB.",
           });
         await optionalOwnedProject(input.projectId, ctx.user.id);
         const id = crypto.randomUUID();
@@ -279,6 +371,16 @@ export const workspaceRouter = router({
           buffer,
           input.mimeType
         );
+        // Best-effort text extraction so the file can be chatted with later.
+        // A failure never blocks the upload itself.
+        let contentText: string | null = null;
+        if (await ensureLiteSchema()) {
+          contentText = await extractFileText(
+            input.filename,
+            input.mimeType,
+            buffer
+          );
+        }
         const { data, error } = await supabase.from("files").insert({
           id,
           user_id: ctx.user.id,
@@ -289,6 +391,7 @@ export const workspaceRouter = router({
           mime_type: input.mimeType,
           size_bytes: buffer.length,
           status: "ready",
+          ...(contentText ? { content_text: contentText } : {}),
         }).select().single();
 
         if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to upload file" });
