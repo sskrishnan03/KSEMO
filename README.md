@@ -38,6 +38,14 @@ Edit `.env` and fill in the required values:
 - `OWNER_OPEN_ID`: OpenID for the admin user
 - `BUILT_IN_FORGE_API_URL`: AI API endpoint
 - `BUILT_IN_FORGE_API_KEY`: AI API key
+- `SUPABASE_URL`: Supabase project URL
+- `SUPABASE_ANON_KEY`: Supabase anonymous key
+- `SUPABASE_SERVICE_ROLE_KEY`: Supabase service role key (required for backend operations)
+- `SMTP_USER`: SMTP username for email sending (optional, required for password reset)
+- `SMTP_PASS`: SMTP password for email sending (optional, required for password reset)
+- `SMTP_FROM`: From email address for password reset emails (optional)
+- `SMTP_HOST`: SMTP server host (optional, defaults to Gmail if not set)
+- `SMTP_PORT`: SMTP server port (optional, defaults to 465)
 
 4. Initialize the database:
 ```bash
@@ -100,6 +108,14 @@ Ensure these environment variables are set in your production environment:
 - `OWNER_OPEN_ID`
 - `BUILT_IN_FORGE_API_URL`
 - `BUILT_IN_FORGE_API_KEY`
+- `SUPABASE_URL`
+- `SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `SMTP_USER` (optional, for password reset emails)
+- `SMTP_PASS` (optional, for password reset emails)
+- `SMTP_FROM` (optional, for password reset emails)
+- `SMTP_HOST` (optional, for password reset emails)
+- `SMTP_PORT` (optional, for password reset emails)
 
 ## Project Structure
 

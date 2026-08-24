@@ -75,6 +75,10 @@ export async function sendPasswordResetEmail({ to, name, resetUrl }: PasswordRes
   const { from } = smtpCredentials();
   const firstName = (name ?? "").trim().split(/\s+/)[0] || "there";
 
+  console.log("[Mailer] Sending password reset email to:", to);
+  console.log("[Mailer] From:", from);
+  console.log("[Mailer] Reset URL:", resetUrl);
+
   const html = `<!doctype html>
 <html>
   <body style="margin:0;padding:0;background-color:#f4f3f1;font-family:'DM Sans',Helvetica,Arial,sans-serif;">
@@ -113,23 +117,30 @@ export async function sendPasswordResetEmail({ to, name, resetUrl }: PasswordRes
   </body>
 </html>`;
 
-  await mailer.sendMail({
-    from: `"KSEMO" <${from}>`,
-    to,
-    subject: "Reset your KSEMO password",
-    text: [
-      `Hi ${firstName},`,
-      "",
-      "We received a request to reset your KSEMO password.",
-      "Open this one-time link within the next hour to choose a new password:",
-      resetUrl,
-      "",
-      "If you didn't request this, you can ignore this email.",
-      "",
-      "— KSEMO",
-    ].join("\n"),
-    html,
-  });
+  try {
+    const info = await mailer.sendMail({
+      from: `"KSEMO" <${from}>`,
+      to,
+      subject: "Reset your KSEMO password",
+      text: [
+        `Hi ${firstName},`,
+        "",
+        "We received a request to reset your KSEMO password.",
+        "Open this one-time link within the next hour to choose a new password:",
+        resetUrl,
+        "",
+        "If you didn't request this, you can ignore this email.",
+        "",
+        "— KSEMO",
+      ].join("\n"),
+      html,
+    });
+    console.log("[Mailer] Email sent successfully:", info.messageId);
+    console.log("[Mailer] Response:", info.response);
+  } catch (error) {
+    console.error("[Mailer] Failed to send email:", error);
+    throw error;
+  }
 }
 
 export type FeedbackEmailInput = {

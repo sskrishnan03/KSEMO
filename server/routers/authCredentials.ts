@@ -134,13 +134,19 @@ export const signUpProcedure = publicProcedure
 export const requestPasswordResetProcedure = publicProcedure
   .input(z.object({ email: emailInput }))
   .mutation(async ({ ctx, input }) => {
+    console.log("[Auth] Password reset requested for email:", input.email);
     const user = await findUserByEmail(input.email);
+    console.log("[Auth] User found:", !!user);
 
     // Always answer success so the form cannot reveal which emails exist.
-    if (!user) return { success: true as const, resetUrl: null };
+    if (!user) {
+      console.log("[Auth] No user found with this email");
+      return { success: true as const, resetUrl: null };
+    }
 
     // Google-only accounts have no local password to reset.
     if (!user.passwordHash) {
+      console.log("[Auth] User has no password hash (Google-only account)");
       return {
         success: true as const,
         resetUrl: null,
@@ -150,6 +156,7 @@ export const requestPasswordResetProcedure = publicProcedure
 
     const token = randomBytes(32).toString("base64url");
     const tokenHash = createHash("sha256").update(token).digest("hex");
+    console.log("[Auth] Reset token generated");
 
     // Update user with reset token in Supabase
     const { error: updateError } = await supabase
@@ -163,6 +170,8 @@ export const requestPasswordResetProcedure = publicProcedure
 
     if (updateError) {
       console.error("[Auth] Failed to set reset token:", updateError);
+    } else {
+      console.log("[Auth] Reset token stored in database successfully");
     }
 
     // Absolute link back into this deployment, derived from the incoming
@@ -179,13 +188,19 @@ export const requestPasswordResetProcedure = publicProcedure
     );
     const resetUrl = `${proto}://${host}/reset-password?token=${encodeURIComponent(token)}`;
 
+    console.log("[Auth] Password reset requested for:", input.email);
+    console.log("[Auth] Mailer configured:", isMailerConfigured());
+    console.log("[Auth] Reset URL generated:", resetUrl);
+
     if (isMailerConfigured()) {
       try {
+        console.log("[Auth] Attempting to send password reset email...");
         await sendPasswordResetEmail({
           to: input.email,
           name: user.name,
           resetUrl,
         });
+        console.log("[Auth] Password reset email sent successfully to:", input.email);
         return {
           success: true as const,
           delivered: "email" as const,
@@ -193,6 +208,7 @@ export const requestPasswordResetProcedure = publicProcedure
         };
       } catch (error) {
         console.error("[Auth] Failed to send password-reset email:", error);
+        console.error("[Auth] Error details:", JSON.stringify(error, null, 2));
         // Don't strand a locked-out user: hand back the one-time link instead.
         return {
           success: true as const,
@@ -204,6 +220,7 @@ export const requestPasswordResetProcedure = publicProcedure
 
     // No mailer configured on this deployment — return the link so the flow
     // still completes end to end.
+    console.log("[Auth] Mailer not configured, returning fallback URL");
     return { success: true as const, delivered: "fallback" as const, resetUrl };
   });
 
