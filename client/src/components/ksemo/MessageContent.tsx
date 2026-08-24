@@ -13,7 +13,9 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import {
+  Brain,
   Check,
+  ChevronDown,
   Copy,
   Ellipsis,
   FileText,
@@ -61,6 +63,7 @@ export function MessageContent({
   onShare,
   onDelete,
   onViewHistory,
+  usedMemories,
 }: {
   message: KsemoMessage;
   onSpeak: (text: string, messageId: string) => void;
@@ -77,6 +80,7 @@ export function MessageContent({
   onShare?: (message: KsemoMessage) => void;
   onDelete?: (message: KsemoMessage) => void;
   onViewHistory?: (message: KsemoMessage) => void;
+  usedMemories?: Array<{ id: string; content: string }>;
 }) {
   const [copied, setCopied] = useState(false);
   const isUser = message.role === "user";
@@ -231,6 +235,9 @@ export function MessageContent({
               )}
           </div>
         )}
+        {!isUser && usedMemories?.length ? (
+          <UsedMemoriesChip memories={usedMemories} />
+        ) : null}
         {!isUser && (message.content || message.status === "failed") && (
           <div className="mt-1.5 flex items-center gap-1">
             {message.content &&
@@ -353,3 +360,45 @@ function MessageOverflow({
 }
 
 export type { KsemoMessage };
+
+function UsedMemoriesChip({
+  memories,
+}: {
+  memories: Array<{ id: string; content: string }>;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="mb-1">
+      <button
+        onClick={() => setOpen(current => !current)}
+        className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/60 px-2 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        aria-expanded={open}
+        aria-label={
+          open ? "Hide memories used" : `Show ${memories.length} memories used`
+        }
+      >
+        <Brain className="size-3" />
+        Used {memories.length}{" "}
+        {memories.length === 1 ? "memory" : "memories"}
+        <ChevronDown
+          className={cn(
+            "size-3 transition-transform duration-150",
+            open && "rotate-180"
+          )}
+        />
+      </button>
+      {open ? (
+        <ul className="mt-1.5 max-w-md space-y-1 rounded-xl border border-border bg-card p-2.5 text-left shadow-sm">
+          {memories.map(item => (
+            <li
+              key={item.id}
+              className="text-xs leading-5 text-muted-foreground"
+            >
+              {item.content}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
+}

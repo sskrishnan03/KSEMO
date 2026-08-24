@@ -35,7 +35,10 @@ import { useVoiceInput } from "../hooks/useVoiceInput";
 import { VoiceChat } from "../components/voice/VoiceChat";
 import { WorkspacePanel } from "../components/ksemo/WorkspacePanel";
 import { LibraryWorkspace } from "../components/ksemo/LibraryWorkspace";
-import { MemoryWorkspace } from "../components/ksemo/MemoryWorkspace";
+import {
+  MemoryWorkspace,
+  type StatusFilter,
+} from "../components/ksemo/MemoryWorkspace";
 import {
   createConversationPdfFile,
   createConversationWordFile,
@@ -189,6 +192,16 @@ export default function Home() {
     id: string;
     title: string;
   } | null>(null);
+  const [usedMemoriesByMessage, setUsedMemoriesByMessage] = useState<
+    Record<string, Array<{ id: string; content: string }>>
+  >({});
+  const [memoryWorkspaceFilter, setMemoryWorkspaceFilter] =
+    useState<StatusFilter | null>(null);
+  const [clearConversationMemoryTarget, setClearConversationMemoryTarget] =
+    useState<{
+      id: string;
+      title: string;
+    } | null>(null);
   const streamAbortRef = useRef<AbortController | null>(null);
   const generationSequenceRef = useRef(0);
   // State does not update until React renders. This ref closes the small
@@ -314,6 +327,37 @@ export default function Home() {
       toast.success("Message permanently deleted");
     },
     onError: () => toast.error("KSEMO could not delete that message."),
+  });
+  const memoryPauseMutation =
+    trpc.memory.conversationControl.setPaused.useMutation({
+      onSuccess: (_data, variables) => {
+        utils.conversation.list.invalidate();
+        if (activeConversationId === variables.conversationId)
+          utils.conversation.get.invalidate({ id: activeConversationId });
+      },
+      onError: () => toast.error("KSEMO could not update memory for that chat."),
+    });
+  const conversationMemoryClearMutation =
+    trpc.memory.conversationMemories.clearAll.useMutation({
+      onSuccess: () => {
+        toast.success("Conversation memory cleared");
+        if (activeConversationId)
+          utils.conversation.get.invalidate({ id: activeConversationId });
+      },
+      onError: () => toast.error("KSEMO could not clear that memory."),
+    });
+  const suggestionDismissMutation = trpc.memory.suggestions.dismiss.useMutation(
+    {
+      onSuccess: () => utils.memory.suggestions.list.invalidate(),
+    }
+  );
+  const suggestionAcceptMutation = trpc.memory.suggestions.accept.useMutation({
+    onSuccess: () => {
+      utils.memory.suggestions.list.invalidate();
+      utils.memory.userMemories.list.invalidate();
+      toast.success("Memory saved");
+    },
+    onError: () => toast.error("KSEMO could not save that memory."),
   });
   const composerFileUpload = trpc.workspace.files.upload.useMutation();
   const composerFileAttach =
@@ -624,6 +668,53 @@ export default function Home() {
             lastProgressAt = Date.now();
             errorMessage =
               data.message || "KSEMO could not complete this response.";
+          } else if (eventName === "memory.used") {
+            lastProgressAt = Date.now();
+            const used = data as unknown as {
+              messageId: string;
+              memories: Array<{ id: string; content: string }>;
+            };
+            if (used.messageId && used.memories?.length) {
+              const { messageId, memories } = used;
+              setUsedMemoriesByMessage(current => ({
+                ...current,
+                [messageId]: memories,
+              }));
+            }
+          } else if (eventName === "memory.suggestion") {
+            lastProgressAt = Date.now();
+            const suggestion = data as unknown as {
+              id: string;
+              content: string;
+              kind?: "new" | "duplicate" | "conflict";
+            };
+            const needsReview =
+              suggestion.kind === "duplicate" ||
+              suggestion.kind === "conflict";
+            toast(suggestion.content, {
+              description: needsReview
+                ? "This may relate to an existing memory. Review it in your Memory Center?"
+                : "Remember this for future conversations?",
+              duration: 20_000,
+              action: needsReview
+                ? {
+                    label: "Review",
+                    onClick: () => {
+                      setPrimaryWorkspace("memories");
+                      setMemoryWorkspaceFilter("suggestions");
+                    },
+                  }
+                : {
+                    label: "Remember",
+                    onClick: () =>
+                      suggestionAcceptMutation.mutate({ id: suggestion.id }),
+                  },
+              cancel: {
+                label: "Don't remember",
+                onClick: () =>
+                  suggestionDismissMutation.mutate({ id: suggestion.id }),
+              },
+            });
           }
         }
       };
@@ -732,6 +823,7 @@ export default function Home() {
     if (generationSequenceRef.current !== turnSequence) return;
     if (synced || persistTurnLocally()) clearPendingDrafts();
     else keepPendingDraftsVisible();
+    void utils.memory.userMemories.list.invalidate();
     if (preferencesQuery.data?.autoPlayResponses && responseText)
       speak(responseText, completedConversation.assistantMessageId);
   }
@@ -1184,9 +1276,22 @@ export default function Home() {
         }
         onSearch={() => setSearchOpen(true)}
         onWorkspace={section => {
+          setMemoryWorkspaceFilter(null);
           setPrimaryWorkspace(section === "files" ? "library" : "memories");
           setSidebarOpen(false);
         }}
+        onToggleMemory={conversation =>
+          memoryPauseMutation.mutate({
+            conversationId: conversation.id,
+            paused: !conversation.memoryDisabled,
+          })
+        }
+        onClearConversationMemory={conversation =>
+          setClearConversationMemoryTarget({
+            id: conversation.id,
+            title: conversation.title,
+          })
+        }
         previewSupportOpen={isProfileSupportPreview}
         onSettings={() => setSettingsOpen(true)}
         onSupport={topic => setLocation(`/support/${topic}`)}
@@ -1196,7 +1301,17 @@ export default function Home() {
 
       <main className="relative flex min-w-0 flex-1 flex-col">
         {activePrimaryWorkspace === "memories" ? (
-          <MemoryWorkspace onBackToChat={() => setPrimaryWorkspace(null)} />
+          <MemoryWorkspace
+            onBackToChat={() => {
+              setPrimaryWorkspace(null);
+              setMemoryWorkspaceFilter(null);
+            }}
+            activeConversationId={activeConversationId}
+            conversationMemoryPaused={Boolean(
+              activeQuery.data?.conversation.memoryDisabled
+            )}
+            initialStatusFilter={memoryWorkspaceFilter ?? undefined}
+          />
         ) : activePrimaryWorkspace === "library" ? (
           <LibraryWorkspace
             onBackToChat={() => setPrimaryWorkspace(null)}
@@ -1261,6 +1376,7 @@ export default function Home() {
                       onFeedback={(messageId, value) =>
                         messageFeedbackMutation.mutate({ messageId, value })
                       }
+                      usedMemories={usedMemoriesByMessage[message.id]}
                     />
                   ))}
                   <div ref={messagesEndRef} />
@@ -1523,6 +1639,22 @@ export default function Home() {
             if (activeConversationId === deleteTarget.id) newChat();
           } else messageRemoveMutation.mutate({ id: deleteTarget.id });
           setDeleteTarget(null);
+        }}
+      />
+      <KsemoConfirmDialog
+        open={Boolean(clearConversationMemoryTarget)}
+        onOpenChange={open => {
+          if (!open) setClearConversationMemoryTarget(null);
+        }}
+        title="Clear all memory from this conversation?"
+        description={`The chat messages will remain, but KSEMO will no longer use the stored conversation memory from “${clearConversationMemoryTarget?.title ?? "this chat"}”.`}
+        actionLabel="Clear Memory"
+        onAction={() => {
+          if (!clearConversationMemoryTarget) return;
+          conversationMemoryClearMutation.mutate({
+            conversationId: clearConversationMemoryTarget.id,
+          });
+          setClearConversationMemoryTarget(null);
         }}
       />
     </div>

@@ -274,21 +274,21 @@ export function LibraryWorkspace({
           </div>
         </div>
       )}
-      <div className="mx-auto w-full max-w-6xl px-5 py-7 sm:px-8 sm:py-9">
-        <header className="flex flex-col gap-5 border-b border-border pb-6 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mx-auto w-full max-w-5xl px-5 py-6 sm:px-8 sm:py-8">
+        <header className="flex flex-col gap-4 border-b border-border pb-5 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <div className="flex items-center gap-3">
               <Library className="size-6 text-muted-foreground" />
-              <h1 className="text-[28px] font-semibold tracking-[-0.03em]">
+              <h1 className="text-2xl font-semibold tracking-[-0.03em]">
                 Library
               </h1>
             </div>
-            <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
+            <p className="mt-1.5 max-w-xl text-sm leading-6 text-muted-foreground">
               Your private space for files and images. Upload multiple files at once or drag and drop them here. Select one or more items
               to chat with them together.
             </p>
           </div>
-          <div className="flex shrink-0 gap-2">
+          <div className="flex shrink-0 flex-wrap gap-2">
             <Button
               variant="outline"
               className="rounded-xl"
@@ -424,42 +424,44 @@ export function LibraryWorkspace({
           </section>
         )}
 
-        {filesQuery.isLoading ? (
-          <div className="grid min-h-64 place-items-center text-sm text-muted-foreground">
-            Loading your private Library…
-          </div>
-        ) : files.length ? (
-          view === "grid" ? (
-            <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-              {files.map(file => (
-                <LibraryGridCard
-                  key={file.id}
-                  file={file}
-                  selected={selectedIds.has(file.id)}
-                  onToggle={() => toggleFile(file.id)}
-                  onRemove={() => setDeleteTarget([file])}
-                />
-              ))}
+        <div className="mt-5 pb-10">
+          {filesQuery.isLoading ? (
+            <div className="grid min-h-64 place-items-center text-sm text-muted-foreground">
+              Loading your private Library…
             </div>
+          ) : files.length ? (
+            view === "grid" ? (
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                {files.map(file => (
+                  <LibraryGridCard
+                    key={file.id}
+                    file={file}
+                    selected={selectedIds.has(file.id)}
+                    onToggle={() => toggleFile(file.id)}
+                    onRemove={() => setDeleteTarget([file])}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card">
+                {files.map(file => (
+                  <LibraryListRow
+                    key={file.id}
+                    file={file}
+                    selected={selectedIds.has(file.id)}
+                    onToggle={() => toggleFile(file.id)}
+                    onRemove={() => setDeleteTarget([file])}
+                  />
+                ))}
+              </div>
+            )
           ) : (
-            <div className="mt-6 divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card">
-              {files.map(file => (
-                <LibraryListRow
-                  key={file.id}
-                  file={file}
-                  selected={selectedIds.has(file.id)}
-                  onToggle={() => toggleFile(file.id)}
-                  onRemove={() => setDeleteTarget([file])}
-                />
-              ))}
-            </div>
-          )
-        ) : (
-          <EmptyLibrary
-            hasQuery={Boolean(query) || filter !== "all"}
-            onUpload={() => fileInputRef.current?.click()}
-          />
-        )}
+            <EmptyLibrary
+              hasQuery={Boolean(query) || filter !== "all"}
+              onUpload={() => fileInputRef.current?.click()}
+            />
+          )}
+        </div>
       </div>
 
       <Dialog
@@ -569,7 +571,7 @@ function EmptyLibrary({
   onUpload: () => void;
 }) {
   return (
-    <div className="mt-6 grid min-h-72 place-items-center rounded-2xl border border-dashed border-border bg-muted/20 p-7 text-center">
+    <div className="grid min-h-72 place-items-center rounded-2xl border border-dashed border-border bg-muted/20 p-7 text-center">
       <div>
         <FolderOpen className="mx-auto size-7 text-muted-foreground" />
         <h2 className="mt-4 text-base font-medium">

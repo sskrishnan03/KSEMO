@@ -16,10 +16,22 @@ import {
   Memory,
   Task,
   TaskActivity,
+  UserMemory,
+  ConversationMemory,
+  MemorySuggestion,
+  MemorySettings,
+  MemoryImportance,
+  MemoryStatus,
+  UserMemoryCategory,
+  DEFAULT_MEMORY_SETTINGS,
   dbToUser,
   dbToConversation,
   dbToMessage,
   dbToUserPreference,
+  dbToUserMemory,
+  dbToConversationMemory,
+  dbToMemorySuggestion,
+  dbToMemorySettings,
   userToDb,
   conversationToDb,
   messageToDb,
@@ -27,6 +39,10 @@ import {
   type DbConversation,
   type DbMessage,
   type DbUserPreference,
+  type DbUserMemory,
+  type DbConversationMemory,
+  type DbMemorySuggestion,
+  type DbMemorySettings,
 } from "../supabase-schema/04-types";
 
 // Re-export types for external use
@@ -291,6 +307,7 @@ export async function updateConversationForUser(
       | "shareToken"
       | "conversationType"
       | "projectId"
+      | "memoryDisabled"
     >
   >
 ): Promise<Conversation | undefined> {
@@ -302,6 +319,7 @@ export async function updateConversationForUser(
   if (values.shareToken !== undefined) updateData.share_token = values.shareToken;
   if (values.conversationType !== undefined) updateData.conversation_type = values.conversationType;
   if (values.projectId !== undefined) updateData.project_id = values.projectId;
+  if (values.memoryDisabled !== undefined) updateData.memory_disabled = values.memoryDisabled;
 
   const { data, error } = await supabase
     .from("conversations")
@@ -925,6 +943,363 @@ export async function searchMemoriesForUser(userId: number, query: string) {
   }
 
   return { memories: (data || []).slice(0, 8) };
+}
+
+// ============================================
+// USER MEMORY FUNCTIONS (memory system)
+// ============================================
+
+export async function listUserMemoriesForUser(userId: number): Promise<UserMemory[]> {
+  const { data, error } = await supabase
+    .from("user_memories")
+    .select("*")
+    .eq("user_id", userId)
+    .order("updated_at", { ascending: false });
+
+  if (error) handleSupabaseError(error, "listUserMemoriesForUser");
+  return (data as DbUserMemory[] | null)?.map(dbToUserMemory) ?? [];
+}
+
+export async function getUserMemoryForUser(
+  id: string,
+  userId: number
+): Promise<UserMemory | undefined> {
+  const { data, error } = await supabase
+    .from("user_memories")
+    .select("*")
+    .eq("id", id)
+    .eq("user_id", userId)
+    .single();
+
+  if (error) {
+    if (error.code === "PGRST116") return undefined;
+    handleSupabaseError(error, "getUserMemoryForUser");
+  }
+  return dbToUserMemory(data as DbUserMemory);
+}
+
+export async function createUserMemoryForUser(input: {
+  id?: string;
+  userId: number;
+  content: string;
+  category?: UserMemoryCategory;
+  status?: MemoryStatus;
+  importance?: MemoryImportance;
+  confidence?: number;
+  source?: "explicit" | "inferred" | "suggested";
+  explanation?: string | null;
+  expiresAt?: Date | null;
+}): Promise<UserMemory> {
+  const { data, error } = await supabase
+    .from("user_memories")
+    .insert({
+      id: input.id ?? crypto.randomUUID(),
+      user_id: input.userId,
+      content: input.content,
+      category: input.category ?? "other",
+      status: input.status ?? "active",
+      importance: input.importance ?? "medium",
+      confidence: input.confidence ?? 0.75,
+      source: input.source ?? "inferred",
+      explanation: input.explanation ?? null,
+      expires_at: input.expiresAt ? input.expiresAt.toISOString() : null,
+    })
+    .select()
+    .single();
+
+  if (error) handleSupabaseError(error, "createUserMemoryForUser");
+  return dbToUserMemory(data as DbUserMemory);
+}
+
+export async function updateUserMemoryForUser(
+  id: string,
+  userId: number,
+  values: Partial<
+    Pick<
+      UserMemory,
+      "content" | "category" | "status" | "importance" | "expiresAt"
+    >
+  >
+): Promise<UserMemory | undefined> {
+  const updateData: Record<string, unknown> = {};
+  if (values.content !== undefined) updateData.content = values.content;
+  if (values.category !== undefined) updateData.category = values.category;
+  if (values.status !== undefined) updateData.status = values.status;
+  if (values.importance !== undefined) updateData.importance = values.importance;
+  if (values.expiresAt !== undefined)
+    updateData.expires_at = values.expiresAt ? values.expiresAt.toISOString() : null;
+
+  const { data, error } = await supabase
+    .from("user_memories")
+    .update(updateData)
+    .eq("id", id)
+    .eq("user_id", userId)
+    .select()
+    .single();
+
+  if (error) {
+    if (error.code === "PGRST116") return undefined;
+    handleSupabaseError(error, "updateUserMemoryForUser");
+  }
+  return dbToUserMemory(data as DbUserMemory);
+}
+
+export async function deleteUserMemoryForUser(id: string, userId: number): Promise<boolean> {
+  const { data, error } = await supabase
+    .from("user_memories")
+    .delete()
+    .eq("id", id)
+    .eq("user_id", userId)
+    .select("id");
+
+  if (error) handleSupabaseError(error, "deleteUserMemoryForUser");
+  return Boolean(data?.length);
+}
+
+export async function deleteAllUserMemoriesForUser(userId: number): Promise<number> {
+  const { data, error } = await supabase
+    .from("user_memories")
+    .delete()
+    .eq("user_id", userId)
+    .select("id");
+
+  if (error) handleSupabaseError(error, "deleteAllUserMemoriesForUser");
+  return data?.length ?? 0;
+}
+
+// Records that a set of memories was actually used to answer a turn.
+export async function touchUserMemoriesForUser(ids: string[], userId: number): Promise<void> {
+  if (!ids.length) return;
+  const now = new Date().toISOString();
+  const { error } = await supabase.rpc("bump_user_memory_usage", {
+    p_ids: ids,
+    p_user_id: userId,
+    p_now: now,
+  });
+  if (error) {
+    // Usage stats are non-critical; never fail a response over them.
+    console.warn("[Supabase] bump_user_memory_usage failed:", error.message);
+  }
+}
+
+// ============================================
+// CONVERSATION MEMORY FUNCTIONS (memory system)
+// ============================================
+
+export async function listConversationMemoriesForConversation(
+  conversationId: string,
+  userId: number
+): Promise<ConversationMemory[]> {
+  const { data, error } = await supabase
+    .from("conversation_memories")
+    .select("*")
+    .eq("conversation_id", conversationId)
+    .eq("user_id", userId)
+    .order("created_at", { ascending: true });
+
+  if (error) handleSupabaseError(error, "listConversationMemoriesForConversation");
+  return (
+    (data as DbConversationMemory[] | null)?.map(dbToConversationMemory) ?? []
+  );
+}
+
+export async function createConversationMemoryForUser(input: {
+  id?: string;
+  conversationId: string;
+  userId: number;
+  content: string;
+  category?: UserMemoryCategory;
+  importance?: MemoryImportance;
+}): Promise<ConversationMemory> {
+  const { data, error } = await supabase
+    .from("conversation_memories")
+    .insert({
+      id: input.id ?? crypto.randomUUID(),
+      conversation_id: input.conversationId,
+      user_id: input.userId,
+      content: input.content,
+      category: input.category ?? "other",
+      importance: input.importance ?? "medium",
+    })
+    .select()
+    .single();
+
+  if (error) handleSupabaseError(error, "createConversationMemoryForUser");
+  return dbToConversationMemory(data as DbConversationMemory);
+}
+
+export async function updateConversationMemoryForUser(
+  id: string,
+  userId: number,
+  values: Partial<Pick<ConversationMemory, "content" | "category" | "importance">>
+): Promise<ConversationMemory | undefined> {
+  const updateData: Record<string, unknown> = {};
+  if (values.content !== undefined) updateData.content = values.content;
+  if (values.category !== undefined) updateData.category = values.category;
+  if (values.importance !== undefined) updateData.importance = values.importance;
+
+  const { data, error } = await supabase
+    .from("conversation_memories")
+    .update(updateData)
+    .eq("id", id)
+    .eq("user_id", userId)
+    .select()
+    .single();
+
+  if (error) {
+    if (error.code === "PGRST116") return undefined;
+    handleSupabaseError(error, "updateConversationMemoryForUser");
+  }
+  return dbToConversationMemory(data as DbConversationMemory);
+}
+
+export async function deleteConversationMemoryForUser(
+  id: string,
+  userId: number
+): Promise<boolean> {
+  const { data, error } = await supabase
+    .from("conversation_memories")
+    .delete()
+    .eq("id", id)
+    .eq("user_id", userId)
+    .select("id");
+
+  if (error) handleSupabaseError(error, "deleteConversationMemoryForUser");
+  return Boolean(data?.length);
+}
+
+export async function clearConversationMemoriesForConversation(
+  conversationId: string,
+  userId: number
+): Promise<number> {
+  const { data, error } = await supabase
+    .from("conversation_memories")
+    .delete()
+    .eq("conversation_id", conversationId)
+    .eq("user_id", userId)
+    .select("id");
+
+  if (error) handleSupabaseError(error, "clearConversationMemoriesForConversation");
+  return data?.length ?? 0;
+}
+
+// ============================================
+// MEMORY SUGGESTION FUNCTIONS (memory system)
+// ============================================
+
+export async function listPendingMemorySuggestionsForUser(
+  userId: number
+): Promise<MemorySuggestion[]> {
+  const { data, error } = await supabase
+    .from("memory_suggestions")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("status", "pending")
+    .order("created_at", { ascending: false });
+
+  if (error) handleSupabaseError(error, "listPendingMemorySuggestionsForUser");
+  return (data as DbMemorySuggestion[] | null)?.map(dbToMemorySuggestion) ?? [];
+}
+
+export async function createMemorySuggestionForUser(input: {
+  id?: string;
+  userId: number;
+  conversationId?: string | null;
+  content: string;
+  category?: UserMemoryCategory;
+  importance?: MemoryImportance;
+  confidence?: number;
+  reason?: string | null;
+  meta?: Record<string, unknown> | null;
+}): Promise<MemorySuggestion> {
+  const { data, error } = await supabase
+    .from("memory_suggestions")
+    .insert({
+      id: input.id ?? crypto.randomUUID(),
+      user_id: input.userId,
+      conversation_id: input.conversationId ?? null,
+      content: input.content,
+      category: input.category ?? "other",
+      importance: input.importance ?? "medium",
+      confidence: input.confidence ?? 0.75,
+      reason: input.reason ?? null,
+      meta: input.meta ?? {},
+    })
+    .select()
+    .single();
+
+  if (error) handleSupabaseError(error, "createMemorySuggestionForUser");
+  return dbToMemorySuggestion(data as DbMemorySuggestion);
+}
+
+export async function resolveMemorySuggestionForUser(
+  id: string,
+  userId: number,
+  status: "accepted" | "dismissed"
+): Promise<MemorySuggestion | undefined> {
+  const { data, error } = await supabase
+    .from("memory_suggestions")
+    .update({ status })
+    .eq("id", id)
+    .eq("user_id", userId)
+    .select()
+    .single();
+
+  if (error) {
+    if (error.code === "PGRST116") return undefined;
+    handleSupabaseError(error, "resolveMemorySuggestionForUser");
+  }
+  return dbToMemorySuggestion(data as DbMemorySuggestion);
+}
+
+// ============================================
+// MEMORY SETTINGS FUNCTIONS (memory system)
+// ============================================
+
+export async function getMemorySettingsForUser(userId: number): Promise<MemorySettings> {
+  const { data, error } = await supabase
+    .from("memory_settings")
+    .select("*")
+    .eq("user_id", userId)
+    .single();
+
+  if (error) {
+    if (error.code === "PGRST116") {
+      return {
+        userId,
+        ...DEFAULT_MEMORY_SETTINGS,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+    }
+    handleSupabaseError(error, "getMemorySettingsForUser");
+  }
+  return dbToMemorySettings(data as DbMemorySettings);
+}
+
+export async function upsertMemorySettingsForUser(
+  userId: number,
+  values: Partial<
+    Pick<
+      MemorySettings,
+      "memoryEnabled" | "autoSuggest" | "autoSaveInferred" | "showMemoryUsage"
+    >
+  >
+): Promise<MemorySettings> {
+  const dbValues: Record<string, unknown> = { user_id: userId };
+  if (values.memoryEnabled !== undefined) dbValues.memory_enabled = values.memoryEnabled;
+  if (values.autoSuggest !== undefined) dbValues.auto_suggest = values.autoSuggest;
+  if (values.autoSaveInferred !== undefined)
+    dbValues.auto_save_inferred = values.autoSaveInferred;
+  if (values.showMemoryUsage !== undefined)
+    dbValues.show_memory_usage = values.showMemoryUsage;
+
+  const { error } = await supabase
+    .from("memory_settings")
+    .upsert(dbValues);
+
+  if (error) handleSupabaseError(error, "upsertMemorySettingsForUser");
+  return getMemorySettingsForUser(userId);
 }
 
 // ============================================

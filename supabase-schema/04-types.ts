@@ -68,6 +68,7 @@ export type Conversation = {
   isArchived: boolean;
   isPublic: boolean;
   shareToken: string | null;
+  memoryDisabled: boolean;
   deletedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -275,6 +276,7 @@ export type DbConversation = {
   is_archived: boolean;
   is_public: boolean;
   share_token: string | null;
+  memory_disabled: boolean;
   deleted_at: string | null;
   created_at: string;
   updated_at: string;
@@ -334,6 +336,7 @@ export function dbToConversation(db: DbConversation): Conversation {
     isArchived: db.is_archived,
     isPublic: db.is_public,
     shareToken: db.share_token,
+    memoryDisabled: db.memory_disabled ?? false,
     deletedAt: db.deleted_at ? new Date(db.deleted_at) : null,
     createdAt: new Date(db.created_at),
     updatedAt: new Date(db.updated_at),
@@ -392,6 +395,7 @@ export function conversationToDb(conv: Partial<Conversation>): Partial<DbConvers
   if (conv.isArchived !== undefined) db.is_archived = conv.isArchived;
   if (conv.isPublic !== undefined) db.is_public = conv.isPublic;
   if (conv.shareToken !== undefined) db.share_token = conv.shareToken;
+  if (conv.memoryDisabled !== undefined) db.memory_disabled = conv.memoryDisabled;
   if (conv.deletedAt !== undefined) db.deleted_at = conv.deletedAt ? conv.deletedAt.toISOString() : null;
   return db;
 }
@@ -405,3 +409,211 @@ export function messageToDb(msg: Partial<Message>): Partial<DbMessage> {
   if (msg.status !== undefined) db.status = msg.status;
   return db;
 }
+
+// ============================================
+// MEMORY SYSTEM TYPES
+// ============================================
+
+export const USER_MEMORY_CATEGORIES = [
+  "preference",
+  "personal_info",
+  "communication_style",
+  "interest",
+  "skill_experience",
+  "instruction",
+  "goal",
+  "other",
+] as const;
+
+export type UserMemoryCategory = (typeof USER_MEMORY_CATEGORIES)[number];
+
+export type MemoryStatus = "active" | "disabled";
+export type MemoryImportance = "low" | "medium" | "high";
+export type MemorySource = "explicit" | "inferred" | "suggested";
+
+export type UserMemory = {
+  id: string;
+  userId: number;
+  content: string;
+  category: UserMemoryCategory;
+  status: MemoryStatus;
+  importance: MemoryImportance;
+  confidence: number;
+  source: MemorySource;
+  explanation: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  lastUsedAt: Date | null;
+  expiresAt: Date | null;
+  usageCount: number;
+};
+
+export type DbUserMemory = {
+  id: string;
+  user_id: number;
+  content: string;
+  category: UserMemoryCategory;
+  status: MemoryStatus;
+  importance: MemoryImportance;
+  confidence: number;
+  source: MemorySource;
+  explanation: string | null;
+  created_at: string;
+  updated_at: string;
+  last_used_at: string | null;
+  expires_at: string | null;
+  usage_count: number;
+};
+
+export function dbToUserMemory(db: DbUserMemory): UserMemory {
+  return {
+    id: db.id,
+    userId: db.user_id,
+    content: db.content,
+    category: db.category,
+    status: db.status,
+    importance: db.importance,
+    confidence: db.confidence,
+    source: db.source,
+    explanation: db.explanation,
+    createdAt: new Date(db.created_at),
+    updatedAt: new Date(db.updated_at),
+    lastUsedAt: db.last_used_at ? new Date(db.last_used_at) : null,
+    expiresAt: db.expires_at ? new Date(db.expires_at) : null,
+    usageCount: db.usage_count ?? 0,
+  };
+}
+
+export type ConversationMemory = {
+  id: string;
+  conversationId: string;
+  userId: number;
+  content: string;
+  category: UserMemoryCategory;
+  importance: MemoryImportance;
+  createdAt: Date;
+  updatedAt: Date;
+  lastUsedAt: Date | null;
+};
+
+export type DbConversationMemory = {
+  id: string;
+  conversation_id: string;
+  user_id: number;
+  content: string;
+  category: UserMemoryCategory;
+  importance: MemoryImportance;
+  created_at: string;
+  updated_at: string;
+  last_used_at: string | null;
+};
+
+export function dbToConversationMemory(
+  db: DbConversationMemory
+): ConversationMemory {
+  return {
+    id: db.id,
+    conversationId: db.conversation_id,
+    userId: db.user_id,
+    content: db.content,
+    category: db.category,
+    importance: db.importance,
+    createdAt: new Date(db.created_at),
+    updatedAt: new Date(db.updated_at),
+    lastUsedAt: db.last_used_at ? new Date(db.last_used_at) : null,
+  };
+}
+
+export type MemorySuggestionMeta = {
+  kind?: "new" | "duplicate" | "conflict";
+  similarTo?: Array<{ id: string; content: string }>;
+};
+
+export type MemorySuggestion = {
+  id: string;
+  userId: number;
+  conversationId: string | null;
+  content: string;
+  category: UserMemoryCategory;
+  importance: MemoryImportance;
+  confidence: number;
+  reason: string | null;
+  status: "pending" | "accepted" | "dismissed";
+  meta: MemorySuggestionMeta | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type DbMemorySuggestion = {
+  id: string;
+  user_id: number;
+  conversation_id: string | null;
+  content: string;
+  category: UserMemoryCategory;
+  importance: MemoryImportance;
+  confidence: number;
+  reason: string | null;
+  status: "pending" | "accepted" | "dismissed";
+  meta: MemorySuggestionMeta | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export function dbToMemorySuggestion(db: DbMemorySuggestion): MemorySuggestion {
+  return {
+    id: db.id,
+    userId: db.user_id,
+    conversationId: db.conversation_id,
+    content: db.content,
+    category: db.category,
+    importance: db.importance,
+    confidence: db.confidence,
+    reason: db.reason,
+    status: db.status,
+    meta: db.meta ?? null,
+    createdAt: new Date(db.created_at),
+    updatedAt: new Date(db.updated_at),
+  };
+}
+
+export type MemorySettings = {
+  userId: number;
+  memoryEnabled: boolean;
+  autoSuggest: boolean;
+  autoSaveInferred: boolean;
+  showMemoryUsage: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type DbMemorySettings = {
+  user_id: number;
+  memory_enabled: boolean;
+  auto_suggest: boolean;
+  auto_save_inferred: boolean;
+  show_memory_usage: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export function dbToMemorySettings(db: DbMemorySettings): MemorySettings {
+  return {
+    userId: db.user_id,
+    memoryEnabled: db.memory_enabled,
+    autoSuggest: db.auto_suggest,
+    autoSaveInferred: db.auto_save_inferred,
+    showMemoryUsage: db.show_memory_usage,
+    createdAt: new Date(db.created_at),
+    updatedAt: new Date(db.updated_at),
+  };
+}
+
+export const DEFAULT_MEMORY_SETTINGS: Omit<
+  MemorySettings,
+  "userId" | "createdAt" | "updatedAt"
+> = {
+  memoryEnabled: true,
+  autoSuggest: true,
+  autoSaveInferred: false,
+  showMemoryUsage: true,
+};

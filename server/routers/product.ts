@@ -360,10 +360,12 @@ export const workspaceRouter = router({
     .input(z.object({ query: z.string().trim().min(2).max(120) }))
     .query(async ({ ctx, input }) => {
       const { data, error } = await supabase
-        .from("memories")
-        .select("*")
+        .from("user_memories")
+        .select("id, content, category")
         .eq("user_id", ctx.user.id)
+        .eq("status", "active")
         .ilike("content", `%${input.query}%`)
+        .order("updated_at", { ascending: false })
         .limit(8);
 
       if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to search" });

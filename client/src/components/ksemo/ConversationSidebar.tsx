@@ -25,6 +25,7 @@ import {
   Copy,
   Download,
   Ellipsis,
+  Eraser,
   ExternalLink,
   FileText,
   HelpCircle,
@@ -50,6 +51,7 @@ type Conversation = {
   isArchived: boolean;
   isPublic?: boolean;
   shareToken?: string | null;
+  memoryDisabled?: boolean;
 };
 
 export function ConversationSidebar({
@@ -70,6 +72,8 @@ export function ConversationSidebar({
   onDelete,
   onSearch,
   onWorkspace,
+  onToggleMemory,
+  onClearConversationMemory,
   onSettings,
   onSupport,
   onLogout,
@@ -93,6 +97,8 @@ export function ConversationSidebar({
   onDelete: (conversation: Conversation) => void;
   onSearch: () => void;
   onWorkspace: (section: "files" | "memories") => void;
+  onToggleMemory?: (conversation: Conversation) => void;
+  onClearConversationMemory?: (conversation: Conversation) => void;
   onSettings: () => void;
   onSupport: (topic: "faq" | "privacy" | "terms") => void;
   onLogout: () => void;
@@ -110,7 +116,7 @@ export function ConversationSidebar({
         "group-hover:translate-x-0.5 group-hover:scale-105 group-active:translate-x-0",
       Library:
         "group-hover:-translate-y-0.5 group-hover:rotate-3 group-active:translate-y-0",
-      Memories:
+      Memory:
         "group-hover:scale-110 group-hover:-rotate-3 group-active:rotate-0",
     })[label] ?? "group-hover:scale-105";
   const utility = (
@@ -241,7 +247,7 @@ export function ConversationSidebar({
           {utility("Library", <Library className="size-4" />, () =>
             onWorkspace("files")
           )}
-          {utility("Memories", <Brain className="size-4" />, () =>
+          {utility("Memory", <Brain className="size-4" />, () =>
             onWorkspace("memories")
           )}
         </div>
@@ -264,6 +270,8 @@ export function ConversationSidebar({
                   onShare={onShare}
                   onExport={onExport}
                   onDelete={onDelete}
+                  onToggleMemory={onToggleMemory}
+                  onClearConversationMemory={onClearConversationMemory}
                 />
               )}
               <ConversationGroup
@@ -278,6 +286,8 @@ export function ConversationSidebar({
                 onShare={onShare}
                 onExport={onExport}
                 onDelete={onDelete}
+                onToggleMemory={onToggleMemory}
+                onClearConversationMemory={onClearConversationMemory}
                 emptyText="Your conversations will appear here."
               />
             </>
@@ -379,6 +389,8 @@ function ConversationGroup({
   onShare,
   onExport,
   onDelete,
+  onToggleMemory,
+  onClearConversationMemory,
   emptyText,
 }: {
   label: string;
@@ -392,6 +404,8 @@ function ConversationGroup({
   onShare: (conversation: Conversation) => void;
   onExport: (conversation: Conversation, format: "pdf" | "word") => void;
   onDelete: (conversation: Conversation) => void;
+  onToggleMemory?: (conversation: Conversation) => void;
+  onClearConversationMemory?: (conversation: Conversation) => void;
   emptyText?: string;
 }) {
   const [expanded, setExpanded] = useState(true);
@@ -483,6 +497,22 @@ function ConversationGroup({
                       </DropdownMenuItem>
                     </DropdownMenuSubContent>
                   </DropdownMenuSub>
+                  {onToggleMemory && (
+                    <DropdownMenuItem onClick={() => onToggleMemory(conversation)}>
+                      <Brain className="mr-2 size-3.5" />
+                      {conversation.memoryDisabled
+                        ? "Use memory for this chat"
+                        : "Don't use memory for this chat"}
+                    </DropdownMenuItem>
+                  )}
+                  {onClearConversationMemory && (
+                    <DropdownMenuItem
+                      onClick={() => onClearConversationMemory(conversation)}
+                    >
+                      <Eraser className="mr-2 size-3.5" />
+                      Delete conversation memory
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     onClick={() => onDelete(conversation)}
