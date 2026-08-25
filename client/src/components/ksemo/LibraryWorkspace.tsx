@@ -758,7 +758,7 @@ function LibraryGridCard({
                 "size-7 rounded-lg",
                 isFavorite
                   ? "text-amber-500"
-                  : "text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+                  : "text-muted-foreground max-lg:opacity-100 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
               )}
               aria-label={
                 isFavorite
@@ -775,7 +775,7 @@ function LibraryGridCard({
                 event.stopPropagation();
                 onDelete();
               }}
-              className="size-7 rounded-lg text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 hover:text-destructive"
+              className="size-7 rounded-lg text-muted-foreground max-lg:opacity-100 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 hover:text-destructive"
               aria-label={`Delete ${file.filename}`}
             >
               <Trash2 className="size-3.5" />

@@ -323,7 +323,7 @@ export function ConversationSidebar({
               sideOffset={10}
               align={compact ? "end" : "start"}
               collisionPadding={12}
-              className="w-60 rounded-2xl border-border/80 p-1.5 shadow-xl"
+              className="max-h-[calc(100dvh-1.5rem)] w-60 overflow-y-auto rounded-2xl border-border/80 p-1.5 shadow-xl"
             >
               <div className="rounded-xl bg-muted/60 px-2.5 py-2.5">
                 <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
@@ -344,7 +344,7 @@ export function ConversationSidebar({
                 <DropdownMenuSubContent
                   sideOffset={8}
                   collisionPadding={12}
-                  className="w-60 rounded-2xl p-1.5"
+                  className="max-h-[calc(100dvh-1.5rem)] w-60 overflow-y-auto rounded-2xl p-1.5"
                 >
                   <p className="px-2.5 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                     Accounts ({accounts.length}/2)
@@ -541,7 +541,7 @@ function ConversationGroup({
                     <Ellipsis className="size-3.5" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-44 rounded-xl">
+                <DropdownMenuContent align="end" sideOffset={4} collisionPadding={8} className="w-44 rounded-xl">
                   <DropdownMenuItem onClick={() => onRename(conversation)}>
                     <Pencil className="mr-2 size-3.5" />
                     Rename
@@ -567,7 +567,7 @@ function ConversationGroup({
                       <Download className="mr-2 size-3.5" />
                       Export
                     </DropdownMenuSubTrigger>
-                    <DropdownMenuSubContent className="ml-2 w-44 rounded-xl">
+                    <DropdownMenuSubContent sideOffset={8} collisionPadding={8} className="ml-2 w-44 rounded-xl">
                       <DropdownMenuItem
                         onClick={() => onExport(conversation, "pdf")}
                       >
