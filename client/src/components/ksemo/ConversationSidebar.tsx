@@ -567,7 +567,7 @@ function ConversationGroup({
                       <Download className="mr-2 size-3.5" />
                       Export
                     </DropdownMenuSubTrigger>
-                    <DropdownMenuSubContent sideOffset={8} collisionPadding={8} className="ml-2 w-44 rounded-xl">
+                    <DropdownMenuSubContent side="bottom" sideOffset={8} collisionPadding={8} className="ml-2 w-44 rounded-xl">
                       <DropdownMenuItem
                         onClick={() => onExport(conversation, "pdf")}
                       >
