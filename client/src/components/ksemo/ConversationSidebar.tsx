@@ -11,7 +11,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import {
-  ArrowLeftRight,
   Archive,
   Check,
   ChevronDown,
@@ -325,21 +324,19 @@ export function ConversationSidebar({
               collisionPadding={12}
               className="max-h-[calc(100dvh-1.5rem)] w-60 overflow-y-auto rounded-2xl border-border/80 p-1.5 shadow-xl"
             >
-              <div className="rounded-xl bg-muted/60 px-2.5 py-2.5">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                  Logged in as
-                </p>
-                <p className="mt-1 truncate text-sm font-semibold">
-                  {user.name || "KSEMO user"}
-                </p>
-                <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                  {user.email || "Account"}
-                </p>
-              </div>
-              <DropdownMenuSeparator />
               <DropdownMenuSub>
-                <DropdownMenuSubTrigger className="focus-visible:ring-0 focus-visible:outline-none">
-                  <ArrowLeftRight className="mr-2 size-4" /> Switch account
+                <DropdownMenuSubTrigger className="h-auto items-center justify-between px-2.5 py-2.5 focus-visible:ring-0 focus-visible:outline-none">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                      Logged in as
+                    </p>
+                    <p className="mt-0.5 truncate text-sm font-semibold">
+                      {user.name || "KSEMO user"}
+                    </p>
+                    <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                      {user.email || "Account"}
+                    </p>
+                  </div>
                 </DropdownMenuSubTrigger>
                 <DropdownMenuSubContent
                   sideOffset={8}
@@ -567,7 +564,7 @@ function ConversationGroup({
                       <Download className="mr-2 size-3.5" />
                       Export
                     </DropdownMenuSubTrigger>
-                    <DropdownMenuSubContent side="bottom" sideOffset={8} collisionPadding={8} className="ml-2 w-44 rounded-xl">
+                    <DropdownMenuSubContent sideOffset={8} collisionPadding={12} className="w-44 rounded-xl">
                       <DropdownMenuItem
                         onClick={() => onExport(conversation, "pdf")}
                       >

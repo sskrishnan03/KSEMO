@@ -25,12 +25,15 @@ import {
   Archive,
   Bug,
   ExternalLink,
+  KeyRound,
   Lightbulb,
   LogOut,
   MessageSquare,
   Monitor,
   Moon,
   Palette,
+  ShieldCheck,
+  ShieldOff,
   Settings2,
   Star,
   Sun,
@@ -50,9 +53,16 @@ type Preferences =
     }
   | null
   | undefined;
-type User = { name?: string | null; email?: string | null };
+type User = {
+  name?: string | null;
+  email?: string | null;
+  role?: string | null;
+  loginMethod?: string | null;
+  createdAt?: Date | string | null;
+  lastSignedIn?: Date | string | null;
+};
 
-type SettingsTab = "account" | "appearance" | "data" | "feedback";
+type SettingsTab = "account" | "security" | "appearance" | "data" | "feedback";
 
 export const settingsSections: Array<{
   id: string;
@@ -74,6 +84,7 @@ const settingsNavItems: Array<{
   icon: typeof MessageSquare;
 }> = [
   { id: "account", label: "Account", icon: User },
+  { id: "security", label: "Security", icon: ShieldCheck },
   { id: "appearance", label: "Appearance", icon: Palette },
   { id: "data", label: "Data Control", icon: Trash2 },
   { id: "feedback", label: "Feedback", icon: MessageSquare },
@@ -104,7 +115,7 @@ export function SettingsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex h-[min(65dvh,520px)] w-[min(60vw,720px)] max-md:h-[min(85dvh,520px)] max-md:w-[calc(100%-1rem)] flex-col gap-0 overflow-hidden rounded-2xl p-0">
+      <DialogContent className="flex h-[70dvh] w-[60vw] !max-w-none max-md:h-[min(85dvh,520px)] max-md:w-[calc(100%-1rem)] flex-col gap-0 overflow-hidden rounded-2xl p-0">
         <DialogHeader className="sr-only">
           <DialogTitle>Settings</DialogTitle>
           <DialogDescription>
@@ -113,7 +124,7 @@ export function SettingsDialog({
         </DialogHeader>
 
         <div className="flex min-h-0 flex-1 flex-col md:flex-row">
-          <aside className="hidden md:flex w-52 shrink-0 flex-col border-r border-border bg-[oklch(0.975_0.002_80)] px-3 py-3 dark:bg-[oklch(0.17_0.003_80)]">
+          <aside className="hidden md:flex w-56 shrink-0 flex-col border-r border-border bg-[oklch(0.975_0.002_80)] px-3 py-3 dark:bg-[oklch(0.17_0.003_80)]">
             <div className="mb-3 flex items-center gap-2 px-2 pb-2">
               <Settings2 className="size-4 text-muted-foreground" />
               <span className="text-sm font-semibold tracking-[-0.02em]">
@@ -178,6 +189,7 @@ export function SettingsDialog({
           <div className="flex min-h-0 flex-1 flex-col">
             <div className="min-h-0 flex-1 overflow-y-auto p-4 md:p-5">
               {activeTab === "account" && <AccountSection user={user} />}
+              {activeTab === "security" && <SecuritySection user={user} />}
               {activeTab === "appearance" && <AppearanceSection />}
               {activeTab === "data" && (
                 <DataSection
@@ -217,6 +229,22 @@ export function SettingsDialog({
 }
 
 function AccountSection({ user }: { user: User }) {
+  const formatDate = (d?: Date | string | null) => {
+    if (!d) return "—";
+    const date = typeof d === "string" ? new Date(d) : d;
+    return date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  };
+  const loginLabel =
+    user.loginMethod === "google"
+      ? "Google"
+      : user.loginMethod === "email"
+        ? "Email & password"
+        : user.loginMethod || "—";
+
   return (
     <div className="space-y-4">
       <div>
@@ -236,6 +264,130 @@ function AccountSection({ user }: { user: User }) {
           <p className="mt-0.5 truncate text-xs text-muted-foreground">
             {user.email || "Signed in"}
           </p>
+        </div>
+      </div>
+      <div className="space-y-2">
+        <div className="flex items-center justify-between rounded-xl border border-border px-4 py-3">
+          <p className="text-sm text-muted-foreground">Email</p>
+          <p className="truncate text-sm font-medium">{user.email || "—"}</p>
+        </div>
+        <div className="flex items-center justify-between rounded-xl border border-border px-4 py-3">
+          <p className="text-sm text-muted-foreground">Role</p>
+          <p className="truncate text-sm font-medium capitalize">
+            {user.role || "user"}
+          </p>
+        </div>
+        <div className="flex items-center justify-between rounded-xl border border-border px-4 py-3">
+          <p className="text-sm text-muted-foreground">Sign-in method</p>
+          <p className="truncate text-sm font-medium">{loginLabel}</p>
+        </div>
+        <div className="flex items-center justify-between rounded-xl border border-border px-4 py-3">
+          <p className="text-sm text-muted-foreground">Member since</p>
+          <p className="truncate text-sm font-medium">
+            {formatDate(user.createdAt)}
+          </p>
+        </div>
+        <div className="flex items-center justify-between rounded-xl border border-border px-4 py-3">
+          <p className="text-sm text-muted-foreground">Last signed in</p>
+          <p className="truncate text-sm font-medium">
+            {formatDate(user.lastSignedIn)}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SecuritySection({ user }: { user: User }) {
+  const hasPassword = !!user.loginMethod;
+  const isGoogle = user.loginMethod === "google";
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h3 className="text-base font-semibold tracking-[-0.02em]">Security</h3>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Manage your password and account security.
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        <div className="rounded-xl border border-border p-4">
+          <div className="flex items-center gap-3">
+            <span className="flex size-9 items-center justify-center rounded-lg bg-muted">
+              <KeyRound className="size-4 text-muted-foreground" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium">Password</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {isGoogle
+                  ? "You sign in with Google. No local password set."
+                  : "Reset your password via email."}
+              </p>
+            </div>
+            {!isGoogle && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="shrink-0 rounded-lg text-xs"
+                disabled={!user.email}
+                onClick={() => {
+                  window.location.href = "/forgot-password";
+                }}
+              >
+                Reset password
+              </Button>
+            )}
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-border p-4">
+          <div className="flex items-center gap-3">
+            <span className="flex size-9 items-center justify-center rounded-lg bg-muted">
+              <ShieldOff className="size-4 text-muted-foreground" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium">Two-factor authentication</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Add an extra layer of security to your account.
+              </p>
+            </div>
+            <span className="rounded-full bg-muted px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Coming soon
+            </span>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-border p-4">
+          <div className="flex items-center gap-3">
+            <span className="flex size-9 items-center justify-center rounded-lg bg-muted">
+              <ShieldCheck className="size-4 text-muted-foreground" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium">Session</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                You are signed in on this device. Sessions expire after 1 year.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-border p-4">
+          <div className="flex items-center gap-3">
+            <span className="flex size-9 items-center justify-center rounded-lg bg-muted">
+              <ExternalLink className="size-4 text-muted-foreground" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium">Login method</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {isGoogle
+                  ? "Connected via Google OAuth."
+                  : hasPassword
+                    ? "Email and password authentication."
+                    : "No sign-in method recorded."}
+              </p>
+            </div>
+          </div>
         </div>
       </div>
     </div>
