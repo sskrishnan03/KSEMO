@@ -1,5 +1,4 @@
 // Supabase database implementation for KSEMO
-// This replaces the in-memory storage with persistent Supabase backend
 import { createClient } from "@supabase/supabase-js";
 import {
   User,
@@ -332,7 +331,6 @@ export async function updateConversationForUser(
       | "shareToken"
       | "conversationType"
       | "projectId"
-      | "memoryDisabled"
     >
   >
 ): Promise<Conversation | undefined> {
@@ -347,8 +345,6 @@ export async function updateConversationForUser(
   if (values.conversationType !== undefined)
     updateData.conversation_type = values.conversationType;
   if (values.projectId !== undefined) updateData.project_id = values.projectId;
-  if (values.memoryDisabled !== undefined)
-    updateData.memory_disabled = values.memoryDisabled;
 
   const { data, error } = await supabase
     .from("conversations")
@@ -1091,8 +1087,6 @@ export async function updateTaskActivityForUser(input: {
 
 // Export a function that matches the old getDb() signature
 export async function getDb() {
-  // Return a mock object that maintains compatibility with the old API
-  // This allows gradual migration from in-memory to Supabase
   return {
     users: new Map(),
     conversations: new Map(),

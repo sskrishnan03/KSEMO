@@ -10,7 +10,7 @@ export const FAQ_CATEGORIES: FaqCategory[] = [
         id: "gs-1",
         question: "What is KSEMO?",
         answer:
-          "KSEMO is your personal AI assistant for conversations, files, and memory. You can ask questions, upload documents, and save the things you want KSEMO to always remember.",
+          "KSEMO is your personal AI assistant for conversations and files. You can ask questions and upload documents.",
       },
       {
         id: "gs-2",
@@ -76,7 +76,7 @@ export const FAQ_CATEGORIES: FaqCategory[] = [
         id: "ac-4",
         question: "Can multiple people use the same KSEMO account?",
         answer:
-          "KSEMO accounts are personal. Each person should sign in with their own Google account so conversations, files, and memories stay private to them.",
+          "KSEMO accounts are personal. Each person should sign in with their own Google account so conversations and files stay private to them.",
       },
       {
         id: "ac-5",
@@ -281,7 +281,7 @@ export const FAQ_CATEGORIES: FaqCategory[] = [
         id: "pd-1",
         question: "What data does KSEMO store about me?",
         answer:
-          "Your account profile from Google, your conversations and messages, files you add to your Library, memories you create, and your preferences. Nothing else is collected beyond what the service needs to run.",
+          "Your account profile from Google, your conversations and messages, files you add to your Library, and your preferences. Nothing else is collected beyond what the service needs to run.",
       },
       {
         id: "pd-2",
@@ -293,7 +293,7 @@ export const FAQ_CATEGORIES: FaqCategory[] = [
         id: "pd-3",
         question: "How do I delete everything?",
         answer:
-          "Delete individual conversations, Library files, and memories from their respective menus. Permanently deleted items cannot be recovered.",
+          "Delete individual conversations and Library files from their respective menus. Permanently deleted items cannot be recovered.",
       },
       {
         id: "pd-4",
@@ -482,7 +482,7 @@ export function answerFromFaq(query: string): AssistantReply {
   if (!tokens.length) {
     return {
       answer:
-        "Could you rephrase that? For example, ask about files, memories, sharing, or your account.",
+        "Could you rephrase that? For example, ask about files, sharing, or your account.",
       related: [],
     };
   }
@@ -523,7 +523,6 @@ export function answerFromFaq(query: string): AssistantReply {
 
 export const ASSISTANT_SUGGESTIONS = [
   "Which file types can I add?",
-  "How do memories work?",
   "How do I share a conversation?",
   "How do I delete my data?",
 ];

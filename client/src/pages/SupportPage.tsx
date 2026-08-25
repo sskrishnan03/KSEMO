@@ -165,7 +165,6 @@ const PRIVACY_SECTION_TITLES = [
   "How your information is used",
   "Conversations and message history",
   "Files and Library storage",
-  "Explicit memories",
   "Sharing and public links",
   "Authentication and account security",
   "Cookies and local storage",
@@ -190,7 +189,6 @@ const TERMS_SECTION_TITLES = [
   "AI output",
   "Your content",
   "Files and Library",
-  "Memories",
   "Sharing links",
   "Fees, usage limits, and plans",
   "Intellectual property",
@@ -475,7 +473,7 @@ function FaqAssistant() {
       id: 0,
       role: "assistant",
       content:
-        "Hi! I am the KSEMO Assistant. Ask me anything about using KSEMO — files, memories, sharing, privacy, and more.",
+        "Hi! I am the KSEMO Assistant. Ask me anything about using KSEMO — files, sharing, privacy, and more.",
     },
   ]);
   const [draft, setDraft] = useState("");
@@ -735,13 +733,13 @@ function PrivacyContent() {
           KSEMO collects when you create an account or use the service, why that
           information is needed, how it is protected, and the choices and rights
           available to you. It covers the KSEMO web application and every
-          feature inside it: chat conversations, the Library, explicit memories,
+          feature inside it: chat conversations, the Library,
           sharing links, exports, and account settings.
         </p>
         <p>
           KSEMO is designed around a simple model. Your workspace is private to
           your account. Nothing is remembered about you unless you deliberately
-          save it — memories exist only because you wrote them. And deletion
+          save it. And deletion
           tools are direct and permanent rather than hidden behind support
           requests.
         </p>
@@ -785,10 +783,6 @@ function PrivacyContent() {
               bytes in private object storage linked to your account.
             </>,
             <>
-              Explicit memories: only the notes you personally add in the
-              Memories section, together with their category and active state.
-            </>,
-            <>
               Preferences: selected model, response style, custom instructions,
               speech rate, autoplay, reduce-motion, and similar accessibility
               settings.
@@ -810,8 +804,8 @@ function PrivacyContent() {
         <PolicyBullets
           items={[
             <>
-              To generate responses: your messages, attached files, and active
-              memories are sent to the configured server-side AI service to
+              To generate responses: your messages and attached files
+              are sent to the configured server-side AI service to
               produce answers.
             </>,
             <>
@@ -820,7 +814,7 @@ function PrivacyContent() {
               time.
             </>,
             <>
-              To personalize replies: active memories and saved preferences
+              To personalize replies: saved preferences
               shape tone, detail, and continuity across chats.
             </>,
             <>
@@ -837,7 +831,7 @@ function PrivacyContent() {
           Where privacy law requires a legal basis, processing rests on
           performing our contract with you (operating the features you use),
           legitimate interests (security, abuse prevention), consent (public
-          sharing, memories), or legal obligation.
+          sharing), or legal obligation.
         </p>
         <p>
           We do not sell your personal information, and we do not share it with
@@ -913,29 +907,6 @@ function PrivacyContent() {
           ]}
         />
       </PolicySection>
-      <PolicySection title="Explicit memories">
-        <p>
-          Memory in KSEMO is strictly opt-in. Nothing is remembered
-          automatically, and background scraping of your chats for memory is not
-          performed. The memory list shows exactly what exists.
-        </p>
-        <PolicyBullets
-          items={[
-            <>
-              Each memory can be disabled instantly, which stops it influencing
-              responses while keeping the text available for later.
-            </>,
-            <>
-              Editing a memory changes what future responses take into account;
-              deleting a memory removes it permanently.
-            </>,
-            <>
-              Disabled or deleted memories stop shaping responses immediately at
-              the next request.
-            </>,
-          ]}
-        />
-      </PolicySection>
       <PolicySection title="Sharing and public links">
         <p>
           Sharing is opt-in per conversation. When you enable a public link,
@@ -946,7 +917,7 @@ function PrivacyContent() {
           items={[
             <>
               Shared views are read-only: visitors cannot send messages, see
-              your other conversations, or access your Library or memories.
+              your other conversations, or access your Library.
             </>,
             <>
               Disabling public sharing invalidates the existing link
@@ -1045,7 +1016,7 @@ function PrivacyContent() {
       </PolicySection>
       <PolicySection title="Data retention and deletion">
         <p>
-          You control retention. Conversations, files, and memories persist only
+          You control retention. Conversations and files persist only
           while you keep them, and every category has a direct deletion control
           in the product.
         </p>
@@ -1090,10 +1061,10 @@ function PrivacyContent() {
             </>,
             <>
               Delete: remove individual messages, entire conversations, all
-              chats at once, Library files, and memories — permanently.
+              chats at once, and Library files — permanently.
             </>,
             <>
-              Restrict: disable memories, turn off autoplay speech, and avoid
+              Restrict: turn off autoplay speech, and avoid
               attaching files you prefer not to use.
             </>,
             <>
@@ -1221,7 +1192,7 @@ function TermsContent() {
           of KSEMO. If you do not agree, please do not use the service.
         </p>
         <p>
-          These terms apply to every feature: chat, the Library, memories,
+          These terms apply to every feature: chat, the Library,
           sharing links, exports, and account settings. Product notices or
           guidelines presented inside the app supplement these terms. If you use
           KSEMO on behalf of an organization, you represent that you have
@@ -1237,7 +1208,7 @@ function TermsContent() {
             </>,
             <>
               “Content” means what you submit or upload: messages, Library
-              files, memories, and preferences.
+              files, and preferences.
             </>,
             <>
               “Output” means AI-generated responses produced by the Service from
@@ -1245,8 +1216,7 @@ function TermsContent() {
             </>,
             <>
               “Conversation” means a saved thread of messages under your
-              account; “Library” means your uploaded files; “Memories” means the
-              explicit notes you create.
+              account; “Library” means your uploaded files.
             </>,
             <>
               “Providers” means the independent third parties that host,
@@ -1272,8 +1242,7 @@ function TermsContent() {
         <PolicyBullets
           items={[
             <>
-              KSEMO is an AI assistant for conversation, file analysis, and
-              explicitly managed memory.
+              KSEMO is an AI assistant for conversation and file analysis.
             </>,
             <>
               Use the service in compliance with applicable laws and only
@@ -1398,8 +1367,7 @@ function TermsContent() {
       </PolicySection>
       <PolicySection title="Your content">
         <p>
-          You retain ownership of everything you submit: messages, files, and
-          memories. These terms do not take that away.
+          You retain ownership of everything you submit: messages and files. These terms do not take that away.
         </p>
         <p>
           You grant KSEMO a limited license to store, reproduce, process,
@@ -1444,29 +1412,7 @@ function TermsContent() {
           ]}
         />
       </PolicySection>
-      <PolicySection title="Memories">
-        <p>
-          Memories are notes you explicitly save so responses can reflect them
-          across your account. They influence future responses until you disable
-          or delete them.
-        </p>
-        <PolicyBullets
-          items={[
-            <>
-              Only add memories you are comfortable having applied everywhere
-              you chat — they are not conversation-scoped.
-            </>,
-            <>
-              Memory content must itself comply with these terms; do not store
-              unlawful or infringing instructions as memories.
-            </>,
-            <>
-              Memories are a personalization feature, not a backup: keep your
-              own copy of anything important.
-            </>,
-          ]}
-        />
-      </PolicySection>
+
       <PolicySection title="Sharing links">
         <PolicyBullets
           items={[
