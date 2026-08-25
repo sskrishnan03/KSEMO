@@ -31,7 +31,7 @@ export function VoiceControls({
             variant="outline"
             size="icon"
             onClick={onClose}
-            className="size-11 rounded-full border-border bg-card/60 text-foreground hover:bg-muted"
+            className="size-11 rounded-full border border-border bg-background text-foreground shadow-sm hover:bg-accent hover:text-accent-foreground"
             aria-label="End voice chat"
           >
             <X className="size-4" />
@@ -48,7 +48,7 @@ export function VoiceControls({
             variant="outline"
             size="icon"
             onClick={onMicToggle}
-            className="size-11 rounded-full border-border bg-card/60 text-foreground hover:bg-muted"
+            className="size-11 rounded-full border border-border bg-background text-foreground shadow-sm hover:bg-accent hover:text-accent-foreground"
             aria-label={micLabel}
             aria-pressed={!muted}
           >

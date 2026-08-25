@@ -80,6 +80,7 @@ export function useVoiceSession(options: {
   const [error, setError] = useState<string | null>(null);
   const [fallbackRecording, setFallbackRecording] = useState(false);
   const levelRef = useRef(0);
+  const freqDataRef = useRef<Uint8Array>(new Uint8Array(64));
 
   const stateRef = useRef(state);
   useEffect(() => {
@@ -660,11 +661,13 @@ export function useVoiceSession(options: {
       source.connect(analyser);
       analyserRef.current = analyser;
       const samples = new Uint8Array(analyser.fftSize);
+      const freqBins = new Uint8Array(analyser.frequencyBinCount);
       let smoothed = 0;
       const tick = () => {
         const currentAnalyser = analyserRef.current;
         if (!currentAnalyser) return;
         currentAnalyser.getByteTimeDomainData(samples);
+        currentAnalyser.getByteFrequencyData(freqBins);
         let sumSquares = 0;
         for (let index = 0; index < samples.length; index += 1) {
           const centered = (samples[index] - 128) / 128;
@@ -673,6 +676,11 @@ export function useVoiceSession(options: {
         const rms = Math.sqrt(sumSquares / samples.length);
         smoothed += (Math.min(1, rms * 3.2) - smoothed) * 0.25;
         levelRef.current = smoothed;
+        const out = freqDataRef.current;
+        const step = Math.max(1, Math.floor(freqBins.length / out.length));
+        for (let i = 0; i < out.length; i++) {
+          out[i] = freqBins[i * step] ?? 0;
+        }
         if (
           stateRef.current === "speaking" &&
           Date.now() - lastSpeakStartRef.current > 900
@@ -872,6 +880,7 @@ export function useVoiceSession(options: {
     error,
     clearError: () => setError(null),
     levelRef,
+    freqDataRef,
     continuousSupported,
     fallbackRecording,
     startListening,

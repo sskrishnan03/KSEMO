@@ -293,3 +293,15 @@ html.ksemo-reduce-motion [data-state] .ksemo-orb-morph-b {
   animation: none;
   border-radius: 50% 50% 50% 50% / 50% 50% 50% 50%;
 }
+
+.voice-chat-bg {
+  background: #000000;
+}
+
+.voice-chat-vignette {
+  background: radial-gradient(
+    ellipse at center,
+    transparent 40%,
+    rgba(0, 0, 0, 0.6) 100%
+  );
+}

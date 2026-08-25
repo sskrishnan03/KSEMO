@@ -1,5 +1,5 @@
 import { useVoiceSession } from "@/hooks/useVoiceSession";
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { VoiceControls } from "./VoiceControls";
 import { VoiceOrb } from "./VoiceOrb";
 
@@ -17,6 +17,7 @@ export function VoiceChat({
   const voice = useVoiceSession({ conversationId, onConversation, speechRate });
   const busy = voice.state === "processing" || voice.state === "speaking";
   const autoStartedRef = useRef(false);
+  const [stateLabel, setStateLabel] = useState("");
 
   useEffect(() => {
     if (autoStartedRef.current) return;
@@ -25,6 +26,19 @@ export function VoiceChat({
     else void voice.startPushToTalk();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    switch (voice.state) {
+      case "processing":
+        setStateLabel("Thinking…");
+        break;
+      case "speaking":
+        setStateLabel("Speaking…");
+        break;
+      default:
+        setStateLabel("");
+    }
+  }, [voice.state]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -49,10 +63,19 @@ export function VoiceChat({
       aria-label="Voice chat"
     >
       <div className="relative flex min-h-0 flex-1 items-center justify-center">
-        <VoiceOrb state={voice.state} levelRef={voice.levelRef} />
-        <div className="pointer-events-none absolute left-1/2 top-[calc(50%+8.9rem)] w-[min(92%,36rem)] -translate-x-1/2">
+        <VoiceOrb
+          state={voice.state}
+          levelRef={voice.levelRef}
+          freqDataRef={voice.freqDataRef}
+        />
+        <div className="pointer-events-none absolute left-1/2 top-[calc(50%+9.5rem)] w-[min(88%,32rem)] -translate-x-1/2">
+          {stateLabel && (
+            <p className="mb-2 text-center text-[11px] font-medium uppercase tracking-[0.25em] text-muted-foreground">
+              {stateLabel}
+            </p>
+          )}
           <p
-            className="max-h-32 overflow-hidden text-center text-[15px] leading-7 tracking-[-0.01em] text-foreground/90"
+            className="max-h-24 overflow-hidden text-center text-[14px] leading-6 tracking-[-0.01em] text-foreground/60"
             aria-live="polite"
           >
             {caption}
