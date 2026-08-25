@@ -95,7 +95,6 @@ export function SettingsDialog({
   onAllChatsDeleted: () => void;
 }) {
   const [activeTab, setActiveTab] = useState<SettingsTab>("account");
-  const [trashOpen, setTrashOpen] = useState(false);
   const [archivedOpen, setArchivedOpen] = useState(false);
   const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
 
@@ -162,7 +161,6 @@ export function SettingsDialog({
               {activeTab === "data" && (
                 <DataSection
                   onOpenWorkspace={onOpenWorkspace}
-                  onOpenTrash={() => setTrashOpen(true)}
                   onOpenArchived={() => setArchivedOpen(true)}
                   onDeleteAll={() => setConfirmDeleteAll(true)}
                 />
@@ -173,7 +171,6 @@ export function SettingsDialog({
         </div>
       </DialogContent>
 
-      <TrashedChatsDialog open={trashOpen} onOpenChange={setTrashOpen} />
       <ArchivedChatsDialog open={archivedOpen} onOpenChange={setArchivedOpen} />
       <AlertDialog open={confirmDeleteAll} onOpenChange={setConfirmDeleteAll}>
         <AlertDialogContent>
@@ -289,12 +286,10 @@ function AppearanceSection() {
 
 function DataSection({
   onOpenWorkspace,
-  onOpenTrash,
   onOpenArchived,
   onDeleteAll,
 }: {
   onOpenWorkspace: (section: "files") => void;
-  onOpenTrash: () => void;
   onOpenArchived: () => void;
   onDeleteAll: () => void;
 }) {
@@ -307,18 +302,6 @@ function DataSection({
         </p>
       </div>
       <div className="space-y-2">
-        <button
-          onClick={onOpenTrash}
-          className="flex w-full items-center justify-between rounded-xl border border-border p-3.5 text-left transition-colors hover:bg-muted/50"
-        >
-          <div>
-            <p className="text-sm font-medium">Trashed chats</p>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              Restore or permanently delete
-            </p>
-          </div>
-          <Trash2 className="size-4 text-muted-foreground" />
-        </button>
         <button
           onClick={onOpenArchived}
           className="flex w-full items-center justify-between rounded-xl border border-border p-3.5 text-left transition-colors hover:bg-muted/50"
@@ -541,95 +524,6 @@ function DeleteAllConfirm({
         </Button>
       </AlertDialogFooter>
     </>
-  );
-}
-
-function TrashedChatsDialog({
-  open,
-  onOpenChange,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}) {
-  const trashQuery = trpc.conversation.list.useQuery(
-    { scope: "trash" },
-    { enabled: open }
-  );
-  const utils = trpc.useUtils();
-  const restoreMutation = trpc.conversation.restore.useMutation({
-    onSuccess: () => {
-      utils.conversation.list.invalidate();
-      toast.success("Chat restored");
-    },
-    onError: () => toast.error("Could not restore chat."),
-  });
-  const deleteMutation = trpc.conversation.remove.useMutation({
-    onSuccess: () => {
-      utils.conversation.list.invalidate();
-      toast.success("Chat deleted");
-    },
-    onError: () => toast.error("Could not delete chat."),
-  });
-  const conversations = (trashQuery.data ?? []) as Array<{
-    id: string;
-    title: string;
-    updatedAt?: Date | string | null;
-  }>;
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[32rem] w-[calc(100%-1.5rem)] max-w-lg flex-col gap-0 overflow-hidden rounded-2xl p-0">
-        <div className="shrink-0 border-b border-border px-4 pb-3 pt-4">
-          <p className="text-base font-semibold">Trashed chats</p>
-          <p className="text-xs text-muted-foreground">
-            Restore or delete permanently.
-          </p>
-        </div>
-        <div className="min-h-0 flex-1 overflow-y-auto p-3">
-          {trashQuery.isLoading ? (
-            <p className="py-6 text-center text-sm text-muted-foreground">
-              Loading…
-            </p>
-          ) : !conversations.length ? (
-            <div className="py-8 text-center">
-              <Trash2 className="mx-auto size-6 text-muted-foreground" />
-              <p className="mt-3 text-sm font-medium">Trash is empty</p>
-            </div>
-          ) : (
-            <ul className="space-y-1.5">
-              {conversations.map(c => (
-                <li
-                  key={c.id}
-                  className="flex items-center gap-2 rounded-xl border border-border px-3 py-2"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-[13px] font-medium">{c.title}</p>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="size-7 shrink-0 rounded-lg"
-                    disabled={restoreMutation.isPending}
-                    onClick={() => restoreMutation.mutate({ id: c.id })}
-                  >
-                    <span className="text-xs">Restore</span>
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="size-7 shrink-0 rounded-lg text-destructive"
-                    disabled={deleteMutation.isPending}
-                    onClick={() => deleteMutation.mutate({ id: c.id })}
-                  >
-                    <Trash2 className="size-3.5" />
-                  </Button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
   );
 }
 

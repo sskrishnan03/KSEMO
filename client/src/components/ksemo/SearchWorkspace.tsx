@@ -1,143 +1,184 @@
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { MessageCircle, Search, Clock, ArrowRight } from "lucide-react";
-import { useMemo, useState } from "react";
+import { trpc } from "@/lib/trpc";
+import { MessageCircle, Search } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
-type Conversation = {
-  id: string;
+type SearchResult = {
+  conversationId: string;
   title: string;
   isPinned: boolean;
-  isArchived: boolean;
+  snippet?: string;
+  role?: string;
 };
 
-function timeAgo(date: Date) {
-  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
-  if (seconds < 60) return "just now";
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}d ago`;
-  return date.toLocaleDateString();
+function snippetFromContent(content: string, maxLen = 120): string {
+  const clean = content.replace(/\s+/g, " ").trim();
+  if (clean.length <= maxLen) return clean;
+  return clean.slice(0, maxLen) + "…";
 }
 
-export function SearchWorkspace({
+export function SearchDialog({
+  open,
+  onOpenChange,
   conversations,
-  onBackToChat,
   onSelectConversation,
 }: {
-  conversations: Conversation[];
-  onBackToChat: () => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  conversations: Array<{
+    id: string;
+    title: string;
+    isPinned: boolean;
+  }>;
   onSelectConversation: (conversationId: string) => void;
 }) {
   const [query, setQuery] = useState("");
   const trimmed = query.trim().toLowerCase();
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  const matched = useMemo(() => {
+  useEffect(() => {
+    if (open) {
+      setQuery("");
+      setTimeout(() => inputRef.current?.focus(), 50);
+    }
+  }, [open]);
+
+  const { data: serverData } = trpc.conversation.search.useQuery(
+    { query: query.trim() },
+    { enabled: open && query.trim().length >= 1 }
+  );
+
+  const titleMatches = useMemo(() => {
     if (!trimmed) return [];
     return conversations.filter(c =>
       c.title.toLowerCase().includes(trimmed)
     );
   }, [conversations, trimmed]);
 
-  return (
-    <main className="min-h-0 flex-1 overflow-y-auto bg-background transition-colors">
-      <div className="mx-auto w-full max-w-5xl px-5 py-6 sm:px-8 sm:py-8">
-        <header className="flex flex-col gap-4 border-b border-border pb-5 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <div className="flex items-center gap-3">
-              <Search className="size-6 text-muted-foreground" />
-              <h1 className="text-2xl font-semibold tracking-[-0.03em]">
-                Search
-              </h1>
-            </div>
-            <p className="mt-1.5 max-w-xl text-sm leading-6 text-muted-foreground">
-              Find any conversation by name. Click a result to open it.
-            </p>
-          </div>
-          <Button
-            variant="outline"
-            className="shrink-0 rounded-xl"
-            onClick={onBackToChat}
-          >
-            Back to chat
-          </Button>
-        </header>
+  const messageMatches = useMemo(() => {
+    if (!serverData) return [];
+    const titleIds = new Set(titleMatches.map(c => c.id));
+    const results: SearchResult[] = [];
+    const seen = new Set<string>();
 
-        <section className="mt-6">
-          <div className="relative w-full xl:max-w-md">
+    for (const msg of serverData.messages) {
+      if (seen.has(msg.conversationId) || titleIds.has(msg.conversationId)) continue;
+      seen.add(msg.conversationId);
+      results.push({
+        conversationId: msg.conversationId,
+        title: msg.conversationTitle,
+        isPinned: false,
+        snippet: snippetFromContent(msg.content),
+        role: msg.role,
+      });
+    }
+
+    return results;
+  }, [serverData, titleMatches]);
+
+  const results = useMemo(() => {
+    const titleResults: SearchResult[] = titleMatches.map(c => ({
+      conversationId: c.id,
+      title: c.title,
+      isPinned: c.isPinned,
+    }));
+    return [...titleResults, ...messageMatches];
+  }, [titleMatches, messageMatches]);
+
+  const handleSelect = (id: string) => {
+    onOpenChange(false);
+    onSelectConversation(id);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="flex max-h-[70dvh] w-[min(55vw,580px)] max-sm:w-[calc(100%-2rem)] flex-col gap-0 overflow-hidden rounded-2xl p-0">
+        <DialogTitle className="sr-only">Search</DialogTitle>
+        <DialogDescription className="sr-only">
+          Search conversations and messages
+        </DialogDescription>
+
+        <div className="shrink-0 border-b border-border px-4 pb-3 pt-4 pr-12">
+          <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
+              ref={inputRef}
               value={query}
-              onChange={event => setQuery(event.target.value)}
-              className="h-10 rounded-xl pl-9"
-              placeholder="Search conversations…"
-              aria-label="Search conversations"
-              autoFocus
+              onChange={e => setQuery(e.target.value)}
+              className="h-10 rounded-xl pl-9 text-sm"
+              placeholder="Search chats and messages…"
+              aria-label="Search conversations and messages"
             />
           </div>
-        </section>
+        </div>
 
-        <div className="mt-5 pb-10">
-          {!trimmed ? (
-            <EmptySearch count={conversations.length} />
-          ) : matched.length > 0 ? (
-            <div className="space-y-2">
-              {matched.map(conversation => (
-                <button
-                  key={conversation.id}
-                  onClick={() => onSelectConversation(conversation.id)}
-                  className="group flex w-full items-center gap-3 rounded-xl border border-border bg-card p-3.5 text-left transition-colors hover:bg-muted/70 active:bg-muted"
-                >
-                  <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground transition-colors group-hover:bg-primary/10 group-hover:text-primary">
-                    <MessageCircle className="size-4" />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">
-                      {conversation.title}
-                    </p>
-                    {conversation.isPinned && (
-                      <span className="mt-0.5 inline-block rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
-                        Pinned
+        <div className="min-h-0 flex-1 overflow-y-auto p-2">
+          {trimmed ? (
+            results.length > 0 ? (
+              <div className="space-y-0.5">
+                {results.map(result => (
+                  <button
+                    key={result.conversationId}
+                    onClick={() => handleSelect(result.conversationId)}
+                    className="group flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-muted/70"
+                  >
+                    <MessageCircle className="size-[18px] shrink-0 stroke-[2.4] text-foreground/85 transition-colors group-hover:text-foreground" />
+                    <div className="min-w-0 flex-1">
+                      <span className="block truncate text-[13px] leading-5">
+                        {result.title}
                       </span>
-                    )}
-                  </div>
-                  <ArrowRight className="size-4 shrink-0 text-muted-foreground transition-all duration-150 group-hover:translate-x-0.5 group-hover:text-foreground" />
-                </button>
-              ))}
-            </div>
-          ) : (
-            <div className="grid min-h-72 place-items-center rounded-2xl border border-dashed border-border bg-muted/20 p-7 text-center">
-              <div>
-                <Search className="mx-auto size-7 text-muted-foreground" />
-                <h2 className="mt-4 text-base font-medium">No results found</h2>
-                <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-muted-foreground">
-                  No conversations match "{query.trim()}". Try a different
-                  search term.
-                </p>
+                      {result.snippet && (
+                        <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-muted-foreground">
+                          {result.role === "user" ? "You: " : ""}
+                          {result.snippet}
+                        </p>
+                      )}
+                    </div>
+                  </button>
+                ))}
               </div>
+            ) : (
+              <div className="grid min-h-32 place-items-center p-5 text-center">
+                <div>
+                  <p className="text-sm font-medium">No results found</p>
+                  <p className="mx-auto mt-1 max-w-xs text-xs text-muted-foreground">
+                    No conversations or messages match "{query.trim()}".
+                  </p>
+                </div>
+              </div>
+            )
+          ) : (
+            <div className="space-y-0.5">
+              {conversations.length > 0 ? (
+                conversations.map(c => (
+                  <button
+                    key={c.id}
+                    onClick={() => handleSelect(c.id)}
+                    className="group flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-muted/70"
+                  >
+                    <MessageCircle className="size-[18px] shrink-0 stroke-[2.4] text-foreground/85 transition-colors group-hover:text-foreground" />
+                    <span className="truncate text-[13px] leading-5">
+                      {c.title}
+                    </span>
+                  </button>
+                ))
+              ) : (
+                <p className="px-2.5 py-4 text-center text-sm text-muted-foreground">
+                  No conversations yet.
+                </p>
+              )}
             </div>
           )}
         </div>
-      </div>
-    </main>
-  );
-}
-
-function EmptySearch({ count }: { count: number }) {
-  return (
-    <div className="grid min-h-72 place-items-center rounded-2xl border border-dashed border-border bg-muted/20 p-7 text-center">
-      <div>
-        <Search className="mx-auto size-7 text-muted-foreground" />
-        <h2 className="mt-4 text-base font-medium">Search your conversations</h2>
-        <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-muted-foreground">
-          {count > 0
-            ? `Type to search across ${count} ${count === 1 ? "conversation" : "conversations"}.`
-            : "Start a conversation and it will appear here."}
-        </p>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

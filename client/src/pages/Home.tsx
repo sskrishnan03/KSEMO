@@ -34,7 +34,7 @@ import { useVoiceInput } from "../hooks/useVoiceInput";
 import { VoiceChat } from "../components/voice/VoiceChat";
 import { WorkspacePanel } from "../components/ksemo/WorkspacePanel";
 import { LibraryWorkspace } from "../components/ksemo/LibraryWorkspace";
-import { SearchWorkspace } from "../components/ksemo/SearchWorkspace";
+import { SearchDialog } from "../components/ksemo/SearchWorkspace";
 import {
   createConversationPdfFile,
   createConversationWordFile,
@@ -140,9 +140,14 @@ export default function Home() {
   const [savedAccounts, setSavedAccounts] =
     useState<SavedAccount[]>(getSavedAccounts);
   const [sidebarOpen, setSidebarOpen] = useState(isSidebarOpenPreview);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(
-    isCollapsedSidebarPreview
-  );
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    if (isCollapsedSidebarPreview) return true;
+    try {
+      return localStorage.getItem("ksemo-sidebar-collapsed") === "true";
+    } catch {
+      return false;
+    }
+  });
   const [activeConversationId, setActiveConversationId] = useState<
     string | null
   >(null);
@@ -168,8 +173,9 @@ export default function Home() {
     "idle"
   );
   const [primaryWorkspace, setPrimaryWorkspace] = useState<
-    "library" | "search" | null
+    "library" | null
   >(null);
+  const [searchOpen, setSearchOpen] = useState(false);
   const [voiceChatOpen, setVoiceChatOpen] = useState(false);
   const activePrimaryWorkspace = primaryWorkspace ?? inlineWorkspaceSection;
   const [shareTarget, setShareTarget] = useState<{
@@ -255,6 +261,12 @@ export default function Home() {
       void logout();
     },
   });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("ksemo-sidebar-collapsed", String(sidebarCollapsed));
+    } catch {}
+  }, [sidebarCollapsed]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -1259,7 +1271,7 @@ export default function Home() {
           })
         }
         onSearch={() => {
-          setPrimaryWorkspace("search");
+          setSearchOpen(true);
           setSidebarOpen(false);
         }}
         onWorkspace={section => {
@@ -1296,15 +1308,6 @@ export default function Home() {
           <LibraryWorkspace
             onBackToChat={() => setPrimaryWorkspace(null)}
             onChatWithFiles={startChatWithLibraryFiles}
-          />
-        ) : activePrimaryWorkspace === "search" ? (
-          <SearchWorkspace
-            conversations={conversationQuery.data ?? []}
-            onBackToChat={() => setPrimaryWorkspace(null)}
-            onSelectConversation={id => {
-              setActiveConversationId(id);
-              setPrimaryWorkspace(null);
-            }}
           />
         ) : voiceChatOpen ? (
           <VoiceChat
@@ -1480,6 +1483,16 @@ export default function Home() {
           </>
         )}
       </main>
+
+      <SearchDialog
+        open={searchOpen}
+        onOpenChange={setSearchOpen}
+        conversations={conversationQuery.data ?? []}
+        onSelectConversation={id => {
+          setActiveConversationId(id);
+          setSearchOpen(false);
+        }}
+      />
 
       <SettingsDialog
         open={settingsOpen || isSettingsPreview}

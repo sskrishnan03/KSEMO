@@ -63,8 +63,8 @@ async function toBase64(blob: Blob) {
   return window.btoa(binary);
 }
 
-const TURN_SILENCE_MS = 450;
-const INTERIM_COMMIT_MS = 1100;
+const TURN_SILENCE_MS = 300;
+const INTERIM_COMMIT_MS = 800;
 const BARGE_IN_LEVEL = 0.14;
 const BARGE_IN_HOLD_MS = 380;
 
