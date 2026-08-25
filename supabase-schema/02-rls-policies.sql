@@ -36,10 +36,6 @@ DROP POLICY IF EXISTS "Users can insert versions for own messages" ON message_ve
 DROP POLICY IF EXISTS "Users can view own message feedback" ON message_feedback;
 DROP POLICY IF EXISTS "Users can upsert own message feedback" ON message_feedback;
 
-DROP POLICY IF EXISTS "Users can view own voice sessions" ON voice_sessions;
-DROP POLICY IF EXISTS "Users can insert own voice sessions" ON voice_sessions;
-DROP POLICY IF EXISTS "Users can update own voice sessions" ON voice_sessions;
-
 DROP POLICY IF EXISTS "Users can view own files" ON files;
 DROP POLICY IF EXISTS "Users can insert own files" ON files;
 DROP POLICY IF EXISTS "Users can update own files" ON files;
@@ -88,7 +84,6 @@ ALTER TABLE conversations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE message_versions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE message_feedback ENABLE ROW LEVEL SECURITY;
-ALTER TABLE voice_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE files ENABLE ROW LEVEL SECURITY;
 ALTER TABLE attachments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE memories ENABLE ROW LEVEL SECURITY;
@@ -270,25 +265,6 @@ CREATE POLICY "Users can view own message feedback"
 -- Users can upsert their own feedback
 CREATE POLICY "Users can upsert own message feedback"
     ON message_feedback FOR ALL
-    USING (user_id = get_current_user_id())
-    WITH CHECK (user_id = get_current_user_id());
-
--- ============================================
--- VOICE SESSIONS POLICIES
--- ============================================
--- Users can read their own voice sessions
-CREATE POLICY "Users can view own voice sessions"
-    ON voice_sessions FOR SELECT
-    USING (user_id = get_current_user_id());
-
--- Users can insert their own voice sessions
-CREATE POLICY "Users can insert own voice sessions"
-    ON voice_sessions FOR INSERT
-    WITH CHECK (user_id = get_current_user_id());
-
--- Users can update their own voice sessions
-CREATE POLICY "Users can update own voice sessions"
-    ON voice_sessions FOR UPDATE
     USING (user_id = get_current_user_id())
     WITH CHECK (user_id = get_current_user_id());
 

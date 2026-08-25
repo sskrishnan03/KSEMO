@@ -13,11 +13,7 @@ import {
   guessMimeType,
   isSupportedUpload,
 } from "@/lib/fileIcons";
-import {
-  Link2,
-  Trash2,
-  Upload,
-} from "lucide-react";
+import { Link2, Trash2, Upload } from "lucide-react";
 import React, { type ChangeEvent, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -131,7 +127,8 @@ export function WorkspacePanel({
               Library
             </DialogTitle>
             <DialogDescription>
-              Manage private files and attach supported items to the active conversation.
+              Manage private files and attach supported items to the active
+              conversation.
             </DialogDescription>
           </DialogHeader>
           <div className="max-h-[65dvh] overflow-y-auto p-4 sm:p-5">
@@ -149,13 +146,11 @@ export function WorkspacePanel({
                 className="w-full rounded-xl"
               >
                 <Upload className="mr-2 size-4" />
-                {fileUpload.isPending
-                  ? "Adding file…"
-                  : "Add file to Library"}
+                {fileUpload.isPending ? "Adding file…" : "Add file to Library"}
               </Button>
               <p className="mt-2 text-xs leading-5 text-muted-foreground">
-                PDF, Word, Excel, PowerPoint, text, data, and image files up
-                to 25 MB. Documents are analyzed so you can chat with them.
+                PDF, Word, Excel, PowerPoint, text, data, and image files up to
+                25 MB. Documents are analyzed so you can chat with them.
               </p>
               <Input
                 value={libraryQuery}

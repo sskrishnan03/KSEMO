@@ -19,12 +19,7 @@ export type FileContent = {
   type: "file_url";
   file_url: {
     url: string;
-    mime_type?:
-      | "audio/mpeg"
-      | "audio/wav"
-      | "application/pdf"
-      | "audio/mp4"
-      | "video/mp4";
+    mime_type?: "application/pdf" | "video/mp4";
   };
 };
 
@@ -252,9 +247,11 @@ const buildRequestTargets = (): RequestTarget[] => {
   // Try every distinct credential against the primary URL so one expired or
   // invalid key cannot take down every request.
   const primaryKeys: Array<{ name: string; apiKey: string }> = [];
-  if (ENV.forgeApiKey) primaryKeys.push({ name: "primary-forge", apiKey: ENV.forgeApiKey });
+  if (ENV.forgeApiKey)
+    primaryKeys.push({ name: "primary-forge", apiKey: ENV.forgeApiKey });
   const openAiKey = process.env.OPENAI_API_KEY?.trim();
-  if (openAiKey) primaryKeys.push({ name: "primary-openai", apiKey: openAiKey });
+  if (openAiKey)
+    primaryKeys.push({ name: "primary-openai", apiKey: openAiKey });
   const geminiKey = process.env.GEMINI_API_KEY?.trim();
   if (geminiKey && !primaryKeys.some(entry => entry.apiKey === geminiKey)) {
     primaryKeys.push({ name: "primary-gemini", apiKey: geminiKey });

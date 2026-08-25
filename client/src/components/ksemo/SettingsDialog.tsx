@@ -64,7 +64,7 @@ export const settingsSections: Array<{
     id: "general",
     label: "General",
     icon: Settings2,
-    keywords: "theme style voice preferences",
+    keywords: "theme style preferences",
   },
 ];
 
@@ -221,7 +221,11 @@ function AccountSection({ user }: { user: User }) {
   );
 }
 
-const themeOptions: Array<{ value: ThemeMode; label: string; icon: typeof Sun }> = [
+const themeOptions: Array<{
+  value: ThemeMode;
+  label: string;
+  icon: typeof Sun;
+}> = [
   { value: "light", label: "Light", icon: Sun },
   { value: "dark", label: "Dark", icon: Moon },
   { value: "system", label: "System", icon: Monitor },
@@ -233,7 +237,9 @@ function AppearanceSection() {
   return (
     <div className="space-y-4">
       <div>
-        <h3 className="text-base font-semibold tracking-[-0.02em]">Appearance</h3>
+        <h3 className="text-base font-semibold tracking-[-0.02em]">
+          Appearance
+        </h3>
         <p className="mt-1 text-sm text-muted-foreground">
           Choose how KSEMO looks on your device.
         </p>
@@ -271,8 +277,18 @@ function AppearanceSection() {
               </div>
               {active && (
                 <span className="flex size-5 items-center justify-center rounded-full bg-primary text-white">
-                  <svg className="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                    <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" />
+                  <svg
+                    className="size-3"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="3"
+                  >
+                    <path
+                      d="M5 13l4 4L19 7"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
                   </svg>
                 </span>
               )}
@@ -296,7 +312,9 @@ function DataSection({
   return (
     <div className="space-y-4">
       <div>
-        <h3 className="text-base font-semibold tracking-[-0.02em]">Data Control</h3>
+        <h3 className="text-base font-semibold tracking-[-0.02em]">
+          Data Control
+        </h3>
         <p className="mt-1 text-sm text-muted-foreground">
           Manage your conversations and uploaded files.
         </p>
@@ -332,7 +350,9 @@ function DataSection({
         className="flex w-full items-center justify-between rounded-xl border border-destructive/30 bg-destructive/5 p-3.5 text-left transition-colors hover:bg-destructive/10"
       >
         <div>
-          <p className="text-sm font-medium text-destructive">Delete all chats</p>
+          <p className="text-sm font-medium text-destructive">
+            Delete all chats
+          </p>
           <p className="mt-0.5 text-xs text-muted-foreground">
             Permanent, cannot be undone
           </p>
@@ -495,7 +515,9 @@ function DeleteAllConfirm({
     <>
       <div className="px-6 pb-4">
         <p className="text-sm text-muted-foreground">
-          Type <span className="font-mono font-medium text-foreground">DELETE</span> to confirm:
+          Type{" "}
+          <span className="font-mono font-medium text-foreground">DELETE</span>{" "}
+          to confirm:
         </p>
         <Input
           autoFocus
@@ -586,7 +608,9 @@ function ArchivedChatsDialog({
                   className="flex items-center gap-2 rounded-xl border border-border px-3 py-2"
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-[13px] font-medium">{c.title}</p>
+                    <p className="truncate text-[13px] font-medium">
+                      {c.title}
+                    </p>
                   </div>
                   <Button
                     variant="ghost"

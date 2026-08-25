@@ -10,7 +10,7 @@ export const FAQ_CATEGORIES: FaqCategory[] = [
         id: "gs-1",
         question: "What is KSEMO?",
         answer:
-          "KSEMO is your personal AI assistant for conversations, voice chats, files, and memory. You can ask questions, upload documents, talk naturally by voice, and save the things you want KSEMO to always remember.",
+          "KSEMO is your personal AI assistant for conversations, files, and memory. You can ask questions, upload documents, and save the things you want KSEMO to always remember.",
       },
       {
         id: "gs-2",
@@ -28,7 +28,7 @@ export const FAQ_CATEGORIES: FaqCategory[] = [
         id: "gs-4",
         question: "Which browsers work best with KSEMO?",
         answer:
-          "KSEMO works on current versions of Chrome, Edge, Firefox, and Safari. For voice features, Chrome, Edge, and Safari provide the best microphone and speech support.",
+          "KSEMO works on current versions of Chrome, Edge, Firefox, and Safari.",
       },
       {
         id: "gs-5",
@@ -167,85 +167,6 @@ export const FAQ_CATEGORIES: FaqCategory[] = [
         question: "Why did a response fail or stop halfway?",
         answer:
           "Short network interruptions can interrupt a response. Your message is kept — simply retry from the failed message or send it again. Completed messages are never lost this way.",
-      },
-    ],
-  },
-  {
-    id: "voice-chat",
-    label: "Voice chat",
-    items: [
-      {
-        id: "vc-1",
-        question: "What happens when I use Voice Chat?",
-        answer:
-          "KSEMO transcribes spoken turns and saves the text transcript into the same conversation as typed messages. KSEMO does not keep raw microphone audio as a permanent conversation attachment.",
-      },
-      {
-        id: "vc-2",
-        question: "How do I start a voice chat?",
-        answer:
-          "Click the waveform icon next to the microphone in the message box. The main area switches to the voice screen while your sidebar stays exactly where it is.",
-      },
-      {
-        id: "vc-3",
-        question: "How do I know when KSEMO is listening?",
-        answer:
-          "The orb gently pulses while KSEMO listens. Click the microphone button once to begin and once more to pause listening.",
-      },
-      {
-        id: "vc-4",
-        question: "Do I have to hold a button down while speaking?",
-        answer:
-          "No. Voice chat listens continuously — just speak naturally and pause when you finish your thought. KSEMO detects the pause and answers out loud.",
-      },
-      {
-        id: "vc-5",
-        question: "Can I interrupt KSEMO while it is speaking?",
-        answer:
-          "Yes. Simply start talking and KSEMO stops speaking to listen to you, just like a real conversation. You can also click the microphone to stop the spoken reply.",
-      },
-      {
-        id: "vc-6",
-        question: "Why does my browser ask for microphone permission?",
-        answer:
-          "Browsers require your permission before any site can hear you. Choose Allow once and your choice is remembered for future voice sessions.",
-      },
-      {
-        id: "vc-7",
-        question: "I denied microphone access by mistake. What now?",
-        answer:
-          "Open your browser's site settings (the lock or slider icon near the address bar), allow the microphone for KSEMO, then try again. KSEMO will guide you if access is still blocked.",
-      },
-      {
-        id: "vc-8",
-        question: "Which languages does voice chat understand?",
-        answer:
-          "Voice recognition follows your browser and device language settings and handles most widely spoken languages. For best results, speak clearly at a normal pace.",
-      },
-      {
-        id: "vc-9",
-        question: "Where do voice conversations appear afterwards?",
-        answer:
-          "They appear in your normal conversation list with their transcripts, so you can read, search, rename, share, or export them exactly like typed chats.",
-      },
-      {
-        id: "vc-10",
-        question: "Does KSEMO store recordings of my voice?",
-        answer:
-          "No permanent audio recordings are kept with your conversations. Spoken turns become text transcripts; the microphone is released as soon as the session ends.",
-      },
-      {
-        id: "vc-11",
-        question:
-          "Voice chat says my browser does not support it. Can I still talk?",
-        answer:
-          "Yes. On unsupported browsers KSEMO offers push-to-talk instead: hold the microphone button, speak, release, and your recording is transcribed into the same conversation.",
-      },
-      {
-        id: "vc-12",
-        question: "Why does voice recognition sometimes stop on its own?",
-        answer:
-          "Some browsers pause recognition after long silence or system events. KSEMO restarts it automatically whenever listening is active, so usually you will not notice.",
       },
     ],
   },
@@ -418,48 +339,30 @@ export const FAQ_CATEGORIES: FaqCategory[] = [
       },
       {
         id: "tr-2",
-        question: "My microphone is not being detected.",
-        answer:
-          "Make sure a microphone is connected and not muted at the system level, allow microphone permission for KSEMO in your browser, and avoid having another app use the mic exclusively.",
-      },
-      {
-        id: "tr-3",
-        question: "Voice transcription came back empty. Why?",
-        answer:
-          "This usually means no speech was captured — check that the correct input device is selected and speak a little louder or closer to the microphone, then try again.",
-      },
-      {
-        id: "tr-4",
-        question: "Why can I not hear KSEMO's spoken replies?",
-        answer:
-          "Check your device volume and output device first. Some browsers block audio until you interact with the page — clicking anywhere in KSEMO unlocks playback.",
-      },
-      {
-        id: "tr-5",
         question: "The page looks frozen after switching chats quickly.",
         answer:
           "Stop the running response with the stop button or Escape, then select the chat again. KSEMO prevents mid-response switching to protect your history, and this clears it.",
       },
       {
-        id: "tr-6",
+        id: "tr-3",
         question: "A file upload failed. What are the limits?",
         answer:
           "Files must be a supported type and under 8 MB. If you are within the limits, check your connection and try again — very large PDFs may need splitting.",
       },
       {
-        id: "tr-7",
+        id: "tr-4",
         question: "Search is not finding something I know exists.",
         answer:
           "Search matches titles and message text but needs at least two characters. Try a distinctive word from the message rather than a short or common term.",
       },
       {
-        id: "tr-8",
+        id: "tr-5",
         question: "Keyboard shortcuts are not working.",
         answer:
           "Make sure no dialog is capturing the keyboard and that your focus is inside the KSEMO page. Shortcuts use Ctrl/Cmd + K for search and Ctrl/Cmd + Shift + O for a new chat.",
       },
       {
-        id: "tr-9",
+        id: "tr-6",
         question: "How do I report a bug or suggest a feature?",
         answer:
           "Open Settings → Feedback and use the feedback button to email us. Describe what you expected and what happened — screenshots help a lot.",
@@ -579,7 +482,7 @@ export function answerFromFaq(query: string): AssistantReply {
   if (!tokens.length) {
     return {
       answer:
-        "Could you rephrase that? For example, ask about voice chat, files, memories, sharing, or your account.",
+        "Could you rephrase that? For example, ask about files, memories, sharing, or your account.",
       related: [],
     };
   }
@@ -619,8 +522,6 @@ export function answerFromFaq(query: string): AssistantReply {
 }
 
 export const ASSISTANT_SUGGESTIONS = [
-  "How do I start a voice chat?",
-  "Can I interrupt KSEMO while it speaks?",
   "Which file types can I add?",
   "How do memories work?",
   "How do I share a conversation?",

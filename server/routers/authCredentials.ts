@@ -76,12 +76,13 @@ export const signInProcedure = publicProcedure
   )
   .mutation(async ({ ctx, input }) => {
     const user = await findUserByEmail(input.email);
-    
+
     // For email-only sign in, if user exists, sign them in directly
     if (!user) {
       throw new TRPCError({
         code: "UNAUTHORIZED",
-        message: "No account found with this email. Please create an account first.",
+        message:
+          "No account found with this email. Please create an account first.",
       });
     }
 
@@ -163,8 +164,10 @@ export const requestPasswordResetProcedure = publicProcedure
       .from("users")
       .update({
         reset_token_hash: tokenHash,
-        reset_token_expires_at: new Date(Date.now() + RESET_TOKEN_TTL_MS).toISOString(),
-        updated_at: new Date().toISOString()
+        reset_token_expires_at: new Date(
+          Date.now() + RESET_TOKEN_TTL_MS
+        ).toISOString(),
+        updated_at: new Date().toISOString(),
       })
       .eq("open_id", user.openId);
 
@@ -177,14 +180,14 @@ export const requestPasswordResetProcedure = publicProcedure
     // Absolute link back into this deployment, derived from the incoming
     // request so it works on localhost and any deployed domain alike.
     const proto = String(
-      ctx.req.headers["x-forwarded-proto"] ?? ctx.req.protocol ?? "http",
+      ctx.req.headers["x-forwarded-proto"] ?? ctx.req.protocol ?? "http"
     )
       .split(",")[0]
       .trim();
     const host = String(
       ctx.req.headers["x-forwarded-host"] ??
         ctx.req.headers.host ??
-        "localhost:3000",
+        "localhost:3000"
     );
     const resetUrl = `${proto}://${host}/reset-password?token=${encodeURIComponent(token)}`;
 
@@ -200,7 +203,10 @@ export const requestPasswordResetProcedure = publicProcedure
           name: user.name,
           resetUrl,
         });
-        console.log("[Auth] Password reset email sent successfully to:", input.email);
+        console.log(
+          "[Auth] Password reset email sent successfully to:",
+          input.email
+        );
         return {
           success: true as const,
           delivered: "email" as const,
@@ -253,7 +259,7 @@ export const resetPasswordProcedure = publicProcedure
         password_hash: hashPassword(input.password),
         reset_token_hash: null,
         reset_token_expires_at: null,
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
       })
       .eq("open_id", users.open_id);
 

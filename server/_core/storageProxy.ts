@@ -14,9 +14,6 @@ const MIME_TYPES: Record<string, string> = {
   ".md": "text/markdown; charset=utf-8",
   ".csv": "text/csv; charset=utf-8",
   ".json": "application/json",
-  ".mp3": "audio/mpeg",
-  ".wav": "audio/wav",
-  ".webm": "audio/webm",
   ".mp4": "video/mp4",
   ".zip": "application/zip",
 };

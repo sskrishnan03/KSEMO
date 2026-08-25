@@ -350,7 +350,9 @@ export function ConversationSidebar({
                     Accounts ({accounts.length}/2)
                   </p>
                   {accounts.map(account => {
-                    const selected = account.id === String(user.id) || account.email === user.email;
+                    const selected =
+                      account.id === String(user.id) ||
+                      account.email === user.email;
                     const switching = switchingAccountId === account.id;
                     return (
                       <DropdownMenuItem
@@ -363,17 +365,24 @@ export function ConversationSidebar({
                           {switching ? (
                             <Loader2 className="size-3.5 animate-spin" />
                           ) : (
-                            account.name?.trim().charAt(0).toUpperCase() || account.email?.charAt(0).toUpperCase() || "U"
+                            account.name?.trim().charAt(0).toUpperCase() ||
+                            account.email?.charAt(0).toUpperCase() ||
+                            "U"
                           )}
                         </span>
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate text-xs font-semibold">{account.name || "KSEMO user"}</span>
+                          <span className="block truncate text-xs font-semibold">
+                            {account.name || "KSEMO user"}
+                          </span>
                           <span className="block truncate text-[10px] text-muted-foreground">
                             {switching ? "Switching…" : account.email}
                           </span>
                         </span>
                         {selected ? (
-                          <Check className="size-3.5 text-primary" aria-label="Current account" />
+                          <Check
+                            className="size-3.5 text-primary"
+                            aria-label="Current account"
+                          />
                         ) : switching ? null : (
                           <button
                             type="button"
@@ -391,18 +400,24 @@ export function ConversationSidebar({
                     );
                   })}
                   {onAddAccount && (
-                    <DropdownMenuItem onClick={onAddAccount} className="mt-1 h-9 rounded-xl text-xs font-medium focus-visible:ring-0 focus-visible:outline-none">
+                    <DropdownMenuItem
+                      onClick={onAddAccount}
+                      className="mt-1 h-9 rounded-xl text-xs font-medium focus-visible:ring-0 focus-visible:outline-none"
+                    >
                       <Plus className="mr-2 size-3.5" /> Add account
                     </DropdownMenuItem>
                   )}
                 </DropdownMenuSubContent>
               </DropdownMenuSub>
-              <DropdownMenuItem onClick={onSettings} className="focus-visible:ring-0 focus-visible:outline-none">
+              <DropdownMenuItem
+                onClick={onSettings}
+                className="focus-visible:ring-0 focus-visible:outline-none"
+              >
                 <Settings2 className="mr-2 size-4" /> Settings
               </DropdownMenuItem>
               <DropdownMenuSub open={previewSupportOpen || undefined}>
                 <DropdownMenuSubTrigger className="focus-visible:ring-0 focus-visible:outline-none">
-                   <Headset className="mr-2 size-4" />
+                  <Headset className="mr-2 size-4" />
                   Help &amp; Support
                 </DropdownMenuSubTrigger>
                 <DropdownMenuSubContent
@@ -410,17 +425,26 @@ export function ConversationSidebar({
                   collisionPadding={12}
                   className="max-h-[calc(100dvh-1.5rem)] w-52 overflow-y-auto rounded-xl"
                 >
-                  <DropdownMenuItem onClick={() => onSupport("faq")} className="focus-visible:ring-0 focus-visible:outline-none">
+                  <DropdownMenuItem
+                    onClick={() => onSupport("faq")}
+                    className="focus-visible:ring-0 focus-visible:outline-none"
+                  >
                     <HelpCircle className="mr-2 size-4" />
                     FAQ
                     <ExternalLink className="ml-auto size-3.5 text-muted-foreground" />
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => onSupport("privacy")} className="focus-visible:ring-0 focus-visible:outline-none">
+                  <DropdownMenuItem
+                    onClick={() => onSupport("privacy")}
+                    className="focus-visible:ring-0 focus-visible:outline-none"
+                  >
                     <ShieldCheck className="mr-2 size-4" />
                     Privacy Policy
                     <ExternalLink className="ml-auto size-3.5 text-muted-foreground" />
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => onSupport("terms")} className="focus-visible:ring-0 focus-visible:outline-none">
+                  <DropdownMenuItem
+                    onClick={() => onSupport("terms")}
+                    className="focus-visible:ring-0 focus-visible:outline-none"
+                  >
                     <FileText className="mr-2 size-4" />
                     Terms of Service
                     <ExternalLink className="ml-auto size-3.5 text-muted-foreground" />

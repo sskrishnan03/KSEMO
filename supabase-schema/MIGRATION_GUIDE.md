@@ -18,6 +18,7 @@ The migration replaces the in-memory storage system in `server/db.ts` with a per
 ### Step 1: Update Environment Variables
 
 Add these to your `.env` file:
+
 ```env
 SUPABASE_URL=https://vauqtdjpjwlhfgixfrij.supabase.co
 SUPABASE_ANON_KEY=sb_publishable_wCv3g2jSb_qMbR7I3Fifbg_obIw1iuq
@@ -28,6 +29,7 @@ SUPABASE_ANON_KEY=sb_publishable_wCv3g2jSb_qMbR7I3Fifbg_obIw1iuq
 Find and replace these imports in router files:
 
 **In `server/routers/ksemo.ts`:**
+
 ```typescript
 // Old:
 import {
@@ -45,6 +47,7 @@ import {
 ```
 
 **In `server/routers/authCredentials.ts`:**
+
 ```typescript
 // Old:
 import * as db from "../db";
@@ -54,6 +57,7 @@ import * as db from "../supabase-db";
 ```
 
 **In `server/routers/product.ts`:**
+
 ```typescript
 // Old:
 import { getDb } from "../db";
@@ -77,11 +81,13 @@ import type { User, Conversation, Message } from "../supabase-schema/04-types";
 ### Step 4: Test the Migration
 
 1. Start your development server:
+
 ```bash
 npm run dev
 ```
 
 2. Test basic operations:
+
 - User registration/login
 - Create a conversation
 - Send a message
@@ -99,14 +105,14 @@ npm run dev
 
 The database uses snake_case, but the TypeScript client automatically converts:
 
-| Database Field | Application Field |
-|---------------|-------------------|
-| `open_id` | `open_id` |
-| `user_id` | `user_id` |
+| Database Field      | Application Field   |
+| ------------------- | ------------------- |
+| `open_id`           | `open_id`           |
+| `user_id`           | `user_id`           |
 | `conversation_type` | `conversation_type` |
-| `is_pinned` | `is_pinned` |
-| `created_at` | `created_at` |
-| `updated_at` | `updated_at` |
+| `is_pinned`         | `is_pinned`         |
+| `created_at`        | `created_at`        |
+| `updated_at`        | `updated_at`        |
 
 ### Function Signatures
 
@@ -122,6 +128,7 @@ await listConversationsForUser(userId, scope);
 ### New Features Available
 
 With Supabase, you now have:
+
 - **Persistent storage** - Data survives server restarts
 - **Full-text search** - Better search performance
 - **Public sharing** - Share conversations via tokens
@@ -133,6 +140,7 @@ With Supabase, you now have:
 If you need to rollback to in-memory storage:
 
 1. Revert the import changes:
+
 ```typescript
 // Change back to:
 import * as db from "../db";
@@ -147,7 +155,8 @@ import * as db from "../db";
 ### Connection Errors
 
 **Error:** "Database connection failed"
-**Solution:** 
+**Solution:**
+
 - Verify SUPABASE_URL and SUPABASE_ANON_KEY are correct
 - Check your Supabase project is active
 - Ensure RLS policies are properly configured
@@ -156,6 +165,7 @@ import * as db from "../db";
 
 **Error:** "Permission denied" or RLS errors
 **Solution:**
+
 - Verify user authentication is working
 - Check RLS policies in Supabase dashboard
 - Ensure service role key is set for admin operations
@@ -164,6 +174,7 @@ import * as db from "../db";
 
 **Error:** TypeScript type mismatches
 **Solution:**
+
 - Import types from `supabase-schema/04-types.ts`
 - Use conversion functions: `dbToUser()`, `dbToConversation()`, etc.
 - Check that field names match the new schema
@@ -172,6 +183,7 @@ import * as db from "../db";
 
 **Error:** Data disappears after restart
 **Solution:**
+
 - Verify you're using the Supabase client, not in-memory
 - Check that imports point to `supabase-db.ts`
 - Test database connection directly in Supabase dashboard
@@ -200,6 +212,7 @@ After successful migration:
 ## Support
 
 For issues:
+
 1. Check the Supabase dashboard logs
 2. Review the SQL scripts for any execution errors
 3. Test functions directly in Supabase SQL Editor
@@ -212,9 +225,9 @@ For issues:
 You can add custom functions in `03-functions.sql` and call them via:
 
 ```typescript
-const { data, error } = await supabase.rpc('your_function', {
+const { data, error } = await supabase.rpc("your_function", {
   param1: value1,
-  param2: value2
+  param2: value2,
 });
 ```
 
@@ -224,10 +237,14 @@ Supabase supports real-time updates:
 
 ```typescript
 const subscription = supabase
-  .channel('conversations')
-  .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'conversations' }, payload => {
-    console.log('New conversation:', payload);
-  })
+  .channel("conversations")
+  .on(
+    "postgres_changes",
+    { event: "INSERT", schema: "public", table: "conversations" },
+    payload => {
+      console.log("New conversation:", payload);
+    }
+  )
   .subscribe();
 ```
 

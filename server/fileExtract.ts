@@ -124,7 +124,12 @@ export async function extractFileText(
       text = await extractPdf(buffer);
     } else if (ext === "docx") {
       text = await extractDocx(buffer);
-    } else if (ext === "xlsx" || ext === "xls" || ext === "csv" || ext === "tsv") {
+    } else if (
+      ext === "xlsx" ||
+      ext === "xls" ||
+      ext === "csv" ||
+      ext === "tsv"
+    ) {
       text = await extractSheet(buffer);
     } else if (ext === "pptx") {
       text = await extractPptx(buffer);

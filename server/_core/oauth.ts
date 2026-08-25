@@ -36,10 +36,13 @@ export function registerOAuthRoutes(app: Express) {
       res.status(403).json({ error: "invalid oauth state" });
       return;
     }
-    const isLocal = req.hostname === "localhost" || req.hostname === "127.0.0.1";
-    const isIpAddress = /^(\d{1,3}\.){3}\d{1,3}$/.test(req.hostname) || req.hostname.includes(":");
-    const domain = (!isLocal && !isIpAddress) ? `.${req.hostname}` : undefined;
-    
+    const isLocal =
+      req.hostname === "localhost" || req.hostname === "127.0.0.1";
+    const isIpAddress =
+      /^(\d{1,3}\.){3}\d{1,3}$/.test(req.hostname) ||
+      req.hostname.includes(":");
+    const domain = !isLocal && !isIpAddress ? `.${req.hostname}` : undefined;
+
     res.clearCookie(OAUTH_STATE_COOKIE, {
       path: "/",
       domain,

@@ -52,8 +52,9 @@ export function registerGoogleOAuthRoutes(app: Express) {
 
     const nonce = randomUUID();
     // For local development, use less strict cookie settings
-    const isLocal = req.hostname === "localhost" || req.hostname === "127.0.0.1";
-    
+    const isLocal =
+      req.hostname === "localhost" || req.hostname === "127.0.0.1";
+
     // Simplified cookie settings for better compatibility
     res.cookie(STATE_COOKIE, nonce, {
       httpOnly: true,
@@ -98,23 +99,29 @@ export function registerGoogleOAuthRoutes(app: Express) {
       .map(c => c.trim())
       .find(part => part.startsWith(`${STATE_COOKIE}=`))
       ?.slice(STATE_COOKIE.length + 1);
-    const isLocal = req.hostname === "localhost" || req.hostname === "127.0.0.1";
-    
-    res.clearCookie(STATE_COOKIE, { 
+    const isLocal =
+      req.hostname === "localhost" || req.hostname === "127.0.0.1";
+
+    res.clearCookie(STATE_COOKIE, {
       path: "/",
       sameSite: "lax",
-      secure: !isLocal
+      secure: !isLocal,
     });
-    
+
     if (!expectedState || state !== expectedState) {
-      console.error("[Google OAuth] State mismatch - received:", state, "expected:", expectedState);
-      res.status(403).json({ 
+      console.error(
+        "[Google OAuth] State mismatch - received:",
+        state,
+        "expected:",
+        expectedState
+      );
+      res.status(403).json({
         error: "invalid oauth state",
         debug: {
           received: state,
           expected: expectedState,
-          cookieHeader: cookies
-        }
+          cookieHeader: cookies,
+        },
       });
       return;
     }
@@ -180,25 +187,33 @@ export function registerGoogleOAuthRoutes(app: Express) {
         expiresInMs: ONE_YEAR_MS,
       });
 
-      console.log("[Google OAuth] Created session token for:", openId, "name:", displayName);
-      console.log("[Google OAuth] Cookie options:", getSessionCookieOptions(req));
+      console.log(
+        "[Google OAuth] Created session token for:",
+        openId,
+        "name:",
+        displayName
+      );
+      console.log(
+        "[Google OAuth] Cookie options:",
+        getSessionCookieOptions(req)
+      );
 
-        const cookieOptions = getSessionCookieOptions(req);
-        res.cookie(COOKIE_NAME, sessionToken, {
-          ...cookieOptions,
-          maxAge: ONE_YEAR_MS,
-        });
+      const cookieOptions = getSessionCookieOptions(req);
+      res.cookie(COOKIE_NAME, sessionToken, {
+        ...cookieOptions,
+        maxAge: ONE_YEAR_MS,
+      });
 
-        console.log("[Google OAuth] Set cookie and redirecting to /");
-        res.redirect(302, "/");
+      console.log("[Google OAuth] Set cookie and redirecting to /");
+      res.redirect(302, "/");
     } catch (err) {
       console.error("[Google OAuth] Callback failed", err);
       const errorMessage = err instanceof Error ? err.message : String(err);
       console.error("[Google OAuth] Error details:", errorMessage);
-      res.status(500).json({ 
-        error: "Google sign-in failed", 
+      res.status(500).json({
+        error: "Google sign-in failed",
         details: errorMessage,
-        hint: "Check server logs for more details"
+        hint: "Check server logs for more details",
       });
     }
   });

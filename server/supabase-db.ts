@@ -7,7 +7,6 @@ import {
   Conversation,
   Message,
   UserPreference,
-  VoiceSession,
   MessageVersion,
   MessageFeedback,
   Project,
@@ -35,7 +34,6 @@ export type {
   Conversation,
   Message,
   UserPreference,
-  VoiceSession,
   MessageVersion,
   MessageFeedback,
   Project,
@@ -48,13 +46,18 @@ export type {
 // Export the supabase client for direct access when needed
 export { supabase };
 
-const supabaseUrl = process.env.SUPABASE_URL || "https://vauqtdjpjwlhfgixfrij.supabase.co";
+const supabaseUrl =
+  process.env.SUPABASE_URL || "https://vauqtdjpjwlhfgixfrij.supabase.co";
 // Service role key is REQUIRED for backend operations to bypass RLS policies
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!supabaseKey) {
-  console.error("[Supabase] ERROR: SUPABASE_SERVICE_ROLE_KEY environment variable is required for backend operations");
-  console.error("[Supabase] Using anon key as fallback - this will cause RLS policy violations");
+  console.error(
+    "[Supabase] ERROR: SUPABASE_SERVICE_ROLE_KEY environment variable is required for backend operations"
+  );
+  console.error(
+    "[Supabase] Using anon key as fallback - this will cause RLS policy violations"
+  );
 }
 
 // A stalled database call must never hang a request (or an open SSE stream)
@@ -66,30 +69,45 @@ function createBoundedFetch(): typeof fetch {
   return (input, init) => {
     const controller = new AbortController();
     const timer = setTimeout(
-      () => controller.abort(new Error(`Supabase request timed out after ${SUPABASE_REQUEST_TIMEOUT_MS}ms`)),
+      () =>
+        controller.abort(
+          new Error(
+            `Supabase request timed out after ${SUPABASE_REQUEST_TIMEOUT_MS}ms`
+          )
+        ),
       SUPABASE_REQUEST_TIMEOUT_MS
     );
     const upstreamSignal = init?.signal;
     if (upstreamSignal) {
       if (upstreamSignal.aborted) controller.abort(upstreamSignal.reason);
       else
-        upstreamSignal.addEventListener("abort", () => controller.abort(upstreamSignal.reason), {
-          once: true,
-        });
+        upstreamSignal.addEventListener(
+          "abort",
+          () => controller.abort(upstreamSignal.reason),
+          {
+            once: true,
+          }
+        );
     }
-    return fetch(input, { ...init, signal: controller.signal }).finally(() => clearTimeout(timer));
+    return fetch(input, { ...init, signal: controller.signal }).finally(() =>
+      clearTimeout(timer)
+    );
   };
 }
 
-const supabase = createClient(supabaseUrl, supabaseKey || process.env.SUPABASE_ANON_KEY || "", {
-  global: {
-    fetch: createBoundedFetch(),
-  },
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false
+const supabase = createClient(
+  supabaseUrl,
+  supabaseKey || process.env.SUPABASE_ANON_KEY || "",
+  {
+    global: {
+      fetch: createBoundedFetch(),
+    },
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
   }
-});
+);
 
 // Helper function to handle Supabase errors
 function handleSupabaseError(error: any, operation: string): never {
@@ -108,10 +126,16 @@ function toDate(dateString: string | null): Date | null {
 
 export async function upsertUser(user: InsertUser): Promise<void> {
   const dbValues = userToDb(user);
-  
-  console.log("[Supabase] Attempting upsertUser with data:", JSON.stringify(dbValues));
-  console.log("[Supabase] Using service role key:", !!process.env.SUPABASE_SERVICE_ROLE_KEY);
-  
+
+  console.log(
+    "[Supabase] Attempting upsertUser with data:",
+    JSON.stringify(dbValues)
+  );
+  console.log(
+    "[Supabase] Using service role key:",
+    !!process.env.SUPABASE_SERVICE_ROLE_KEY
+  );
+
   // First try to get existing user
   const { data: existingUser, error: fetchError } = await supabase
     .from("users")
@@ -121,7 +145,10 @@ export async function upsertUser(user: InsertUser): Promise<void> {
 
   if (fetchError && fetchError.code !== "PGRST116") {
     // Real error (not "not found")
-    console.error("[Supabase] Fetch user error:", JSON.stringify(fetchError, null, 2));
+    console.error(
+      "[Supabase] Fetch user error:",
+      JSON.stringify(fetchError, null, 2)
+    );
     handleSupabaseError(fetchError, "fetchUser");
   }
 
@@ -135,17 +162,20 @@ export async function upsertUser(user: InsertUser): Promise<void> {
         email: dbValues.email ?? existingUser.email,
         login_method: dbValues.login_method ?? existingUser.login_method,
         last_signed_in: dbValues.last_signed_in,
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
       })
       .eq("id", existingUser.id)
       .select()
       .single();
 
     if (updateError) {
-      console.error("[Supabase] Update user error:", JSON.stringify(updateError, null, 2));
+      console.error(
+        "[Supabase] Update user error:",
+        JSON.stringify(updateError, null, 2)
+      );
       handleSupabaseError(updateError, "updateUser");
     }
-    
+
     console.log("[Supabase] User updated successfully:", updateData);
   } else {
     // User doesn't exist - insert them
@@ -157,7 +187,7 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       login_method: dbValues.login_method,
       last_signed_in: dbValues.last_signed_in,
     };
-    
+
     const { data: insertResult, error: insertError } = await supabase
       .from("users")
       .insert(insertData)
@@ -165,15 +195,20 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       .single();
 
     if (insertError) {
-      console.error("[Supabase] Insert user error:", JSON.stringify(insertError, null, 2));
+      console.error(
+        "[Supabase] Insert user error:",
+        JSON.stringify(insertError, null, 2)
+      );
       handleSupabaseError(insertError, "insertUser");
     }
-    
+
     console.log("[Supabase] User inserted successfully:", insertResult);
   }
 }
 
-export async function getUserByOpenId(openId: string): Promise<User | undefined> {
+export async function getUserByOpenId(
+  openId: string
+): Promise<User | undefined> {
   const { data, error } = await supabase
     .from("users")
     .select("*")
@@ -197,7 +232,10 @@ export async function getUserByEmail(email: string): Promise<User | undefined> {
 
   if (error) {
     if (error.code === "PGRST116") return undefined; // Not found
-    console.error("[Supabase] getUserByEmail error:", JSON.stringify(error, null, 2));
+    console.error(
+      "[Supabase] getUserByEmail error:",
+      JSON.stringify(error, null, 2)
+    );
     handleSupabaseError(error, "getUserByEmail");
   }
 
@@ -212,10 +250,7 @@ export async function listConversationsForUser(
   userId: number,
   scope: "active" | "archived" | "trash" = "active"
 ): Promise<Conversation[]> {
-  let query = supabase
-    .from("conversations")
-    .select("*")
-    .eq("user_id", userId);
+  let query = supabase.from("conversations").select("*").eq("user_id", userId);
 
   if (scope === "trash") {
     query = query.not("deleted_at", "is", null);
@@ -225,7 +260,8 @@ export async function listConversationsForUser(
     query = query.eq("is_archived", false).is("deleted_at", null);
   }
 
-  const { data, error } = await query.order("is_pinned", { ascending: false })
+  const { data, error } = await query
+    .order("is_pinned", { ascending: false })
     .order("updated_at", { ascending: false });
 
   if (error) {
@@ -258,19 +294,23 @@ export async function createConversationForUser(input: {
   id: string;
   userId: number;
   title?: string;
-  conversationType?: "text" | "voice" | "mixed";
+  conversationType?: "text";
 }): Promise<Conversation> {
-  const { data, error } = await supabase.from("conversations").insert({
-    id: input.id,
-    user_id: input.userId,
-    title: input.title || "New conversation",
-    conversation_type: input.conversationType || "text",
-    is_pinned: false,
-    is_archived: false,
-    is_public: false,
-    share_token: null,
-    deleted_at: null,
-  }).select().single();
+  const { data, error } = await supabase
+    .from("conversations")
+    .insert({
+      id: input.id,
+      user_id: input.userId,
+      title: input.title || "New conversation",
+      conversation_type: input.conversationType || "text",
+      is_pinned: false,
+      is_archived: false,
+      is_public: false,
+      share_token: null,
+      deleted_at: null,
+    })
+    .select()
+    .single();
 
   if (error) {
     handleSupabaseError(error, "createConversationForUser");
@@ -299,12 +339,16 @@ export async function updateConversationForUser(
   const updateData: any = {};
   if (values.title !== undefined) updateData.title = values.title;
   if (values.isPinned !== undefined) updateData.is_pinned = values.isPinned;
-  if (values.isArchived !== undefined) updateData.is_archived = values.isArchived;
+  if (values.isArchived !== undefined)
+    updateData.is_archived = values.isArchived;
   if (values.isPublic !== undefined) updateData.is_public = values.isPublic;
-  if (values.shareToken !== undefined) updateData.share_token = values.shareToken;
-  if (values.conversationType !== undefined) updateData.conversation_type = values.conversationType;
+  if (values.shareToken !== undefined)
+    updateData.share_token = values.shareToken;
+  if (values.conversationType !== undefined)
+    updateData.conversation_type = values.conversationType;
   if (values.projectId !== undefined) updateData.project_id = values.projectId;
-  if (values.memoryDisabled !== undefined) updateData.memory_disabled = values.memoryDisabled;
+  if (values.memoryDisabled !== undefined)
+    updateData.memory_disabled = values.memoryDisabled;
 
   const { data, error } = await supabase
     .from("conversations")
@@ -323,9 +367,12 @@ export async function updateConversationForUser(
 }
 
 export async function getPublicConversationByToken(shareToken: string) {
-  const { data, error } = await supabase.rpc("get_public_conversation_by_token", {
-    p_share_token: shareToken,
-  });
+  const { data, error } = await supabase.rpc(
+    "get_public_conversation_by_token",
+    {
+      p_share_token: shareToken,
+    }
+  );
 
   if (error) {
     if (error.code === "PGRST116") return null;
@@ -356,7 +403,10 @@ export async function getPublicConversationByToken(shareToken: string) {
   return { conversation, messages };
 }
 
-export async function deleteConversationForUser(id: string, userId: number): Promise<void> {
+export async function deleteConversationForUser(
+  id: string,
+  userId: number
+): Promise<void> {
   const { error } = await supabase
     .from("conversations")
     .delete()
@@ -368,7 +418,9 @@ export async function deleteConversationForUser(id: string, userId: number): Pro
   }
 }
 
-export async function deleteAllConversationsForUser(userId: number): Promise<number> {
+export async function deleteAllConversationsForUser(
+  userId: number
+): Promise<number> {
   const { data, error } = await supabase
     .from("conversations")
     .delete()
@@ -382,7 +434,10 @@ export async function deleteAllConversationsForUser(userId: number): Promise<num
   return data?.length ?? 0;
 }
 
-export async function moveConversationToTrash(id: string, userId: number): Promise<Conversation | undefined> {
+export async function moveConversationToTrash(
+  id: string,
+  userId: number
+): Promise<Conversation | undefined> {
   const { data, error } = await supabase.rpc("move_conversation_to_trash", {
     p_conversation_id: id,
     p_user_id: userId,
@@ -396,7 +451,10 @@ export async function moveConversationToTrash(id: string, userId: number): Promi
   return getConversationForUser(id, userId);
 }
 
-export async function restoreConversationForUser(id: string, userId: number): Promise<Conversation | undefined> {
+export async function restoreConversationForUser(
+  id: string,
+  userId: number
+): Promise<Conversation | undefined> {
   const { data, error } = await supabase.rpc("restore_conversation", {
     p_conversation_id: id,
     p_user_id: userId,
@@ -414,7 +472,9 @@ export async function restoreConversationForUser(id: string, userId: number): Pr
 // MESSAGE FUNCTIONS
 // ============================================
 
-export async function listMessagesForConversation(conversationId: string): Promise<Message[]> {
+export async function listMessagesForConversation(
+  conversationId: string
+): Promise<Message[]> {
   const { data, error } = await supabase
     .from("messages")
     .select("*")
@@ -441,23 +501,25 @@ export async function updateMessage(
   id: string,
   values: Partial<Pick<Message, "content" | "model" | "status">>
 ): Promise<void> {
-  const { error } = await supabase
-    .from("messages")
-    .update(values)
-    .eq("id", id);
+  const { error } = await supabase.from("messages").update(values).eq("id", id);
 
   if (error) {
     handleSupabaseError(error, "updateMessage");
   }
 }
 
-export async function getMessageForUser(messageId: string, userId: number): Promise<Message | undefined> {
+export async function getMessageForUser(
+  messageId: string,
+  userId: number
+): Promise<Message | undefined> {
   const { data, error } = await supabase
     .from("messages")
-    .select(`
+    .select(
+      `
       *,
       conversations!inner(user_id)
-    `)
+    `
+    )
     .eq("id", messageId)
     .eq("conversations.user_id", userId)
     .single();
@@ -470,7 +532,10 @@ export async function getMessageForUser(messageId: string, userId: number): Prom
   return dbToMessage(data as DbMessage);
 }
 
-export async function deleteMessageForUser(messageId: string, userId: number): Promise<boolean> {
+export async function deleteMessageForUser(
+  messageId: string,
+  userId: number
+): Promise<boolean> {
   const message = await getMessageForUser(messageId, userId);
   if (!message) return false;
 
@@ -493,7 +558,9 @@ export async function removeFollowingAssistantDuplicatesForUser(
   const assistant = await getMessageForUser(assistantMessageId, userId);
   if (!assistant || assistant.role !== "assistant") return [];
 
-  const conversationMessages = await listMessagesForConversation(assistant.conversationId);
+  const conversationMessages = await listMessagesForConversation(
+    assistant.conversationId
+  );
   const index = conversationMessages.findIndex(m => m.id === assistant.id);
   if (index < 0) return [];
 
@@ -506,10 +573,7 @@ export async function removeFollowingAssistantDuplicatesForUser(
 
   // Delete all duplicate messages
   for (const id of duplicateIds) {
-    const { error } = await supabase
-      .from("messages")
-      .delete()
-      .eq("id", id);
+    const { error } = await supabase.from("messages").delete().eq("id", id);
 
     if (error) {
       console.error(`Failed to delete duplicate message ${id}:`, error);
@@ -529,11 +593,13 @@ export async function editMessageForUser(input: {
   if (!message) return undefined;
 
   // Save version
-  const { error: versionError } = await supabase.from("message_versions").insert({
-    id: input.versionId,
-    message_id: message.id,
-    content: message.content,
-  });
+  const { error: versionError } = await supabase
+    .from("message_versions")
+    .insert({
+      id: input.versionId,
+      message_id: message.id,
+      content: message.content,
+    });
 
   if (versionError) {
     handleSupabaseError(versionError, "editMessageForUser (save version)");
@@ -554,7 +620,10 @@ export async function editMessageForUser(input: {
   return dbToMessage(data as DbMessage);
 }
 
-export async function listMessageVersionsForUser(messageId: string, userId: number): Promise<MessageVersion[]> {
+export async function listMessageVersionsForUser(
+  messageId: string,
+  userId: number
+): Promise<MessageVersion[]> {
   const message = await getMessageForUser(messageId, userId);
   if (!message) return [];
 
@@ -593,7 +662,10 @@ export async function setMessageFeedbackForUser(input: {
   }
 }
 
-export async function searchConversationMessages(userId: number, query: string) {
+export async function searchConversationMessages(
+  userId: number,
+  query: string
+) {
   const { data, error } = await supabase.rpc("search_messages", {
     p_user_id: userId,
     p_query: query,
@@ -634,7 +706,9 @@ export async function searchConversationTitles(userId: number, query: string) {
 // USER PREFERENCES FUNCTIONS
 // ============================================
 
-export async function getUserPreferences(userId: number): Promise<UserPreference | undefined> {
+export async function getUserPreferences(
+  userId: number
+): Promise<UserPreference | undefined> {
   const { data, error } = await supabase
     .from("user_preferences")
     .select("*")
@@ -653,15 +727,15 @@ export async function upsertUserPreferences(
   userId: number,
   values: Partial<Omit<UserPreference, "userId" | "createdAt" | "updatedAt">>
 ): Promise<UserPreference | undefined> {
-    const dbValues: any = {
-      user_id: userId,
-      selected_model: values.selectedModel || null,
-      persona: values.persona || "balanced",
-      custom_instructions: values.customInstructions || null,
-      speech_rate: values.speechRate || 100,
-      auto_play_responses: values.autoPlayResponses || false,
-      reduce_motion: values.reduceMotion || false,
-    };
+  const dbValues: any = {
+    user_id: userId,
+    selected_model: values.selectedModel || null,
+    persona: values.persona || "balanced",
+    custom_instructions: values.customInstructions || null,
+    speech_rate: values.speechRate || 100,
+    auto_play_responses: values.autoPlayResponses || false,
+    reduce_motion: values.reduceMotion || false,
+  };
 
   const { error } = await supabase
     .from("user_preferences")
@@ -677,56 +751,13 @@ export async function upsertUserPreferences(
 }
 
 // ============================================
-// VOICE SESSION FUNCTIONS
-// ============================================
-
-export async function createVoiceSession(input: {
-  id: string;
-  userId: number;
-  conversationId: string;
-}): Promise<VoiceSession> {
-  const { data, error } = await supabase.from("voice_sessions").insert({
-    id: input.id,
-    user_id: input.userId,
-    conversation_id: input.conversationId,
-    status: "connecting",
-  }).select().single();
-
-  if (error) {
-    handleSupabaseError(error, "createVoiceSession");
-  }
-
-  return {
-    id: data.id,
-    userId: data.user_id,
-    conversationId: data.conversation_id,
-    status: data.status,
-    createdAt: new Date(data.created_at),
-    updatedAt: new Date(data.updated_at),
-  };
-}
-
-export async function updateVoiceSessionForUser(
-  id: string,
-  userId: number,
-  status: VoiceSession["status"]
-): Promise<void> {
-  const { error } = await supabase
-    .from("voice_sessions")
-    .update({ status })
-    .eq("id", id)
-    .eq("user_id", userId);
-
-  if (error) {
-    handleSupabaseError(error, "updateVoiceSessionForUser");
-  }
-}
-
-// ============================================
 // FILE FUNCTIONS
 // ============================================
 
-export async function listMessageFilesForUser(messageId: string, userId: number) {
+export async function listMessageFilesForUser(
+  messageId: string,
+  userId: number
+) {
   const message = await getMessageForUser(messageId, userId);
   if (!message) return [];
 
@@ -735,20 +766,24 @@ export async function listMessageFilesForUser(messageId: string, userId: number)
   let error: any = null;
   ({ data, error } = await supabase
     .from("attachments")
-    .select(`
+    .select(
+      `
       file_id,
       files!inner(id, user_id, filename, mime_type, url, storage_key, content_text)
-    `)
+    `
+    )
     .eq("message_id", messageId)
     .eq("files.user_id", userId));
 
   if (error) {
     ({ data, error } = await supabase
       .from("attachments")
-      .select(`
+      .select(
+        `
         file_id,
         files!inner(id, user_id, filename, mime_type, url, storage_key)
-      `)
+      `
+      )
       .eq("message_id", messageId)
       .eq("files.user_id", userId));
   }
@@ -848,14 +883,18 @@ export async function createProjectForUser(input: {
   description?: string;
   instructions?: string;
 }): Promise<Project> {
-  const { data, error } = await supabase.from("projects").insert({
-    id: input.id,
-    user_id: input.userId,
-    name: input.name,
-    description: input.description || null,
-    instructions: input.instructions || null,
-    is_archived: false,
-  }).select().single();
+  const { data, error } = await supabase
+    .from("projects")
+    .insert({
+      id: input.id,
+      user_id: input.userId,
+      name: input.name,
+      description: input.description || null,
+      instructions: input.instructions || null,
+      is_archived: false,
+    })
+    .select()
+    .single();
 
   if (error) {
     handleSupabaseError(error, "createProjectForUser");
@@ -877,7 +916,10 @@ export async function createProjectForUser(input: {
 // TASK FUNCTIONS
 // ============================================
 
-export async function getTaskForUser(taskId: string, userId: number): Promise<Task | undefined> {
+export async function getTaskForUser(
+  taskId: string,
+  userId: number
+): Promise<Task | undefined> {
   const { data, error } = await supabase
     .from("tasks")
     .select("*")
@@ -906,7 +948,10 @@ export async function getTaskForUser(taskId: string, userId: number): Promise<Ta
   };
 }
 
-export async function listTaskActivitiesForUser(taskId: string, userId: number) {
+export async function listTaskActivitiesForUser(
+  taskId: string,
+  userId: number
+) {
   const { data, error } = await supabase
     .from("task_activities")
     .select("*")
@@ -946,16 +991,22 @@ export async function createTaskActivityForUser(input: {
   const status = input.status || "queued";
   const now = new Date();
 
-  const { data, error } = await supabase.from("task_activities").insert({
-    id: input.id,
-    user_id: input.userId,
-    task_id: input.taskId,
-    status,
-    summary: input.summary,
-    detail: input.detail || null,
-    started_at: status === "running" ? now.toISOString() : null,
-    completed_at: ["completed", "failed", "cancelled"].includes(status) ? now.toISOString() : null,
-  }).select().single();
+  const { data, error } = await supabase
+    .from("task_activities")
+    .insert({
+      id: input.id,
+      user_id: input.userId,
+      task_id: input.taskId,
+      status,
+      summary: input.summary,
+      detail: input.detail || null,
+      started_at: status === "running" ? now.toISOString() : null,
+      completed_at: ["completed", "failed", "cancelled"].includes(status)
+        ? now.toISOString()
+        : null,
+    })
+    .select()
+    .single();
 
   if (error) {
     handleSupabaseError(error, "createTaskActivityForUser");
@@ -1047,7 +1098,6 @@ export async function getDb() {
     conversations: new Map(),
     messages: new Map(),
     userPreferences: new Map(),
-    voiceSessions: new Map(),
     messageVersions: new Map(),
     messageFeedback: new Map(),
     projects: new Map(),

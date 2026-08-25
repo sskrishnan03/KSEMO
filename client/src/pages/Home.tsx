@@ -31,7 +31,6 @@ import {
 } from "../components/ksemo/DialogPanels";
 import { MessageHistoryDialogPanel } from "../components/ksemo/MessageHistoryDialogPanel";
 import { useVoiceInput } from "../hooks/useVoiceInput";
-import { VoiceChat } from "../components/voice/VoiceChat";
 import { WorkspacePanel } from "../components/ksemo/WorkspacePanel";
 import { LibraryWorkspace } from "../components/ksemo/LibraryWorkspace";
 import { SearchDialog } from "../components/ksemo/SearchWorkspace";
@@ -104,8 +103,6 @@ export default function Home() {
   const interactionPreview = import.meta.env.DEV
     ? new URLSearchParams(window.location.search).get("interactionPreview")
     : null;
-  const isRecordingPreview = interactionPreview === "recording";
-  const isTranscribingPreview = interactionPreview === "transcribing";
   const isLibraryPreview = interactionPreview === "library";
   const isSharePreview = interactionPreview === "share";
   const isRenamePreview = interactionPreview === "rename";
@@ -133,9 +130,7 @@ export default function Home() {
     []
   );
   const inlineWorkspaceSection: "library" | null =
-    workspacePreview === "files"
-      ? "library"
-      : null;
+    workspacePreview === "files" ? "library" : null;
   const utils = trpc.useUtils();
   const [savedAccounts, setSavedAccounts] =
     useState<SavedAccount[]>(getSavedAccounts);
@@ -172,11 +167,10 @@ export default function Home() {
   const [speechState, setSpeechState] = useState<"idle" | "playing" | "paused">(
     "idle"
   );
-  const [primaryWorkspace, setPrimaryWorkspace] = useState<
-    "library" | null
-  >(null);
+  const [primaryWorkspace, setPrimaryWorkspace] = useState<"library" | null>(
+    null
+  );
   const [searchOpen, setSearchOpen] = useState(false);
-  const [voiceChatOpen, setVoiceChatOpen] = useState(false);
   const activePrimaryWorkspace = primaryWorkspace ?? inlineWorkspaceSection;
   const [shareTarget, setShareTarget] = useState<{
     id: string;
@@ -236,7 +230,9 @@ export default function Home() {
     },
     onError: () => toast.error("Settings could not be saved."),
   });
-  const [switchingAccountId, setSwitchingAccountId] = useState<string | null>(null);
+  const [switchingAccountId, setSwitchingAccountId] = useState<string | null>(
+    null
+  );
   const switchAccountMutation = trpc.auth.signIn.useMutation({
     onSuccess: async () => {
       await utils.auth.me.invalidate();
@@ -256,7 +252,7 @@ export default function Home() {
         });
       }
       toast.error(
-        "That account could not be switched. Signing out so you can sign in again.",
+        "That account could not be switched. Signing out so you can sign in again."
       );
       void logout();
     },
@@ -372,7 +368,6 @@ export default function Home() {
       setComposerValue(current => (current ? `${current} ${text}` : text)),
     onError: message => toast.error(message),
   });
-
   const persistedMessages = useMemo<KsemoMessage[]>(
     () =>
       (activeQuery.data?.messages ?? []).map(message => ({
@@ -880,7 +875,6 @@ export default function Home() {
     setPendingConversationId(null);
     setActiveConversationId(null);
     setPrimaryWorkspace(null);
-    setVoiceChatOpen(false);
     setSidebarOpen(false);
   }
 
@@ -1172,7 +1166,6 @@ export default function Home() {
     setPendingMessages(null);
     setPendingConversationId(null);
     setPrimaryWorkspace(null);
-    setVoiceChatOpen(false);
     setActiveConversationId(id);
     setSidebarOpen(false);
   }
@@ -1309,16 +1302,6 @@ export default function Home() {
             onBackToChat={() => setPrimaryWorkspace(null)}
             onChatWithFiles={startChatWithLibraryFiles}
           />
-        ) : voiceChatOpen ? (
-          <VoiceChat
-            conversationId={activeConversationId}
-            onConversation={id => {
-              setActiveConversationId(id);
-              utils.conversation.list.invalidate();
-            }}
-            onExit={() => setVoiceChatOpen(false)}
-            speechRate={(preferencesQuery.data?.speechRate ?? 100) / 100}
-          />
         ) : (
           <>
             <Button
@@ -1383,19 +1366,11 @@ export default function Home() {
                       onVoice={
                         voice.state === "recording" ? voice.stop : voice.start
                       }
-                      onVoiceChat={() => {
-                        setPrimaryWorkspace(null);
-                        setVoiceChatOpen(true);
-                      }}
                       onCancelRecording={voice.cancel}
                       isGenerating={isGenerating}
-                      isRecording={
-                        voice.state === "recording" || isRecordingPreview
-                      }
-                      isTranscribing={
-                        voice.state === "transcribing" || isTranscribingPreview
-                      }
-                      recordingSeconds={isRecordingPreview ? 7 : voice.seconds}
+                      isRecording={voice.state === "recording"}
+                      isTranscribing={voice.state === "transcribing"}
+                      recordingSeconds={voice.seconds}
                       value={composerValue}
                       onValueChange={setComposerValue}
                       onAttachment={attachFromComposer}
@@ -1438,17 +1413,13 @@ export default function Home() {
               <ChatComposer
                 onSend={sendMessage}
                 onCancel={stopGeneration}
-                onVoice={voice.state === "recording" ? voice.stop : voice.start}
-                onVoiceChat={() => {
-                  setPrimaryWorkspace(null);
-                  setVoiceChatOpen(true);
-                }}
+                onVoice={
+                  voice.state === "recording" ? voice.stop : voice.start
+                }
                 onCancelRecording={voice.cancel}
                 isGenerating={isGenerating}
                 isRecording={voice.state === "recording"}
-                isTranscribing={
-                  voice.state === "transcribing" || isTranscribingPreview
-                }
+                isTranscribing={voice.state === "transcribing"}
                 recordingSeconds={voice.seconds}
                 value={composerValue}
                 onValueChange={setComposerValue}

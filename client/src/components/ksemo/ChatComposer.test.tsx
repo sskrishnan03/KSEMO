@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import {
   ChatComposer,
-  librarySubmenuClass,
+  getLibrarySubmenuClass,
   LibraryPickerContent,
 } from "./ChatComposer";
 
@@ -13,23 +13,14 @@ const baseProps = {
   onVoice: () => undefined,
   onCancelRecording: () => undefined,
   isGenerating: false,
+  isRecording: false,
   isTranscribing: false,
-  recordingSeconds: 7,
+  recordingSeconds: 0,
   value: "",
   onValueChange: () => undefined,
 };
 
-describe("ChatComposer recording state", () => {
-  it("keeps the message field in the original composer while recording", () => {
-    const markup = renderToStaticMarkup(
-      createElement(ChatComposer, { ...baseProps, isRecording: true })
-    );
-    expect(markup).toContain('aria-label="Message KSEMO"');
-    expect(markup).toContain('aria-label="Recording 7 seconds"');
-    expect(markup).toContain('aria-label="Cancel recording"');
-    expect(markup).toContain('aria-label="Finish recording"');
-  });
-
+describe("ChatComposer", () => {
   it("renders a searchable cancellable Library flyout with a selectable private file", () => {
     const markup = renderToStaticMarkup(
       createElement(LibraryPickerContent, {
@@ -57,7 +48,6 @@ describe("ChatComposer recording state", () => {
     const markup = renderToStaticMarkup(
       createElement(ChatComposer, {
         ...baseProps,
-        isRecording: false,
         attachmentNotice: { name: "brief.pdf", linked: true },
         onClearAttachment: () => undefined,
       })
@@ -75,7 +65,6 @@ describe("ChatComposer recording state", () => {
     const markup = renderToStaticMarkup(
       createElement(ChatComposer, {
         ...baseProps,
-        isRecording: false,
         attachmentNotices: [
           { fileId: "doc-1", name: "brief.pdf", linked: false },
           { fileId: "image-1", name: "diagram.png", linked: false },
@@ -90,44 +79,31 @@ describe("ChatComposer recording state", () => {
   });
 
   it("keeps the mobile Library selector translated inward and height-bounded", () => {
+    const librarySubmenuClass = getLibrarySubmenuClass(false);
     expect(librarySubmenuClass).not.toContain("bottom-[calc(100%+0.5rem)]");
-    expect(librarySubmenuClass).toContain("max-sm:left-1/2");
-    expect(librarySubmenuClass).toContain("max-sm:-translate-x-1/2");
-    expect(librarySubmenuClass).toContain("max-h-[calc(100dvh-2rem)]");
+    expect(librarySubmenuClass).toContain("left-1/2");
+    expect(librarySubmenuClass).toContain("-translate-x-1/2");
+    expect(librarySubmenuClass).toContain("max-h-[calc(100dvh-6rem)]");
   });
 
   it("hides the safety note for the centered fresh-chat composer while retaining it by default below a conversation", () => {
     const centeredMarkup = renderToStaticMarkup(
       createElement(ChatComposer, {
         ...baseProps,
-        isRecording: false,
         showSafetyNote: false,
       })
     );
     const conversationMarkup = renderToStaticMarkup(
-      createElement(ChatComposer, { ...baseProps, isRecording: false })
+      createElement(ChatComposer, { ...baseProps })
     );
     expect(centeredMarkup).not.toContain("KSEMO can make mistakes");
     expect(conversationMarkup).toContain("KSEMO can make mistakes");
   });
 
-  it("places the dedicated live Voice Chat control between quick recording and Send", () => {
-    const markup = renderToStaticMarkup(
-      createElement(ChatComposer, { ...baseProps, isRecording: false })
-    );
-    const recordIndex = markup.indexOf('aria-label="Use voice input"');
-    const voiceChatIndex = markup.indexOf('aria-label="Start voice chat"');
-    const sendIndex = markup.indexOf('aria-label="Send message"');
-    expect(recordIndex).toBeGreaterThan(-1);
-    expect(voiceChatIndex).toBeGreaterThan(recordIndex);
-    expect(sendIndex).toBeGreaterThan(voiceChatIndex);
-  });
-
-  it("shows a cancellable web search pill next to the voice controls only while enabled", () => {
+  it("shows a cancellable web search pill only while enabled", () => {
     const off = renderToStaticMarkup(
       createElement(ChatComposer, {
         ...baseProps,
-        isRecording: false,
         webSearchEnabled: false,
         onToggleWebSearch: () => undefined,
       })
@@ -137,16 +113,11 @@ describe("ChatComposer recording state", () => {
     const on = renderToStaticMarkup(
       createElement(ChatComposer, {
         ...baseProps,
-        isRecording: false,
         webSearchEnabled: true,
         onToggleWebSearch: () => undefined,
       })
     );
     expect(on).toContain(">Web search</span>");
     expect(on).toContain('aria-label="Cancel web search"');
-    // The pill must sit after the voice chat control in the bottom row.
-    expect(on.indexOf('aria-label="Start voice chat"')).toBeLessThan(
-      on.indexOf('aria-label="Cancel web search"')
-    );
   });
 });

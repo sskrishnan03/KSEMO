@@ -8,7 +8,8 @@ import { protectedProcedure, router } from "../_core/trpc";
 // The anon key cannot be used here: RLS policies require a Supabase Auth
 // session (auth.uid()), which a server-side client never has. Use the service
 // role key like supabase-db.ts; ownership is enforced per-query via user_id.
-const supabaseUrl = process.env.SUPABASE_URL || "https://vauqtdjpjwlhfgixfrij.supabase.co";
+const supabaseUrl =
+  process.env.SUPABASE_URL || "https://vauqtdjpjwlhfgixfrij.supabase.co";
 const supabaseKey =
   process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || "";
 
@@ -129,23 +130,35 @@ export const workspaceRouter = router({
         .eq("is_archived", false)
         .order("updated_at", { ascending: false });
 
-      if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to fetch projects" });
+      if (error)
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to fetch projects",
+        });
       return data || [];
     }),
     create: protectedProcedure
       .input(projectInput)
       .mutation(async ({ ctx, input }) => {
         const id = crypto.randomUUID();
-        const { data, error } = await supabase.from("projects").insert({
-          id,
-          user_id: ctx.user.id,
-          name: input.name,
-          description: input.description ?? null,
-          instructions: input.instructions ?? null,
-          is_archived: false,
-        }).select().single();
+        const { data, error } = await supabase
+          .from("projects")
+          .insert({
+            id,
+            user_id: ctx.user.id,
+            name: input.name,
+            description: input.description ?? null,
+            instructions: input.instructions ?? null,
+            is_archived: false,
+          })
+          .select()
+          .single();
 
-        if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create project" });
+        if (error)
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to create project",
+          });
         return data;
       }),
     update: protectedProcedure
@@ -160,7 +173,11 @@ export const workspaceRouter = router({
           .select()
           .single();
 
-        if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to update project" });
+        if (error)
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to update project",
+          });
         return data;
       }),
     archive: protectedProcedure
@@ -172,7 +189,11 @@ export const workspaceRouter = router({
           .update({ is_archived: input.isArchived })
           .eq("id", input.id);
 
-        if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to archive project" });
+        if (error)
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to archive project",
+          });
         return { success: true } as const;
       }),
     remove: protectedProcedure
@@ -184,7 +205,11 @@ export const workspaceRouter = router({
           .delete()
           .eq("id", input.id);
 
-        if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to delete project" });
+        if (error)
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to delete project",
+          });
         return { success: true } as const;
       }),
     conversations: protectedProcedure
@@ -199,7 +224,11 @@ export const workspaceRouter = router({
           .is("deleted_at", null)
           .order("updated_at", { ascending: false });
 
-        if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to fetch conversations" });
+        if (error)
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to fetch conversations",
+          });
         return data || [];
       }),
     setConversation: protectedProcedure
@@ -226,7 +255,11 @@ export const workspaceRouter = router({
           .update({ project_id: input.projectId })
           .eq("id", input.conversationId);
 
-        if (updateError) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to set conversation project" });
+        if (updateError)
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to set conversation project",
+          });
         return { success: true } as const;
       }),
   }),
@@ -244,7 +277,11 @@ export const workspaceRouter = router({
         .eq("user_id", ctx.user.id)
         .order("created_at", { ascending: false });
 
-      if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to fetch files" });
+      if (error)
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to fetch files",
+        });
       // Map to plain objects with a stable shape — the raw Supabase builder
       // types don't play well with conditional select columns + tRPC.
       const rows = (data || []) as unknown as Array<Record<string, unknown>>;
@@ -257,9 +294,16 @@ export const workspaceRouter = router({
         filename: String(row.filename),
         mimeType: String(row.mime_type),
         sizeBytes: Number(row.size_bytes),
-        status: String(row.status) === "failed" ? ("failed" as const) : ("ready" as const),
-        createdAt: row.created_at ? new Date(String(row.created_at)) : new Date(),
-        updatedAt: row.updated_at ? new Date(String(row.updated_at)) : new Date(),
+        status:
+          String(row.status) === "failed"
+            ? ("failed" as const)
+            : ("ready" as const),
+        createdAt: row.created_at
+          ? new Date(String(row.created_at))
+          : new Date(),
+        updatedAt: row.updated_at
+          ? new Date(String(row.updated_at))
+          : new Date(),
         isFavorite: ready ? Boolean(row.is_favorite) : false,
       }));
     }),
@@ -278,7 +322,11 @@ export const workspaceRouter = router({
           .eq("id", input.id)
           .eq("user_id", ctx.user.id);
 
-        if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to update file" });
+        if (error)
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to update file",
+          });
         return { success: true } as const;
       }),
     upload: protectedProcedure
@@ -292,7 +340,10 @@ export const workspaceRouter = router({
       )
       .mutation(async ({ ctx, input }) => {
         const extension = extensionOf(input.filename);
-        if (!allowedMimeTypes.has(input.mimeType) && !allowedExtensions.has(extension))
+        if (
+          !allowedMimeTypes.has(input.mimeType) &&
+          !allowedExtensions.has(extension)
+        )
           throw new TRPCError({
             code: "BAD_REQUEST",
             message:
@@ -321,20 +372,28 @@ export const workspaceRouter = router({
             buffer
           );
         }
-        const { data, error } = await supabase.from("files").insert({
-          id,
-          user_id: ctx.user.id,
-          project_id: input.projectId ?? null,
-          storage_key: saved.key,
-          url: saved.url,
-          filename: input.filename,
-          mime_type: input.mimeType,
-          size_bytes: buffer.length,
-          status: "ready",
-          ...(contentText ? { content_text: contentText } : {}),
-        }).select().single();
+        const { data, error } = await supabase
+          .from("files")
+          .insert({
+            id,
+            user_id: ctx.user.id,
+            project_id: input.projectId ?? null,
+            storage_key: saved.key,
+            url: saved.url,
+            filename: input.filename,
+            mime_type: input.mimeType,
+            size_bytes: buffer.length,
+            status: "ready",
+            ...(contentText ? { content_text: contentText } : {}),
+          })
+          .select()
+          .single();
 
-        if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to upload file" });
+        if (error)
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to upload file",
+          });
         return data;
       }),
     remove: protectedProcedure
@@ -346,7 +405,11 @@ export const workspaceRouter = router({
           .eq("id", input.id)
           .eq("user_id", ctx.user.id);
 
-        if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to delete file" });
+        if (error)
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to delete file",
+          });
         return { success: true } as const;
       }),
     attachToConversation: protectedProcedure
@@ -386,14 +449,20 @@ export const workspaceRouter = router({
           .single();
 
         if (!existing) {
-          const { error: insertError } = await supabase.from("attachments").insert({
-            id: crypto.randomUUID(),
-            file_id: file.id,
-            conversation_id: conversation.id,
-            message_id: null,
-          });
+          const { error: insertError } = await supabase
+            .from("attachments")
+            .insert({
+              id: crypto.randomUUID(),
+              file_id: file.id,
+              conversation_id: conversation.id,
+              message_id: null,
+            });
 
-          if (insertError) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to attach file" });
+          if (insertError)
+            throw new TRPCError({
+              code: "INTERNAL_SERVER_ERROR",
+              message: "Failed to attach file",
+            });
         }
 
         return { success: true } as const;

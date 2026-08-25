@@ -58,9 +58,7 @@ export function SearchDialog({
 
   const titleMatches = useMemo(() => {
     if (!trimmed) return [];
-    return conversations.filter(c =>
-      c.title.toLowerCase().includes(trimmed)
-    );
+    return conversations.filter(c => c.title.toLowerCase().includes(trimmed));
   }, [conversations, trimmed]);
 
   const messageMatches = useMemo(() => {
@@ -70,7 +68,8 @@ export function SearchDialog({
     const seen = new Set<string>();
 
     for (const msg of serverData.messages) {
-      if (seen.has(msg.conversationId) || titleIds.has(msg.conversationId)) continue;
+      if (seen.has(msg.conversationId) || titleIds.has(msg.conversationId))
+        continue;
       seen.add(msg.conversationId);
       results.push({
         conversationId: msg.conversationId,

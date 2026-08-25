@@ -6,7 +6,8 @@ function isIpAddress(host: string) {
   // Basic IPv4 check and IPv6 presence detection.
   if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) return true;
   return host.includes(":");
-}function isSecureRequest(req: Request) {
+}
+function isSecureRequest(req: Request) {
   if (req.protocol === "https") return true;
 
   const forwardedProto = req.headers["x-forwarded-proto"];
@@ -23,19 +24,21 @@ export function getSessionCookieOptions(
   req: Request
 ): Pick<CookieOptions, "domain" | "httpOnly" | "path" | "sameSite" | "secure"> {
   const hostname = req.hostname || "";
-  const isLocal = LOCAL_HOSTS.has(hostname) || 
-                  hostname === "127.0.0.1" || 
-                  hostname === "::1" ||
-                  isIpAddress(hostname);
-  
+  const isLocal =
+    LOCAL_HOSTS.has(hostname) ||
+    hostname === "127.0.0.1" ||
+    hostname === "::1" ||
+    isIpAddress(hostname);
+
   // Only set domain for non-local, non-IP hosts
   const shouldSetDomain = hostname && !isLocal;
-  
-  const domain = shouldSetDomain && !hostname.startsWith(".")
-    ? `.${hostname}`
-    : shouldSetDomain
-      ? hostname
-      : undefined;
+
+  const domain =
+    shouldSetDomain && !hostname.startsWith(".")
+      ? `.${hostname}`
+      : shouldSetDomain
+        ? hostname
+        : undefined;
 
   const secure = isSecureRequest(req);
   return {

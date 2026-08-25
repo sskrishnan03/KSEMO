@@ -16,7 +16,6 @@ import {
 import { filterLibraryItems } from "@/lib/ksemoInteraction";
 import {
   ArrowUp,
-  AudioLines,
   Check,
   FileText,
   FileUp,
@@ -37,13 +36,12 @@ import React, {
 } from "react";
 
 export const getLibrarySubmenuClass = (isCentered: boolean) =>
-  `absolute left-1/2 -translate-x-1/2 z-50 max-h-[calc(100dvh-${isCentered ? '12rem' : '6rem'})] w-full max-w-3xl rounded-xl border border-border bg-popover p-0 text-popover-foreground shadow-xl`;
+  `absolute left-1/2 -translate-x-1/2 z-50 max-h-[calc(100dvh-${isCentered ? "12rem" : "6rem"})] w-full max-w-3xl rounded-xl border border-border bg-popover p-0 text-popover-foreground shadow-xl`;
 
 export function ChatComposer({
   onSend,
   onCancel,
   onVoice,
-  onVoiceChat,
   onCancelRecording,
   isGenerating,
   isRecording,
@@ -69,7 +67,6 @@ export function ChatComposer({
   onSend: (content: string) => void;
   onCancel: () => void;
   onVoice: () => void;
-  onVoiceChat?: () => void;
   onCancelRecording: () => void;
   isGenerating: boolean;
   isRecording: boolean;
@@ -88,12 +85,14 @@ export function ChatComposer({
     sizeBytes?: number;
     url?: string;
   }>;
-  onLibraryFile?: (files: Array<{
-    id: string;
-    filename: string;
-    mimeType?: string;
-    url?: string;
-  }>) => void;
+  onLibraryFile?: (
+    files: Array<{
+      id: string;
+      filename: string;
+      mimeType?: string;
+      url?: string;
+    }>
+  ) => void;
   initialLibraryOpen?: boolean;
   initialToolsOpen?: boolean;
   menuPlacement?: "above" | "below";
@@ -178,9 +177,13 @@ export function ChatComposer({
                 setLibraryQuery("");
               }}
               listMaxHeightClass={
-                menuPlacement === "below" 
-                  ? (isCentered ? "max-h-32" : "max-h-64") 
-                  : (isCentered ? "max-h-16" : "max-h-32")
+                menuPlacement === "below"
+                  ? isCentered
+                    ? "max-h-32"
+                    : "max-h-64"
+                  : isCentered
+                    ? "max-h-16"
+                    : "max-h-32"
               }
             />
           </div>
@@ -313,48 +316,46 @@ export function ChatComposer({
           ) : (
             <div className="flex items-center gap-1">
               <DropdownMenu
-                open={toolsOpen && !libraryOpen}
-                onOpenChange={setToolsOpen}
+              open={toolsOpen && !libraryOpen}
+              onOpenChange={setToolsOpen}
+            >
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-9 rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground"
+                      aria-label="Open composer tools"
+                    >
+                      <Plus className="size-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  Add a file or browse Library
+                </TooltipContent>
+              </Tooltip>
+              <DropdownMenuContent
+                align="start"
+                side={menuPlacement === "below" ? "bottom" : "top"}
+                sideOffset={10}
+                collisionPadding={12}
+                className="w-56 rounded-xl"
               >
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="size-9 rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground"
-                        aria-label="Open composer tools"
-                      >
-                        <Plus className="size-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom">
-                    Add a file or browse Library
-                  </TooltipContent>
-                </Tooltip>
-                <DropdownMenuContent
-                  align="start"
-                  side={menuPlacement === "below" ? "bottom" : "top"}
-                  sideOffset={10}
-                  collisionPadding={12}
-                  className="w-56 rounded-xl"
+                <DropdownMenuItem onClick={() => fileInputRef.current?.click()}>
+                  <FileUp className="mr-2 size-4" /> Add images and files
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={() => {
+                    setLibraryOpen(true);
+                    setToolsOpen(false);
+                  }}
                 >
-                  <DropdownMenuItem
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    <FileUp className="mr-2 size-4" /> Add images and files
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onSelect={() => {
-                      setLibraryOpen(true);
-                      setToolsOpen(false);
-                    }}
-                  >
-                    <Library className="mr-2 size-4" />
-                    Browse Library
-                  </DropdownMenuItem>
-                  {onToggleWebSearch && (
+                  <Library className="mr-2 size-4" />
+                  Browse Library
+                </DropdownMenuItem>
+                {onToggleWebSearch && (
                   <DropdownMenuItem
                     onSelect={() => {
                       onToggleWebSearch();
@@ -364,74 +365,55 @@ export function ChatComposer({
                     <Globe className="mr-2 size-4" />
                     Web search
                   </DropdownMenuItem>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
-              {!isGenerating && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={onVoice}
-                      disabled={isTranscribing}
-                      className="size-9 rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground"
-                      aria-label="Use voice input"
-                    >
-                      <Mic className="size-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom">
-                    Record a voice message
-                  </TooltipContent>
-                </Tooltip>
-              )}
-              {!isGenerating && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={onVoiceChat}
-                      disabled={isTranscribing || !onVoiceChat}
-                      className="size-9 rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground"
-                      aria-label="Start voice chat"
-                    >
-                      <AudioLines className="size-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom">
-                    Start a live voice chat
-                  </TooltipContent>
-                </Tooltip>
-              )}
-              {webSearchEnabled && (
-                <div className="flex h-9 items-center gap-1.5 rounded-xl border border-border bg-muted pl-2.5 pr-1.5">
-                  <Globe className="size-3.5 text-muted-foreground" />
-                  <span className="text-xs font-medium text-foreground">
-                    Web search
-                  </span>
-                  {onToggleWebSearch && (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={onToggleWebSearch}
-                          className="size-6 rounded-lg text-muted-foreground hover:bg-background hover:text-foreground"
-                          aria-label="Cancel web search"
-                        >
-                          <X className="size-3" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent side="bottom">
-                        Cancel web search
-                      </TooltipContent>
-                    </Tooltip>
-                  )}
-                </div>
-              )}
-            </div>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            {webSearchEnabled && (
+              <div className="flex h-9 items-center gap-1.5 rounded-xl border border-border bg-muted pl-2.5 pr-1.5">
+                <Globe className="size-3.5 text-muted-foreground" />
+                <span className="text-xs font-medium text-foreground">
+                  Web search
+                </span>
+                {onToggleWebSearch && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={onToggleWebSearch}
+                        className="size-6 rounded-lg text-muted-foreground hover:bg-background hover:text-foreground"
+                        aria-label="Cancel web search"
+                      >
+                        <X className="size-3" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">
+                      Cancel web search
+                    </TooltipContent>
+                  </Tooltip>
+                )}
+              </div>
+            )}
+            {!isGenerating && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={onVoice}
+                    disabled={isTranscribing}
+                    className="size-9 rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground"
+                    aria-label="Use voice input"
+                  >
+                    <Mic className="size-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  Record a voice message
+                </TooltipContent>
+              </Tooltip>
+            )}
+          </div>
           )}
           <div className="ml-auto flex items-center">
             {isGenerating ? (
@@ -493,12 +475,14 @@ export function LibraryPickerContent({
   }>;
   query: string;
   onQueryChange: (value: string) => void;
-  onSelect: (files: Array<{
-    id: string;
-    filename: string;
-    mimeType?: string;
-    url?: string;
-  }>) => void;
+  onSelect: (
+    files: Array<{
+      id: string;
+      filename: string;
+      mimeType?: string;
+      url?: string;
+    }>
+  ) => void;
   onCancel?: () => void;
   listMaxHeightClass?: string;
 }) {
@@ -558,9 +542,7 @@ export function LibraryPickerContent({
           </Button>
         )}
       </div>
-      <div
-        className={cn(listMaxHeightClass, "space-y-1 overflow-y-auto pr-1")}
-      >
+      <div className={cn(listMaxHeightClass, "space-y-1 overflow-y-auto pr-1")}>
         {files.length ? (
           files.map(file => (
             <button
@@ -568,9 +550,7 @@ export function LibraryPickerContent({
               onClick={() => toggleFileSelection(file.id)}
               className={cn(
                 "flex w-full items-center gap-2 rounded-lg p-2 text-left transition-colors hover:bg-muted/50",
-                selectedFiles.has(file.id)
-                  ? "bg-primary/5"
-                  : ""
+                selectedFiles.has(file.id) ? "bg-primary/5" : ""
               )}
             >
               <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted/50 text-muted-foreground">
@@ -592,7 +572,7 @@ export function LibraryPickerContent({
                 </span>
               </span>
               <button
-                onClick={(e) => {
+                onClick={e => {
                   e.stopPropagation();
                   toggleFileSelection(file.id);
                 }}

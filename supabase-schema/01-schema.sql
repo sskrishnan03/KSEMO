@@ -68,7 +68,7 @@ CREATE TABLE conversations (
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     project_id UUID REFERENCES projects(id) ON DELETE SET NULL,
     title VARCHAR(120) NOT NULL DEFAULT 'New conversation',
-    conversation_type VARCHAR(20) DEFAULT 'text' CHECK (conversation_type IN ('text', 'voice', 'mixed')),
+    conversation_type VARCHAR(20) DEFAULT 'text' CHECK (conversation_type IN ('text')),
     is_pinned BOOLEAN DEFAULT FALSE,
     is_archived BOOLEAN DEFAULT FALSE,
     is_public BOOLEAN DEFAULT FALSE,
@@ -136,23 +136,6 @@ CREATE TABLE message_feedback (
 -- Indexes for message feedback
 CREATE INDEX idx_message_feedback_message_id ON message_feedback(message_id);
 CREATE INDEX idx_message_feedback_user_id ON message_feedback(user_id);
-
--- ============================================
--- VOICE SESSIONS TABLE
--- ============================================
-CREATE TABLE voice_sessions (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    conversation_id UUID NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
-    status VARCHAR(20) DEFAULT 'connecting' CHECK (status IN ('connecting', 'listening', 'speaking', 'processing', 'interrupted', 'ended', 'error')),
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Indexes for voice sessions
-CREATE INDEX idx_voice_sessions_user_id ON voice_sessions(user_id);
-CREATE INDEX idx_voice_sessions_conversation_id ON voice_sessions(conversation_id);
-CREATE INDEX idx_voice_sessions_status ON voice_sessions(status);
 
 -- ============================================
 -- FILES TABLE
@@ -289,9 +272,6 @@ CREATE TRIGGER update_messages_updated_at BEFORE UPDATE ON messages
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_message_feedback_updated_at BEFORE UPDATE ON message_feedback
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_voice_sessions_updated_at BEFORE UPDATE ON voice_sessions
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_files_updated_at BEFORE UPDATE ON files

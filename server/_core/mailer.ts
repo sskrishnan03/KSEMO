@@ -68,7 +68,11 @@ export type PasswordResetEmailInput = {
 
 // Branded transactional email for the forgot-password flow. Inline styles only,
 // since Gmail strips <style> blocks.
-export async function sendPasswordResetEmail({ to, name, resetUrl }: PasswordResetEmailInput): Promise<void> {
+export async function sendPasswordResetEmail({
+  to,
+  name,
+  resetUrl,
+}: PasswordResetEmailInput): Promise<void> {
   const mailer = getTransporter();
   if (!mailer) throw new Error("Mailer is not configured");
 

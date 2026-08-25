@@ -86,13 +86,10 @@ export function guessMimeType(filename: string) {
     jpeg: "image/jpeg",
     webp: "image/webp",
     gif: "image/gif",
-    docx:
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    xlsx:
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     xls: "application/vnd.ms-excel",
-    pptx:
-      "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
   };
   return map[ext] ?? "application/octet-stream";
 }

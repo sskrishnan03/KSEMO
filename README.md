@@ -19,12 +19,14 @@ KSEMO is a full-stack TypeScript application featuring AI-powered conversations,
 ## Installation
 
 1. Clone the repository:
+
 ```bash
 git clone <repository-url>
 cd KSEMO
 ```
 
 2. Install dependencies:
+
 ```bash
 pnpm install
 ```
@@ -32,6 +34,7 @@ pnpm install
 3. Set up environment variables:
 
 Edit `.env` and fill in the required values:
+
 - `DATABASE_URL`: PostgreSQL connection string
 - `JWT_SECRET`: Secret for JWT token generation
 - `OAUTH_SERVER_URL`: OAuth server endpoint
@@ -48,6 +51,7 @@ Edit `.env` and fill in the required values:
 - `SMTP_PORT`: SMTP server port (optional, defaults to 465)
 
 4. Initialize the database:
+
 ```bash
 pnpm db:generate
 pnpm db:push
@@ -56,6 +60,7 @@ pnpm db:push
 ## Development
 
 Run the development server:
+
 ```bash
 pnpm dev
 ```
@@ -65,6 +70,7 @@ The application will be available at `http://localhost:5173`
 ## Build
 
 Build for production:
+
 ```bash
 pnpm build
 ```
@@ -72,6 +78,7 @@ pnpm build
 ## Production
 
 Start the production server:
+
 ```bash
 pnpm start
 ```
@@ -101,6 +108,7 @@ This project includes a `render.yaml` configuration file for easy deployment on 
 ### Environment Variables for Production
 
 Ensure these environment variables are set in your production environment:
+
 - `NODE_ENV=production`
 - `DATABASE_URL` (provided by Render database)
 - `JWT_SECRET` (generate a secure random string)
@@ -148,6 +156,7 @@ KSEMO/
 ## Documentation
 
 Detailed documentation is available in the `docs/` directory:
+
 - `ARCHITECTURE.md` - System architecture and design
 - `PRODUCT_AUDIT.md` - Feature audit and implementation status
 - `ACCESSIBILITY.md` - Accessibility guidelines

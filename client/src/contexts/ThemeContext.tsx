@@ -1,4 +1,10 @@
-import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
 
 export type ThemeMode = "light" | "dark" | "system";
 
@@ -75,12 +81,9 @@ export function ThemeProvider({
     return () => mq.removeEventListener("change", handler);
   }, [mode]);
 
-  const setMode = useCallback(
-    (newMode: ThemeMode) => {
-      setModeState(newMode);
-    },
-    [],
-  );
+  const setMode = useCallback((newMode: ThemeMode) => {
+    setModeState(newMode);
+  }, []);
 
   const toggleTheme = switchable
     ? () => {
@@ -89,7 +92,9 @@ export function ThemeProvider({
     : undefined;
 
   return (
-    <ThemeContext.Provider value={{ mode, resolvedTheme, setMode, toggleTheme, switchable }}>
+    <ThemeContext.Provider
+      value={{ mode, resolvedTheme, setMode, toggleTheme, switchable }}
+    >
       {children}
     </ThemeContext.Provider>
   );

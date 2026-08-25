@@ -11,20 +11,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import {
-  Check,
-  Copy,
-  Download,
-  FileCode2,
-  Maximize2,
-} from "lucide-react";
-import React, {
-  memo,
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import { Check, Copy, Download, FileCode2, Maximize2 } from "lucide-react";
+import React, { memo, useCallback, useEffect, useRef, useState } from "react";
 import { codeToHtml } from "shiki";
 
 /** Blocks longer than this get a capped, scrollable body (expand for full view). */
@@ -97,9 +85,7 @@ export function codeBlockLanguageLabel(rawLanguage?: string) {
 export function codeBlockDownloadName(rawLanguage?: string) {
   const { id, known } = normalizeLanguage(rawLanguage);
   if (!known) return "code.txt";
-  const slug = LANGUAGE_META[id].label
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "");
+  const slug = LANGUAGE_META[id].label.toLowerCase().replace(/[^a-z0-9]+/g, "");
   return `${slug}-code.${LANGUAGE_META[id].ext}`;
 }
 
@@ -113,8 +99,7 @@ function CopyCodeButton({ code }: { code: string }) {
 
   useEffect(
     () => () => {
-      if (timerRef.current !== null)
-        window.clearTimeout(timerRef.current);
+      if (timerRef.current !== null) window.clearTimeout(timerRef.current);
     },
     []
   );
@@ -275,26 +260,28 @@ function CodeSurface({
   rawLanguage?: string;
   expanded: boolean;
 }) {
-  const capped =
-    !expanded && code.split("\n").length > COLLAPSED_LINE_LIMIT;
+  const capped = !expanded && code.split("\n").length > COLLAPSED_LINE_LIMIT;
   const [html, setHtml] = useState<string>("");
 
   useEffect(() => {
     let cancelled = false;
     const lang = (rawLanguage ?? "").trim().toLowerCase();
-    const validLang =
-      lang && lang in LANGUAGE_META ? lang : "text";
+    const validLang = lang && lang in LANGUAGE_META ? lang : "text";
 
     codeToHtml(code, {
       lang: validLang,
       themes: { light: "github-light", dark: "github-dark" },
       defaultColor: false,
-    }).then(result => {
-      if (!cancelled) setHtml(result);
-    }).catch(() => {
-      if (!cancelled) setHtml("");
-    });
-    return () => { cancelled = true; };
+    })
+      .then(result => {
+        if (!cancelled) setHtml(result);
+      })
+      .catch(() => {
+        if (!cancelled) setHtml("");
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [code, rawLanguage]);
 
   return (
@@ -331,9 +318,7 @@ function KsemoCodeBlockHeader({
     <div className="flex items-center justify-between gap-2 px-2.5 pb-1 pt-1.5">
       <span className="flex min-w-0 items-center gap-1.5 font-mono text-[11px] lowercase tracking-wide text-muted-foreground">
         <LanguageIcon />
-        <span className="truncate">
-          {codeBlockLanguageLabel(rawLanguage)}
-        </span>
+        <span className="truncate">{codeBlockLanguageLabel(rawLanguage)}</span>
       </span>
       <CodeBlockActions
         code={code}
@@ -380,8 +365,7 @@ export function KsemoCodeBlock({
           aria-describedby={undefined}
         >
           <DialogTitle className="sr-only">
-            Expanded{" "}
-            {codeBlockLanguageLabel(rawLanguage).toLowerCase()} code
+            Expanded {codeBlockLanguageLabel(rawLanguage).toLowerCase()} code
           </DialogTitle>
           <DialogDescription className="sr-only">
             Full view of the code snippet with copy and download actions.

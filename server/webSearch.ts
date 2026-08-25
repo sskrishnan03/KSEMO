@@ -73,9 +73,7 @@ async function searchWithSerpApi(
 ): Promise<WebSearchResult[]> {
   const endpoint = `https://serpapi.com/search.json?engine=google&q=${encodeURIComponent(query)}&num=${MAX_RESULTS}&api_key=${encodeURIComponent(apiKey)}`;
   const payload = (await fetchJson(endpoint, { method: "GET" })) as {
-    organic_results?: Array<
-      RawResult & { link?: unknown; snippet?: unknown }
-    >;
+    organic_results?: Array<RawResult & { link?: unknown; snippet?: unknown }>;
   };
   const results = (payload.organic_results ?? []).map(item => ({
     title: item.title,

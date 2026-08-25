@@ -14,19 +14,13 @@ import {
 import { streamLLM, type Message } from "./_core/llm";
 import { sdk } from "./_core/sdk";
 import { storageGetSignedUrl, requestBaseUrl } from "./storage";
-import {
-  composeWebSearchContext,
-  performWebSearch,
-} from "./webSearch";
+import { composeWebSearchContext, performWebSearch } from "./webSearch";
 
 const BASE_SYSTEM_INSTRUCTION =
   "You are KSEMO, a thoughtful and reliable AI assistant. Be clear, accurate, respectful, and practical. Use Markdown when it improves readability. Never claim to have completed work you cannot verify.";
 
 // Per-file cap on extracted document text injected into the model context.
 const FILE_TEXT_PER_FILE_CHARS = 12_000;
-
-const VOICE_STYLE_INSTRUCTION =
-  "Your reply will be spoken aloud in a live voice conversation. Answer exactly what was asked, briefly and naturally — one to three short sentences for simple questions like greetings, a little more only when depth is genuinely required. No filler, no lists, no markdown formatting, no repeating the question back.";
 
 function createTitle(content: string) {
   const cleaned = content.replace(/\s+/g, " ").trim();
@@ -401,7 +395,6 @@ export function registerChatStream(app: Express) {
           BASE_SYSTEM_INSTRUCTION,
           personaInstruction,
           preferences?.customInstructions?.trim(),
-          body.mode === "voice" ? VOICE_STYLE_INSTRUCTION : null,
         ]
           .filter(Boolean)
           .join("\n\n");

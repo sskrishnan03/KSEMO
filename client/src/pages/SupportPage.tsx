@@ -164,7 +164,6 @@ const PRIVACY_SECTION_TITLES = [
   "What KSEMO stores",
   "How your information is used",
   "Conversations and message history",
-  "Voice input and transcripts",
   "Files and Library storage",
   "Explicit memories",
   "Sharing and public links",
@@ -190,7 +189,6 @@ const TERMS_SECTION_TITLES = [
   "Acceptable use",
   "AI output",
   "Your content",
-  "Voice features",
   "Files and Library",
   "Memories",
   "Sharing links",
@@ -309,9 +307,7 @@ function SupportSectionNav({ topic }: { topic: SupportTopic }) {
                   : "border-border bg-background text-muted-foreground hover:bg-muted/50 hover:text-foreground lg:border-transparent lg:bg-transparent"
               )}
             >
-              <span className="min-w-0">
-                {item.label}
-              </span>
+              <span className="min-w-0">{item.label}</span>
             </a>
           );
         })}
@@ -325,7 +321,9 @@ function FaqContent() {
   // One open question per category. When a category has not been interacted
   // with yet its first question stays open; picking another question closes
   // the previously open one.
-  const [openBySection, setOpenBySection] = useState<Record<string, string | null>>({});
+  const [openBySection, setOpenBySection] = useState<
+    Record<string, string | null>
+  >({});
   const sections = useMemo(() => searchFaq(query), [query]);
 
   function isOpen(sectionId: string, itemId: string, isFirst: boolean) {
@@ -477,7 +475,7 @@ function FaqAssistant() {
       id: 0,
       role: "assistant",
       content:
-        "Hi! I am the KSEMO Assistant. Ask me anything about using KSEMO — voice chat, files, memories, sharing, privacy, and more.",
+        "Hi! I am the KSEMO Assistant. Ask me anything about using KSEMO — files, memories, sharing, privacy, and more.",
     },
   ]);
   const [draft, setDraft] = useState("");
@@ -734,23 +732,22 @@ function PrivacyContent() {
       <PolicySection title="Overview">
         <p>
           This Privacy Policy explains, in plain language, what information
-          KSEMO collects when you create an account or use the service, why
-          that information is needed, how it is protected, and the choices and
-          rights available to you. It covers the KSEMO web application and
-          every feature inside it: chat conversations, voice interaction, the
-          Library, explicit memories, sharing links, exports, and account
-          settings.
+          KSEMO collects when you create an account or use the service, why that
+          information is needed, how it is protected, and the choices and rights
+          available to you. It covers the KSEMO web application and every
+          feature inside it: chat conversations, the Library, explicit memories,
+          sharing links, exports, and account settings.
         </p>
         <p>
-          KSEMO is designed around a simple model. Your workspace is private
-          to your account. Nothing is remembered about you unless you
-          deliberately save it — memories exist only because you wrote them.
-          And deletion tools are direct and permanent rather than hidden
-          behind support requests.
+          KSEMO is designed around a simple model. Your workspace is private to
+          your account. Nothing is remembered about you unless you deliberately
+          save it — memories exist only because you wrote them. And deletion
+          tools are direct and permanent rather than hidden behind support
+          requests.
         </p>
         <p>
-          When we say “we”, “us”, or “KSEMO”, we mean the operators of the
-          KSEMO service. When we say “you”, we mean any registered user of the
+          When we say “we”, “us”, or “KSEMO”, we mean the operators of the KSEMO
+          service. When we say “you”, we mean any registered user of the
           service. We act as the controller of your account information; the
           independent companies we rely on for authentication, hosting, and AI
           processing act on our instructions under their own terms.
@@ -779,9 +776,9 @@ function PrivacyContent() {
               compare outcomes.
             </>,
             <>
-              Voice transcripts: spoken turns are transcribed to text and
-              saved as normal conversation messages, subject to the same
-              controls as typed text.
+              Voice transcripts: spoken turns are transcribed to text and saved
+              as normal conversation messages, subject to the same controls as
+              typed text.
             </>,
             <>
               Library files: documents and images you upload, stored as file
@@ -792,9 +789,9 @@ function PrivacyContent() {
               Memories section, together with their category and active state.
             </>,
             <>
-              Preferences: selected model, response style, custom
-              instructions, speech rate, autoplay, reduce-motion, and similar
-              accessibility settings.
+              Preferences: selected model, response style, custom instructions,
+              speech rate, autoplay, reduce-motion, and similar accessibility
+              settings.
             </>,
             <>
               Operational records: sign-in session cookies, feedback messages
@@ -839,29 +836,29 @@ function PrivacyContent() {
         <p>
           Where privacy law requires a legal basis, processing rests on
           performing our contract with you (operating the features you use),
-          legitimate interests (security, abuse prevention), consent (voice
-          transcription, public sharing, memories), or legal obligation.
+          legitimate interests (security, abuse prevention), consent (public
+          sharing, memories), or legal obligation.
         </p>
         <p>
-          We do not sell your personal information, and we do not share it
-          with advertising networks or data brokers. Your content is not used
-          to train third-party foundation models beyond the transient
-          processing needed to answer your requests.
+          We do not sell your personal information, and we do not share it with
+          advertising networks or data brokers. Your content is not used to
+          train third-party foundation models beyond the transient processing
+          needed to answer your requests.
         </p>
       </PolicySection>
       <PolicySection title="Conversations and message history">
         <p>
-          Conversations persist until you delete them, so your history
-          survives refreshes, new devices, and new sessions. Persistence is
-          what makes rename, search, duplication, export, and sharing
-          possible; it is always under your control.
+          Conversations persist until you delete them, so your history survives
+          refreshes, new devices, and new sessions. Persistence is what makes
+          rename, search, duplication, export, and sharing possible; it is
+          always under your control.
         </p>
         <PolicyBullets
           items={[
             <>
-              Archiving hides a conversation from your sidebar without
-              deleting it. Trashed conversations remain recoverable until you
-              permanently delete them or empty the trash.
+              Archiving hides a conversation from your sidebar without deleting
+              it. Trashed conversations remain recoverable until you permanently
+              delete them or empty the trash.
             </>,
             <>
               Deleting a conversation permanently removes its messages and
@@ -869,12 +866,12 @@ function PrivacyContent() {
               version history.
             </>,
             <>
-              “Delete all chats” permanently removes every conversation in
-              your account in one confirmed action.
+              “Delete all chats” permanently removes every conversation in your
+              account in one confirmed action.
             </>,
             <>
-              Duplicating a conversation creates an independent copy under
-              your account; deleting the original does not affect the copy.
+              Duplicating a conversation creates an independent copy under your
+              account; deleting the original does not affect the copy.
             </>,
             <>
               Exports (PDF or Word) are generated from your stored messages on
@@ -884,52 +881,16 @@ function PrivacyContent() {
         />
         <p>
           If a conversation was shared while active and is then deleted, the
-          public link stops resolving. Deleting content is not reversible,
-          which is why destructive actions ask for confirmation first.
-        </p>
-      </PolicySection>
-      <PolicySection title="Voice input and transcripts">
-        <p>
-          Voice Chat lets you hold a spoken conversation with KSEMO. When it
-          is active, your speech is transcribed so each spoken turn continues
-          the conversation exactly like typed text.
-        </p>
-        <PolicyBullets
-          items={[
-            <>
-              Your browser asks for microphone permission before any audio is
-              captured, and you can revoke that permission at any time in
-              browser settings.
-            </>,
-            <>
-              Raw microphone audio is processed to produce text and is not
-              kept as a permanent record; the microphone stream ends when the
-              voice session ends.
-            </>,
-            <>
-              Transcripts become ordinary message text and follow the same
-              access, sharing, export, and deletion controls as typed
-              messages.
-            </>,
-            <>
-              Spoken replies use speech synthesis on your device or browser;
-              playback settings such as rate and autoplay stay in your
-              preferences.
-            </>,
-          ]}
-        />
-        <p>
-          Do not use voice features where capturing audio would be unlawful or
-          where others present have not consented — see also the Voice
-          features section of the Terms of Service.
+          public link stops resolving. Deleting content is not reversible, which
+          is why destructive actions ask for confirmation first.
         </p>
       </PolicySection>
       <PolicySection title="Files and Library storage">
         <p>
           Files you add to the Library are private to your account. They are
           stored outside the chat database in secured object storage and are
-          reached only through short-lived, authorized links generated for
-          your session.
+          reached only through short-lived, authorized links generated for your
+          session.
         </p>
         <PolicyBullets
           items={[
@@ -938,8 +899,8 @@ function PrivacyContent() {
               attach or select it for that conversation.
             </>,
             <>
-              Removing a Library file revokes its availability, including
-              within messages that previously referenced it.
+              Removing a Library file revokes its availability, including within
+              messages that previously referenced it.
             </>,
             <>
               Uploads are limited in size and type; these limits protect both
@@ -955,23 +916,22 @@ function PrivacyContent() {
       <PolicySection title="Explicit memories">
         <p>
           Memory in KSEMO is strictly opt-in. Nothing is remembered
-          automatically, and background scraping of your chats for memory is
-          not performed. The memory list shows exactly what exists.
+          automatically, and background scraping of your chats for memory is not
+          performed. The memory list shows exactly what exists.
         </p>
         <PolicyBullets
           items={[
             <>
-              Each memory can be disabled instantly, which stops it
-              influencing responses while keeping the text available for
-              later.
+              Each memory can be disabled instantly, which stops it influencing
+              responses while keeping the text available for later.
             </>,
             <>
-              Editing a memory changes what future responses take into
-              account; deleting a memory removes it permanently.
+              Editing a memory changes what future responses take into account;
+              deleting a memory removes it permanently.
             </>,
             <>
-              Disabled or deleted memories stop shaping responses immediately
-              at the next request.
+              Disabled or deleted memories stop shaping responses immediately at
+              the next request.
             </>,
           ]}
         />
@@ -979,8 +939,8 @@ function PrivacyContent() {
       <PolicySection title="Sharing and public links">
         <p>
           Sharing is opt-in per conversation. When you enable a public link,
-          that specific conversation becomes viewable by anyone who has the
-          link — no KSEMO account is needed to read it.
+          that specific conversation becomes viewable by anyone who has the link
+          — no KSEMO account is needed to read it.
         </p>
         <PolicyBullets
           items={[
@@ -1008,9 +968,9 @@ function PrivacyContent() {
         <PolicyBullets
           items={[
             <>
-              Sign-in uses Google's OAuth flow. KSEMO never sees or stores
-              your Google password, and cannot act on your Google account
-              beyond the identity information you approve.
+              Sign-in uses Google's OAuth flow. KSEMO never sees or stores your
+              Google password, and cannot act on your Google account beyond the
+              identity information you approve.
             </>,
             <>
               Session integrity relies on secure, signed cookies scoped to the
@@ -1021,8 +981,8 @@ function PrivacyContent() {
               associated with your account for next time.
             </>,
             <>
-              If you believe someone used your session without permission,
-              sign out, secure your Google account, then contact us so we can
+              If you believe someone used your session without permission, sign
+              out, secure your Google account, then contact us so we can
               investigate.
             </>,
           ]}
@@ -1041,8 +1001,8 @@ function PrivacyContent() {
             </>,
             <>
               Interface preferences (for example selected model or motion
-              settings) may be stored in your browser's local storage so the
-              app remembers them between visits.
+              settings) may be stored in your browser's local storage so the app
+              remembers them between visits.
             </>,
             <>
               No advertising cookies, third-party analytics trackers, or
@@ -1057,15 +1017,13 @@ function PrivacyContent() {
         />
       </PolicySection>
       <PolicySection title="Service providers">
-        <p>
-          KSEMO relies on a small set of independent providers to operate:
-        </p>
+        <p>KSEMO relies on a small set of independent providers to operate:</p>
         <PolicyBullets
           items={[
             <>Google: account authentication and identity verification.</>,
             <>
               Server-side AI services: processing prompts, attachments, and
-              voice transcripts to generate responses.
+              transcripts to generate responses.
             </>,
             <>
               Cloud hosting and storage providers: serving the application and
@@ -1079,24 +1037,24 @@ function PrivacyContent() {
         />
         <p>
           Providers receive only what is necessary for their function, under
-          terms that require confidentiality and appropriate security. They
-          are not permitted to sell your data or reuse it for their own
-          marketing. This list may be updated as the service evolves, and this
-          policy will reflect material changes.
+          terms that require confidentiality and appropriate security. They are
+          not permitted to sell your data or reuse it for their own marketing.
+          This list may be updated as the service evolves, and this policy will
+          reflect material changes.
         </p>
       </PolicySection>
       <PolicySection title="Data retention and deletion">
         <p>
-          You control retention. Conversations, files, and memories persist
-          only while you keep them, and every category has a direct deletion
-          control in the product.
+          You control retention. Conversations, files, and memories persist only
+          while you keep them, and every category has a direct deletion control
+          in the product.
         </p>
         <PolicyBullets
           items={[
             <>
               Permanent deletion removes content from the active system
-              promptly; residual encrypted backups expire on the backup
-              rotation schedule before disappearing entirely.
+              promptly; residual encrypted backups expire on the backup rotation
+              schedule before disappearing entirely.
             </>,
             <>
               Trashed items remain recoverable until permanently deleted;
@@ -1123,12 +1081,12 @@ function PrivacyContent() {
               you sign in.
             </>,
             <>
-              Export: download conversations as PDF or Word whenever you want
-              a copy outside KSEMO.
+              Export: download conversations as PDF or Word whenever you want a
+              copy outside KSEMO.
             </>,
             <>
-              Correct: edit your own messages; earlier versions remain
-              recorded for transparency.
+              Correct: edit your own messages; earlier versions remain recorded
+              for transparency.
             </>,
             <>
               Delete: remove individual messages, entire conversations, all
@@ -1139,8 +1097,7 @@ function PrivacyContent() {
               attaching files you prefer not to use.
             </>,
             <>
-              Withdraw sharing: switch off any public link whenever you
-              choose.
+              Withdraw sharing: switch off any public link whenever you choose.
             </>,
           ]}
         />
@@ -1160,11 +1117,11 @@ function PrivacyContent() {
           consent, and be free from discrimination for exercising these rights.
         </p>
         <p>
-          KSEMO's built-in tools satisfy most of these rights directly: you
-          can view, export, correct, and delete your content without asking
-          us. For anything else, use the contact paths below and describe the
-          right you wish to exercise. We will verify your identity as needed
-          and respond within the window required by the applicable law.
+          KSEMO's built-in tools satisfy most of these rights directly: you can
+          view, export, correct, and delete your content without asking us. For
+          anything else, use the contact paths below and describe the right you
+          wish to exercise. We will verify your identity as needed and respond
+          within the window required by the applicable law.
         </p>
         <p>
           You also have the right to lodge a complaint with your local
@@ -1221,18 +1178,18 @@ function PrivacyContent() {
           jurisdiction.
         </p>
         <p>
-          Where transfers of personal data are subject to cross-border
-          transfer restrictions, we rely on appropriate safeguards such as
-          standard contractual clauses or equivalent mechanisms recognized
-          under applicable law.
+          Where transfers of personal data are subject to cross-border transfer
+          restrictions, we rely on appropriate safeguards such as standard
+          contractual clauses or equivalent mechanisms recognized under
+          applicable law.
         </p>
       </PolicySection>
       <PolicySection title="Changes to this policy">
         <p>
-          We may update this policy as KSEMO evolves — for example when
-          features change what is stored or how providers are used. Material
-          changes will be announced in the product or on this page with a
-          revised “Last updated” date before they take effect.
+          We may update this policy as KSEMO evolves — for example when features
+          change what is stored or how providers are used. Material changes will
+          be announced in the product or on this page with a revised “Last
+          updated” date before they take effect.
         </p>
         <p>
           Continued use after changes take effect means you accept the updated
@@ -1243,11 +1200,11 @@ function PrivacyContent() {
       </PolicySection>
       <PolicySection title="Contact">
         <p>
-          For privacy questions, data-access requests, or account help, use
-          the Help &amp; Support link available from your KSEMO profile menu,
-          or reach us through Settings → Feedback. Describe your request
-          clearly and include the email address on your account so we can
-          verify and assist quickly.
+          For privacy questions, data-access requests, or account help, use the
+          Help &amp; Support link available from your KSEMO profile menu, or
+          reach us through Settings → Feedback. Describe your request clearly
+          and include the email address on your account so we can verify and
+          assist quickly.
         </p>
       </PolicySection>
     </div>
@@ -1260,17 +1217,15 @@ function TermsContent() {
       <PolicySection title="Acceptance of terms">
         <p>
           By creating an account or using KSEMO you agree to these Terms of
-          Service, which form a binding agreement between you and the
-          operators of KSEMO. If you do not agree, please do not use the
-          service.
+          Service, which form a binding agreement between you and the operators
+          of KSEMO. If you do not agree, please do not use the service.
         </p>
         <p>
-          These terms apply to every feature: chat, voice interaction, the
-          Library, memories, sharing links, exports, and account settings.
-          Product notices or guidelines presented inside the app supplement
-          these terms. If you use KSEMO on behalf of an organization, you
-          represent that you have authority to bind that organization to this
-          agreement.
+          These terms apply to every feature: chat, the Library, memories,
+          sharing links, exports, and account settings. Product notices or
+          guidelines presented inside the app supplement these terms. If you use
+          KSEMO on behalf of an organization, you represent that you have
+          authority to bind that organization to this agreement.
         </p>
       </PolicySection>
       <PolicySection title="Definitions">
@@ -1285,13 +1240,13 @@ function TermsContent() {
               files, memories, and preferences.
             </>,
             <>
-              “Output” means AI-generated responses produced by the Service
-              from your prompts and Content.
+              “Output” means AI-generated responses produced by the Service from
+              your prompts and Content.
             </>,
             <>
               “Conversation” means a saved thread of messages under your
-              account; “Library” means your uploaded files; “Memories” means
-              the explicit notes you create.
+              account; “Library” means your uploaded files; “Memories” means the
+              explicit notes you create.
             </>,
             <>
               “Providers” means the independent third parties that host,
@@ -1302,24 +1257,23 @@ function TermsContent() {
       </PolicySection>
       <PolicySection title="Eligibility">
         <p>
-          You must meet the minimum digital-consent age in your jurisdiction
-          to use KSEMO, and you must not be barred from using the service
-          under applicable law, including sanctions and export-control
-          restrictions.
+          You must meet the minimum digital-consent age in your jurisdiction to
+          use KSEMO, and you must not be barred from using the service under
+          applicable law, including sanctions and export-control restrictions.
         </p>
         <p>
           Accounts are created through Google sign-in, so Google's own terms
-          also govern that relationship. One person uses one account; sharing
-          a single account among several people is not supported and is done
-          at your own risk.
+          also govern that relationship. One person uses one account; sharing a
+          single account among several people is not supported and is done at
+          your own risk.
         </p>
       </PolicySection>
       <PolicySection title="Using KSEMO">
         <PolicyBullets
           items={[
             <>
-              KSEMO is an AI assistant for conversation, voice interaction,
-              file analysis, and explicitly managed memory.
+              KSEMO is an AI assistant for conversation, file analysis, and
+              explicitly managed memory.
             </>,
             <>
               Use the service in compliance with applicable laws and only
@@ -1327,13 +1281,13 @@ function TermsContent() {
               APIs, and automated bulk access are not permitted.
             </>,
             <>
-              Features may evolve: we may add, change, or retire
-              functionality as the product improves, with reasonable efforts
-              to give notice for material removals.
+              Features may evolve: we may add, change, or retire functionality
+              as the product improves, with reasonable efforts to give notice
+              for material removals.
             </>,
             <>
-              Early-access or experimental features may be less reliable and
-              may change or disappear without notice.
+              Early-access or experimental features may be less reliable and may
+              change or disappear without notice.
             </>,
           ]}
         />
@@ -1346,28 +1300,28 @@ function TermsContent() {
               activity that occurs under your session.
             </>,
             <>
-              Do not use KSEMO on shared devices you do not trust, and sign
-              out when finished on any shared computer.
+              Do not use KSEMO on shared devices you do not trust, and sign out
+              when finished on any shared computer.
             </>,
             <>
               Accounts are personal. Do not resell access, redistribute the
               service, or operate it for third parties as a service bureau.
             </>,
             <>
-              Do not impersonate another person or misrepresent affiliation
-              with any entity through your account, content, or shared links.
+              Do not impersonate another person or misrepresent affiliation with
+              any entity through your account, content, or shared links.
             </>,
             <>
-              Tell us promptly if you suspect unauthorized use of your
-              account or session.
+              Tell us promptly if you suspect unauthorized use of your account
+              or session.
             </>,
           ]}
         />
       </PolicySection>
       <PolicySection title="Acceptable use">
         <p>
-          KSEMO should be safe for you and everyone else. Accordingly, you
-          agree not to use the service to create, store, or distribute:
+          KSEMO should be safe for you and everyone else. Accordingly, you agree
+          not to use the service to create, store, or distribute:
         </p>
         <PolicyBullets
           items={[
@@ -1424,12 +1378,12 @@ function TermsContent() {
               consequential decisions, consult a qualified professional.
             </>,
             <>
-              Generated content is not professional advice and does not create
-              a professional relationship with KSEMO or its operators.
+              Generated content is not professional advice and does not create a
+              professional relationship with KSEMO or its operators.
             </>,
             <>
-              In an emergency, contact your local emergency services rather
-              than an AI assistant.
+              In an emergency, contact your local emergency services rather than
+              an AI assistant.
             </>,
             <>
               Regenerated or edited responses may differ; message version
@@ -1456,41 +1410,18 @@ function TermsContent() {
           backups on their rotation schedule and records we must keep by law.
         </p>
         <p>
-          You are responsible for having the rights to what you upload, for
-          the share links you create, and for keeping your own copies of
-          irreplaceable material — exports exist for exactly this purpose.
-          If you send us product suggestions, you agree we may use them
-          without obligation or attribution.
+          You are responsible for having the rights to what you upload, for the
+          share links you create, and for keeping your own copies of
+          irreplaceable material — exports exist for exactly this purpose. If
+          you send us product suggestions, you agree we may use them without
+          obligation or attribution.
         </p>
-      </PolicySection>
-      <PolicySection title="Voice features">
-        <PolicyBullets
-          items={[
-            <>
-              Voice Chat transcribes your speech into conversation text;
-              transcription quality depends on your environment, accent, and
-              device.
-            </>,
-            <>
-              Only use voice features where conversation recording is lawful
-              and where everyone present consents to being transcribed.
-            </>,
-            <>
-              Spoken turns become part of the saved conversation and follow
-              the same sharing, export, and deletion rules as typed messages.
-            </>,
-            <>
-              Spoken replies are synthesized speech; do not rely on them as a
-              verbatim record of important proceedings.
-            </>,
-          ]}
-        />
       </PolicySection>
       <PolicySection title="Files and Library">
         <p>
           The Library exists for documents and images you want available
-          alongside your conversations. Upload only content you have the
-          rights to store and process.
+          alongside your conversations. Upload only content you have the rights
+          to store and process.
         </p>
         <PolicyBullets
           items={[
@@ -1503,8 +1434,8 @@ function TermsContent() {
               relevant request; it is never shared with other users' requests.
             </>,
             <>
-              Do not upload malicious files or material designed to disrupt
-              the service or other users.
+              Do not upload malicious files or material designed to disrupt the
+              service or other users.
             </>,
             <>
               Removing a Library file revokes its availability, including in
@@ -1515,9 +1446,9 @@ function TermsContent() {
       </PolicySection>
       <PolicySection title="Memories">
         <p>
-          Memories are notes you explicitly save so responses can reflect
-          them across your account. They influence future responses until you
-          disable or delete them.
+          Memories are notes you explicitly save so responses can reflect them
+          across your account. They influence future responses until you disable
+          or delete them.
         </p>
         <PolicyBullets
           items={[
@@ -1541,20 +1472,20 @@ function TermsContent() {
           items={[
             <>
               Public links make the chosen conversation readable by anyone who
-              has the link, without needing an account. You choose what to
-              share and are responsible for that choice.
+              has the link, without needing an account. You choose what to share
+              and are responsible for that choice.
             </>,
             <>
-              Shared views are read-only; visitors cannot message, edit, or
-              see anything else in your workspace.
+              Shared views are read-only; visitors cannot message, edit, or see
+              anything else in your workspace.
             </>,
             <>
               You may disable any link at any time, which immediately
               invalidates it; deleting the conversation has the same effect.
             </>,
             <>
-              Once public, content may be copied, cached, or indexed by
-              others; we cannot recall third-party copies.
+              Once public, content may be copied, cached, or indexed by others;
+              we cannot recall third-party copies.
             </>,
             <>
               Do not publish links whose disclosure would violate law,
@@ -1565,21 +1496,21 @@ function TermsContent() {
       </PolicySection>
       <PolicySection title="Fees, usage limits, and plans">
         <p>
-          KSEMO is currently offered free of charge during its launch period.
-          To keep capacity fair for everyone, fair-use limits apply per model
-          and reset on a rolling daily cycle; switching models gives you a
-          separate allowance. Limits exist to protect service quality and
-          prevent abuse, and may be adjusted as capacity evolves.
+          KSEMO is currently offered free of charge during its launch period. To
+          keep capacity fair for everyone, fair-use limits apply per model and
+          reset on a rolling daily cycle; switching models gives you a separate
+          allowance. Limits exist to protect service quality and prevent abuse,
+          and may be adjusted as capacity evolves.
         </p>
         <p>
-          If paid plans are introduced in the future, the price, billing
-          cycle, and what is included will be disclosed clearly before you
-          subscribe. Price changes would be announced in advance, recurring
-          plans would be cancelable before renewal, applicable taxes would be
-          shown at checkout, and refunds would follow the terms stated for the
-          specific plan. If you ever believe a charge is wrong, contact us
-          through Settings → Feedback before initiating a payment dispute so
-          we can resolve it quickly.
+          If paid plans are introduced in the future, the price, billing cycle,
+          and what is included will be disclosed clearly before you subscribe.
+          Price changes would be announced in advance, recurring plans would be
+          cancelable before renewal, applicable taxes would be shown at
+          checkout, and refunds would follow the terms stated for the specific
+          plan. If you ever believe a charge is wrong, contact us through
+          Settings → Feedback before initiating a payment dispute so we can
+          resolve it quickly.
         </p>
         <p>
           Free usage does not create an entitlement to any particular level of
@@ -1600,11 +1531,10 @@ function TermsContent() {
           hold in underlying material.
         </p>
         <p>
-          If you believe content accessible through KSEMO infringes your
-          rights, notify us via Settings → Feedback with enough detail to
-          identify the material; we will investigate and remove infringing
-          content where a claim is valid, and may suspend repeat infringers'
-          accounts.
+          If you believe content accessible through KSEMO infringes your rights,
+          notify us via Settings → Feedback with enough detail to identify the
+          material; we will investigate and remove infringing content where a
+          claim is valid, and may suspend repeat infringers' accounts.
         </p>
       </PolicySection>
       <PolicySection title="Third-party services">
@@ -1625,12 +1555,12 @@ function TermsContent() {
         <PolicyBullets
           items={[
             <>
-              We aim for high availability but do not guarantee uninterrupted
-              or error-free operation.
+              We aim for high availability but do not guarantee uninterrupted or
+              error-free operation.
             </>,
             <>
-              Maintenance, outages, provider issues, or force-majeure events
-              can temporarily affect features, including voice.
+              Maintenance, outages, provider issues, or force-majeure events can
+              temporarily affect features.
             </>,
             <>
               We may add, change, or retire functionality; where a feature
@@ -1674,40 +1604,40 @@ function TermsContent() {
           KSEMO is provided “as is” and “as available”, without warranties of
           any kind, whether express or implied, including warranties of
           merchantability, fitness for a particular purpose, non-infringement,
-          accuracy, and uninterrupted operation, to the maximum extent
-          permitted by law.
+          accuracy, and uninterrupted operation, to the maximum extent permitted
+          by law.
         </p>
         <p>
-          We do not warrant that Output will be accurate, complete, or
-          suitable for your purposes, that files stored in the Library will be
-          free of loss without your own backups, or that downloaded exports
-          will be free of defects. Some jurisdictions do not allow certain
-          warranty exclusions, so parts of this section may not apply to you.
+          We do not warrant that Output will be accurate, complete, or suitable
+          for your purposes, that files stored in the Library will be free of
+          loss without your own backups, or that downloaded exports will be free
+          of defects. Some jurisdictions do not allow certain warranty
+          exclusions, so parts of this section may not apply to you.
         </p>
       </PolicySection>
       <PolicySection title="Limitation of liability">
         <p>
           To the maximum extent permitted by law, KSEMO and its operators will
           not be liable for indirect, incidental, special, consequential, or
-          punitive damages — including lost profits, data, goodwill, or
-          business interruption — arising from or relating to your use of the
-          service, even if advised of the possibility of such damages.
+          punitive damages — including lost profits, data, goodwill, or business
+          interruption — arising from or relating to your use of the service,
+          even if advised of the possibility of such damages.
         </p>
         <p>
           Where liability cannot be excluded, it is limited, to the extent
           permitted by law, to the amount you paid us in the twelve months
           before the event giving rise to the claim (which may be zero during
           free usage). Nothing in these terms excludes liability that cannot
-          lawfully be excluded, such as liability for gross negligence,
-          willful misconduct, or statutory consumer guarantees.
+          lawfully be excluded, such as liability for gross negligence, willful
+          misconduct, or statutory consumer guarantees.
         </p>
       </PolicySection>
       <PolicySection title="Indemnification">
         <p>
           You agree to defend and indemnify KSEMO and its operators against
-          claims, damages, and reasonable costs arising from your Content,
-          your use of the service in violation of these terms or applicable
-          law, or the share links you publish.
+          claims, damages, and reasonable costs arising from your Content, your
+          use of the service in violation of these terms or applicable law, or
+          the share links you publish.
         </p>
         <p>
           We will notify you promptly of any claim covered here, and you may
@@ -1725,8 +1655,8 @@ function TermsContent() {
           Feedback: most issues can be resolved informally and quickly. Where
           informal resolution does not work within a reasonable period, the
           dispute will be brought exclusively in the courts of competent
-          jurisdiction at that place of business, unless mandatory law gives
-          you the right to bring claims elsewhere. Claims must be brought
+          jurisdiction at that place of business, unless mandatory law gives you
+          the right to bring claims elsewhere. Claims must be brought
           individually; nothing here prevents either party from seeking
           injunctive relief to protect intellectual property or confidential
           information.
@@ -1739,8 +1669,8 @@ function TermsContent() {
           updated” date before they take effect.
         </p>
         <p>
-          Continued use after the effective date constitutes acceptance. If
-          you disagree with an update, stop using the service and remove your
+          Continued use after the effective date constitutes acceptance. If you
+          disagree with an update, stop using the service and remove your
           account content; the prior terms governed your use up to that point.
         </p>
       </PolicySection>
@@ -1749,16 +1679,14 @@ function TermsContent() {
           items={[
             <>
               Severability: if any provision is found unenforceable, the rest
-              remains in force and the unenforceable part applies to the
-              maximum lawful extent.
+              remains in force and the unenforceable part applies to the maximum
+              lawful extent.
             </>,
-            <>
-              Waiver: failing to enforce a provision is not a waiver of it.
-            </>,
+            <>Waiver: failing to enforce a provision is not a waiver of it.</>,
             <>
               Assignment: you may not transfer these terms; we may assign them
-              in connection with a merger, acquisition, or sale of assets,
-              with notice.
+              in connection with a merger, acquisition, or sale of assets, with
+              notice.
             </>,
             <>
               Entire agreement: these terms, together with the Privacy Policy
@@ -1770,10 +1698,10 @@ function TermsContent() {
       </PolicySection>
       <PolicySection title="Questions">
         <p>
-          Use Help &amp; Support in your profile menu for questions about
-          these terms or account access, or reach us via Settings → Feedback.
-          We aim to acknowledge messages promptly and resolve substantive
-          questions within a few business days.
+          Use Help &amp; Support in your profile menu for questions about these
+          terms or account access, or reach us via Settings → Feedback. We aim
+          to acknowledge messages promptly and resolve substantive questions
+          within a few business days.
         </p>
       </PolicySection>
     </div>

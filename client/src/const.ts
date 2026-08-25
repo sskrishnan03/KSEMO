@@ -16,17 +16,22 @@ export const startLogin = () => {
   const redirectUri = `${window.location.origin}/api/oauth/callback`;
 
   const nonce = crypto.randomUUID();
-  const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+  const isLocal =
+    window.location.hostname === "localhost" ||
+    window.location.hostname === "127.0.0.1";
   const isSecure = window.location.protocol === "https:";
-  const isIpAddress = /^(\d{1,3}\.){3}\d{1,3}$/.test(window.location.hostname) || window.location.hostname.includes(":");
-  
+  const isIpAddress =
+    /^(\d{1,3}\.){3}\d{1,3}$/.test(window.location.hostname) ||
+    window.location.hostname.includes(":");
+
   // Set domain for production environments (only for valid domain names, not IPs)
-  const domain = (!isLocal && !isIpAddress) ? ` domain=.${window.location.hostname};` : "";
-  
+  const domain =
+    !isLocal && !isIpAddress ? ` domain=.${window.location.hostname};` : "";
+
   // In production (HTTPS), always use Secure. In localhost HTTP, skip Secure flag
   const sameSite = isLocal ? "Lax" : "None";
   const secure = !isLocal || isSecure; // Secure in production or HTTPS localhost
-  
+
   document.cookie = `${OAUTH_STATE_COOKIE}=${nonce}; Path=/; Max-Age=600;${domain} SameSite=${sameSite}; ${secure ? "Secure;" : ""}`;
   const state = encodeOAuthState({ redirectUri, nonce });
 

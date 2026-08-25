@@ -1,10 +1,22 @@
-import { AuthError, AuthPasswordField, AuthTextField, GoogleButton } from "@/components/ksemo/AuthShell";
+import {
+  AuthError,
+  AuthPasswordField,
+  AuthTextField,
+  GoogleButton,
+} from "@/components/ksemo/AuthShell";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { startGoogleLogin } from "@/const";
 import { trpc } from "@/lib/trpc";
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
-import { ArrowLeft, KeyRound, LogIn, MailCheck, Send, UserPlus } from "lucide-react";
+import {
+  ArrowLeft,
+  KeyRound,
+  LogIn,
+  MailCheck,
+  Send,
+  UserPlus,
+} from "lucide-react";
 import React, { useState } from "react";
 import { useLocation } from "wouter";
 import { Link } from "wouter";
@@ -18,7 +30,9 @@ function AuthDivider() {
   return (
     <div className="flex items-center gap-3" aria-hidden="true">
       <span className="h-px flex-1 bg-border" />
-      <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">or</span>
+      <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+        or
+      </span>
       <span className="h-px flex-1 bg-border" />
     </div>
   );
@@ -27,22 +41,37 @@ function AuthDivider() {
 function FooterLinks() {
   return (
     <div className="flex items-center justify-center gap-2 text-[11px] leading-5 text-muted-foreground">
-      <Link href="/support/faq" className="underline-offset-4 hover:text-foreground hover:underline">
+      <Link
+        href="/support/faq"
+        className="underline-offset-4 hover:text-foreground hover:underline"
+      >
         Help
       </Link>
       <span aria-hidden="true">·</span>
-      <Link href="/support/privacy" className="underline-offset-4 hover:text-foreground hover:underline">
+      <Link
+        href="/support/privacy"
+        className="underline-offset-4 hover:text-foreground hover:underline"
+      >
         Privacy
       </Link>
       <span aria-hidden="true">·</span>
-      <Link href="/support/terms" className="underline-offset-4 hover:text-foreground hover:underline">
+      <Link
+        href="/support/terms"
+        className="underline-offset-4 hover:text-foreground hover:underline"
+      >
         Terms
       </Link>
     </div>
   );
 }
 
-function SignInForm({ onForgot, onSignup }: { onForgot: () => void; onSignup: () => void }) {
+function SignInForm({
+  onForgot,
+  onSignup,
+}: {
+  onForgot: () => void;
+  onSignup: () => void;
+}) {
   const [, navigate] = useLocation();
   const utils = trpc.useUtils();
 
@@ -95,12 +124,19 @@ function SignInForm({ onForgot, onSignup }: { onForgot: () => void; onSignup: ()
           disabled={signIn.isPending}
           className="mt-0.5"
         />
-        <label htmlFor="signin-remember" className="cursor-pointer text-xs leading-5 text-muted-foreground">
+        <label
+          htmlFor="signin-remember"
+          className="cursor-pointer text-xs leading-5 text-muted-foreground"
+        >
           Remember me
         </label>
       </div>
       <AuthError message={formError} />
-      <Button type="submit" disabled={signIn.isPending} className="h-10 w-full rounded-lg text-sm font-medium bg-[oklch(0.95_0.003_80)] text-[oklch(0.21_0.008_80)] hover:bg-[oklch(0.93_0.003_80)]">
+      <Button
+        type="submit"
+        disabled={signIn.isPending}
+        className="h-10 w-full rounded-lg text-sm font-medium bg-[oklch(0.95_0.003_80)] text-[oklch(0.21_0.008_80)] hover:bg-[oklch(0.93_0.003_80)]"
+      >
         <span className="inline-flex items-center gap-2">
           <LogIn className="size-4" />
           {signIn.isPending ? "Signing in…" : "Sign in"}
@@ -153,7 +189,9 @@ function SignUpForm({ onSignin }: { onSignin: () => void }) {
         setFieldErrors({ email: error.message });
         return;
       }
-      setFormError(error.message || "Could not create your account. Please try again.");
+      setFormError(
+        error.message || "Could not create your account. Please try again."
+      );
     },
   });
 
@@ -163,10 +201,13 @@ function SignUpForm({ onSignin }: { onSignin: () => void }) {
 
     const errors: typeof fieldErrors = {};
     if (name.trim().length === 0) errors.name = "Tell us your name.";
-    if (!EMAIL_PATTERN.test(email.trim())) errors.email = "Enter a valid email address.";
+    if (!EMAIL_PATTERN.test(email.trim()))
+      errors.email = "Enter a valid email address.";
     if (password.length < 8) errors.password = "At least 8 characters.";
-    if (confirmPassword !== password) errors.confirmPassword = "Passwords do not match.";
-    if (!agreed) errors.agreed = "Please accept the Terms and Privacy Policy to continue.";
+    if (confirmPassword !== password)
+      errors.confirmPassword = "Passwords do not match.";
+    if (!agreed)
+      errors.agreed = "Please accept the Terms and Privacy Policy to continue.";
     setFieldErrors(errors);
     if (Object.keys(errors).length > 0) return;
 
@@ -229,7 +270,10 @@ function SignUpForm({ onSignin }: { onSignin: () => void }) {
             aria-invalid={Boolean(fieldErrors.agreed)}
             className="mt-0.5"
           />
-          <label htmlFor="signup-agree-terms" className="cursor-pointer text-xs leading-5 text-muted-foreground">
+          <label
+            htmlFor="signup-agree-terms"
+            className="cursor-pointer text-xs leading-5 text-muted-foreground"
+          >
             I agree to the{" "}
             <Link
               href="/support/terms"
@@ -249,10 +293,16 @@ function SignUpForm({ onSignin }: { onSignin: () => void }) {
             .
           </label>
         </div>
-        {fieldErrors.agreed ? <p className="px-1 text-xs text-destructive">{fieldErrors.agreed}</p> : null}
+        {fieldErrors.agreed ? (
+          <p className="px-1 text-xs text-destructive">{fieldErrors.agreed}</p>
+        ) : null}
       </div>
       <AuthError message={formError} />
-      <Button type="submit" disabled={signUp.isPending} className="h-10 w-full rounded-lg text-sm font-medium bg-[oklch(0.95_0.003_80)] text-[oklch(0.21_0.008_80)] hover:bg-[oklch(0.93_0.003_80)]">
+      <Button
+        type="submit"
+        disabled={signUp.isPending}
+        className="h-10 w-full rounded-lg text-sm font-medium bg-[oklch(0.95_0.003_80)] text-[oklch(0.21_0.008_80)] hover:bg-[oklch(0.93_0.003_80)]"
+      >
         <span className="inline-flex items-center gap-2">
           <UserPlus className="size-4" />
           {signUp.isPending ? "Creating account…" : "Create account"}
@@ -269,7 +319,13 @@ function SignUpForm({ onSignin }: { onSignin: () => void }) {
   );
 }
 
-function ForgotForm({ onBackToSignIn, onSignin }: { onBackToSignIn: () => void; onSignin: () => void }) {
+function ForgotForm({
+  onBackToSignIn,
+  onSignin,
+}: {
+  onBackToSignIn: () => void;
+  onSignin: () => void;
+}) {
   const [email, setEmail] = useState("");
   const [fieldError, setFieldError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
@@ -286,11 +342,15 @@ function ForgotForm({ onBackToSignIn, onSignin }: { onBackToSignIn: () => void; 
       setResult({
         delivered: data.delivered ?? "skipped",
         resetUrl: data.resetUrl ?? null,
-        usesGoogleOnly: Boolean((data as { usesGoogleOnly?: boolean }).usesGoogleOnly),
+        usesGoogleOnly: Boolean(
+          (data as { usesGoogleOnly?: boolean }).usesGoogleOnly
+        ),
       });
     },
     onError: error => {
-      setFormError(error.message || "Could not start the reset. Please try again.");
+      setFormError(
+        error.message || "Could not start the reset. Please try again."
+      );
     },
   });
 
@@ -331,7 +391,10 @@ function ForgotForm({ onBackToSignIn, onSignin }: { onBackToSignIn: () => void; 
               <p className="text-xs leading-5 text-muted-foreground">
                 Here is your reset link:
               </p>
-              <Button asChild className="h-10 w-full rounded-lg text-sm font-medium">
+              <Button
+                asChild
+                className="h-10 w-full rounded-lg text-sm font-medium"
+              >
                 <a href={result.resetUrl}>Open reset link</a>
               </Button>
             </div>
@@ -377,7 +440,11 @@ function ForgotForm({ onBackToSignIn, onSignin }: { onBackToSignIn: () => void; 
         autoFocus
       />
       <AuthError message={formError} />
-      <Button type="submit" disabled={requestReset.isPending} className="h-10 w-full rounded-lg text-sm font-medium bg-[oklch(0.95_0.003_80)] text-[oklch(0.21_0.008_80)] hover:bg-[oklch(0.93_0.003_80)]">
+      <Button
+        type="submit"
+        disabled={requestReset.isPending}
+        className="h-10 w-full rounded-lg text-sm font-medium bg-[oklch(0.95_0.003_80)] text-[oklch(0.21_0.008_80)] hover:bg-[oklch(0.93_0.003_80)]"
+      >
         <span className="inline-flex items-center gap-2">
           <Send className="size-4" />
           {requestReset.isPending ? "Sending…" : "Send reset link"}
@@ -394,7 +461,7 @@ export default function AuthStage() {
     <MotionConfig reducedMotion="user">
       <main className="relative flex min-h-dvh items-center justify-center bg-background px-5 py-10">
         <div className="pointer-events-none absolute inset-0 opacity-35 [background-image:radial-gradient(var(--border)_1px,transparent_1px)] [background-size:28px_28px]" />
-        
+
         <div className="relative z-10 w-full max-w-5xl">
           <AnimatePresence mode="wait" initial={false}>
             {panel === "idle" && (
@@ -407,11 +474,22 @@ export default function AuthStage() {
                 className="max-w-md mx-auto"
               >
                 <div className="flex flex-col items-center text-center">
-                  <Link href="/" className="mx-auto block size-14 overflow-hidden rounded-lg border border-border bg-card">
-                    <img src="/KSEMOlogo.png" alt="KSEMO logo" className="size-full object-cover" />
+                  <Link
+                    href="/"
+                    className="mx-auto block size-14 overflow-hidden rounded-lg border border-border bg-card"
+                  >
+                    <img
+                      src="/KSEMOlogo.png"
+                      alt="KSEMO logo"
+                      className="size-full object-cover"
+                    />
                   </Link>
-                  <p className="mt-4 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">KSEMO</p>
-                  <h1 className="mt-3 text-2xl font-semibold tracking-[-0.03em]">Welcome back</h1>
+                  <p className="mt-4 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                    KSEMO
+                  </p>
+                  <h1 className="mt-3 text-2xl font-semibold tracking-[-0.03em]">
+                    Welcome back
+                  </h1>
                   <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-muted-foreground">
                     Your private space to think, talk, and remember.
                   </p>
@@ -446,7 +524,7 @@ export default function AuthStage() {
                 </div>
               </motion.div>
             )}
-            
+
             {panel === "signin" && (
               <motion.div
                 key="signin"
@@ -466,7 +544,9 @@ export default function AuthStage() {
                 <div className="flex flex-col items-center text-center">
                   <div className="flex items-center gap-2">
                     <LogIn className="size-5 text-muted-foreground" />
-                    <h1 className="text-2xl font-semibold tracking-[-0.03em]">Sign in</h1>
+                    <h1 className="text-2xl font-semibold tracking-[-0.03em]">
+                      Sign in
+                    </h1>
                   </div>
                   <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-muted-foreground">
                     Enter your email to sign in to your account.
@@ -476,7 +556,10 @@ export default function AuthStage() {
                 <div className="mt-8 space-y-3 max-w-xs mx-auto">
                   <GoogleButton onClick={startGoogleLogin} />
                   <AuthDivider />
-                  <SignInForm onForgot={() => setPanel("forgot")} onSignup={() => setPanel("signup")} />
+                  <SignInForm
+                    onForgot={() => setPanel("forgot")}
+                    onSignup={() => setPanel("signup")}
+                  />
                 </div>
 
                 <div className="mt-8">
@@ -484,7 +567,7 @@ export default function AuthStage() {
                 </div>
               </motion.div>
             )}
-            
+
             {panel === "signup" && (
               <motion.div
                 key="signup"
@@ -504,7 +587,9 @@ export default function AuthStage() {
                 <div className="flex flex-col items-center text-center">
                   <div className="flex items-center gap-2">
                     <UserPlus className="size-5 text-muted-foreground" />
-                    <h1 className="text-2xl font-semibold tracking-[-0.03em]">Create account</h1>
+                    <h1 className="text-2xl font-semibold tracking-[-0.03em]">
+                      Create account
+                    </h1>
                   </div>
                   <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-muted-foreground">
                     Join KSEMO to start your private space.
@@ -522,7 +607,7 @@ export default function AuthStage() {
                 </div>
               </motion.div>
             )}
-            
+
             {panel === "forgot" && (
               <motion.div
                 key="forgot"
@@ -542,7 +627,9 @@ export default function AuthStage() {
                 <div className="flex flex-col items-center text-center">
                   <div className="flex items-center gap-2">
                     <KeyRound className="size-5 text-muted-foreground" />
-                    <h1 className="text-2xl font-semibold tracking-[-0.03em]">Forgot password?</h1>
+                    <h1 className="text-2xl font-semibold tracking-[-0.03em]">
+                      Forgot password?
+                    </h1>
                   </div>
                   <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-muted-foreground">
                     We'll send you a link to reset your password.
@@ -550,7 +637,10 @@ export default function AuthStage() {
                 </div>
 
                 <div className="mt-8">
-                  <ForgotForm onBackToSignIn={() => setPanel("signin")} onSignin={() => setPanel("signin")} />
+                  <ForgotForm
+                    onBackToSignIn={() => setPanel("signin")}
+                    onSignin={() => setPanel("signin")}
+                  />
                 </div>
 
                 <div className="mt-8">

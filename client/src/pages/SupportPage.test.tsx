@@ -6,7 +6,7 @@ import { FaqPage, PrivacyPage, TermsPage } from "./SupportPage";
 describe("KSEMO support information destinations", () => {
   it("renders substantive FAQ, privacy, and terms content", () => {
     expect(renderToStaticMarkup(createElement(FaqPage))).toContain(
-      "What happens when I use Voice Chat?"
+      "Which file types can I add?"
     );
     expect(renderToStaticMarkup(createElement(PrivacyPage))).toContain(
       "What KSEMO stores"

@@ -206,15 +206,25 @@ class SDKServer {
 
     try {
       const secretKey = this.getSessionSecret();
-      console.log("[Auth] Verifying session with secret length:", secretKey.length);
+      console.log(
+        "[Auth] Verifying session with secret length:",
+        secretKey.length
+      );
       console.log("[Auth] Current appId:", ENV.appId);
-      
+
       const { payload } = await jwtVerify(cookieValue, secretKey, {
         algorithms: ["HS256"],
       });
       const { openId, appId, name } = payload as Record<string, unknown>;
-      
-      console.log("[Auth] Session payload - openId:", openId, "appId:", appId, "name:", name);
+
+      console.log(
+        "[Auth] Session payload - openId:",
+        openId,
+        "appId:",
+        appId,
+        "name:",
+        name
+      );
 
       if (
         !isNonEmptyString(openId) ||
@@ -227,7 +237,12 @@ class SDKServer {
 
       // Optional: Verify appId matches current environment
       if (ENV.appId && appId !== ENV.appId) {
-        console.warn("[Auth] Session appId mismatch - expected:", ENV.appId, "got:", appId);
+        console.warn(
+          "[Auth] Session appId mismatch - expected:",
+          ENV.appId,
+          "got:",
+          appId
+        );
         // For now, allow mismatch to avoid breaking existing sessions
         // In production, you might want to be stricter here
       }

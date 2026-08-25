@@ -17,22 +17,24 @@ export type User = {
   lastSignedIn: Date;
 };
 
-export type InsertUser = Partial<Omit<User, "id" | "createdAt" | "updatedAt">> & {
+export type InsertUser = Partial<
+  Omit<User, "id" | "createdAt" | "updatedAt">
+> & {
   openId: string;
   lastSignedIn?: Date;
 };
 
 export type UserPreference = {
-    userId: number;
-    selectedModel: string | null;
-    persona: "balanced" | "concise" | "creative" | "analytical";
-    customInstructions: string | null;
-    speechRate: number;
-    autoPlayResponses: boolean;
-    reduceMotion: boolean;
-    createdAt: Date;
-    updatedAt: Date;
-  };
+  userId: number;
+  selectedModel: string | null;
+  persona: "balanced" | "concise" | "creative" | "analytical";
+  customInstructions: string | null;
+  speechRate: number;
+  autoPlayResponses: boolean;
+  reduceMotion: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+};
 
 export type InsertUserPreference = Partial<
   Omit<UserPreference, "userId" | "createdAt" | "updatedAt">
@@ -63,7 +65,7 @@ export type Conversation = {
   userId: number;
   projectId: string | null;
   title: string;
-  conversationType: "text" | "voice" | "mixed";
+  conversationType: "text";
   isPinned: boolean;
   isArchived: boolean;
   isPublic: boolean;
@@ -125,26 +127,6 @@ export type InsertMessageFeedback = Omit<
   MessageFeedback,
   "id" | "createdAt" | "updatedAt"
 > & {
-  id: string;
-};
-
-export type VoiceSession = {
-  id: string;
-  userId: number;
-  conversationId: string;
-  status:
-    | "connecting"
-    | "listening"
-    | "speaking"
-    | "processing"
-    | "interrupted"
-    | "ended"
-    | "error";
-  createdAt: Date;
-  updatedAt: Date;
-};
-
-export type InsertVoiceSession = Omit<VoiceSession, "id" | "createdAt" | "updatedAt"> & {
   id: string;
 };
 
@@ -271,7 +253,7 @@ export type DbConversation = {
   user_id: number;
   project_id: string | null;
   title: string;
-  conversation_type: "text" | "voice" | "mixed";
+  conversation_type: "text";
   is_pinned: boolean;
   is_archived: boolean;
   is_public: boolean;
@@ -293,17 +275,17 @@ export type DbMessage = {
   updated_at: string;
 };
 
-  export type DbUserPreference = {
-    user_id: number;
-    selected_model: string | null;
-    persona: "balanced" | "concise" | "creative" | "analytical";
-    custom_instructions: string | null;
-    speech_rate: number;
-    auto_play_responses: boolean;
-    reduce_motion: boolean;
-    created_at: string;
-    updated_at: string;
-  };
+export type DbUserPreference = {
+  user_id: number;
+  selected_model: string | null;
+  persona: "balanced" | "concise" | "creative" | "analytical";
+  custom_instructions: string | null;
+  speech_rate: number;
+  auto_play_responses: boolean;
+  reduce_motion: boolean;
+  created_at: string;
+  updated_at: string;
+};
 
 // Helper function to convert DB row to app type
 export function dbToUser(db: DbUser): User {
@@ -357,18 +339,18 @@ export function dbToMessage(db: DbMessage): Message {
 }
 
 export function dbToUserPreference(db: DbUserPreference): UserPreference {
-    return {
-      userId: db.user_id,
-      selectedModel: db.selected_model,
-      persona: db.persona,
-      customInstructions: db.custom_instructions,
-      speechRate: db.speech_rate,
-      autoPlayResponses: db.auto_play_responses,
-      reduceMotion: db.reduce_motion,
-      createdAt: new Date(db.created_at),
-      updatedAt: new Date(db.updated_at),
-    };
-  }
+  return {
+    userId: db.user_id,
+    selectedModel: db.selected_model,
+    persona: db.persona,
+    customInstructions: db.custom_instructions,
+    speechRate: db.speech_rate,
+    autoPlayResponses: db.auto_play_responses,
+    reduceMotion: db.reduce_motion,
+    createdAt: new Date(db.created_at),
+    updatedAt: new Date(db.updated_at),
+  };
+}
 
 // Helper function to convert app type to DB format
 export function userToDb(user: Partial<User>): Partial<DbUser> {
@@ -378,25 +360,35 @@ export function userToDb(user: Partial<User>): Partial<DbUser> {
   if (user.email !== undefined) db.email = user.email;
   if (user.loginMethod !== undefined) db.login_method = user.loginMethod;
   if (user.passwordHash !== undefined) db.password_hash = user.passwordHash;
-  if (user.resetTokenHash !== undefined) db.reset_token_hash = user.resetTokenHash;
-  if (user.resetTokenExpiresAt !== undefined) db.reset_token_expires_at = user.resetTokenExpiresAt ? user.resetTokenExpiresAt.toISOString() : null;
+  if (user.resetTokenHash !== undefined)
+    db.reset_token_hash = user.resetTokenHash;
+  if (user.resetTokenExpiresAt !== undefined)
+    db.reset_token_expires_at = user.resetTokenExpiresAt
+      ? user.resetTokenExpiresAt.toISOString()
+      : null;
   if (user.role !== undefined) db.role = user.role;
-  if (user.lastSignedIn !== undefined) db.last_signed_in = user.lastSignedIn.toISOString();
+  if (user.lastSignedIn !== undefined)
+    db.last_signed_in = user.lastSignedIn.toISOString();
   return db;
 }
 
-export function conversationToDb(conv: Partial<Conversation>): Partial<DbConversation> {
+export function conversationToDb(
+  conv: Partial<Conversation>
+): Partial<DbConversation> {
   const db: Partial<DbConversation> = {};
   if (conv.userId !== undefined) db.user_id = conv.userId;
   if (conv.projectId !== undefined) db.project_id = conv.projectId;
   if (conv.title !== undefined) db.title = conv.title;
-  if (conv.conversationType !== undefined) db.conversation_type = conv.conversationType;
+  if (conv.conversationType !== undefined)
+    db.conversation_type = conv.conversationType;
   if (conv.isPinned !== undefined) db.is_pinned = conv.isPinned;
   if (conv.isArchived !== undefined) db.is_archived = conv.isArchived;
   if (conv.isPublic !== undefined) db.is_public = conv.isPublic;
   if (conv.shareToken !== undefined) db.share_token = conv.shareToken;
-  if (conv.memoryDisabled !== undefined) db.memory_disabled = conv.memoryDisabled;
-  if (conv.deletedAt !== undefined) db.deleted_at = conv.deletedAt ? conv.deletedAt.toISOString() : null;
+  if (conv.memoryDisabled !== undefined)
+    db.memory_disabled = conv.memoryDisabled;
+  if (conv.deletedAt !== undefined)
+    db.deleted_at = conv.deletedAt ? conv.deletedAt.toISOString() : null;
   return db;
 }
 

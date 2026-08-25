@@ -169,7 +169,9 @@ export function LibraryWorkspace({
         `Unsupported: ${unsupported
           .slice(0, 3)
           .map(file => file.name)
-          .join(", ")}${unsupported.length > 3 ? "…" : ""}. PDF, Word, Excel, PowerPoint, text, data, and image files are supported.`
+          .join(
+            ", "
+          )}${unsupported.length > 3 ? "…" : ""}. PDF, Word, Excel, PowerPoint, text, data, and image files are supported.`
       );
       return;
     }
