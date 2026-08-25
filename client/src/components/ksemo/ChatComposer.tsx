@@ -36,8 +36,8 @@ import React, {
   type ChangeEvent,
 } from "react";
 
-export const librarySubmenuClass =
-  "absolute left-2 z-50 max-h-[calc(100dvh-2rem)] w-80 rounded-xl border border-border bg-popover p-0 text-popover-foreground shadow-xl max-sm:left-1/2 max-sm:-translate-x-1/2";
+export const getLibrarySubmenuClass = (isCentered: boolean) =>
+  `absolute left-1/2 -translate-x-1/2 z-50 max-h-[calc(100dvh-${isCentered ? '12rem' : '6rem'})] w-full max-w-3xl rounded-xl border border-border bg-popover p-0 text-popover-foreground shadow-xl`;
 
 export function ChatComposer({
   onSend,
@@ -64,6 +64,7 @@ export function ChatComposer({
   showSafetyNote = true,
   webSearchEnabled = false,
   onToggleWebSearch,
+  isCentered = false,
 }: {
   onSend: (content: string) => void;
   onCancel: () => void;
@@ -87,12 +88,12 @@ export function ChatComposer({
     sizeBytes?: number;
     url?: string;
   }>;
-  onLibraryFile?: (file: {
+  onLibraryFile?: (files: Array<{
     id: string;
     filename: string;
     mimeType?: string;
     url?: string;
-  }) => void;
+  }>) => void;
   initialLibraryOpen?: boolean;
   initialToolsOpen?: boolean;
   menuPlacement?: "above" | "below";
@@ -100,6 +101,7 @@ export function ChatComposer({
   showSafetyNote?: boolean;
   webSearchEnabled?: boolean;
   onToggleWebSearch?: () => void;
+  isCentered?: boolean;
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -159,7 +161,7 @@ export function ChatComposer({
           <div
             ref={libraryPanelRef}
             className={cn(
-              librarySubmenuClass,
+              getLibrarySubmenuClass(isCentered),
               menuPlacement === "below"
                 ? "top-[calc(100%+0.5rem)]"
                 : "bottom-[calc(100%+0.5rem)]"
@@ -170,13 +172,15 @@ export function ChatComposer({
               query={libraryQuery}
               onQueryChange={setLibraryQuery}
               onCancel={() => setLibraryOpen(false)}
-              onSelect={file => {
-                onLibraryFile?.(file);
+              onSelect={files => {
+                onLibraryFile?.(files);
                 setLibraryOpen(false);
                 setLibraryQuery("");
               }}
               listMaxHeightClass={
-                menuPlacement === "below" ? "max-h-32" : "max-h-48"
+                menuPlacement === "below" 
+                  ? (isCentered ? "max-h-32" : "max-h-64") 
+                  : (isCentered ? "max-h-16" : "max-h-32")
               }
             />
           </div>
@@ -478,7 +482,7 @@ export function LibraryPickerContent({
   onQueryChange,
   onSelect,
   onCancel,
-  listMaxHeightClass = "max-h-48",
+  listMaxHeightClass = "max-h-32",
 }: {
   files: Array<{
     id: string;
@@ -489,17 +493,39 @@ export function LibraryPickerContent({
   }>;
   query: string;
   onQueryChange: (value: string) => void;
-  onSelect: (file: {
+  onSelect: (files: Array<{
     id: string;
     filename: string;
     mimeType?: string;
     url?: string;
-  }) => void;
+  }>) => void;
   onCancel?: () => void;
   listMaxHeightClass?: string;
 }) {
+  const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
+
+  const toggleFileSelection = (fileId: string) => {
+    setSelectedFiles(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(fileId)) {
+        newSet.delete(fileId);
+      } else {
+        newSet.add(fileId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleConfirm = () => {
+    const selected = files.filter(file => selectedFiles.has(file.id));
+    if (selected.length > 0) {
+      onSelect(selected);
+      setSelectedFiles(new Set());
+    }
+  };
+
   return (
-    <div className="space-y-2 p-2.5">
+    <div className="space-y-2 p-2">
       <div className="flex items-center gap-2 px-1">
         <Library className="size-3.5 text-muted-foreground" />
         <p className="flex-1 text-sm font-medium">Browse Library</p>
@@ -514,45 +540,79 @@ export function LibraryPickerContent({
           </Button>
         )}
       </div>
-      <Input
-        autoFocus
-        value={query}
-        onChange={event => onQueryChange(event.target.value)}
-        placeholder="Search your files and images"
-        className="h-9 rounded-xl bg-background text-sm"
-      />
+      <div className="flex items-center gap-2">
+        <Input
+          autoFocus
+          value={query}
+          onChange={event => onQueryChange(event.target.value)}
+          placeholder="Search your files and images"
+          className="h-8 flex-1 rounded-lg bg-background text-sm"
+        />
+        {selectedFiles.size > 0 && (
+          <Button
+            onClick={handleConfirm}
+            className="h-8 rounded-xl bg-foreground text-background hover:bg-foreground/90 text-sm px-4"
+            size="sm"
+          >
+            Add to chat
+          </Button>
+        )}
+      </div>
       <div
-        className={cn(listMaxHeightClass, "space-y-1.5 overflow-y-auto pr-1")}
+        className={cn(listMaxHeightClass, "space-y-1 overflow-y-auto pr-1")}
       >
         {files.length ? (
           files.map(file => (
             <button
               key={file.id}
-              onClick={() => onSelect(file)}
-              className="flex w-full items-center gap-2.5 rounded-xl border border-border bg-background p-2.5 text-left transition-colors hover:bg-muted"
+              onClick={() => toggleFileSelection(file.id)}
+              className={cn(
+                "flex w-full items-center gap-2 rounded-lg p-2 text-left transition-colors hover:bg-muted/50",
+                selectedFiles.has(file.id)
+                  ? "bg-primary/5"
+                  : ""
+              )}
             >
-              <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+              <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted/50 text-muted-foreground">
                 {file.mimeType?.startsWith("image/") ? (
-                  <Image className="size-3.5" />
+                  <Image className="size-3" />
                 ) : (
-                  <FileText className="size-3.5" />
+                  <FileText className="size-3" />
                 )}
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-medium">
+                <span className="block truncate text-xs font-medium">
                   {file.filename}
                 </span>
-                <span className="mt-0.5 block text-[11px] text-muted-foreground">
+                <span className="mt-0.5 block text-[10px] text-muted-foreground">
                   {file.mimeType?.startsWith("image/") ? "Image" : "File"}
                   {file.sizeBytes
                     ? ` · ${Math.max(1, Math.round(file.sizeBytes / 1024))} KB`
                     : ""}
                 </span>
               </span>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleFileSelection(file.id);
+                }}
+                className={cn(
+                  "flex size-6 shrink-0 items-center justify-center rounded-md transition-colors",
+                  selectedFiles.has(file.id)
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted/50 text-muted-foreground hover:bg-muted"
+                )}
+              >
+                {selectedFiles.has(file.id) ? (
+                  <Check className="size-3.5" />
+                ) : (
+                  <Plus className="size-3.5" />
+                )}
+              </button>
             </button>
           ))
         ) : (
-          <p className="px-3 py-6 text-center text-sm text-muted-foreground">
+          <p className="px-3 py-4 text-center text-xs text-muted-foreground">
             {query
               ? "No Library items match that search."
               : "Your Library is empty."}

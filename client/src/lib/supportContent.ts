@@ -304,55 +304,6 @@ export const FAQ_CATEGORIES: FaqCategory[] = [
     ],
   },
   {
-    id: "memories",
-    label: "Memories",
-    items: [
-      {
-        id: "mm-1",
-        question: "What are memories?",
-        answer:
-          "Memories are notes you explicitly save about yourself — preferences, facts, projects, or instructions — that KSEMO quietly uses in every conversation to give more personal answers.",
-      },
-      {
-        id: "mm-2",
-        question: "Does KSEMO remember things automatically?",
-        answer:
-          "No. Memory is completely opt-in. KSEMO saves only what you add yourself in the Memories section, and nothing is remembered behind your back.",
-      },
-      {
-        id: "mm-3",
-        question: "How do I add a memory?",
-        answer:
-          "Open Memories from the sidebar, click “Add memory”, write what you want remembered, and optionally tag it as a preference, fact, project, or instruction.",
-      },
-      {
-        id: "mm-4",
-        question:
-          "What is the difference between active and disabled memories?",
-        answer:
-          "Active memories are used while KSEMO answers you. Disabled memories are kept but ignored until you switch them back on — handy for temporary projects.",
-      },
-      {
-        id: "mm-5",
-        question: "How do I edit or remove a memory?",
-        answer:
-          "Toggle a memory off to disable it instantly, or click its trash icon to delete it permanently. Changes apply to every new response right away.",
-      },
-      {
-        id: "mm-6",
-        question: "Do memories apply to voice chats too?",
-        answer:
-          "Yes. Active memories shape both typed and spoken conversations equally, so KSEMO stays consistent no matter how you talk to it.",
-      },
-      {
-        id: "mm-7",
-        question: "Can I search my memories?",
-        answer:
-          "Yes. Use the search box at the top of the Memories page, and filter to show only active or disabled memories.",
-      },
-    ],
-  },
-  {
     id: "sharing-export",
     label: "Sharing & export",
     items: [

@@ -102,6 +102,11 @@
   * {
     @apply border-border outline-ring/50;
   }
+  [data-slot="dropdown-menu-item"],
+  [data-slot="dropdown-menu-sub-trigger"],
+  [data-slot="dropdown-menu-trigger"] {
+    @apply focus-visible:ring-0 focus-visible:ring-offset-0 outline-none;
+  }
   * {
     scrollbar-width: none;
   }
@@ -160,10 +165,7 @@
 }
 
 /* ── KSEMO Code Block (client/src/components/ksemo/code-block.tsx) ─────────
-   The component owns its layout with Tailwind classes. These rules keep the
-   code metrics in lockstep with the line-number gutter and render every
-   token in ONE uniform, high-contrast color on ONE uniform sidebar-colored
-   surface — no internal strips, dividers, or second tones. */
+   Clean, simple code blocks with Shiki syntax highlighting. */
 .ksemo-code-body pre {
   margin: 0 !important;
   background: transparent !important;
@@ -171,7 +173,6 @@
   border-radius: 0 !important;
   padding: 0.75rem 1rem !important;
   overflow-x: auto !important;
-  color: var(--foreground) !important;
   font-family:
     ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas,
     "Liberation Mono", monospace !important;
@@ -180,13 +181,18 @@
   tab-size: 4;
   white-space: pre;
 }
-.ksemo-code-body pre code,
-.ksemo-code-body pre span {
-  color: inherit !important;
-  background: transparent !important;
-  text-shadow: none !important;
-  white-space: pre;
+
+/* Shiki syntax highlighting: light theme tokens */
+.shiki,
+.shiki span {
+  color: var(--shiki-light);
 }
+/* Shiki syntax highlighting: dark theme tokens */
+html.dark .shiki,
+html.dark .shiki span {
+  color: var(--shiki-dark);
+}
+
 .ksemo-code-body ::selection {
   background: color-mix(in oklab, var(--foreground) 18%, transparent);
 }

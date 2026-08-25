@@ -25,6 +25,7 @@ import React, {
   useRef,
   useState,
 } from "react";
+import { codeToHtml } from "shiki";
 
 /** Blocks longer than this get a capped, scrollable body (expand for full view). */
 const COLLAPSED_LINE_LIMIT = 12;
@@ -267,24 +268,50 @@ function CodeBlockActions({
 
 function CodeSurface({
   code,
+  rawLanguage,
   expanded,
 }: {
   code: string;
+  rawLanguage?: string;
   expanded: boolean;
 }) {
   const capped =
     !expanded && code.split("\n").length > COLLAPSED_LINE_LIMIT;
+  const [html, setHtml] = useState<string>("");
+
+  useEffect(() => {
+    let cancelled = false;
+    const lang = (rawLanguage ?? "").trim().toLowerCase();
+    const validLang =
+      lang && lang in LANGUAGE_META ? lang : "text";
+
+    codeToHtml(code, {
+      lang: validLang,
+      themes: { light: "github-light", dark: "github-dark" },
+      defaultColor: false,
+    }).then(result => {
+      if (!cancelled) setHtml(result);
+    }).catch(() => {
+      if (!cancelled) setHtml("");
+    });
+    return () => { cancelled = true; };
+  }, [code, rawLanguage]);
 
   return (
     <div
       className="ksemo-code-body overflow-y-auto overscroll-contain"
       style={capped ? { maxHeight: COLLAPSED_MAX_HEIGHT_PX } : undefined}
     >
-      {/* Rendered through React so the code is always safely escaped
-          text — never executed, never injected as HTML. */}
-      <pre data-code-pre="plain">
-        <code>{code}</code>
-      </pre>
+      {html ? (
+        <div
+          className="[&>pre]:m-0 [&>pre]:bg-transparent [&>pre]:p-4"
+          dangerouslySetInnerHTML={{ __html: html }}
+        />
+      ) : (
+        <pre data-code-pre="plain">
+          <code>{code}</code>
+        </pre>
+      )}
     </div>
   );
 }
@@ -333,14 +360,14 @@ export function KsemoCodeBlock({
   }, [expandable]);
 
   const block = (
-    <div className="my-4 w-full overflow-hidden rounded-xl border border-border/70 bg-sidebar shadow-[0_1px_2px_rgba(24,22,18,0.04),0_16px_40px_-18px_rgba(24,22,18,0.35)]">
+    <div className="my-4 w-full overflow-hidden rounded-xl border border-border/70">
       <KsemoCodeBlockHeader
         code={code}
         rawLanguage={rawLanguage}
         expandable={expandable}
         onExpand={() => setExpanded(true)}
       />
-      <CodeSurface code={code} expanded={false} />
+      <CodeSurface code={code} rawLanguage={rawLanguage} expanded={false} />
     </div>
   );
 
@@ -365,7 +392,7 @@ export function KsemoCodeBlock({
             expandable={false}
           />
           <div className="min-h-0 flex-1">
-            <CodeSurface code={code} expanded />
+            <CodeSurface code={code} rawLanguage={rawLanguage} expanded />
           </div>
         </DialogContent>
       </Dialog>

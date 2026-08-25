@@ -14,7 +14,7 @@ const supabaseKey =
 
 if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
   console.error(
-    "[Workspace] SUPABASE_SERVICE_ROLE_KEY missing - RLS will block memories/files/projects"
+    "[Workspace] SUPABASE_SERVICE_ROLE_KEY missing - RLS will block files/projects"
   );
 }
 
@@ -27,13 +27,6 @@ const projectInput = z.object({
   name: z.string().trim().min(1).max(120),
   description: z.string().trim().max(2_000).nullable().optional(),
   instructions: z.string().trim().max(4_000).nullable().optional(),
-});
-const memoryInput = z.object({
-  content: z.string().trim().min(1).max(2_000),
-  category: z
-    .enum(["preference", "fact", "project", "instruction"])
-    .default("fact"),
-  projectId: entityId.nullable().optional(),
 });
 
 async function ownedProject(projectId: string, userId: number) {
@@ -237,59 +230,6 @@ export const workspaceRouter = router({
         return { success: true } as const;
       }),
   }),
-  memories: router({
-    list: protectedProcedure.query(async ({ ctx }) => {
-      const { data, error } = await supabase
-        .from("memories")
-        .select("*")
-        .eq("user_id", ctx.user.id)
-        .order("updated_at", { ascending: false });
-
-      if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to fetch memories" });
-      return data || [];
-    }),
-    create: protectedProcedure
-      .input(memoryInput)
-      .mutation(async ({ ctx, input }) => {
-        await optionalOwnedProject(input.projectId, ctx.user.id);
-        const id = crypto.randomUUID();
-        const { data, error } = await supabase.from("memories").insert({
-          id,
-          user_id: ctx.user.id,
-          content: input.content,
-          category: input.category,
-          project_id: input.projectId ?? null,
-          is_active: true,
-        }).select().single();
-
-        if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create memory" });
-        return data;
-      }),
-    setActive: protectedProcedure
-      .input(z.object({ id: entityId, isActive: z.boolean() }))
-      .mutation(async ({ ctx, input }) => {
-        const { error } = await supabase
-          .from("memories")
-          .update({ is_active: input.isActive })
-          .eq("id", input.id)
-          .eq("user_id", ctx.user.id);
-
-        if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to update memory" });
-        return { success: true } as const;
-      }),
-    remove: protectedProcedure
-      .input(z.object({ id: entityId }))
-      .mutation(async ({ ctx, input }) => {
-        const { error } = await supabase
-          .from("memories")
-          .delete()
-          .eq("id", input.id)
-          .eq("user_id", ctx.user.id);
-
-        if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to delete memory" });
-        return { success: true } as const;
-      }),
-  }),
   files: router({
     list: protectedProcedure.query(async ({ ctx }) => {
       // Exclude content_text from listings — it can be large and is only
@@ -459,19 +399,4 @@ export const workspaceRouter = router({
         return { success: true } as const;
       }),
   }),
-  search: protectedProcedure
-    .input(z.object({ query: z.string().trim().min(2).max(120) }))
-    .query(async ({ ctx, input }) => {
-      const { data, error } = await supabase
-        .from("user_memories")
-        .select("id, content, category")
-        .eq("user_id", ctx.user.id)
-        .eq("status", "active")
-        .ilike("content", `%${input.query}%`)
-        .order("updated_at", { ascending: false })
-        .limit(8);
-
-      if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to search" });
-      return { memories: data || [] };
-    }),
 });

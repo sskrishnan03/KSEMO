@@ -29,23 +29,17 @@ import {
   KsemoConfirmDialogPanel,
   KsemoTextDialogPanel,
 } from "../components/ksemo/DialogPanels";
-import { type SearchFilter } from "../components/ksemo/SearchFilterChips";
-import { SearchDialog } from "../components/ksemo/SearchDialog";
 import { MessageHistoryDialogPanel } from "../components/ksemo/MessageHistoryDialogPanel";
 import { useVoiceInput } from "../hooks/useVoiceInput";
 import { VoiceChat } from "../components/voice/VoiceChat";
 import { WorkspacePanel } from "../components/ksemo/WorkspacePanel";
 import { LibraryWorkspace } from "../components/ksemo/LibraryWorkspace";
-import {
-  MemoryWorkspace,
-  type StatusFilter,
-} from "../components/ksemo/MemoryWorkspace";
+import { SearchWorkspace } from "../components/ksemo/SearchWorkspace";
 import {
   createConversationPdfFile,
   createConversationWordFile,
 } from "../lib/conversationExport";
 import { createPublicConversationUrl } from "../lib/ksemoInteraction";
-import { getFollowingAssistantMessageId } from "../lib/messageEditPlan";
 import { saveEditedUserMessageAndRegenerate } from "../lib/editRegeneration";
 import { buildStreamingDrafts } from "../lib/streamingDrafts";
 import { restoreUserMessageVersionAndRegenerate } from "../lib/historyRestoration";
@@ -77,6 +71,23 @@ type SelectedAttachment = {
   url: string;
   linked: boolean;
 };
+
+type SavedAccount = {
+  id: string;
+  name?: string | null;
+  email?: string | null;
+};
+
+const SAVED_ACCOUNTS_KEY = "ksemo-saved-accounts";
+
+function getSavedAccounts(): SavedAccount[] {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(SAVED_ACCOUNTS_KEY) ?? "[]");
+    return Array.isArray(parsed) ? parsed.slice(0, 2) : [];
+  } catch {
+    return [];
+  }
+}
 
 export default function Home() {
   const { user, loading, logout } = useAuth();
@@ -114,11 +125,6 @@ export default function Home() {
   const isSidebarOpenPreview =
     import.meta.env.DEV &&
     new URLSearchParams(window.location.search).has("sidebarOpenPreview");
-  const searchPreviewMode = import.meta.env.DEV
-    ? new URLSearchParams(window.location.search).get("searchPreview")
-    : null;
-  const isSearchPreview = searchPreviewMode !== null;
-  const searchPreviewQuery = searchPreviewMode === "recent" ? "" : "he";
   const isProfileSupportPreview =
     import.meta.env.DEV &&
     new URLSearchParams(window.location.search).has("profileSupportPreview");
@@ -126,13 +132,13 @@ export default function Home() {
     () => new URLSearchParams(window.location.search).get("conversation"),
     []
   );
-  const inlineWorkspaceSection: "library" | "memories" | null =
+  const inlineWorkspaceSection: "library" | null =
     workspacePreview === "files"
       ? "library"
-      : workspacePreview === "memories"
-        ? "memories"
-        : null;
+      : null;
   const utils = trpc.useUtils();
+  const [savedAccounts, setSavedAccounts] =
+    useState<SavedAccount[]>(getSavedAccounts);
   const [sidebarOpen, setSidebarOpen] = useState(isSidebarOpenPreview);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     isCollapsedSidebarPreview
@@ -155,9 +161,6 @@ export default function Home() {
     SelectedAttachment[]
   >([]);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchFilter, setSearchFilter] = useState<SearchFilter>("all");
   const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(
     null
   );
@@ -165,7 +168,7 @@ export default function Home() {
     "idle"
   );
   const [primaryWorkspace, setPrimaryWorkspace] = useState<
-    "library" | "memories" | null
+    "library" | "search" | null
   >(null);
   const [voiceChatOpen, setVoiceChatOpen] = useState(false);
   const activePrimaryWorkspace = primaryWorkspace ?? inlineWorkspaceSection;
@@ -193,16 +196,11 @@ export default function Home() {
     id: string;
     title: string;
   } | null>(null);
-  const [usedMemoriesByMessage, setUsedMemoriesByMessage] = useState<
-    Record<string, Array<{ id: string; content: string }>>
-  >({});
   const [webSearchEnabled, setWebSearchEnabled] = useState(false);
   const [webSourcesByMessage, setWebSourcesByMessage] = useState<
     Record<string, Array<{ title: string; url: string }>>
   >({});
-    const [memoryWorkspaceFilter, setMemoryWorkspaceFilter] =
-      useState<StatusFilter | null>(null);
-    const streamAbortRef = useRef<AbortController | null>(null);
+  const streamAbortRef = useRef<AbortController | null>(null);
   const generationSequenceRef = useRef(0);
   // State does not update until React renders. This ref closes the small
   // double-submit window between a click/Enter event and that render.
@@ -221,42 +219,9 @@ export default function Home() {
   const preferencesQuery = trpc.preferences.get.useQuery(undefined, {
     enabled: Boolean(user),
   });
-  const effectiveSearchQuery = isSearchPreview
-    ? searchPreviewQuery
-    : searchQuery.trim();
-  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(
-    effectiveSearchQuery
-  );
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearchQuery(effectiveSearchQuery);
-    }, 120);
-    return () => clearTimeout(timer);
-  }, [effectiveSearchQuery]);
-  const searchResults = trpc.conversation.search.useQuery(
-    { query: debouncedSearchQuery || "--" },
-    {
-      enabled:
-        debouncedSearchQuery.length >= 1 && (searchOpen || isSearchPreview),
-      placeholderData: keepPreviousData,
-    }
-  );
-  const workspaceSearchResults = trpc.workspace.search.useQuery(
-    { query: debouncedSearchQuery || "--" },
-    {
-      enabled:
-        debouncedSearchQuery.length >= 1 &&
-        searchFilter !== "chats" &&
-        (searchOpen || isSearchPreview),
-      placeholderData: keepPreviousData,
-    }
-  );
-  const libraryFilesQuery = trpc.workspace.files.list.useQuery(
-    undefined,
-    {
-      enabled: Boolean(user),
-    }
-  );
+  const libraryFilesQuery = trpc.workspace.files.list.useQuery(undefined, {
+    enabled: Boolean(user),
+  });
   const preferenceMutation = trpc.preferences.update.useMutation({
     onSuccess: () => {
       utils.preferences.get.invalidate();
@@ -265,10 +230,52 @@ export default function Home() {
     },
     onError: () => toast.error("Settings could not be saved."),
   });
-  const renameMutation = trpc.conversation.rename.useMutation({
-    onSuccess: () => utils.conversation.list.invalidate(),
+  const [switchingAccountId, setSwitchingAccountId] = useState<string | null>(null);
+  const switchAccountMutation = trpc.auth.signIn.useMutation({
+    onSuccess: async () => {
+      await utils.auth.me.invalidate();
+      await utils.conversation.list.invalidate();
+      setActiveConversationId(null);
+      setPrimaryWorkspace(null);
+      setSwitchingAccountId(null);
+      toast.success("Switched account");
+    },
+    onError: (_error, variables) => {
+      setSwitchingAccountId(null);
+      if (variables?.email) {
+        setSavedAccounts(prev => {
+          const next = prev.filter(a => a.email !== variables.email);
+          localStorage.setItem(SAVED_ACCOUNTS_KEY, JSON.stringify(next));
+          return next;
+        });
+      }
+      toast.error(
+        "That account could not be switched. Signing out so you can sign in again.",
+      );
+      void logout();
+    },
   });
-  const pinMutation = trpc.conversation.setPinned.useMutation({
+
+  useEffect(() => {
+    if (!user?.id) return;
+    const current: SavedAccount = {
+      id: String(user.id),
+      name: user.name,
+      email: user.email,
+    };
+    setSavedAccounts(previous => {
+      const next = [
+        current,
+        ...previous.filter(
+          account =>
+            account.id !== current.id && account.email !== current.email
+        ),
+      ].slice(0, 2);
+      localStorage.setItem(SAVED_ACCOUNTS_KEY, JSON.stringify(next));
+      return next;
+    });
+  }, [user?.email, user?.id, user?.name]);
+  const renameMutation = trpc.conversation.rename.useMutation({
     onSuccess: () => utils.conversation.list.invalidate(),
   });
   const archiveMutation = trpc.conversation.setArchived.useMutation({
@@ -276,6 +283,9 @@ export default function Home() {
       utils.conversation.list.invalidate();
       toast.success("Conversation archived");
     },
+  });
+  const pinMutation = trpc.conversation.setPinned.useMutation({
+    onSuccess: () => utils.conversation.list.invalidate(),
   });
   const publicShareMutation =
     trpc.conversation.configurePublicShare.useMutation({
@@ -338,22 +348,9 @@ export default function Home() {
     onSuccess: () => {
       if (activeConversationId)
         utils.conversation.get.invalidate({ id: activeConversationId });
-        toast.success("Message permanently deleted");
-      },
-      onError: () => toast.error("KSEMO could not delete that message."),
-    });
-    const suggestionDismissMutation = trpc.memory.suggestions.dismiss.useMutation(
-      {
-      onSuccess: () => utils.memory.suggestions.list.invalidate(),
-    }
-  );
-  const suggestionAcceptMutation = trpc.memory.suggestions.accept.useMutation({
-    onSuccess: () => {
-      utils.memory.suggestions.list.invalidate();
-      utils.memory.userMemories.list.invalidate();
-      toast.success("Memory saved");
+      toast.success("Message permanently deleted");
     },
-    onError: () => toast.error("KSEMO could not save that memory."),
+    onError: () => toast.error("KSEMO could not delete that message."),
   });
   const composerFileUpload = trpc.workspace.files.upload.useMutation();
   const composerFileAttach =
@@ -474,11 +471,7 @@ export default function Home() {
     }
     if (conversationQuery.data.length)
       setActiveConversationId(conversationQuery.data[0].id);
-  }, [
-    isFreshChatPreview,
-    sharedConversationId,
-    utils.conversation.get,
-  ]);
+  }, [isFreshChatPreview, sharedConversationId, utils.conversation.get]);
 
   useEffect(() => {
     document.documentElement.classList.toggle(
@@ -492,7 +485,6 @@ export default function Home() {
       const modifier = event.metaKey || event.ctrlKey;
       if (modifier && event.key.toLowerCase() === "k") {
         event.preventDefault();
-        setSearchOpen(true);
         return;
       }
       if (modifier && event.shiftKey && event.key.toLowerCase() === "o") {
@@ -603,8 +595,7 @@ export default function Home() {
           attachmentFileIds: selectedAttachments.length
             ? selectedAttachments.map(file => file.fileId)
             : undefined,
-          webSearch:
-            webSearchEnabled && !isRegeneration ? true : undefined,
+          webSearch: webSearchEnabled && !isRegeneration ? true : undefined,
         }),
       });
       if (!response.ok || !response.body) {
@@ -678,53 +669,6 @@ export default function Home() {
                 [payload.messageId]: payload.sources ?? [],
               }));
             }
-          } else if (eventName === "memory.used") {
-            lastProgressAt = Date.now();
-            const used = data as unknown as {
-              messageId: string;
-              memories: Array<{ id: string; content: string }>;
-            };
-            if (used.messageId && used.memories?.length) {
-              const { messageId, memories } = used;
-              setUsedMemoriesByMessage(current => ({
-                ...current,
-                [messageId]: memories,
-              }));
-            }
-          } else if (eventName === "memory.suggestion") {
-            lastProgressAt = Date.now();
-            const suggestion = data as unknown as {
-              id: string;
-              content: string;
-              kind?: "new" | "duplicate" | "conflict";
-            };
-            const needsReview =
-              suggestion.kind === "duplicate" ||
-              suggestion.kind === "conflict";
-            toast(suggestion.content, {
-              description: needsReview
-                ? "This may relate to an existing memory. Review it in your Memory Center?"
-                : "Remember this for future conversations?",
-              duration: 20_000,
-              action: needsReview
-                ? {
-                    label: "Review",
-                    onClick: () => {
-                      setPrimaryWorkspace("memories");
-                      setMemoryWorkspaceFilter("suggestions");
-                    },
-                  }
-                : {
-                    label: "Remember",
-                    onClick: () =>
-                      suggestionAcceptMutation.mutate({ id: suggestion.id }),
-                  },
-              cancel: {
-                label: "Don't remember",
-                onClick: () =>
-                  suggestionDismissMutation.mutate({ id: suggestion.id }),
-              },
-            });
           }
         }
       };
@@ -735,7 +679,9 @@ export default function Home() {
           if (buffer.trim()) processEvents([buffer.replace(/\r\n/g, "\n")]);
           break;
         }
-        buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, "\n");
+        buffer += decoder
+          .decode(value, { stream: true })
+          .replace(/\r\n/g, "\n");
         const events = buffer.split("\n\n");
         buffer = events.pop() ?? "";
         processEvents(events);
@@ -745,7 +691,8 @@ export default function Home() {
         userStopped = true;
       else if ((error as Error).name !== "AbortError")
         errorMessage =
-          errorMessage ?? "KSEMO could not start a response. Your message was kept.";
+          errorMessage ??
+          "KSEMO could not start a response. Your message was kept.";
     } finally {
       clearInterval(watchdog);
     }
@@ -768,39 +715,48 @@ export default function Home() {
         : null);
     // The stream event handler assigns this asynchronously, which TypeScript
     // cannot follow through the closure even though it is available at runtime.
-    const completedConversation = streamConversation as StreamConversation | null;
+    const completedConversation =
+      streamConversation as StreamConversation | null;
 
     const persistTurnLocally = () => {
       if (!completedConversation) return false;
-      return mergeTurnIntoConversationCache(completedConversation.conversationId, {
-        user: {
-          id: completedConversation.userMessageId,
-          role: "user",
-          content,
-          status: "completed",
-          attachments: selectedAttachments.length
-            ? selectedAttachments.map(file => ({
-                id: file.fileId,
-                filename: file.name,
-                mimeType: file.mimeType,
-                url: file.url,
-              }))
-            : undefined,
-        },
-        assistant: {
-          id: completedConversation.assistantMessageId,
-          role: "assistant",
-          content: responseText,
-          status: failureMessage ? "failed" : userStopped ? "cancelled" : "completed",
-        },
-      });
+      return mergeTurnIntoConversationCache(
+        completedConversation.conversationId,
+        {
+          user: {
+            id: completedConversation.userMessageId,
+            role: "user",
+            content,
+            status: "completed",
+            attachments: selectedAttachments.length
+              ? selectedAttachments.map(file => ({
+                  id: file.fileId,
+                  filename: file.name,
+                  mimeType: file.mimeType,
+                  url: file.url,
+                }))
+              : undefined,
+          },
+          assistant: {
+            id: completedConversation.assistantMessageId,
+            role: "assistant",
+            content: responseText,
+            status: failureMessage
+              ? "failed"
+              : userStopped
+                ? "cancelled"
+                : "completed",
+          },
+        }
+      );
     };
 
     if (!completedConversation) {
       // Nothing was saved server-side: give the text back to the composer.
       setPendingMessages(null);
       setPendingConversationId(null);
-      if (!userStopped) setComposerValue(current => (current ? current : content));
+      if (!userStopped)
+        setComposerValue(current => (current ? current : content));
       if (failureMessage) toast.error(failureMessage);
       return;
     }
@@ -833,7 +789,6 @@ export default function Home() {
     if (generationSequenceRef.current !== turnSequence) return;
     if (synced || persistTurnLocally()) clearPendingDrafts();
     else keepPendingDraftsVisible();
-    void utils.memory.userMemories.list.invalidate();
     if (preferencesQuery.data?.autoPlayResponses && responseText)
       speak(responseText, completedConversation.assistantMessageId);
   }
@@ -1140,7 +1095,8 @@ export default function Home() {
     mimeType?: string;
     url?: string;
   }) {
-    setAttachmentNotices([
+    setAttachmentNotices(current => [
+      ...current,
       {
         fileId: file.id,
         name: file.filename,
@@ -1149,8 +1105,26 @@ export default function Home() {
         linked: Boolean(activeConversationId),
       },
     ]);
+  }
+
+  function attachLibraryFiles(
+    files: Array<{
+      id: string;
+      filename: string;
+      mimeType?: string;
+      url?: string;
+    }>
+  ) {
+    const newAttachments = files.map(file => ({
+      fileId: file.id,
+      name: file.filename,
+      mimeType: file.mimeType,
+      url: file.url ?? "",
+      linked: Boolean(activeConversationId),
+    }));
+    setAttachmentNotices(current => [...current, ...newAttachments]);
     toast.success(
-      "Library file selected. Send your message to include it in this conversation."
+      `${files.length} file${files.length > 1 ? "s" : ""} selected. Send your message to include ${files.length > 1 ? "them" : "it"} in this conversation.`
     );
   }
 
@@ -1253,17 +1227,17 @@ export default function Home() {
           setRenameTarget({ id: conversation.id, title: conversation.title });
           setRenameValue(conversation.title);
         }}
-        onPin={conversation =>
-          pinMutation.mutate({
-            id: conversation.id,
-            isPinned: !conversation.isPinned,
-          })
-        }
         onDuplicate={conversation =>
           duplicateMutation.mutate({ id: conversation.id })
         }
         onArchive={conversation =>
           archiveMutation.mutate({ id: conversation.id, isArchived: true })
+        }
+        onPin={conversation =>
+          pinMutation.mutate({
+            id: conversation.id,
+            isPinned: !conversation.isPinned,
+          })
         }
         onShare={conversation => {
           setShareTarget({
@@ -1284,36 +1258,53 @@ export default function Home() {
             title: conversation.title,
           })
         }
-        onSearch={() => setSearchOpen(true)}
+        onSearch={() => {
+          setPrimaryWorkspace("search");
+          setSidebarOpen(false);
+        }}
         onWorkspace={section => {
-          setMemoryWorkspaceFilter(null);
-          setPrimaryWorkspace(section === "files" ? "library" : "memories");
+          setPrimaryWorkspace("library");
           setSidebarOpen(false);
         }}
         previewSupportOpen={isProfileSupportPreview}
         onSettings={() => setSettingsOpen(true)}
         onSupport={topic => setLocation(`/support/${topic}`)}
         onLogout={logout}
+        accounts={savedAccounts}
+        switchingAccountId={switchingAccountId}
+        onSwitchAccount={account => {
+          if (!account.email || account.email === user.email) return;
+          setSwitchingAccountId(account.id);
+          switchAccountMutation.mutate({ email: account.email });
+        }}
+        onAddAccount={() => {
+          void logout();
+        }}
+        onRemoveAccount={account => {
+          setSavedAccounts(prev => {
+            const next = prev.filter(a => a.id !== account.id);
+            localStorage.setItem(SAVED_ACCOUNTS_KEY, JSON.stringify(next));
+            return next;
+          });
+          toast.success("Account removed");
+        }}
         user={user}
       />
 
       <main className="relative flex min-w-0 flex-1 flex-col">
-        {activePrimaryWorkspace === "memories" ? (
-          <MemoryWorkspace
-            onBackToChat={() => {
-              setPrimaryWorkspace(null);
-              setMemoryWorkspaceFilter(null);
-            }}
-            activeConversationId={activeConversationId}
-            conversationMemoryPaused={Boolean(
-              activeQuery.data?.conversation.memoryDisabled
-            )}
-            initialStatusFilter={memoryWorkspaceFilter ?? undefined}
-          />
-        ) : activePrimaryWorkspace === "library" ? (
+        {activePrimaryWorkspace === "library" ? (
           <LibraryWorkspace
             onBackToChat={() => setPrimaryWorkspace(null)}
             onChatWithFiles={startChatWithLibraryFiles}
+          />
+        ) : activePrimaryWorkspace === "search" ? (
+          <SearchWorkspace
+            conversations={conversationQuery.data ?? []}
+            onBackToChat={() => setPrimaryWorkspace(null)}
+            onSelectConversation={id => {
+              setActiveConversationId(id);
+              setPrimaryWorkspace(null);
+            }}
           />
         ) : voiceChatOpen ? (
           <VoiceChat
@@ -1374,7 +1365,6 @@ export default function Home() {
                       onFeedback={(messageId, value) =>
                         messageFeedbackMutation.mutate({ messageId, value })
                       }
-                      usedMemories={usedMemoriesByMessage[message.id]}
                       webSources={webSourcesByMessage[message.id]}
                     />
                   ))}
@@ -1425,7 +1415,7 @@ export default function Home() {
                         )
                       }
                       libraryFiles={libraryFilesQuery.data}
-                      onLibraryFile={attachLibraryFile}
+                      onLibraryFile={attachLibraryFiles}
                       initialLibraryOpen={isLibraryPreview}
                       initialToolsOpen={isLibraryPreview}
                       menuPlacement="below"
@@ -1434,6 +1424,7 @@ export default function Home() {
                       onToggleWebSearch={() =>
                         setWebSearchEnabled(current => !current)
                       }
+                      isCentered={true}
                     />
                   }
                 />
@@ -1476,7 +1467,7 @@ export default function Home() {
                   )
                 }
                 libraryFiles={libraryFilesQuery.data}
-                onLibraryFile={attachLibraryFile}
+                onLibraryFile={attachLibraryFiles}
                 initialLibraryOpen={isLibraryPreview}
                 compactBottomSpacing
                 showSafetyNote
@@ -1493,50 +1484,15 @@ export default function Home() {
       <SettingsDialog
         open={settingsOpen || isSettingsPreview}
         onOpenChange={setSettingsOpen}
-        preferences={preferencesQuery.data}
-        onSave={draft => preferenceMutation.mutate(draft)}
-        saving={preferenceMutation.isPending}
         user={user}
         onSignOut={logout}
         onOpenWorkspace={section => {
           setSettingsOpen(false);
-          setPrimaryWorkspace(section === "files" ? "library" : "memories");
+          setPrimaryWorkspace("library");
         }}
-        onOpenSupport={topic => setLocation(`/support/${topic}`)}
         onAllChatsDeleted={() => {
           setActiveConversationId(null);
           utils.conversation.list.invalidate();
-        }}
-      />
-      <SearchDialog
-        open={searchOpen || isSearchPreview}
-        onOpenChange={next => {
-          if (!next) setSearchOpen(false);
-        }}
-        query={isSearchPreview ? searchPreviewQuery : searchQuery}
-        onQueryChange={setSearchQuery}
-        filter={searchFilter}
-        onFilterChange={setSearchFilter}
-        results={searchResults.data}
-        memories={workspaceSearchResults.data?.memories}
-        recentChats={(conversationQuery.data ?? [])
-          .slice(0, 8)
-          .map(conversation => ({
-            conversationId: conversation.id,
-            conversationTitle: conversation.title,
-            createdAt: conversation.createdAt,
-          }))}
-        loading={
-          (searchResults.isLoading && !searchResults.data) ||
-          (workspaceSearchResults.isLoading && !workspaceSearchResults.data)
-        }
-        onSelect={id => {
-          selectConversation(id);
-          setSearchOpen(false);
-        }}
-        onOpenMemories={() => {
-          setPrimaryWorkspace("memories");
-          setSearchOpen(false);
         }}
       />
       <WorkspacePanel
@@ -1667,16 +1623,6 @@ function timeGreeting() {
   if (hour < 12) return "Good morning — what can I help you with?";
   if (hour < 18) return "Good afternoon — what can I help you with?";
   return "Good evening — what can I help you with?";
-}
-
-function escapeHtml(value: string) {
-  return value.replace(
-    /[&<>'"]/g,
-    character =>
-      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[
-        character
-      ] || character
-  );
 }
 
 function EmptyState({

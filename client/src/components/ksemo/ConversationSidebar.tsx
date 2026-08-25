@@ -11,8 +11,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import {
+  ArrowLeftRight,
   Archive,
-  Brain,
+  Check,
   ChevronDown,
   ChevronRight,
   ChevronsLeft,
@@ -24,17 +25,21 @@ import {
   FileText,
   HelpCircle,
   Library,
+  Headset,
+  Loader2,
   LogOut,
   MessageCircle,
   PanelLeftClose,
   Pencil,
   Pin,
+  Plus,
   Search,
   Settings2,
   Share2,
   ShieldCheck,
   SquarePen,
   Trash2,
+  X,
 } from "lucide-react";
 import React, { useState } from "react";
 
@@ -45,7 +50,6 @@ type Conversation = {
   isArchived: boolean;
   isPublic?: boolean;
   shareToken?: string | null;
-  memoryDisabled?: boolean;
 };
 
 export function ConversationSidebar({
@@ -69,6 +73,11 @@ export function ConversationSidebar({
   onSettings,
   onSupport,
   onLogout,
+  accounts = [],
+  onSwitchAccount,
+  onAddAccount,
+  onRemoveAccount,
+  switchingAccountId,
   user,
   previewSupportOpen = false,
 }: {
@@ -88,11 +97,24 @@ export function ConversationSidebar({
   onExport: (conversation: Conversation, format: "pdf" | "word") => void;
   onDelete: (conversation: Conversation) => void;
   onSearch: () => void;
-  onWorkspace: (section: "files" | "memories") => void;
+  onWorkspace: (section: "files") => void;
   onSettings: () => void;
   onSupport: (topic: "faq" | "privacy" | "terms") => void;
   onLogout: () => void;
-  user: { name?: string | null; email?: string | null };
+  accounts?: Array<{ id: string; name?: string | null; email?: string | null }>;
+  onSwitchAccount?: (account: {
+    id: string;
+    name?: string | null;
+    email?: string | null;
+  }) => void;
+  onAddAccount?: () => void;
+  onRemoveAccount?: (account: {
+    id: string;
+    name?: string | null;
+    email?: string | null;
+  }) => void;
+  switchingAccountId?: string | null;
+  user: { id?: string | number; name?: string | null; email?: string | null };
   previewSupportOpen?: boolean;
 }) {
   const pinned = conversations.filter(item => item.isPinned);
@@ -106,8 +128,6 @@ export function ConversationSidebar({
         "group-hover:translate-x-0.5 group-hover:scale-105 group-active:translate-x-0",
       Library:
         "group-hover:-translate-y-0.5 group-hover:rotate-3 group-active:translate-y-0",
-      Memory:
-        "group-hover:scale-110 group-hover:-rotate-3 group-active:rotate-0",
     })[label] ?? "group-hover:scale-105";
   const railTip = (label: string) =>
     compact ? (
@@ -238,9 +258,6 @@ export function ConversationSidebar({
           {utility("Library", <Library className="size-4" />, () =>
             onWorkspace("files")
           )}
-          {utility("Memory", <Brain className="size-4" />, () =>
-            onWorkspace("memories")
-          )}
         </div>
         <nav
           className="mt-4 min-h-0 flex-1 overflow-y-auto"
@@ -285,7 +302,7 @@ export function ConversationSidebar({
             <DropdownMenuTrigger asChild>
               <button
                 className={cn(
-                  "group relative flex w-full items-center rounded-xl py-2 text-left transition-colors hover:bg-muted",
+                  "group relative flex w-full items-center rounded-xl py-2 text-left transition-colors hover:bg-muted focus-visible:ring-0 focus-visible:outline-none",
                   compact ? "justify-center" : "gap-2.5 px-2"
                 )}
                 aria-label="Open profile menu"
@@ -297,9 +314,6 @@ export function ConversationSidebar({
                   <span className="block truncate text-sm font-medium">
                     {user.name || "KSEMO user"}
                   </span>
-                  <span className="block truncate text-[11px] text-muted-foreground">
-                    {user.email || "Signed in"}
-                  </span>
                 </span>
                 {railTip("Account")}
               </button>
@@ -309,23 +323,86 @@ export function ConversationSidebar({
               sideOffset={10}
               align={compact ? "end" : "start"}
               collisionPadding={12}
-              className="w-52 rounded-xl"
+              className="w-60 rounded-2xl border-border/80 p-1.5 shadow-xl"
             >
-              <div className="px-2 py-2">
-                <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+              <div className="rounded-xl bg-muted/60 px-2.5 py-2.5">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                   Logged in as
                 </p>
-                <p className="mt-0.5 truncate text-xs font-medium">
+                <p className="mt-1 truncate text-sm font-semibold">
                   {user.name || "KSEMO user"}
+                </p>
+                <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                  {user.email || "Account"}
                 </p>
               </div>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={onSettings}>
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger className="focus-visible:ring-0 focus-visible:outline-none">
+                  <ArrowLeftRight className="mr-2 size-4" /> Switch account
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent
+                  sideOffset={8}
+                  collisionPadding={12}
+                  className="w-60 rounded-2xl p-1.5"
+                >
+                  <p className="px-2.5 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                    Accounts ({accounts.length}/2)
+                  </p>
+                  {accounts.map(account => {
+                    const selected = account.id === String(user.id) || account.email === user.email;
+                    const switching = switchingAccountId === account.id;
+                    return (
+                      <DropdownMenuItem
+                        key={account.id}
+                        disabled={selected || switching}
+                        onClick={() => onSwitchAccount?.(account)}
+                        className="h-11 rounded-xl px-2.5 focus-visible:ring-0 focus-visible:outline-none"
+                      >
+                        <span className="mr-2.5 flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-[10px] font-bold text-primary">
+                          {switching ? (
+                            <Loader2 className="size-3.5 animate-spin" />
+                          ) : (
+                            account.name?.trim().charAt(0).toUpperCase() || account.email?.charAt(0).toUpperCase() || "U"
+                          )}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-xs font-semibold">{account.name || "KSEMO user"}</span>
+                          <span className="block truncate text-[10px] text-muted-foreground">
+                            {switching ? "Switching…" : account.email}
+                          </span>
+                        </span>
+                        {selected ? (
+                          <Check className="size-3.5 text-primary" aria-label="Current account" />
+                        ) : switching ? null : (
+                          <button
+                            type="button"
+                            onClick={event => {
+                              event.stopPropagation();
+                              onRemoveAccount?.(account);
+                            }}
+                            className="ml-1 rounded-md p-0.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                            aria-label={`Remove ${account.name || account.email}`}
+                          >
+                            <X className="size-3" />
+                          </button>
+                        )}
+                      </DropdownMenuItem>
+                    );
+                  })}
+                  {onAddAccount && (
+                    <DropdownMenuItem onClick={onAddAccount} className="mt-1 h-9 rounded-xl text-xs font-medium focus-visible:ring-0 focus-visible:outline-none">
+                      <Plus className="mr-2 size-3.5" /> Add account
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+              <DropdownMenuItem onClick={onSettings} className="focus-visible:ring-0 focus-visible:outline-none">
                 <Settings2 className="mr-2 size-4" /> Settings
               </DropdownMenuItem>
               <DropdownMenuSub open={previewSupportOpen || undefined}>
-                <DropdownMenuSubTrigger>
-                  <HelpCircle className="mr-2 size-4" />
+                <DropdownMenuSubTrigger className="focus-visible:ring-0 focus-visible:outline-none">
+                   <Headset className="mr-2 size-4" />
                   Help &amp; Support
                 </DropdownMenuSubTrigger>
                 <DropdownMenuSubContent
@@ -333,17 +410,17 @@ export function ConversationSidebar({
                   collisionPadding={12}
                   className="max-h-[calc(100dvh-1.5rem)] w-52 overflow-y-auto rounded-xl"
                 >
-                  <DropdownMenuItem onClick={() => onSupport("faq")}>
+                  <DropdownMenuItem onClick={() => onSupport("faq")} className="focus-visible:ring-0 focus-visible:outline-none">
                     <HelpCircle className="mr-2 size-4" />
                     FAQ
                     <ExternalLink className="ml-auto size-3.5 text-muted-foreground" />
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => onSupport("privacy")}>
+                  <DropdownMenuItem onClick={() => onSupport("privacy")} className="focus-visible:ring-0 focus-visible:outline-none">
                     <ShieldCheck className="mr-2 size-4" />
                     Privacy Policy
                     <ExternalLink className="ml-auto size-3.5 text-muted-foreground" />
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => onSupport("terms")}>
+                  <DropdownMenuItem onClick={() => onSupport("terms")} className="focus-visible:ring-0 focus-visible:outline-none">
                     <FileText className="mr-2 size-4" />
                     Terms of Service
                     <ExternalLink className="ml-auto size-3.5 text-muted-foreground" />
@@ -353,7 +430,7 @@ export function ConversationSidebar({
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 onClick={onLogout}
-                className="text-destructive focus:text-destructive"
+                className="text-destructive focus:text-destructive focus-visible:ring-0 focus-visible:outline-none"
               >
                 <LogOut className="mr-2 size-4" /> Sign out
               </DropdownMenuItem>

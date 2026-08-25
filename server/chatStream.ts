@@ -2,40 +2,18 @@ import type { Express, Request, Response } from "express";
 import {
   attachFileToMessageForUser,
   createConversationForUser,
-  createConversationMemoryForUser,
-  createMemorySuggestionForUser,
   createMessage,
-  createUserMemoryForUser,
-  deleteAllUserMemoriesForUser,
-  deleteUserMemoryForUser,
   getConversationForUser,
-  getMemorySettingsForUser,
   getUserPreferences,
-  listConversationMemoriesForConversation,
   listMessageFilesForUser,
   listMessagesForConversation,
-  listPendingMemorySuggestionsForUser,
-  listUserMemoriesForUser,
   removeFollowingAssistantDuplicatesForUser,
-  resolveMemorySuggestionForUser,
-  touchUserMemoriesForUser,
   updateConversationForUser,
   updateMessage,
 } from "./supabase-db";
 import { streamLLM, type Message } from "./_core/llm";
 import { sdk } from "./_core/sdk";
 import { storageGetSignedUrl, requestBaseUrl } from "./storage";
-import {
-  analyzeTurnForMemories,
-  detectExplicitCommand,
-  evaluateAgainstExisting,
-  classifyExplicitContent,
-  formatMemoryContextBlock,
-  formatRecallBlock,
-  isActiveAndUnexpired,
-  selectRelevantMemories,
-} from "./memory/memoryEngine";
-import { DEFAULT_MEMORY_SETTINGS, type UserMemory } from "../supabase-schema/04-types";
 import {
   composeWebSearchContext,
   performWebSearch,
@@ -134,184 +112,6 @@ function writeEvent(res: Response, event: string, payload: unknown) {
     res.write(`event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`);
   } catch {
     // Socket already gone; the close handler aborts generation separately.
-  }
-}
-
-type UsedMemoryItem = { id: string; content: string };
-
-// Runs the explicit-command side effects ("remember that...", "forget ...").
-// Returns notes to inject into the system prompt so the reply can acknowledge
-// what actually happened instead of guessing.
-async function applyExplicitMemoryCommand(
-  userId: number,
-  command: NonNullable<ReturnType<typeof detectExplicitCommand>>,
-  notes: string[]
-): Promise<void> {
-  switch (command.kind) {
-    case "remember": {
-      const { category, importance } = classifyExplicitContent(command.content);
-      await createUserMemoryForUser({
-        userId,
-        content: command.content,
-        category,
-        importance,
-        confidence: 1,
-        source: "explicit",
-        explanation: `You explicitly asked me to remember: "${command.content.slice(0, 200)}"`,
-      });
-      notes.push(
-        `MEMORY SAVED THIS TURN: The user explicitly asked you to remember "${command.content}". It is now saved as a long-term memory. Briefly confirm this in your reply.`
-      );
-      return;
-    }
-    case "forget": {
-      if (command.all) {
-        const removed = await deleteAllUserMemoriesForUser(userId);
-        const pending = await listPendingMemorySuggestionsForUser(userId);
-        await Promise.all(
-          pending.map(item =>
-            resolveMemorySuggestionForUser(item.id, userId, "dismissed")
-          )
-        );
-        notes.push(
-          `MEMORY FORGOTTEN: You just deleted all ${removed} stored long-term memories at the user's explicit request. Acknowledge this briefly and kindly.`
-        );
-        return;
-      }
-      if (!command.target) {
-        // "Don't remember this." declines the most recent suggestion.
-        const pending = await listPendingMemorySuggestionsForUser(userId);
-        if (pending[0]) {
-          await resolveMemorySuggestionForUser(
-            pending[0].id,
-            userId,
-            "dismissed"
-          );
-          notes.push(
-            "The user declined your most recent memory suggestion; it was discarded. Acknowledge briefly."
-          );
-        } else {
-          notes.push(
-            "The user said not to remember something, but there are no pending suggestions. Acknowledge briefly."
-          );
-        }
-        return;
-      }
-      const all = await listUserMemoriesForUser(userId);
-      const active = all.filter(memory => isActiveAndUnexpired(memory));
-      const verdict = evaluateAgainstExisting(command.target, active);
-      let forgotten = verdict.match?.content ?? null;
-      if (verdict.match) {
-        await deleteUserMemoryForUser(verdict.match.id, userId);
-      } else {
-        const lowerTarget = command.target.toLowerCase();
-        const fuzzy = active.find(
-          memory =>
-            memory.content.toLowerCase().includes(lowerTarget) ||
-            lowerTarget.includes(memory.content.toLowerCase())
-        );
-        if (fuzzy) {
-          await deleteUserMemoryForUser(fuzzy.id, userId);
-          forgotten = fuzzy.content;
-        }
-      }
-      notes.push(
-        forgotten
-          ? `MEMORY FORGOTTEN: You deleted the memory "${forgotten}" at the user's request. Acknowledge briefly.`
-          : `FORGET REQUEST NOT FOUND: The user asked you to forget "${command.target}" but no matching memory exists. Say so honestly and briefly.`
-      );
-      return;
-    }
-    default:
-      return;
-  }
-}
-
-// Post-turn analysis: detects new candidates, stores conversation memories
-// directly, and either saves inferred memories or files pending suggestions.
-// Never throws; memory problems must not fail a completed response.
-async function runPostTurnMemoryAnalysis(options: {
-  res: Response;
-  userId: number;
-  conversationId: string;
-  userMessage: string;
-  assistantMessage: string;
-  settings: { autoSuggest: boolean; autoSaveInferred: boolean };
-  existingActiveUserMemories: UserMemory[];
-  existingConversationMemories: Array<{ id: string; content: string }>;
-}): Promise<void> {
-  try {
-    const outcome = await analyzeTurnForMemories(
-      {
-        userMessage: options.userMessage,
-        assistantMessage: options.assistantMessage,
-        settings: options.settings,
-        existingActiveUserMemories: options.existingActiveUserMemories.filter(
-          memory => isActiveAndUnexpired(memory)
-        ),
-        existingConversationMemories:
-          options.existingConversationMemories,
-      },
-      12_000
-    );
-    if (!outcome) return;
-
-    for (const candidate of outcome.conversationCandidates) {
-      try {
-        await createConversationMemoryForUser({
-          conversationId: options.conversationId,
-          userId: options.userId,
-          content: candidate.content,
-          category: candidate.category,
-          importance: candidate.importance,
-        });
-      } catch (error) {
-        console.warn("[ChatStream] conversation memory save failed", error);
-      }
-    }
-
-    for (const candidate of outcome.inferredToSave) {
-      try {
-        await createUserMemoryForUser({
-          userId: options.userId,
-          content: candidate.content,
-          category: candidate.category,
-          importance: candidate.importance,
-          confidence: candidate.confidence,
-          source: "inferred",
-          explanation: candidate.reason
-            ? `This was suggested because you mentioned this in your conversations: ${candidate.reason}`
-            : "Detected automatically from your conversations.",
-        });
-      } catch (error) {
-        console.warn("[ChatStream] inferred memory save failed", error);
-      }
-    }
-
-    for (const entry of outcome.suggestionsToCreate) {
-      try {
-        const suggestion = await createMemorySuggestionForUser({
-          userId: options.userId,
-          conversationId: options.conversationId,
-          content: entry.candidate.content,
-          category: entry.candidate.category,
-          importance: entry.candidate.importance,
-          confidence: entry.candidate.confidence,
-          reason: entry.candidate.reason || null,
-          meta: entry.meta,
-        });
-        writeEvent(options.res, "memory.suggestion", {
-          id: suggestion.id,
-          content: suggestion.content,
-          kind: entry.meta.kind,
-          similarTo: entry.meta.similarTo ?? [],
-        });
-      } catch (error) {
-        console.warn("[ChatStream] suggestion creation failed", error);
-      }
-    }
-  } catch (error) {
-    console.warn("[ChatStream] memory analysis failed", error);
   }
 }
 
@@ -503,98 +303,6 @@ export function registerChatStream(app: Express) {
       });
 
       // ============================================
-      // MEMORY SYSTEM
-      // User Memory = durable info across conversations.
-      // Conversation Memory = context for this conversation only.
-      // Explicit commands run immediately; retrieval picks only relevant
-      // memories; analysis after the answer proposes anything new.
-      // Every step is non-fatal: a memory failure never breaks a response.
-      // ============================================
-      let usedMemoryItems: UsedMemoryItem[] = [];
-      const memoryNotes: string[] = [];
-      let recallScope: "user" | "conversation" | null = null;
-      let allUserMemoriesSnapshot: UserMemory[] = [];
-      const memorySettings = await getMemorySettingsForUser(user.id).catch(
-        error => {
-          console.warn(
-            "[ChatStream] memory settings unavailable, defaults in use",
-            error
-          );
-          return {
-            userId: user.id,
-            ...DEFAULT_MEMORY_SETTINGS,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          };
-        }
-      );
-      const memoryActive =
-        memorySettings.memoryEnabled && !conversation.memoryDisabled;
-      const explicitCommand =
-        memoryActive &&
-        !body.regenerateAssistantMessageId &&
-        content &&
-        body.mode !== "voice"
-          ? detectExplicitCommand(content)
-          : null;
-
-      try {
-        if (explicitCommand && explicitCommand.kind !== "recall_user" && explicitCommand.kind !== "recall_conversation") {
-          await applyExplicitMemoryCommand(user.id, explicitCommand, memoryNotes);
-        }
-        if (explicitCommand?.kind === "recall_user") recallScope = "user";
-        if (explicitCommand?.kind === "recall_conversation")
-          recallScope = "conversation";
-
-        if (memoryActive) {
-          const [allUserMemories, allConversationMemories] = await Promise.all([
-            listUserMemoriesForUser(user.id),
-            listConversationMemoriesForConversation(conversation.id, user.id),
-          ]);
-          allUserMemoriesSnapshot = allUserMemories;
-
-          if (recallScope === "user") {
-            const block = formatRecallBlock(allUserMemories, "user");
-            if (block) memoryNotes.push(block);
-          } else if (recallScope === "conversation") {
-            const block = formatRecallBlock(allConversationMemories, "conversation");
-            if (block) memoryNotes.push(block);
-          } else {
-            const relevant = selectRelevantMemories(
-              content ?? "",
-              allUserMemories,
-              allConversationMemories
-            );
-            usedMemoryItems = [
-              ...relevant.conversationMemories.map(item => ({
-                id: item.id,
-                content: item.content,
-              })),
-              ...relevant.userMemories.map(item => ({
-                id: item.id,
-                content: item.content,
-              })),
-            ];
-            if (usedMemoryItems.length) {
-              void touchUserMemoriesForUser(
-                relevant.userMemories.map(item => item.id),
-                user.id
-              ).catch(() => undefined);
-              const block = formatMemoryContextBlock(relevant);
-              if (block) memoryNotes.push(block);
-            }
-          }
-        }
-      } catch (error) {
-        console.warn("[ChatStream] memory pipeline failed (non-fatal)", error);
-      }
-
-      if (memorySettings.showMemoryUsage && usedMemoryItems.length) {
-        writeEvent(res, "memory.used", {
-          messageId: assistantMessageId,
-          memories: usedMemoryItems,
-        });
-      }
 
       try {
         const preferences = await retryPreparation("preferences lookup", () =>
@@ -694,7 +402,6 @@ export function registerChatStream(app: Express) {
           personaInstruction,
           preferences?.customInstructions?.trim(),
           body.mode === "voice" ? VOICE_STYLE_INSTRUCTION : null,
-          ...memoryNotes,
         ]
           .filter(Boolean)
           .join("\n\n");
@@ -816,26 +523,6 @@ export function registerChatStream(app: Express) {
           });
           terminalStatusWritten = true;
           if (!cancelled) {
-            // Post-turn memory analysis runs while the stream is still open so
-            // suggestion/saved events reach the client in order. It is
-            // skipped for voice turns and when memory is off or paused.
-            if (memoryActive && body.mode !== "voice") {
-              await runPostTurnMemoryAnalysis({
-                res,
-                userId: user.id,
-                conversationId: conversation.id,
-                userMessage: content ?? "",
-                assistantMessage: responseText,
-                settings: memorySettings,
-                existingActiveUserMemories: allUserMemoriesSnapshot,
-                existingConversationMemories: (
-                  await listConversationMemoriesForConversation(
-                    conversation.id,
-                    user.id
-                  ).catch(() => [])
-                ).map(item => ({ id: item.id, content: item.content })),
-              });
-            }
             writeEvent(res, "assistant.completed", {
               messageId: assistantMessageId,
             });

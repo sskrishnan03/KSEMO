@@ -7,7 +7,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
 import {
   fileVisualFor,
@@ -15,19 +14,14 @@ import {
   isSupportedUpload,
 } from "@/lib/fileIcons";
 import {
-  Archive,
-  Brain,
-  Check,
-  Library,
   Link2,
-  Plus,
   Trash2,
   Upload,
 } from "lucide-react";
-import React, { type ChangeEvent, useEffect, useRef, useState } from "react";
+import React, { type ChangeEvent, useRef, useState } from "react";
 import { toast } from "sonner";
 
-export type WorkspaceSection = "files" | "memories";
+export type WorkspaceSection = "files";
 
 function bytesLabel(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
@@ -61,11 +55,9 @@ export function WorkspacePanel({
   activeConversationId?: string | null;
   initialDeletePreview?: boolean;
 }) {
-  const [section, setSection] = useState<WorkspaceSection>(initialSection);
-  const [memoryText, setMemoryText] = useState("");
   const [libraryQuery, setLibraryQuery] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<{
-    kind: "file" | "memory";
+    kind: "file";
     id: string;
     label: string;
   } | null>(
@@ -78,28 +70,10 @@ export function WorkspacePanel({
   const filesQuery = trpc.workspace.files.list.useQuery(undefined, {
     enabled: open,
   });
-  const memoriesQuery = trpc.workspace.memories.list.useQuery(undefined, {
-    enabled: open,
-  });
   const visibleFiles = (filesQuery.data ?? []).filter(file =>
     file.filename.toLowerCase().includes(libraryQuery.trim().toLowerCase())
   );
-  useEffect(() => setSection(initialSection), [initialSection, open]);
 
-  const memoryCreate = trpc.workspace.memories.create.useMutation({
-    onSuccess: () => {
-      utils.workspace.memories.list.invalidate();
-      setMemoryText("");
-      toast.success("Memory saved");
-    },
-    onError: () => toast.error("Memory could not be saved."),
-  });
-  const memoryActive = trpc.workspace.memories.setActive.useMutation({
-    onSuccess: () => utils.workspace.memories.list.invalidate(),
-  });
-  const memoryRemove = trpc.workspace.memories.remove.useMutation({
-    onSuccess: () => utils.workspace.memories.list.invalidate(),
-  });
   const fileUpload = trpc.workspace.files.upload.useMutation({
     onSuccess: () => {
       utils.workspace.files.list.invalidate();
@@ -144,220 +118,124 @@ export function WorkspacePanel({
 
   function confirmDelete() {
     if (!deleteTarget) return;
-    if (deleteTarget.kind === "file")
-      fileRemove.mutate({ id: deleteTarget.id });
-    else memoryRemove.mutate({ id: deleteTarget.id });
+    fileRemove.mutate({ id: deleteTarget.id });
     setDeleteTarget(null);
   }
 
-  const title = section === "files" ? "Library" : "Memories";
-  const description =
-    section === "files"
-      ? "Manage private files and attach supported items to the active conversation."
-      : "Review only the memories you explicitly choose for KSEMO to retain.";
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-h-[88dvh] overflow-hidden rounded-2xl p-0 sm:max-w-3xl">
           <DialogHeader className="border-b border-border px-5 pb-4 pt-5">
             <DialogTitle className="text-xl font-semibold tracking-[-0.02em]">
-              {title}
+              Library
             </DialogTitle>
-            <DialogDescription>{description}</DialogDescription>
+            <DialogDescription>
+              Manage private files and attach supported items to the active conversation.
+            </DialogDescription>
           </DialogHeader>
           <div className="max-h-[65dvh] overflow-y-auto p-4 sm:p-5">
-            {section === "files" ? (
-              <section>
-                <input
-                  ref={fileInputRef}
-                  onChange={uploadFile}
-                  type="file"
-                  className="sr-only"
-                  accept=".pdf,.txt,.md,.markdown,.csv,.tsv,.json,.log,.xml,.yml,.yaml,.png,.jpg,.jpeg,.webp,.gif,.docx,.xlsx,.xls,.pptx"
-                />
-                <Button
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={fileUpload.isPending}
-                  className="w-full rounded-xl"
-                >
-                  <Upload className="mr-2 size-4" />
-                  {fileUpload.isPending
-                    ? "Adding file…"
-                    : "Add file to Library"}
-                </Button>
-                <p className="mt-2 text-xs leading-5 text-muted-foreground">
-                  PDF, Word, Excel, PowerPoint, text, data, and image files up
-                  to 25 MB. Documents are analyzed so you can chat with them.
-                </p>
-                <Input
-                  value={libraryQuery}
-                  onChange={event => setLibraryQuery(event.target.value)}
-                  placeholder="Search your Library"
-                  className="mt-4 h-10 rounded-xl"
-                  aria-label="Search your Library"
-                />
-                <div className="mt-3 space-y-2">
-                  {visibleFiles.length ? (
-                    visibleFiles.map(file => (
-                      <div
-                        key={file.id}
-                        className="flex items-center gap-3 rounded-xl border border-border p-3"
+            <section>
+              <input
+                ref={fileInputRef}
+                onChange={uploadFile}
+                type="file"
+                className="sr-only"
+                accept=".pdf,.txt,.md,.markdown,.csv,.tsv,.json,.log,.xml,.yml,.yaml,.png,.jpg,.jpeg,.webp,.gif,.docx,.xlsx,.xls,.pptx"
+              />
+              <Button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={fileUpload.isPending}
+                className="w-full rounded-xl"
+              >
+                <Upload className="mr-2 size-4" />
+                {fileUpload.isPending
+                  ? "Adding file…"
+                  : "Add file to Library"}
+              </Button>
+              <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                PDF, Word, Excel, PowerPoint, text, data, and image files up
+                to 25 MB. Documents are analyzed so you can chat with them.
+              </p>
+              <Input
+                value={libraryQuery}
+                onChange={event => setLibraryQuery(event.target.value)}
+                placeholder="Search your Library"
+                className="mt-4 h-10 rounded-xl"
+                aria-label="Search your Library"
+              />
+              <div className="mt-3 space-y-2">
+                {visibleFiles.length ? (
+                  visibleFiles.map(file => (
+                    <div
+                      key={file.id}
+                      className="flex items-center gap-3 rounded-xl border border-border p-3"
+                    >
+                      {(() => {
+                        const visual = fileVisualFor(
+                          file.filename,
+                          file.mimeType
+                        );
+                        return (
+                          <visual.Icon
+                            className={`size-4 ${visual.className}`}
+                            aria-hidden
+                          />
+                        );
+                      })()}
+                      <a
+                        href={file.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="min-w-0 flex-1"
                       >
-                        {(() => {
-                          const visual = fileVisualFor(
-                            file.filename,
-                            file.mimeType
-                          );
-                          return (
-                            <visual.Icon
-                              className={`size-4 ${visual.className}`}
-                              aria-hidden
-                            />
-                          );
-                        })()}
-                        <a
-                          href={file.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="min-w-0 flex-1"
-                        >
-                          <p className="truncate text-sm font-medium hover:underline">
-                            {file.filename}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {file.mimeType} · {bytesLabel(file.sizeBytes)}
-                          </p>
-                        </a>
-                        {activeConversationId && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() =>
-                              fileAttach.mutate({
-                                fileId: file.id,
-                                conversationId: activeConversationId,
-                              })
-                            }
-                            aria-label={`Attach ${file.filename} to active conversation`}
-                          >
-                            <Link2 className="size-4" />
-                          </Button>
-                        )}
+                        <p className="truncate text-sm font-medium hover:underline">
+                          {file.filename}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {file.mimeType} · {bytesLabel(file.sizeBytes)}
+                        </p>
+                      </a>
+                      {activeConversationId && (
                         <Button
                           variant="ghost"
                           size="icon"
                           onClick={() =>
-                            setDeleteTarget({
-                              kind: "file",
-                              id: file.id,
-                              label: file.filename,
+                            fileAttach.mutate({
+                              fileId: file.id,
+                              conversationId: activeConversationId,
                             })
                           }
-                          aria-label={`Remove ${file.filename}`}
+                          aria-label={`Attach ${file.filename} to active conversation`}
                         >
-                          <Trash2 className="size-4" />
+                          <Link2 className="size-4" />
                         </Button>
-                      </div>
-                    ))
-                  ) : (
-                    <p className="py-10 text-center text-sm text-muted-foreground">
-                      {libraryQuery
-                        ? "No Library items match that search."
-                        : "Your private Library is empty."}
-                    </p>
-                  )}
-                </div>
-              </section>
-            ) : (
-              <section>
-                <Textarea
-                  value={memoryText}
-                  onChange={event => setMemoryText(event.target.value)}
-                  placeholder="Save something KSEMO should remember only because you explicitly choose to."
-                  maxLength={2000}
-                  className="min-h-24 resize-none"
-                />
-                <div className="mt-2 flex justify-end">
-                  <Button
-                    onClick={() =>
-                      memoryText.trim() &&
-                      memoryCreate.mutate({ content: memoryText.trim() })
-                    }
-                    disabled={memoryCreate.isPending || !memoryText.trim()}
-                  >
-                    <Plus className="mr-1.5 size-4" />
-                    Save memory
-                  </Button>
-                </div>
-                <p className="mt-2 text-xs leading-5 text-muted-foreground">
-                  Memories are never created automatically from conversation
-                  text. You can disable or remove each item at any time.
-                </p>
-                <div className="mt-5 space-y-2">
-                  {memoriesQuery.data?.length ? (
-                    memoriesQuery.data.map(memory => (
-                      <div
-                        key={memory.id}
-                        className="flex items-start gap-3 rounded-xl border border-border p-3"
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() =>
+                          setDeleteTarget({
+                            kind: "file",
+                            id: file.id,
+                            label: file.filename,
+                          })
+                        }
+                        aria-label={`Remove ${file.filename}`}
                       >
-                        <Brain className="mt-0.5 size-4 text-muted-foreground" />
-                        <p
-                          className={
-                            memory.isActive
-                              ? "min-w-0 flex-1 text-sm leading-6"
-                              : "min-w-0 flex-1 text-sm leading-6 text-muted-foreground line-through"
-                          }
-                        >
-                          {memory.content}
-                        </p>
-                        <div className="flex shrink-0">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() =>
-                              memoryActive.mutate({
-                                id: memory.id,
-                                isActive: !memory.isActive,
-                              })
-                            }
-                            aria-label={
-                              memory.isActive
-                                ? "Disable memory"
-                                : "Enable memory"
-                            }
-                          >
-                            {memory.isActive ? (
-                              <Archive className="size-4" />
-                            ) : (
-                              <Check className="size-4" />
-                            )}
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() =>
-                              setDeleteTarget({
-                                kind: "memory",
-                                id: memory.id,
-                                label: "this memory",
-                              })
-                            }
-                            aria-label="Remove memory"
-                          >
-                            <Trash2 className="size-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <p className="py-10 text-center text-sm text-muted-foreground">
-                      No memories are active. Add only the details you want
-                      KSEMO to retain.
-                    </p>
-                  )}
-                </div>
-              </section>
-            )}
+                        <Trash2 className="size-4" />
+                      </Button>
+                    </div>
+                  ))
+                ) : (
+                  <p className="py-10 text-center text-sm text-muted-foreground">
+                    {libraryQuery
+                      ? "No Library items match that search."
+                      : "Your private Library is empty."}
+                  </p>
+                )}
+              </div>
+            </section>
           </div>
         </DialogContent>
       </Dialog>
@@ -373,7 +251,7 @@ export function WorkspacePanel({
               Remove {deleteTarget?.kind ?? "item"}?
             </DialogTitle>
             <DialogDescription>
-              “{deleteTarget?.label}” will be permanently removed from your
+              "{deleteTarget?.label}" will be permanently removed from your
               KSEMO workspace.
             </DialogDescription>
           </DialogHeader>
