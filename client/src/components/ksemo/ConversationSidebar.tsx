@@ -9,6 +9,11 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import {
   Archive,
@@ -229,26 +234,36 @@ export function ConversationSidebar({
             </div>
           )}
           {!compact && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onToggleCollapsed}
-              className="hidden size-8 rounded-lg transition-transform duration-150 hover:bg-muted active:scale-95 lg:inline-flex"
-              aria-label="Collapse sidebar"
-            >
-              <ChevronsLeft className="size-4" />
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={onToggleCollapsed}
+                  className="hidden size-8 rounded-lg transition-transform duration-150 hover:bg-muted active:scale-95 lg:inline-flex"
+                  aria-label="Collapse sidebar"
+                >
+                  <ChevronsLeft className="size-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">Collapse sidebar</TooltipContent>
+            </Tooltip>
           )}
           {!compact && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onClose}
-              className="size-8 rounded-lg lg:hidden"
-              aria-label="Close navigation"
-            >
-              <PanelLeftClose className="size-4" />
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={onClose}
+                  className="size-8 rounded-lg lg:hidden"
+                  aria-label="Close navigation"
+                >
+                  <PanelLeftClose className="size-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">Close sidebar</TooltipContent>
+            </Tooltip>
           )}
         </div>
         <div className="space-y-1">

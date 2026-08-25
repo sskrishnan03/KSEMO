@@ -266,52 +266,62 @@ export function ChatComposer({
         />
         <div className="flex min-h-10 items-center justify-between px-1 pt-1">
           {isRecording ? (
-            <div className="flex h-9 items-center gap-2 rounded-full border border-border bg-muted px-2">
-              <span
-                className="flex items-center gap-0.5 px-1"
-                aria-label={`Recording ${recordingSeconds} seconds`}
-              >
-                {[4, 8, 12, 7, 15, 9, 5, 11].map((height, index) => (
-                  <span
-                    key={index}
-                    className="w-px animate-pulse rounded-full bg-muted-foreground"
-                    style={{ height, animationDelay: `${index * 70}ms` }}
-                  />
-                ))}
-              </span>
-              <span className="text-[11px] font-medium tabular-nums text-muted-foreground">
-                {String(Math.floor(recordingSeconds / 60)).padStart(2, "0")}:
-                {String(recordingSeconds % 60).padStart(2, "0")}
-              </span>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={onCancelRecording}
-                    className="size-7 rounded-full"
-                    aria-label="Cancel recording"
-                  >
-                    <X className="size-3.5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom">Discard recording</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    size="icon"
-                    onClick={onVoice}
-                    className="size-7 rounded-full bg-foreground text-background hover:bg-foreground/90"
-                    aria-label="Finish recording"
-                  >
-                    <Check className="size-3.5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom">
-                  Transcribe recording
-                </TooltipContent>
-              </Tooltip>
+            <div className="flex items-center gap-1.5">
+              {webSearchEnabled && (
+                <div className="flex h-9 items-center gap-1.5 rounded-xl border border-border bg-muted pl-2.5 pr-1.5">
+                  <Globe className="size-3.5 text-muted-foreground" />
+                  <span className="text-xs font-medium text-foreground">
+                    Web search
+                  </span>
+                </div>
+              )}
+              <div className="flex h-9 items-center gap-2 rounded-full border border-border bg-muted px-2">
+                <span
+                  className="flex items-center gap-0.5 px-1"
+                  aria-label={`Recording ${recordingSeconds} seconds`}
+                >
+                  {[4, 8, 12, 7, 15, 9, 5, 11].map((height, index) => (
+                    <span
+                      key={index}
+                      className="w-px animate-pulse rounded-full bg-muted-foreground"
+                      style={{ height, animationDelay: `${index * 70}ms` }}
+                    />
+                  ))}
+                </span>
+                <span className="text-[11px] font-medium tabular-nums text-muted-foreground">
+                  {String(Math.floor(recordingSeconds / 60)).padStart(2, "0")}:
+                  {String(recordingSeconds % 60).padStart(2, "0")}
+                </span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={onCancelRecording}
+                      className="size-7 rounded-full"
+                      aria-label="Cancel recording"
+                    >
+                      <X className="size-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">Discard recording</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="icon"
+                      onClick={onVoice}
+                      className="size-7 rounded-full bg-foreground text-background hover:bg-foreground/90"
+                      aria-label="Finish recording"
+                    >
+                      <Check className="size-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    Transcribe recording
+                  </TooltipContent>
+                </Tooltip>
+              </div>
             </div>
           ) : (
             <div className="flex items-center gap-1">

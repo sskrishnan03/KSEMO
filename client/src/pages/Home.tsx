@@ -1478,6 +1478,13 @@ export default function Home() {
           setActiveConversationId(null);
           utils.conversation.list.invalidate();
         }}
+        onOpenSharedLinks={() => {
+          setSettingsOpen(false);
+          setPrimaryWorkspace("library");
+        }}
+        onDeleteAccount={() => {
+          toast.info("Account deletion is not yet implemented.");
+        }}
       />
       <WorkspacePanel
         open={isWorkspaceDeletePreview}

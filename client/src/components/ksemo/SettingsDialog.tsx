@@ -29,14 +29,12 @@ import {
   Lightbulb,
   LogOut,
   MessageSquare,
-  Monitor,
-  Moon,
   Palette,
+  Share2,
   ShieldCheck,
   ShieldOff,
   Settings2,
   Star,
-  Sun,
   Trash2,
   User,
   Zap,
@@ -97,6 +95,8 @@ export function SettingsDialog({
   onSignOut,
   onOpenWorkspace,
   onAllChatsDeleted,
+  onOpenSharedLinks,
+  onDeleteAccount,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -104,10 +104,13 @@ export function SettingsDialog({
   onSignOut: () => void;
   onOpenWorkspace: (section: "files") => void;
   onAllChatsDeleted: () => void;
+  onOpenSharedLinks?: () => void;
+  onDeleteAccount?: () => void;
 }) {
   const [activeTab, setActiveTab] = useState<SettingsTab>("account");
   const [archivedOpen, setArchivedOpen] = useState(false);
   const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
+  const [confirmDeleteAccount, setConfirmDeleteAccount] = useState(false);
 
   useEffect(() => {
     if (open) setActiveTab("account");
@@ -196,6 +199,8 @@ export function SettingsDialog({
                   onOpenWorkspace={onOpenWorkspace}
                   onOpenArchived={() => setArchivedOpen(true)}
                   onDeleteAll={() => setConfirmDeleteAll(true)}
+                  onOpenSharedLinks={onOpenSharedLinks}
+                  onDeleteAccount={() => setConfirmDeleteAccount(true)}
                 />
               )}
               {activeTab === "feedback" && <FeedbackSection />}
@@ -222,6 +227,32 @@ export function SettingsDialog({
             }}
             onCancel={() => setConfirmDeleteAll(false)}
           />
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog open={confirmDeleteAccount} onOpenChange={setConfirmDeleteAccount}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Account?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Permanently delete your account and associated data. Deletions are
+              immediate and cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setConfirmDeleteAccount(false)}>
+              Cancel
+            </AlertDialogCancel>
+            <Button
+              className="bg-destructive text-white hover:bg-destructive/90"
+              onClick={() => {
+                setConfirmDeleteAccount(false);
+                onOpenChange(false);
+                onDeleteAccount?.();
+              }}
+            >
+              Delete Account
+            </Button>
+          </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </Dialog>
@@ -397,77 +428,297 @@ function SecuritySection({ user }: { user: User }) {
 const themeOptions: Array<{
   value: ThemeMode;
   label: string;
-  icon: typeof Sun;
+  ariaLabel: string;
 }> = [
-  { value: "light", label: "Light", icon: Sun },
-  { value: "dark", label: "Dark", icon: Moon },
-  { value: "system", label: "System", icon: Monitor },
+  { value: "light", label: "Light", ariaLabel: "Light theme" },
+  { value: "dark", label: "Dark", ariaLabel: "Dark theme" },
+  { value: "system", label: "System", ariaLabel: "System theme" },
 ];
+
+const THUMB_W = 112;
+const THUMB_H = 72;
+
+function MiniKsemoLight() {
+  const s = {
+    bg: "#FFFFFF",
+    sidebar: "#F9FAFB",
+    sidebarBorder: "#E5E7EB",
+    surface: "#F3F4F6",
+    text: "#111111",
+    textSec: "#6B7280",
+    border: "#E5E7EB",
+    inputBg: "#F3F4F6",
+    userBubble: "#F3F4F6",
+    assistantBg: "#FFFFFF",
+  } as const;
+  return (
+    <div className="flex size-full" style={{ background: s.bg }}>
+      <div
+        className="flex w-[26%] shrink-0 flex-col gap-[3px] px-[4px] py-[5px]"
+        style={{ background: s.sidebar, borderRight: `1px solid ${s.sidebarBorder}` }}
+      >
+        <div className="flex items-center gap-[2px]">
+          <div className="size-[5px] rounded-[1.5px]" style={{ background: s.border }} />
+          <div className="h-[2.5px] w-[55%] rounded-full" style={{ background: s.border }} />
+        </div>
+        <div className="mt-[3px] flex flex-col gap-[2.5px]">
+          <div className="h-[2.5px] w-[72%] rounded-full" style={{ background: s.border }} />
+          <div className="h-[2.5px] w-[60%] rounded-full" style={{ background: s.border }} />
+          <div className="h-[2.5px] w-[66%] rounded-full" style={{ background: s.border }} />
+        </div>
+        <div className="mt-auto flex items-center gap-[2px]">
+          <div className="size-[5px] rounded-full" style={{ background: s.border }} />
+          <div className="h-[2.5px] w-[50%] rounded-full" style={{ background: s.border }} />
+        </div>
+      </div>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <div className="flex items-center gap-[3px] px-[5px] py-[4px]" style={{ borderBottom: `1px solid ${s.border}` }}>
+          <div className="h-[2.5px] w-[35%] rounded-full" style={{ background: s.textSec }} />
+        </div>
+        <div className="flex min-h-0 flex-1 flex-col justify-end gap-[3px] px-[5px] pb-[4px] pt-[3px]">
+          <div className="flex justify-end">
+            <div className="max-w-[65%] rounded-[3px] px-[4px] py-[2px]" style={{ background: s.userBubble }}>
+              <div className="h-[2px] w-[40px] rounded-full" style={{ background: s.textSec }} />
+            </div>
+          </div>
+          <div className="flex justify-start">
+            <div className="max-w-[70%] rounded-[3px] px-[4px] py-[2px]" style={{ background: s.assistantBg, border: `1px solid ${s.border}` }}>
+              <div className="h-[2px] w-[50px] rounded-full" style={{ background: s.border }} />
+              <div className="mt-[1px] h-[2px] w-[32px] rounded-full" style={{ background: s.border }} />
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-[2px] px-[5px] pb-[4px]">
+          <div className="h-[5px] flex-1 rounded-[2px]" style={{ background: s.inputBg, border: `1px solid ${s.border}` }} />
+          <div className="size-[5px] rounded-[1.5px]" style={{ background: s.text }} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MiniKsemoDark() {
+  const s = {
+    bg: "#0A0A0A",
+    sidebar: "#111111",
+    sidebarBorder: "#222222",
+    surface: "#1A1A1A",
+    text: "#FFFFFF",
+    textSec: "#888888",
+    border: "#222222",
+    inputBg: "#141414",
+    userBubble: "#1A1A1A",
+    assistantBg: "#111111",
+  } as const;
+  return (
+    <div className="flex size-full" style={{ background: s.bg }}>
+      <div
+        className="flex w-[26%] shrink-0 flex-col gap-[3px] px-[4px] py-[5px]"
+        style={{ background: s.sidebar, borderRight: `1px solid ${s.sidebarBorder}` }}
+      >
+        <div className="flex items-center gap-[2px]">
+          <div className="size-[5px] rounded-[1.5px]" style={{ background: s.border }} />
+          <div className="h-[2.5px] w-[55%] rounded-full" style={{ background: s.border }} />
+        </div>
+        <div className="mt-[3px] flex flex-col gap-[2.5px]">
+          <div className="h-[2.5px] w-[72%] rounded-full" style={{ background: s.border }} />
+          <div className="h-[2.5px] w-[60%] rounded-full" style={{ background: s.border }} />
+          <div className="h-[2.5px] w-[66%] rounded-full" style={{ background: s.border }} />
+        </div>
+        <div className="mt-auto flex items-center gap-[2px]">
+          <div className="size-[5px] rounded-full" style={{ background: s.border }} />
+          <div className="h-[2.5px] w-[50%] rounded-full" style={{ background: s.border }} />
+        </div>
+      </div>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <div className="flex items-center gap-[3px] px-[5px] py-[4px]" style={{ borderBottom: `1px solid ${s.border}` }}>
+          <div className="h-[2.5px] w-[35%] rounded-full" style={{ background: s.textSec }} />
+        </div>
+        <div className="flex min-h-0 flex-1 flex-col justify-end gap-[3px] px-[5px] pb-[4px] pt-[3px]">
+          <div className="flex justify-end">
+            <div className="max-w-[65%] rounded-[3px] px-[4px] py-[2px]" style={{ background: s.userBubble, border: `1px solid ${s.border}` }}>
+              <div className="h-[2px] w-[40px] rounded-full" style={{ background: s.textSec }} />
+            </div>
+          </div>
+          <div className="flex justify-start">
+            <div className="max-w-[70%] rounded-[3px] px-[4px] py-[2px]" style={{ background: s.assistantBg, border: `1px solid ${s.border}` }}>
+              <div className="h-[2px] w-[50px] rounded-full" style={{ background: s.border }} />
+              <div className="mt-[1px] h-[2px] w-[32px] rounded-full" style={{ background: s.border }} />
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-[2px] px-[5px] pb-[4px]">
+          <div className="h-[5px] flex-1 rounded-[2px]" style={{ background: s.inputBg, border: `1px solid ${s.border}` }} />
+          <div className="size-[5px] rounded-[1.5px]" style={{ background: s.text }} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SystemPreviewThumb() {
+  const light = {
+    bg: "#FFFFFF",
+    sidebar: "#F9FAFB",
+    sidebarBorder: "#E5E7EB",
+    border: "#E5E7EB",
+    textSec: "#6B7280",
+    inputBg: "#F3F4F6",
+    userBubble: "#F3F4F6",
+    assistantBg: "#FFFFFF",
+    text: "#111111",
+  } as const;
+  const dark = {
+    bg: "#0A0A0A",
+    sidebar: "#111111",
+    sidebarBorder: "#222222",
+    border: "#222222",
+    textSec: "#888888",
+    inputBg: "#141414",
+    userBubble: "#1A1A1A",
+    assistantBg: "#111111",
+    text: "#FFFFFF",
+  } as const;
+
+  function Half({ c }: { c: Record<string, string> }) {
+    return (
+      <div className="flex h-full flex-1 flex-col" style={{ background: c.bg }}>
+        <div
+          className="flex w-[26%] shrink-0 flex-col gap-[2px] px-[3px] py-[4px]"
+          style={{ background: c.sidebar, borderRight: `1px solid ${c.sidebarBorder}` }}
+        >
+          <div className="flex items-center gap-[2px]">
+            <div className="size-[4px] rounded-[1px]" style={{ background: c.border }} />
+            <div className="h-[2px] w-[50%] rounded-full" style={{ background: c.border }} />
+          </div>
+          <div className="mt-[2px] flex flex-col gap-[2px]">
+            <div className="h-[2px] w-[65%] rounded-full" style={{ background: c.border }} />
+            <div className="h-[2px] w-[55%] rounded-full" style={{ background: c.sidebarBorder }} />
+            <div className="h-[2px] w-[60%] rounded-full" style={{ background: c.border }} />
+          </div>
+        </div>
+        <div className="flex min-w-0 flex-1 flex-col">
+          <div
+            className="flex items-center px-[3px] py-[2px]"
+            style={{ borderBottom: `1px solid ${c.border}` }}
+          >
+            <div className="h-[1.5px] w-[30%] rounded-full" style={{ background: c.textSec }} />
+          </div>
+          <div className="flex min-h-0 flex-1 flex-col justify-end gap-[2px] px-[3px] pb-[3px] pt-[2px]">
+            <div className="flex justify-end">
+              <div
+                className="max-w-[70%] rounded-[2px] px-[3px] py-[1.5px]"
+                style={{ background: c.userBubble, border: `1px solid ${c.border}` }}
+              >
+                <div className="h-[1.5px] w-[28px] rounded-full" style={{ background: c.textSec }} />
+              </div>
+            </div>
+            <div className="flex justify-start">
+              <div
+                className="max-w-[70%] rounded-[2px] px-[3px] py-[1.5px]"
+                style={{ background: c.assistantBg, border: `1px solid ${c.border}` }}
+              >
+                <div className="h-[1.5px] w-[32px] rounded-full" style={{ background: c.border }} />
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-[2px] px-[3px] pb-[3px]">
+            <div
+              className="h-[3.5px] flex-1 rounded-[1.5px]"
+              style={{ background: c.inputBg, border: `1px solid ${c.border}` }}
+            />
+            <div className="size-[3.5px] rounded-[1px]" style={{ background: c.text }} />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex size-full overflow-hidden rounded-lg">
+      <Half c={light} />
+      <div style={{ width: 1, background: "#D1D5DB" }} />
+      <Half c={dark} />
+    </div>
+  );
+}
 
 function AppearanceSection() {
   const { mode, setMode } = useTheme();
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <div>
         <h3 className="text-base font-semibold tracking-[-0.02em]">
           Appearance
         </h3>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Choose how KSEMO looks on your device.
-        </p>
       </div>
-      <div className="space-y-3">
-        {themeOptions.map(opt => {
-          const Icon = opt.icon;
-          const active = mode === opt.value;
-          return (
-            <button
-              key={opt.value}
-              onClick={() => setMode(opt.value)}
-              className={`flex w-full items-center gap-3 rounded-xl border p-3.5 text-left transition-colors ${
-                active
-                  ? "border-primary bg-primary/5"
-                  : "border-border hover:bg-muted/50"
-              }`}
-            >
-              <span
-                className={`flex size-9 items-center justify-center rounded-lg transition-colors ${
-                  active
-                    ? "bg-primary/10 text-primary"
-                    : "bg-muted text-muted-foreground"
-                }`}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+        <p className="w-20 shrink-0 pt-1 text-sm font-medium text-muted-foreground">
+          Theme
+        </p>
+        <div className="flex flex-wrap items-start gap-4">
+          {themeOptions.map(opt => {
+            const active = mode === opt.value;
+            return (
+              <button
+                key={opt.value}
+                role="radio"
+                aria-checked={active}
+                aria-label={opt.ariaLabel}
+                tabIndex={0}
+                onClick={() => setMode(opt.value)}
+                onKeyDown={e => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setMode(opt.value);
+                  }
+                }}
+                className="group flex flex-col items-center gap-2 outline-none"
               >
-                <Icon className="size-4" />
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium">{opt.label}</p>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  {opt.value === "light" && "Use the light theme"}
-                  {opt.value === "dark" && "Use the dark theme"}
-                  {opt.value === "system" && "Match your system setting"}
-                </p>
-              </div>
-              {active && (
-                <span className="flex size-5 items-center justify-center rounded-full bg-primary text-white">
-                  <svg
-                    className="size-3"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="3"
-                  >
-                    <path
-                      d="M5 13l4 4L19 7"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
+                <div
+                  className="relative overflow-hidden rounded-xl transition-all duration-200 ease-out group-hover:-translate-y-0.5 group-hover:shadow-md group-focus-visible:shadow-md"
+                  style={{
+                    width: THUMB_W,
+                    height: THUMB_H,
+                  }}
+                >
+                  {opt.value === "light" && <MiniKsemoLight />}
+                  {opt.value === "dark" && <MiniKsemoDark />}
+                  {opt.value === "system" && <SystemPreviewThumb />}
+                  {active && (
+                    <span className="absolute inset-0 z-10 flex items-center justify-center bg-black/20">
+                      <span className="flex size-5 items-center justify-center rounded-full bg-foreground">
+                        <svg
+                          className="size-3 text-background"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="3"
+                        >
+                          <path
+                            d="M5 13l4 4L19 7"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      </span>
+                    </span>
+                  )}
+                </div>
+                <span
+                  className={`text-[11px] font-medium tracking-wide ${
+                    active
+                      ? "text-foreground"
+                      : "text-muted-foreground group-hover:text-foreground"
+                  }`}
+                >
+                  {opt.label}
                 </span>
-              )}
-            </button>
-          );
-        })}
+              </button>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
@@ -477,10 +728,14 @@ function DataSection({
   onOpenWorkspace,
   onOpenArchived,
   onDeleteAll,
+  onOpenSharedLinks,
+  onDeleteAccount,
 }: {
   onOpenWorkspace: (section: "files") => void;
   onOpenArchived: () => void;
   onDeleteAll: () => void;
+  onOpenSharedLinks?: () => void;
+  onDeleteAccount?: () => void;
 }) {
   return (
     <div className="space-y-4">
@@ -517,6 +772,19 @@ function DataSection({
           </div>
           <ExternalLink className="size-4 text-muted-foreground" />
         </button>
+        <button
+          onClick={onOpenSharedLinks}
+          className="flex w-full items-center justify-between rounded-xl border border-border p-3.5 text-left transition-colors hover:bg-muted/50"
+        >
+          <div>
+            <p className="text-sm font-medium">See Shared Links</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              See all the shared links you have created. You can also delete
+              them and revoke access here.
+            </p>
+          </div>
+          <Share2 className="size-4 text-muted-foreground" />
+        </button>
       </div>
       <button
         onClick={onDeleteAll}
@@ -528,6 +796,21 @@ function DataSection({
           </p>
           <p className="mt-0.5 text-xs text-muted-foreground">
             Permanent, cannot be undone
+          </p>
+        </div>
+        <Trash2 className="size-4 text-destructive" />
+      </button>
+      <button
+        onClick={onDeleteAccount}
+        className="flex w-full items-center justify-between rounded-xl border border-destructive/30 bg-destructive/5 p-3.5 text-left transition-colors hover:bg-destructive/10"
+      >
+        <div>
+          <p className="text-sm font-medium text-destructive">
+            Delete Account
+          </p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Permanently delete your account and associated data. Deletions are
+            immediate and cannot be undone.
           </p>
         </div>
         <Trash2 className="size-4 text-destructive" />
