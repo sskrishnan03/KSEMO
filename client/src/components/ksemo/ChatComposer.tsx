@@ -200,7 +200,7 @@ export function ChatComposer({
             {visibleAttachmentNotices.map(item => (
               <div
                 key={item.fileId}
-                className="flex w-52 items-center gap-2 rounded-xl border border-border bg-muted/50 p-2 text-left shadow-sm"
+                className="flex max-w-52 flex-1 items-center gap-2 rounded-xl border border-border bg-muted/50 p-2 text-left shadow-sm"
               >
                 <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-background text-muted-foreground">
                   {/(png|jpe?g|webp|gif)$/i.test(item.name) ? (

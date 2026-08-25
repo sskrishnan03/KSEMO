@@ -211,7 +211,7 @@ export function MessageContent({
           ) : null}
         </div>
         {isUser && message.content && (
-          <div className="mt-1.5 flex items-center gap-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
+          <div className="mt-1.5 flex items-center gap-1 max-lg:opacity-100 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
             {action(
               "Copy message",
               copied ? (

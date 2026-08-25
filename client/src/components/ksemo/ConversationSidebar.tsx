@@ -535,7 +535,7 @@ function ConversationGroup({
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="mr-1 size-7 rounded-md opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100 group-focus-within:opacity-100"
+                    className="mr-1 size-7 rounded-md max-lg:opacity-100 opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100 group-focus-within:opacity-100"
                     aria-label={`Actions for ${conversation.title}`}
                   >
                     <Ellipsis className="size-3.5" />

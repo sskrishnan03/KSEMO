@@ -174,7 +174,7 @@ export function AuthShell({
   footer,
 }: AuthShellProps) {
   return (
-    <main className="relative grid h-dvh place-items-center overflow-hidden bg-background px-5 py-6 sm:px-6">
+    <main className="relative grid min-h-dvh place-items-center overflow-auto bg-background px-5 py-6 sm:h-dvh sm:overflow-hidden sm:px-6">
       <div className="absolute inset-0 opacity-35 [background-image:radial-gradient(var(--border)_1px,transparent_1px)] [background-size:28px_28px]" />
       <section className="relative w-full max-w-sm text-center">
         <a

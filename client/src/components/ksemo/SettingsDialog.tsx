@@ -104,7 +104,7 @@ export function SettingsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex h-[min(65dvh,520px)] w-[min(60vw,720px)] max-sm:h-[min(80dvh,520px)] max-sm:w-[calc(100%-2rem)] flex-col gap-0 overflow-hidden rounded-2xl p-0">
+      <DialogContent className="flex h-[min(65dvh,520px)] w-[min(60vw,720px)] max-md:h-[min(85dvh,520px)] max-md:w-[calc(100%-1rem)] flex-col gap-0 overflow-hidden rounded-2xl p-0">
         <DialogHeader className="sr-only">
           <DialogTitle>Settings</DialogTitle>
           <DialogDescription>
@@ -112,8 +112,8 @@ export function SettingsDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex min-h-0 flex-1">
-          <aside className="flex w-52 shrink-0 flex-col border-r border-border bg-[oklch(0.975_0.002_80)] px-3 py-3 dark:bg-[oklch(0.17_0.003_80)]">
+        <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+          <aside className="hidden md:flex w-52 shrink-0 flex-col border-r border-border bg-[oklch(0.975_0.002_80)] px-3 py-3 dark:bg-[oklch(0.17_0.003_80)]">
             <div className="mb-3 flex items-center gap-2 px-2 pb-2">
               <Settings2 className="size-4 text-muted-foreground" />
               <span className="text-sm font-semibold tracking-[-0.02em]">
@@ -154,8 +154,29 @@ export function SettingsDialog({
             </div>
           </aside>
 
+          <nav className="flex md:hidden overflow-x-auto border-b border-border bg-[oklch(0.975_0.002_80)] px-2 py-1.5 dark:bg-[oklch(0.17_0.003_80)]">
+            {settingsNavItems.map(item => {
+              const Icon = item.icon;
+              const active = activeTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveTab(item.id)}
+                  className={`flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs transition-colors ${
+                    active
+                      ? "bg-muted font-medium text-foreground"
+                      : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
+                  }`}
+                >
+                  <Icon className="size-3.5 shrink-0" />
+                  {item.label}
+                </button>
+              );
+            })}
+          </nav>
+
           <div className="flex min-h-0 flex-1 flex-col">
-            <div className="min-h-0 flex-1 overflow-y-auto p-5">
+            <div className="min-h-0 flex-1 overflow-y-auto p-4 md:p-5">
               {activeTab === "account" && <AccountSection user={user} />}
               {activeTab === "appearance" && <AppearanceSection />}
               {activeTab === "data" && (
