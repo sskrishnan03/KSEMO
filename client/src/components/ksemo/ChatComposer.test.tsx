@@ -54,8 +54,7 @@ describe("ChatComposer", () => {
     );
     expect(markup).toContain("brief.pdf");
     expect(markup).toContain("Ready in this chat");
-    expect(markup).toContain("Cancel");
-    expect(markup).toContain('aria-label="Cancel selected upload"');
+    expect(markup).toContain('aria-label="Remove screenshot"');
     expect(markup.indexOf("brief.pdf")).toBeLessThan(
       markup.indexOf('aria-label="Message KSEMO"')
     );
@@ -74,8 +73,8 @@ describe("ChatComposer", () => {
     );
     expect(markup).toContain("brief.pdf");
     expect(markup).toContain("diagram.png");
-    expect(markup).toContain('aria-label="Remove brief.pdf"');
-    expect(markup).toContain('aria-label="Remove diagram.png"');
+    const removeButtons = (markup.match(/aria-label="Remove screenshot"/g) ?? []).length;
+    expect(removeButtons).toBe(2);
   });
 
   it("keeps the mobile Library selector translated inward and height-bounded", () => {

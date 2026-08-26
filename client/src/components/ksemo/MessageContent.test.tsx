@@ -102,7 +102,7 @@ describe("MessageContent speech controls", () => {
     expect(markup).toContain("gap-1");
   });
 
-  it("surfaces a retry action for a failed assistant response instead of the completed-response regenerate control", () => {
+  it("renders nothing for a failed assistant response with no content", () => {
     const markup = renderToStaticMarkup(
       createElement(MessageContent, {
         message: { ...assistantMessage, status: "failed", content: "" },
@@ -113,7 +113,7 @@ describe("MessageContent speech controls", () => {
         onRegenerate: () => undefined,
       })
     );
-    expect(markup).toContain("Try again");
+    expect(markup).not.toContain("Try again");
     expect(markup).not.toContain('aria-label="Regenerate response"');
   });
 
@@ -140,7 +140,7 @@ describe("MessageContent speech controls", () => {
       })
     );
     expect(markup).toContain("scene.jpg");
-    expect(markup).toContain("Image attached");
+    expect(markup).toContain("/ksemo-storage/scene.jpg");
     expect(markup.indexOf("scene.jpg")).toBeLessThan(
       markup.indexOf("What is in this image?")
     );

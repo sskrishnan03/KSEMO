@@ -17,7 +17,7 @@ import { storageGetSignedUrl, requestBaseUrl } from "./storage";
 import { composeWebSearchContext, performWebSearch } from "./webSearch";
 
 const BASE_SYSTEM_INSTRUCTION =
-  "You are KSEMO, a thoughtful and reliable AI assistant. Be clear, accurate, respectful, and practical. Use Markdown when it improves readability. Never claim to have completed work you cannot verify.";
+  "You are KSEMO, a thoughtful and reliable AI assistant. Be clear, accurate, respectful, and practical. Use Markdown when it improves readability. Never claim to have completed work you cannot verify. You can perform math, logic, code analysis, and general reasoning directly — do not refuse calculation or analysis questions. When asked about the current time or date, state that you do not have access to a real-time clock but you can help with time-zone conversions, date math, and scheduling if the user provides a reference time or zone.";
 
 // Per-file cap on extracted document text injected into the model context.
 const FILE_TEXT_PER_FILE_CHARS = 12_000;
@@ -131,15 +131,18 @@ export function registerChatStream(app: Express) {
       webSearch?: boolean;
     };
     let content = body.content?.trim();
+    const hasAttachments = (body.attachmentFileIds?.length ?? 0) > 0;
     if (
       !body.regenerateAssistantMessageId &&
-      (!content || content.length > 16_000)
+      (!content || content.length > 16_000) &&
+      !hasAttachments
     ) {
       res.status(400).json({
         error: "A message between 1 and 16,000 characters is required.",
       });
       return;
     }
+    if (!content) content = "";
 
     let conversation;
     try {
@@ -153,7 +156,7 @@ export function registerChatStream(app: Express) {
           return;
         }
       } else {
-        if (body.regenerateAssistantMessageId || !content) {
+        if (body.regenerateAssistantMessageId || (!content && !hasAttachments)) {
           res.status(400).json({
             error: "A saved conversation is required to regenerate a response.",
           });
@@ -313,7 +316,7 @@ export function registerChatStream(app: Express) {
                     message.role === "user" || message.role === "assistant"
                 )
                 .slice(-30)
-                .filter(message => message.content.length > 0)
+                .filter(message => message.content.length > 0 || (message.role === "user" && historyForContext.indexOf(message) >= 0))
                 .map(async message => {
                   if (message.role !== "user")
                     return {
@@ -324,8 +327,8 @@ export function registerChatStream(app: Express) {
                     message.id,
                     user.id
                   );
-                  if (!media.length)
-                    return { role: "user" as const, content: message.content };
+                  if (!media.length && !message.content)
+                    return null;
                   const contentParts: Array<
                     | { type: "text"; text: string }
                     | {
@@ -336,7 +339,9 @@ export function registerChatStream(app: Express) {
                         type: "file_url";
                         file_url: { url: string; mime_type: "application/pdf" };
                       }
-                  > = [{ type: "text", text: message.content }];
+                  > = message.content
+                    ? [{ type: "text" as const, text: message.content }]
+                    : [];
                   for (const file of media) {
                     if (file.mimeType.startsWith("image/")) {
                       contentParts.push({
@@ -384,6 +389,9 @@ export function registerChatStream(app: Express) {
                 })
             )
         );
+        const filteredAssistantContext = assistantContext.filter(
+          (msg): msg is NonNullable<typeof msg> => msg !== null
+        );
         const personaInstruction = {
           balanced: "Use a balanced level of detail.",
           concise: "Be direct and concise unless the user asks for depth.",
@@ -391,13 +399,26 @@ export function registerChatStream(app: Express) {
           analytical:
             "Reason carefully, state assumptions, and organize analysis clearly.",
         }[preferences?.persona ?? "balanced"];
-        const systemInstruction = [
-          BASE_SYSTEM_INSTRUCTION,
-          personaInstruction,
-          preferences?.customInstructions?.trim(),
-        ]
-          .filter(Boolean)
-          .join("\n\n");
+    const now = new Date();
+    const currentTimeString = now.toLocaleString("en-US", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: true,
+      timeZoneName: "short",
+    });
+    const systemInstruction = [
+      BASE_SYSTEM_INSTRUCTION,
+      `The current date and time is: ${currentTimeString}. Use this to answer questions about time, dates, and scheduling. You may be asked about mathematical equations, code analysis, general reasoning, and anything else — always attempt to answer helpfully.`,
+      personaInstruction,
+      preferences?.customInstructions?.trim(),
+    ]
+      .filter(Boolean)
+      .join("\n\n");
 
         // WEB SEARCH: when the user toggled it on in the composer, retrieve
         // fresh results for this turn and hand them to the model. Failures
@@ -411,7 +432,17 @@ export function registerChatStream(app: Express) {
                   .find(message => message.role === "user")?.content
               : content) ?? "";
           if (searchQuery) {
+            writeEvent(res, "web.searching", {
+              messageId: assistantMessageId,
+              status: "searching",
+            });
             const searchResults = await performWebSearch(searchQuery);
+            if (searchResults.length > 0) {
+              writeEvent(res, "web.searching", {
+                messageId: assistantMessageId,
+                status: "reading",
+              });
+            }
             webSearchContext = composeWebSearchContext(
               searchQuery,
               searchResults
@@ -422,8 +453,15 @@ export function registerChatStream(app: Express) {
               sources: searchResults.map(result => ({
                 title: result.title,
                 url: result.url,
+                snippet: result.snippet,
               })),
             });
+            if (!searchResults.length) {
+              writeEvent(res, "web.searching", {
+                messageId: assistantMessageId,
+                status: "no-results",
+              });
+            }
           }
         }
 
@@ -439,7 +477,7 @@ export function registerChatStream(app: Express) {
                 },
               ]
             : []),
-          ...assistantContext,
+          ...filteredAssistantContext,
         ];
         try {
           responseText = await runGeneration(

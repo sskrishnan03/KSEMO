@@ -19,7 +19,7 @@ import {
   FileText,
   Globe,
   History,
-  Image,
+  Loader2,
   Pencil,
   RotateCcw,
   Share2,
@@ -64,6 +64,7 @@ export function MessageContent({
   onDelete,
   onViewHistory,
   webSources,
+  webSearchStatus,
 }: {
   message: KsemoMessage;
   onSpeak: (text: string, messageId: string) => void;
@@ -80,7 +81,8 @@ export function MessageContent({
   onShare?: (message: KsemoMessage) => void;
   onDelete?: (message: KsemoMessage) => void;
   onViewHistory?: (message: KsemoMessage) => void;
-  webSources?: Array<{ title: string; url: string }>;
+  webSources?: Array<{ title: string; url: string; snippet?: string }>;
+  webSearchStatus?: "searching" | "reading" | "no-results" | "done";
 }) {
   const [copied, setCopied] = useState(false);
   const isUser = message.role === "user";
@@ -126,33 +128,43 @@ export function MessageContent({
       >
         {isUser && message.attachments?.length ? (
           <div className="mb-2 flex max-w-full flex-wrap justify-end gap-2">
-            {message.attachments.map(file => (
-              <a
-                key={file.id}
-                href={file.url}
-                target="_blank"
-                rel="noreferrer"
-                className="overflow-hidden rounded-xl border border-border bg-muted/50 text-left shadow-sm"
-              >
-                <span className="flex min-w-44 items-center gap-2 p-2.5">
-                  {file.mimeType?.startsWith("image/") ? (
-                    <Image className="size-4 shrink-0 text-muted-foreground" />
-                  ) : (
+            {message.attachments.map(file =>
+              file.mimeType?.startsWith("image/") ? (
+                <button
+                  key={file.id}
+                  type="button"
+                  onClick={() => window.open(file.url, "_blank")}
+                  className="group overflow-hidden rounded-xl border border-border bg-muted/50 text-left shadow-sm transition-opacity hover:opacity-90"
+                  aria-label={`View ${file.filename}`}
+                >
+                  <img
+                    src={file.url}
+                    alt={file.filename}
+                    className="block max-h-40 max-w-64 rounded-xl object-cover"
+                  />
+                </button>
+              ) : (
+                <a
+                  key={file.id}
+                  href={file.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="overflow-hidden rounded-xl border border-border bg-muted/50 text-left shadow-sm"
+                >
+                  <span className="flex min-w-44 items-center gap-2 p-2.5">
                     <FileText className="size-4 shrink-0 text-muted-foreground" />
-                  )}
-                  <span className="min-w-0">
-                    <span className="block truncate text-xs font-medium">
-                      {file.filename}
-                    </span>
-                    <span className="mt-0.5 block text-[10px] text-muted-foreground">
-                      {file.mimeType?.startsWith("image/")
-                        ? "Image attached"
-                        : "File attached"}
+                    <span className="min-w-0">
+                      <span className="block truncate text-xs font-medium">
+                        {file.filename}
+                      </span>
+                      <span className="mt-0.5 block text-[10px] text-muted-foreground">
+                        File attached
+                      </span>
                     </span>
                   </span>
-                </span>
-              </a>
-            ))}
+                </a>
+              )
+            )}
           </div>
         ) : null}
         <div
@@ -179,34 +191,6 @@ export function MessageContent({
               <span className="size-1.5 animate-pulse rounded-full bg-muted-foreground" />
               <span className="size-1.5 animate-pulse rounded-full bg-muted-foreground [animation-delay:150ms]" />
               <span className="size-1.5 animate-pulse rounded-full bg-muted-foreground [animation-delay:300ms]" />
-            </div>
-          ) : message.status === "streaming" ? (
-            <div className="flex items-center gap-3 text-muted-foreground">
-              <p>This response did not finish.</p>
-              {onRetry && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => onRetry(message)}
-                  className="h-8 rounded-lg"
-                >
-                  Try again
-                </Button>
-              )}
-            </div>
-          ) : message.status === "failed" ? (
-            <div className="flex items-center gap-3 text-destructive">
-              <p>KSEMO could not complete this response.</p>
-              {onRetry && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => onRetry(message)}
-                  className="h-8 rounded-lg border-destructive/30 text-destructive hover:bg-destructive/10"
-                >
-                  Try again
-                </Button>
-              )}
             </div>
           ) : null}
         </div>
@@ -237,20 +221,63 @@ export function MessageContent({
               )}
           </div>
         )}
+        {!isUser && webSearchStatus && webSearchStatus !== "done" && (
+          <div className="mb-1.5 flex items-center gap-2 text-xs text-muted-foreground">
+            <Loader2 className="size-3.5 animate-spin" />
+            <span>
+              {webSearchStatus === "searching" && "Searching the web…"}
+              {webSearchStatus === "reading" && "Reading relevant sources…"}
+              {webSearchStatus === "no-results" && "No results found"}
+            </span>
+          </div>
+        )}
         {!isUser && webSources?.length ? (
-          <div className="mb-1 flex flex-wrap gap-1.5">
-            {webSources.slice(0, 5).map((source, index) => (
-              <a
-                key={`${source.url}-${index}`}
-                href={source.url}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex max-w-[15rem] items-center gap-1 rounded-full border border-border bg-muted/60 px-2 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              >
-                <Globe className="size-3 shrink-0" />
-                <span className="truncate">{source.title}</span>
-              </a>
-            ))}
+          <div className="mb-1 space-y-1.5">
+            <div className="flex flex-wrap gap-1.5">
+              {webSources.slice(0, 5).map((source, index) => {
+                let domain = "";
+                try {
+                  domain = new URL(source.url).hostname.replace("www.", "");
+                } catch {
+                  domain = source.url;
+                }
+                return (
+                  <Tooltip key={`${source.url}-${index}`}>
+                    <TooltipTrigger asChild>
+                      <a
+                        href={source.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex max-w-[15rem] items-center gap-1 rounded-full border border-border bg-muted/60 px-2 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                      >
+                        <Globe className="size-3 shrink-0" />
+                        <span className="truncate">
+                          {source.title || domain}
+                        </span>
+                      </a>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="max-w-xs">
+                      <div className="space-y-1">
+                        <p className="text-xs font-medium">{source.title}</p>
+                        {source.snippet && (
+                          <p className="text-[10px] text-muted-foreground line-clamp-2">
+                            {source.snippet}
+                          </p>
+                        )}
+                        <p className="text-[10px] text-muted-foreground">
+                          {domain}
+                        </p>
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                );
+              })}
+              {webSources.length > 5 && (
+                <span className="inline-flex items-center rounded-full border border-border bg-muted/60 px-2 py-0.5 text-[11px] text-muted-foreground">
+                  +{webSources.length - 5} more
+                </span>
+              )}
+            </div>
           </div>
         ) : null}
         {!isUser && (message.content || message.status === "failed") && (

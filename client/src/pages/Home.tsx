@@ -146,12 +146,7 @@ export default function Home() {
   const [activeConversationId, setActiveConversationId] = useState<
     string | null
   >(null);
-  const [pendingConversationId, setPendingConversationId] = useState<
-    string | null
-  >(null);
-  const [pendingMessages, setPendingMessages] = useState<KsemoMessage[] | null>(
-    null
-  );
+  const [chatMessages, setChatMessages] = useState<KsemoMessage[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatingMessageId, setGeneratingMessageId] = useState<string | null>(
     null
@@ -198,7 +193,10 @@ export default function Home() {
   } | null>(null);
   const [webSearchEnabled, setWebSearchEnabled] = useState(false);
   const [webSourcesByMessage, setWebSourcesByMessage] = useState<
-    Record<string, Array<{ title: string; url: string }>>
+    Record<string, Array<{ title: string; url: string; snippet?: string }>>
+  >({});
+  const [webSearchStatus, setWebSearchStatus] = useState<
+    Record<string, "searching" | "reading" | "no-results" | "done">
   >({});
   const streamAbortRef = useRef<AbortController | null>(null);
   const generationSequenceRef = useRef(0);
@@ -368,7 +366,7 @@ export default function Home() {
       setComposerValue(current => (current ? `${current} ${text}` : text)),
     onError: message => toast.error(message),
   });
-  const persistedMessages = useMemo<KsemoMessage[]>(
+  const serverMessages = useMemo<KsemoMessage[]>(
     () =>
       (activeQuery.data?.messages ?? []).map(message => ({
         id: message.id,
@@ -379,6 +377,17 @@ export default function Home() {
       })),
     [activeQuery.data?.messages]
   );
+
+  useEffect(() => {
+    if (!activeConversationId) {
+      setChatMessages([]);
+      return;
+    }
+    if (!isGenerating) {
+      setChatMessages(serverMessages);
+    }
+  }, [activeConversationId, serverMessages, isGenerating]);
+
   const visibleMessages = isAttachedMessagePreview
     ? [
         {
@@ -446,13 +455,11 @@ export default function Home() {
                 id: "preview-assistant",
                 role: "assistant" as const,
                 content:
-                  "Absolutely. I’ll keep the main decisions, remove repetition, and make the next steps easier to scan.",
+                  "Absolutely. I'll keep the main decisions, remove repetition, and make the next steps easier to scan.",
                 status: "completed" as const,
               },
             ]
-          : pendingConversationId === activeConversationId && pendingMessages
-            ? pendingMessages
-            : persistedMessages;
+          : chatMessages;
 
   useEffect(() => {
     if (initialConversationResolvedRef.current || !conversationQuery.data)
@@ -533,27 +540,25 @@ export default function Home() {
     if (generationActiveRef.current) return;
     generationActiveRef.current = true;
     const conversationId = activeConversationId;
-    const knownMessages = conversationId ? persistedMessages : [];
+    const knownMessages = chatMessages;
     const isRegeneration = Boolean(options.regenerateAssistantMessageId);
     const draftNow = Date.now();
-    setPendingConversationId(conversationId ?? "pending");
     const selectedAttachments = !isRegeneration ? attachmentNotices : [];
-    setPendingMessages(
-      buildStreamingDrafts(knownMessages, content, {
-        isRegeneration,
-        replaceUserMessageId: options.replaceUserMessageId,
-        replaceAssistantMessageId: options.regenerateAssistantMessageId,
-        attachments: selectedAttachments.length
-          ? selectedAttachments.map(file => ({
-              id: file.fileId,
-              filename: file.name,
-              mimeType: file.mimeType,
-              url: file.url,
-            }))
-          : undefined,
-        now: draftNow,
-      }) as KsemoMessage[]
-    );
+    const drafts = buildStreamingDrafts(knownMessages, content, {
+      isRegeneration,
+      replaceUserMessageId: options.replaceUserMessageId,
+      replaceAssistantMessageId: options.regenerateAssistantMessageId,
+      attachments: selectedAttachments.length
+        ? selectedAttachments.map(file => ({
+            id: file.fileId,
+            filename: file.name,
+            mimeType: file.mimeType,
+            url: file.url,
+          }))
+        : undefined,
+      now: draftNow,
+    }) as KsemoMessage[];
+    setChatMessages(drafts);
     if (selectedAttachments.length) setAttachmentNotices([]);
     setIsGenerating(true);
     setGeneratingMessageId(
@@ -563,12 +568,7 @@ export default function Home() {
     streamAbortRef.current = controller;
     const turnSequence = ++generationSequenceRef.current;
 
-    // Watchdog: the stream must always terminate. A silent connection (half
-    // -open socket, stalled provider, proxy drop) previously hung the composer
-    // forever with no error; now silence or an overlong run aborts the turn.
     const startedAt = Date.now();
-    // Only real protocol events count as progress. SSE heartbeats keep the
-    // socket open, but they must not keep a stalled model generation alive.
     let lastProgressAt = startedAt;
     let stalled = false;
     let userStopped = false;
@@ -635,28 +635,25 @@ export default function Home() {
             streamConversation = data as StreamConversation;
             setGeneratingMessageId(data.assistantMessageId);
             setActiveConversationId(data.conversationId);
-            setPendingConversationId(data.conversationId);
-            setPendingMessages(
-              current =>
-                current?.map(message =>
-                  message.id.startsWith("local-user")
-                    ? { ...message, id: data.userMessageId }
-                    : message.id.startsWith("local-assistant")
-                      ? { ...message, id: data.assistantMessageId }
-                      : message
-                ) ?? null
+            setChatMessages(current =>
+              current.map(message =>
+                message.id.startsWith("local-user")
+                  ? { ...message, id: data.userMessageId }
+                  : message.id.startsWith("local-assistant")
+                    ? { ...message, id: data.assistantMessageId }
+                    : message
+              )
             );
             utils.conversation.list.invalidate();
           } else if (eventName === "assistant.delta") {
             lastProgressAt = Date.now();
             responseText += data.delta;
-            setPendingMessages(
-              current =>
-                current?.map(message =>
-                  message.id === data.messageId
-                    ? { ...message, content: `${message.content}${data.delta}` }
-                    : message
-                ) ?? null
+            setChatMessages(current =>
+              current.map(message =>
+                message.id === data.messageId
+                  ? { ...message, content: `${message.content}${data.delta}` }
+                  : message
+              )
             );
           } else if (eventName === "assistant.completed") {
             lastProgressAt = Date.now();
@@ -668,12 +665,30 @@ export default function Home() {
             lastProgressAt = Date.now();
             const payload = data as unknown as {
               messageId: string;
-              sources?: Array<{ title: string; url: string }>;
+              sources?: Array<{ title: string; url: string; snippet?: string }>;
             };
-            if (payload.messageId && payload.sources?.length) {
-              setWebSourcesByMessage(current => ({
+            if (payload.messageId) {
+              setWebSearchStatus(current => ({
                 ...current,
-                [payload.messageId]: payload.sources ?? [],
+                [payload.messageId]: "done",
+              }));
+              if (payload.sources?.length) {
+                setWebSourcesByMessage(current => ({
+                  ...current,
+                  [payload.messageId]: payload.sources ?? [],
+                }));
+              }
+            }
+          } else if (eventName === "web.searching") {
+            lastProgressAt = Date.now();
+            const payload = data as unknown as {
+              messageId: string;
+              status: "searching" | "reading" | "no-results";
+            };
+            if (payload.messageId) {
+              setWebSearchStatus(current => ({
+                ...current,
+                [payload.messageId]: payload.status,
               }));
             }
           }
@@ -704,8 +719,6 @@ export default function Home() {
       clearInterval(watchdog);
     }
 
-    // Finalization always runs exactly once and every network step is
-    // time-bounded, so isGenerating can never stick on a hanging request.
     if (generationSequenceRef.current !== turnSequence) return;
     clearInterval(watchdog);
     setIsGenerating(false);
@@ -720,104 +733,37 @@ export default function Home() {
           ? "KSEMO stopped waiting because this response took too long."
           : "KSEMO's response stalled. Please try again."
         : null);
-    // The stream event handler assigns this asynchronously, which TypeScript
-    // cannot follow through the closure even though it is available at runtime.
     const completedConversation =
       streamConversation as StreamConversation | null;
 
-    const persistTurnLocally = () => {
-      if (!completedConversation) return false;
-      return mergeTurnIntoConversationCache(
-        completedConversation.conversationId,
-        {
-          user: {
-            id: completedConversation.userMessageId,
-            role: "user",
-            content,
-            status: "completed",
-            attachments: selectedAttachments.length
-              ? selectedAttachments.map(file => ({
-                  id: file.fileId,
-                  filename: file.name,
-                  mimeType: file.mimeType,
-                  url: file.url,
-                }))
-              : undefined,
-          },
-          assistant: {
-            id: completedConversation.assistantMessageId,
-            role: "assistant",
-            content: responseText,
-            status: failureMessage
-              ? "failed"
-              : userStopped
-                ? "cancelled"
-                : "completed",
-          },
-        }
-      );
-    };
+    const finalStatus = failureMessage
+      ? "failed"
+      : userStopped
+        ? "cancelled"
+        : "completed";
 
     if (!completedConversation) {
-      // Nothing was saved server-side: give the text back to the composer.
-      setPendingMessages(null);
-      setPendingConversationId(null);
       if (!userStopped)
         setComposerValue(current => (current ? current : content));
       if (failureMessage) toast.error(failureMessage);
       return;
     }
 
-    if (failureMessage) {
-      markStreamingDraft("failed");
-      toast.error(failureMessage);
-      const synced = await syncConversationFromServer(
-        completedConversation.conversationId
-      );
-      if (generationSequenceRef.current !== turnSequence) return;
-      if (synced) clearPendingDrafts();
-      else if (!persistTurnLocally()) keepPendingDraftsVisible();
-      return;
-    }
+    if (failureMessage) toast.error(failureMessage);
 
-    if (userStopped) {
-      markStreamingDraft("cancelled");
-      const synced = await syncConversationFromServer(
-        completedConversation.conversationId
-      );
-      if (generationSequenceRef.current !== turnSequence) return;
-      if (synced || persistTurnLocally()) clearPendingDrafts();
-      return;
-    }
-
-    const synced = await syncConversationFromServer(
-      completedConversation.conversationId
+    setChatMessages(current =>
+      current.map(message =>
+        message.role === "assistant" && message.status === "streaming"
+          ? { ...message, content: responseText || message.content, status: finalStatus }
+          : message
+      )
     );
+
+    await syncConversationFromServer(completedConversation.conversationId);
+
     if (generationSequenceRef.current !== turnSequence) return;
-    if (synced || persistTurnLocally()) clearPendingDrafts();
-    else keepPendingDraftsVisible();
-    if (preferencesQuery.data?.autoPlayResponses && responseText)
+    if (preferencesQuery.data?.autoPlayResponses && responseText && !failureMessage && !userStopped)
       speak(responseText, completedConversation.assistantMessageId);
-  }
-
-  function markStreamingDraft(status: "failed" | "cancelled" | "completed") {
-    setPendingMessages(
-      current =>
-        current?.map(message =>
-          message.role === "assistant" && message.status === "streaming"
-            ? { ...message, status }
-            : message
-        ) ?? null
-    );
-  }
-
-  function clearPendingDrafts() {
-    setPendingMessages(null);
-    setPendingConversationId(null);
-  }
-
-  function keepPendingDraftsVisible() {
-    // Leave the streamed answer on screen; a later cache refresh replaces it.
   }
 
   async function syncConversationFromServer(targetId: string) {
@@ -826,33 +772,6 @@ export default function Home() {
       REFRESH_TIMEOUT_MS
     );
     return fresh !== null;
-  }
-
-  function mergeTurnIntoConversationCache(
-    targetId: string,
-    turn: { user: KsemoMessage; assistant: KsemoMessage }
-  ) {
-    const existing = utils.conversation.get.getData({ id: targetId });
-    if (!existing) return false;
-    const messages = [...existing.messages];
-    const upsert = (incoming: KsemoMessage) => {
-      const index = messages.findIndex(message => message.id === incoming.id);
-      if (index >= 0)
-        messages[index] = {
-          ...messages[index],
-          content: incoming.content,
-          status: incoming.status ?? "completed",
-        };
-      else
-        messages.push({
-          ...incoming,
-          attachments: incoming.attachments ?? [],
-        } as (typeof messages)[number]);
-    };
-    upsert(turn.user);
-    upsert(turn.assistant);
-    utils.conversation.get.setData({ id: targetId }, { ...existing, messages });
-    return true;
   }
 
   function stopGeneration() {
@@ -871,8 +790,7 @@ export default function Home() {
     generationActiveRef.current = false;
     setIsGenerating(false);
     setGeneratingMessageId(null);
-    setPendingMessages(null);
-    setPendingConversationId(null);
+    setChatMessages([]);
     setActiveConversationId(null);
     setPrimaryWorkspace(null);
     setSidebarOpen(false);
@@ -970,7 +888,7 @@ export default function Home() {
         messageId: message.id,
         versionId,
         restoredContent: content,
-        messages: persistedMessages,
+        messages: chatMessages,
         restore: async (messageId, restoredVersionId) => {
           await messageRestoreMutation.mutateAsync({
             id: messageId,
@@ -1003,7 +921,7 @@ export default function Home() {
       const result = await saveEditedUserMessageAndRegenerate({
         message,
         editedContent: content,
-        messages: persistedMessages,
+        messages: chatMessages,
         save: (messageId, editedContent) =>
           messageEditMutation.mutateAsync({
             id: messageId,
@@ -1026,12 +944,12 @@ export default function Home() {
   }
 
   function regenerateMessage(message: KsemoMessage) {
-    const assistantIndex = persistedMessages.findIndex(
+    const assistantIndex = chatMessages.findIndex(
       item => item.id === message.id
     );
     const sourceUser =
       assistantIndex >= 0
-        ? [...persistedMessages.slice(0, assistantIndex)]
+        ? [...chatMessages.slice(0, assistantIndex)]
             .reverse()
             .find(item => item.role === "user")
         : undefined;
@@ -1092,6 +1010,74 @@ export default function Home() {
       }
     } catch {
       toast.error("KSEMO could not add that file.");
+    }
+  }
+
+  async function captureScreenshot() {
+    if (!navigator.mediaDevices?.getDisplayMedia) {
+      toast.error(
+        "Screen capture is not supported in this browser."
+      );
+      return;
+    }
+    let stream: MediaStream | null = null;
+    try {
+      stream = await navigator.mediaDevices.getDisplayMedia({
+        video: { displaySurface: "monitor" } as MediaTrackConstraints,
+        audio: false,
+      });
+      const track = stream.getVideoTracks()[0];
+      if (!track) {
+        toast.error("Screen capture failed. Please try again.");
+        return;
+      }
+      const video = document.createElement("video");
+      video.srcObject = stream;
+      video.muted = true;
+      await video.play();
+      await new Promise<void>(resolve => {
+        if (video.readyState >= 2) return resolve();
+        video.onloadeddata = () => resolve();
+      });
+      await new Promise(r => setTimeout(r, 100));
+      const canvas = document.createElement("canvas");
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        track.stop();
+        toast.error("Screen capture failed. Please try again.");
+        return;
+      }
+      ctx.drawImage(video, 0, 0);
+      video.srcObject = null;
+      track.stop();
+      const blob = await new Promise<Blob | null>(resolve =>
+        canvas.toBlob(resolve, "image/png", 0.92)
+      );
+      if (!blob) {
+        toast.error("Screen capture failed. Please try again.");
+        return;
+      }
+      const timestamp = Date.now();
+      const file = new File(
+        [blob],
+        `ksemo-screenshot-${timestamp}.png`,
+        { type: "image/png" }
+      );
+      await attachFromComposer(file);
+    } catch (error: unknown) {
+      if (stream) {
+        for (const track of stream.getVideoTracks()) track.stop();
+      }
+      const name =
+        error instanceof Error ? error.name : String(error);
+      if (name === "NotAllowedError") return;
+      if (name === "NotReadableError") {
+        toast.error("Could not read the captured screen. Please try again.");
+        return;
+      }
+      toast.error("Screen capture failed. Please try again.");
     }
   }
 
@@ -1163,8 +1149,7 @@ export default function Home() {
       toast.info("Finish or stop the current response before switching chats.");
       return;
     }
-    setPendingMessages(null);
-    setPendingConversationId(null);
+    setChatMessages([]);
     setPrimaryWorkspace(null);
     setActiveConversationId(id);
     setSidebarOpen(false);
@@ -1352,6 +1337,7 @@ export default function Home() {
                         messageFeedbackMutation.mutate({ messageId, value })
                       }
                       webSources={webSourcesByMessage[message.id]}
+                      webSearchStatus={webSearchStatus[message.id]}
                     />
                   ))}
                   <div ref={messagesEndRef} />
@@ -1403,6 +1389,7 @@ export default function Home() {
                         setWebSearchEnabled(current => !current)
                       }
                       isCentered={true}
+                      onTakeScreenshot={captureScreenshot}
                     />
                   }
                 />
@@ -1449,6 +1436,7 @@ export default function Home() {
                 onToggleWebSearch={() =>
                   setWebSearchEnabled(current => !current)
                 }
+                onTakeScreenshot={captureScreenshot}
               />
             )}
           </>

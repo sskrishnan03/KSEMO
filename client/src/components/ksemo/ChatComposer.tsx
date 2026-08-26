@@ -23,6 +23,7 @@ import {
   Image,
   Library,
   Mic,
+  MonitorUp,
   Plus,
   Square,
   X,
@@ -63,6 +64,7 @@ export function ChatComposer({
   webSearchEnabled = false,
   onToggleWebSearch,
   isCentered = false,
+  onTakeScreenshot,
 }: {
   onSend: (content: string) => void;
   onCancel: () => void;
@@ -75,8 +77,8 @@ export function ChatComposer({
   value: string;
   onValueChange: (value: string) => void;
   onAttachment?: (file: File) => void;
-  attachmentNotice?: { name: string; linked: boolean } | null;
-  attachmentNotices?: Array<{ fileId: string; name: string; linked: boolean }>;
+  attachmentNotice?: { name: string; linked: boolean; mimeType?: string; url?: string } | null;
+  attachmentNotices?: Array<{ fileId: string; name: string; linked: boolean; mimeType?: string; url?: string }>;
   onClearAttachment?: (fileId?: string) => void;
   libraryFiles?: Array<{
     id: string;
@@ -101,6 +103,7 @@ export function ChatComposer({
   webSearchEnabled?: boolean;
   onToggleWebSearch?: () => void;
   isCentered?: boolean;
+  onTakeScreenshot?: () => void;
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -137,7 +140,7 @@ export function ChatComposer({
 
   function submit() {
     const content = value.trim();
-    if (!content || isGenerating) return;
+    if ((!content && !visibleAttachmentNotices.length) || isGenerating) return;
     onSend(content);
     onValueChange("");
   }
@@ -200,15 +203,23 @@ export function ChatComposer({
             {visibleAttachmentNotices.map(item => (
               <div
                 key={item.fileId}
-                className="flex max-w-52 flex-1 items-center gap-2 rounded-xl border border-border bg-muted/50 p-2 text-left shadow-sm"
+                className="group relative flex max-w-52 flex-1 items-center gap-2 rounded-xl border border-border bg-muted/50 p-2 text-left shadow-sm"
               >
-                <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-background text-muted-foreground">
-                  {/(png|jpe?g|webp|gif)$/i.test(item.name) ? (
-                    <Image className="size-4" />
-                  ) : (
-                    <FileText className="size-4" />
-                  )}
-                </span>
+                {item.url && /(png|jpe?g|webp|gif)$/i.test(item.name) ? (
+                  <img
+                    src={item.url}
+                    alt=""
+                    className="size-10 shrink-0 rounded-lg object-cover"
+                  />
+                ) : (
+                  <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-background text-muted-foreground">
+                    {/(png|jpe?g|webp|gif)$/i.test(item.name) ? (
+                      <Image className="size-4" />
+                    ) : (
+                      <FileText className="size-4" />
+                    )}
+                  </span>
+                )}
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-xs font-medium text-foreground">
                     {item.name}
@@ -225,11 +236,7 @@ export function ChatComposer({
                         size="icon"
                         onClick={() => onClearAttachment(item.fileId)}
                         className="size-7 shrink-0 rounded-lg"
-                        aria-label={
-                          attachmentNotices
-                            ? `Remove ${item.name}`
-                            : "Cancel selected upload"
-                        }
+                        aria-label="Remove screenshot"
                       >
                         <X className="size-3.5" />
                       </Button>
@@ -267,14 +274,6 @@ export function ChatComposer({
         <div className="flex min-h-10 items-center justify-between px-1 pt-1">
           {isRecording ? (
             <div className="flex items-center gap-1.5">
-              {webSearchEnabled && (
-                <div className="flex h-9 items-center gap-1.5 rounded-xl border border-border bg-muted pl-2.5 pr-1.5">
-                  <Globe className="size-3.5 text-muted-foreground" />
-                  <span className="text-xs font-medium text-foreground">
-                    Web search
-                  </span>
-                </div>
-              )}
               <div className="flex h-9 items-center gap-2 rounded-full border border-border bg-muted px-2">
                 <span
                   className="flex items-center gap-0.5 px-1"
@@ -322,6 +321,14 @@ export function ChatComposer({
                   </TooltipContent>
                 </Tooltip>
               </div>
+              {webSearchEnabled && (
+                <div className="flex h-9 items-center gap-1.5 rounded-xl border border-border bg-muted pl-2.5 pr-1.5">
+                  <Globe className="size-3.5 text-muted-foreground" />
+                  <span className="text-xs font-medium text-foreground">
+                    Web search
+                  </span>
+                </div>
+              )}
             </div>
           ) : (
             <div className="flex items-center gap-1">
@@ -354,8 +361,19 @@ export function ChatComposer({
                 className="w-56 rounded-xl"
               >
                 <DropdownMenuItem onClick={() => fileInputRef.current?.click()}>
-                  <FileUp className="mr-2 size-4" /> Add images and files
+                  <FileUp className="mr-2 size-4" /> Upload files
                 </DropdownMenuItem>
+                {onTakeScreenshot && (
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      setToolsOpen(false);
+                      onTakeScreenshot();
+                    }}
+                  >
+                    <MonitorUp className="mr-2 size-4" />
+                    Take Screenshot
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem
                   onSelect={() => {
                     setLibraryOpen(true);
@@ -378,6 +396,25 @@ export function ChatComposer({
                 )}
               </DropdownMenuContent>
             </DropdownMenu>
+            {!isGenerating && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={onVoice}
+                    disabled={isTranscribing}
+                    className="size-9 rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground"
+                    aria-label="Use voice input"
+                  >
+                    <Mic className="size-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  Record a voice message
+                </TooltipContent>
+              </Tooltip>
+            )}
             {webSearchEnabled && (
               <div className="flex h-9 items-center gap-1.5 rounded-xl border border-border bg-muted pl-2.5 pr-1.5">
                 <Globe className="size-3.5 text-muted-foreground" />
@@ -404,25 +441,6 @@ export function ChatComposer({
                 )}
               </div>
             )}
-            {!isGenerating && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={onVoice}
-                    disabled={isTranscribing}
-                    className="size-9 rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground"
-                    aria-label="Use voice input"
-                  >
-                    <Mic className="size-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom">
-                  Record a voice message
-                </TooltipContent>
-              </Tooltip>
-            )}
           </div>
           )}
           <div className="ml-auto flex items-center">
@@ -445,7 +463,7 @@ export function ChatComposer({
                 <TooltipTrigger asChild>
                   <Button
                     onClick={submit}
-                    disabled={!value.trim() || isRecording || isTranscribing}
+                    disabled={!value.trim() && !visibleAttachmentNotices.length || isRecording || isTranscribing}
                     size="icon"
                     className="size-9 rounded-xl bg-foreground text-background hover:bg-foreground/90 disabled:bg-muted disabled:text-muted-foreground"
                     aria-label="Send message"
