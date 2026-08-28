@@ -1,4 +1,5 @@
 import { trpc } from "@/lib/trpc";
+import { Loading } from "@/components/ui/loading";
 import { MessageCircle } from "lucide-react";
 import { useRoute } from "wouter";
 
@@ -12,9 +13,7 @@ export default function SharedConversation() {
 
   if (shared.isLoading)
     return (
-      <main className="grid min-h-screen place-items-center bg-background">
-        <div className="size-7 animate-pulse rounded-xl bg-foreground" />
-      </main>
+      <Loading fullScreen />
     );
   if (shared.isError || !shared.data)
     return (

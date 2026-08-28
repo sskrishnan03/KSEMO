@@ -45,7 +45,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 
 type Conversation = {
   id: string;
@@ -124,6 +124,10 @@ export function ConversationSidebar({
   const pinned = conversations.filter(item => item.isPinned);
   const recent = conversations.filter(item => !item.isPinned);
   const compact = collapsed;
+
+  const asideRef = useRef<HTMLElement>(null);
+  const navRef = useRef<HTMLElement>(null);
+
   const iconMotion = (label: string) =>
     ({
       "New chat":
@@ -133,21 +137,12 @@ export function ConversationSidebar({
       Library:
         "group-hover:-translate-y-0.5 group-hover:rotate-3 group-active:translate-y-0",
     })[label] ?? "group-hover:scale-105";
-  const railTip = (label: string) =>
-    compact ? (
-      <span
-        aria-hidden
-        className="pointer-events-none absolute left-full top-1/2 z-[70] ml-2 -translate-y-1/2 whitespace-nowrap rounded-md bg-foreground px-2 py-1 text-xs font-medium text-background opacity-0 shadow-md transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100 motion-reduce:transition-none"
-      >
-        {label}
-      </span>
-    ) : null;
   const utility = (
     label: string,
     icon: React.ReactNode,
     action: () => void
   ) => {
-    return (
+    const button = (
       <Button
         onClick={action}
         variant="ghost"
@@ -167,10 +162,37 @@ export function ConversationSidebar({
         <span className={compact ? "sr-only" : "text-sm font-semibold"}>
           {label}
         </span>
-        {railTip(label)}
       </Button>
     );
+    return compact ? (
+      <Tooltip>
+        <TooltipTrigger asChild>{button}</TooltipTrigger>
+        <TooltipContent side="right" sideOffset={8} collisionPadding={12}>
+          {label}
+        </TooltipContent>
+      </Tooltip>
+    ) : (
+      button
+    );
   };
+  const accountButton = (
+    <button
+      className={cn(
+        "group relative flex w-full items-center rounded-xl py-2 text-left transition-colors hover:bg-muted focus-visible:ring-0 focus-visible:outline-none",
+        compact ? "justify-center" : "gap-2.5 px-2"
+      )}
+      aria-label="Open profile menu"
+    >
+      <span className="flex size-7 shrink-0 items-center justify-center rounded-lg border border-border bg-card text-[11px] font-semibold">
+        {user.name?.trim().charAt(0).toUpperCase() ?? "U"}
+      </span>
+      <span className={compact ? "sr-only" : "min-w-0 flex-1"}>
+        <span className="block truncate text-sm font-medium">
+          {user.name || "KSEMO user"}
+        </span>
+      </span>
+    </button>
+  );
 
   return (
     <>
@@ -182,9 +204,10 @@ export function ConversationSidebar({
         />
       )}
       <aside
+        ref={asideRef}
         className={cn(
           "fixed inset-y-0 left-0 z-50 flex flex-col border-r border-border bg-[oklch(0.975_0.002_80)] px-3 py-3 transition-[width,transform] duration-200 dark:bg-[oklch(0.17_0.003_80)] lg:static lg:translate-x-0",
-          compact ? "w-16" : "w-[18.5rem]",
+          compact ? "w-16" : "w-[16.5rem]",
           open ? "translate-x-0" : "-translate-x-full"
         )}
       >
@@ -203,35 +226,27 @@ export function ConversationSidebar({
                   className="size-full object-cover"
                 />
               </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={onToggleCollapsed}
-                className="absolute inset-0 size-8 rounded-xl opacity-0 transition-all duration-150 group-hover/brand:scale-100 group-hover/brand:opacity-100 group-focus-within/brand:scale-100 group-focus-within/brand:opacity-100 hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring active:scale-95"
-                aria-label="Expand sidebar"
-              >
-                <ChevronsRight className="size-4" />
-                <span
-                  aria-hidden
-                  className="pointer-events-none absolute left-full top-1/2 z-[70] ml-2 -translate-y-1/2 whitespace-nowrap rounded-md bg-foreground px-2 py-1 text-xs font-medium text-background opacity-0 shadow-md transition-opacity duration-150 group-hover/brand:opacity-100 group-focus-within/brand:opacity-100 motion-reduce:transition-none"
-                >
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={onToggleCollapsed}
+                    className="absolute inset-0 size-8 rounded-xl opacity-0 transition-all duration-150 group-hover/brand:scale-100 group-hover/brand:opacity-100 group-focus-within/brand:scale-100 group-focus-within/brand:opacity-100 hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring active:scale-95"
+                    aria-label="Expand sidebar"
+                  >
+                    <ChevronsRight className="size-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="right" sideOffset={8} collisionPadding={12}>
                   Expand sidebar
-                </span>
-              </Button>
+                </TooltipContent>
+              </Tooltip>
             </div>
           ) : (
-            <div className="flex min-w-0 items-center gap-2.5">
-              <div className="size-8 shrink-0 overflow-hidden rounded-lg border border-border bg-card shadow-sm">
-                <img
-                  src="/KSEMOlogo.png"
-                  alt="KSEMO logo"
-                  className="size-full object-cover"
-                />
-              </div>
-              <span className="text-sm font-semibold tracking-[-0.02em]">
-                KSEMO
-              </span>
-            </div>
+            <span className="min-w-0 truncate text-lg font-semibold tracking-[-0.02em]">
+              KSEMO
+            </span>
           )}
           {!compact && (
             <Tooltip>
@@ -274,6 +289,7 @@ export function ConversationSidebar({
           )}
         </div>
         <nav
+          ref={navRef}
           className="mt-4 min-h-0 flex-1 overflow-y-auto"
           aria-label="Conversations"
         >
@@ -313,25 +329,18 @@ export function ConversationSidebar({
         </nav>
         <div className="mt-3 border-t border-border pt-3">
           <DropdownMenu open={previewSupportOpen || undefined}>
-            <DropdownMenuTrigger asChild>
-              <button
-                className={cn(
-                  "group relative flex w-full items-center rounded-xl py-2 text-left transition-colors hover:bg-muted focus-visible:ring-0 focus-visible:outline-none",
-                  compact ? "justify-center" : "gap-2.5 px-2"
-                )}
-                aria-label="Open profile menu"
-              >
-                <span className="flex size-7 shrink-0 items-center justify-center rounded-lg border border-border bg-card text-[11px] font-semibold">
-                  {user.name?.trim().charAt(0).toUpperCase() ?? "U"}
-                </span>
-                <span className={compact ? "sr-only" : "min-w-0 flex-1"}>
-                  <span className="block truncate text-sm font-medium">
-                    {user.name || "KSEMO user"}
-                  </span>
-                </span>
-                {railTip("Account")}
-              </button>
-            </DropdownMenuTrigger>
+            {compact ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <DropdownMenuTrigger asChild>{accountButton}</DropdownMenuTrigger>
+                </TooltipTrigger>
+                <TooltipContent side="right" sideOffset={8} collisionPadding={12}>
+                  Account
+                </TooltipContent>
+              </Tooltip>
+            ) : (
+              <DropdownMenuTrigger asChild>{accountButton}</DropdownMenuTrigger>
+            )}
             <DropdownMenuContent
               side={compact ? "right" : "top"}
               sideOffset={10}
@@ -529,81 +538,26 @@ function ConversationGroup({
             <div
               key={conversation.id}
               className={cn(
-                "group flex items-center rounded-lg",
+                "group flex items-center gap-1 rounded-lg",
                 activeConversationId === conversation.id
                   ? "bg-muted"
                   : "hover:bg-muted/70"
               )}
             >
-              <button
-                onClick={() => onSelect(conversation.id)}
-                className="flex min-w-0 flex-1 items-center gap-2 truncate px-2.5 py-2 text-left text-[13px] leading-5"
-              >
-                <MessageCircle className="size-[18px] shrink-0 stroke-[2.4] text-foreground/85 transition-colors group-hover:text-foreground" />
-                <span className="truncate">{conversation.title}</span>
-              </button>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="mr-1 size-7 rounded-md max-lg:opacity-100 opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100 group-focus-within:opacity-100"
-                    aria-label={`Actions for ${conversation.title}`}
-                  >
-                    <Ellipsis className="size-3.5" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" sideOffset={4} collisionPadding={8} className="w-44 rounded-xl">
-                  <DropdownMenuItem onClick={() => onRename(conversation)}>
-                    <Pencil className="mr-2 size-3.5" />
-                    Rename
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => onPin(conversation)}>
-                    <Pin className="mr-2 size-3.5" />
-                    {conversation.isPinned ? "Unpin" : "Pin"}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => onShare(conversation)}>
-                    <Share2 className="mr-2 size-3.5" />
-                    Share
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => onArchive(conversation)}>
-                    <Archive className="mr-2 size-3.5" />
-                    Archive
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => onDuplicate(conversation)}>
-                    <Copy className="mr-2 size-3.5" />
-                    Duplicate
-                  </DropdownMenuItem>
-                  <DropdownMenuSub>
-                    <DropdownMenuSubTrigger>
-                      <Download className="mr-2 size-3.5" />
-                      Export
-                    </DropdownMenuSubTrigger>
-                    <DropdownMenuSubContent sideOffset={8} collisionPadding={12} className="w-44 rounded-xl">
-                      <DropdownMenuItem
-                        onClick={() => onExport(conversation, "pdf")}
-                      >
-                        <FileText className="mr-2 size-3.5" />
-                        Download PDF
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => onExport(conversation, "word")}
-                      >
-                        <FileText className="mr-2 size-3.5" />
-                        Download Word
-                      </DropdownMenuItem>
-                    </DropdownMenuSubContent>
-                  </DropdownMenuSub>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={() => onDelete(conversation)}
-                    className="text-destructive focus:text-destructive"
-                  >
-                    <Trash2 className="mr-2 size-3.5" />
-                    Delete
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <ConversationTitleButton
+                conversation={conversation}
+                onSelect={onSelect}
+              />
+              <ConversationActionsMenu
+                conversation={conversation}
+                onRename={onRename}
+                onPin={onPin}
+                onDuplicate={onDuplicate}
+                onArchive={onArchive}
+                onShare={onShare}
+                onExport={onExport}
+                onDelete={onDelete}
+              />
             </div>
           ))}
           {!conversations.length && emptyText && (
@@ -614,5 +568,119 @@ function ConversationGroup({
         </div>
       )}
     </section>
+  );
+}
+
+function ConversationActionsMenu({
+  conversation,
+  onRename,
+  onPin,
+  onDuplicate,
+  onArchive,
+  onShare,
+  onExport,
+  onDelete,
+}: {
+  conversation: Conversation;
+  onRename: (conversation: Conversation) => void;
+  onPin: (conversation: Conversation) => void;
+  onDuplicate: (conversation: Conversation) => void;
+  onArchive: (conversation: Conversation) => void;
+  onShare: (conversation: Conversation) => void;
+  onExport: (conversation: Conversation, format: "pdf" | "word") => void;
+  onDelete: (conversation: Conversation) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <DropdownMenu open={open} onOpenChange={setOpen}>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className={cn(
+            "mr-1 size-7 rounded-md opacity-0 transition-opacity",
+            "group-hover:opacity-100 group-focus-within:opacity-100 focus:opacity-100",
+            open && "opacity-100"
+          )}
+          aria-label={`Actions for ${conversation.title}`}
+        >
+          <Ellipsis className="size-3.5" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="end"
+        sideOffset={4}
+        collisionPadding={8}
+        className="w-44 rounded-xl"
+      >
+        <DropdownMenuItem onClick={() => onRename(conversation)}>
+          <Pencil className="mr-2 size-3.5" />
+          Rename
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => onPin(conversation)}>
+          <Pin className="mr-2 size-3.5" />
+          {conversation.isPinned ? "Unpin" : "Pin"}
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => onShare(conversation)}>
+          <Share2 className="mr-2 size-3.5" />
+          Share
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => onArchive(conversation)}>
+          <Archive className="mr-2 size-3.5" />
+          Archive
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => onDuplicate(conversation)}>
+          <Copy className="mr-2 size-3.5" />
+          Duplicate
+        </DropdownMenuItem>
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger>
+            <Download className="mr-2 size-3.5" />
+            Export
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent
+            sideOffset={8}
+            collisionPadding={12}
+            className="w-44 rounded-xl"
+          >
+            <DropdownMenuItem onClick={() => onExport(conversation, "pdf")}>
+              <FileText className="mr-2 size-3.5" />
+              Download PDF
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onExport(conversation, "word")}>
+              <FileText className="mr-2 size-3.5" />
+              Download Word
+            </DropdownMenuItem>
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          onClick={() => onDelete(conversation)}
+          className="text-destructive focus:text-destructive"
+        >
+          <Trash2 className="mr-2 size-3.5" />
+          Delete
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function ConversationTitleButton({
+  conversation,
+  onSelect,
+}: {
+  conversation: Conversation;
+  onSelect: (id: string) => void;
+}) {
+  return (
+    <button
+      onClick={() => onSelect(conversation.id)}
+      aria-label={conversation.title}
+      className="flex min-w-0 flex-1 items-center gap-2 truncate px-2.5 py-2 text-left text-[13px] leading-5"
+    >
+      <MessageCircle className="size-[18px] shrink-0 stroke-[2.4] text-foreground/85 transition-colors group-hover:text-foreground" />
+      <span className="min-w-0 truncate">{conversation.title}</span>
+    </button>
   );
 }

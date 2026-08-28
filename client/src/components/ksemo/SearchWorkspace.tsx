@@ -6,6 +6,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Loading } from "@/components/ui/loading";
 import { cn } from "@/lib/utils";
 import { trpc } from "@/lib/trpc";
 import { MessageCircle, Search } from "lucide-react";
@@ -51,10 +52,11 @@ export function SearchDialog({
     }
   }, [open]);
 
-  const { data: serverData } = trpc.conversation.search.useQuery(
-    { query: query.trim() },
-    { enabled: open && query.trim().length >= 1 }
-  );
+  const { data: serverData, isFetching: searchLoading } =
+    trpc.conversation.search.useQuery(
+      { query: query.trim() },
+      { enabled: open && query.trim().length >= 1 }
+    );
 
   const titleMatches = useMemo(() => {
     if (!trimmed) return [];
@@ -121,7 +123,9 @@ export function SearchDialog({
 
         <div className="min-h-0 flex-1 overflow-y-auto p-2">
           {trimmed ? (
-            results.length > 0 ? (
+            searchLoading && titleMatches.length === 0 ? (
+              <Loading className="min-h-32" />
+            ) : results.length > 0 ? (
               <div className="space-y-0.5">
                 {results.map(result => (
                   <button

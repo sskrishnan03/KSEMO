@@ -369,10 +369,18 @@ export function conversationToDb(
 
 export function messageToDb(msg: Partial<Message>): Partial<DbMessage> {
   const db: Partial<DbMessage> = {};
+  // The id MUST be persisted exactly as provided. If it is omitted, the
+  // database default (uuid_generate_v4()) silently creates a different id,
+  // which breaks every later lookup that references the message by id.
+  if (msg.id !== undefined) db.id = msg.id;
   if (msg.conversationId !== undefined) db.conversation_id = msg.conversationId;
   if (msg.role !== undefined) db.role = msg.role;
   if (msg.content !== undefined) db.content = msg.content;
   if (msg.model !== undefined) db.model = msg.model;
   if (msg.status !== undefined) db.status = msg.status;
+  if (msg.createdAt !== undefined)
+    db.created_at = msg.createdAt.toISOString();
+  if (msg.updatedAt !== undefined)
+    db.updated_at = msg.updatedAt.toISOString();
   return db;
 }

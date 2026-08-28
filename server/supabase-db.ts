@@ -484,23 +484,54 @@ export async function listMessagesForConversation(
   return (data as DbMessage[]).map(dbToMessage);
 }
 
-export async function createMessage(input: Message): Promise<void> {
+export async function createMessage(input: Message): Promise<Message> {
   const dbValues = messageToDb(input);
-  const { error } = await supabase.from("messages").insert(dbValues);
+  const { data, error } = await supabase
+    .from("messages")
+    .insert(dbValues)
+    .select()
+    .single();
 
   if (error) {
     handleSupabaseError(error, "createMessage");
   }
+
+  const persisted = dbToMessage(data as DbMessage);
+  if (persisted.id !== input.id) {
+    // This used to be silent: the row was stored under a database-generated
+    // id while every subsequent update referenced the app-generated one,
+    // leaving assistant messages stuck at status "streaming" with no content.
+    throw new Error(
+      `[createMessage] stored id "${persisted.id}" does not match the ` +
+        `provided id "${input.id}". The message id, createdAt and updatedAt ` +
+        "must be preserved by messageToDb exactly."
+    );
+  }
+  return persisted;
 }
 
 export async function updateMessage(
   id: string,
   values: Partial<Pick<Message, "content" | "model" | "status">>
 ): Promise<void> {
-  const { error } = await supabase.from("messages").update(values).eq("id", id);
+  const { data, error } = await supabase
+    .from("messages")
+    .update(values)
+    .eq("id", id)
+    .select("id");
 
   if (error) {
     handleSupabaseError(error, "updateMessage");
+  }
+
+  if (!data || data.length === 0) {
+    // Previously this no-op was swallowed, so answers never persisted. Make
+    // it impossible to miss again: an unknown message id is a real error.
+    throw new Error(
+      `[updateMessage] no message matched id "${id}" while setting ` +
+        `status "${values.status ?? "unchanged"}". The message was never ` +
+        "persisted with this id; check createMessage/messageToDb."
+    );
   }
 }
 

@@ -1,23 +1,13 @@
 import { Button } from "@/components/ui/button";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { Check, Copy, Download, FileCode2, Maximize2 } from "lucide-react";
+import { Check, Copy, Download } from "lucide-react";
 import React, { memo, useCallback, useEffect, useRef, useState } from "react";
 import { codeToHtml } from "shiki";
-
-/** Blocks longer than this get a capped, scrollable body (expand for full view). */
-const COLLAPSED_LINE_LIMIT = 12;
-const COLLAPSED_MAX_HEIGHT_PX = 420;
 
 /**
  * Display name + download extension for the languages KSEMO recognises.
@@ -90,7 +80,14 @@ export function codeBlockDownloadName(rawLanguage?: string) {
 }
 
 function LanguageIcon() {
-  return <FileCode2 className="size-4 shrink-0" aria-hidden />;
+  return (
+    <span
+      className="grid size-6 shrink-0 place-items-center font-mono text-[11px] font-semibold text-muted-foreground"
+      aria-hidden
+    >
+      &lt;/&gt;
+    </span>
+  );
 }
 
 function CopyCodeButton({ code }: { code: string }) {
@@ -137,7 +134,12 @@ function CopyCodeButton({ code }: { code: string }) {
           type="button"
           variant="ghost"
           size="icon"
-          className="size-7 rounded-md text-muted-foreground hover:bg-foreground/5 hover:text-foreground focus-visible:ring-1"
+          className={cn(
+            "size-7 rounded-md transition-colors focus-visible:ring-1",
+            copied
+              ? "text-foreground"
+              : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
+          )}
           onClick={copy}
           disabled={!code}
           aria-label={label}
@@ -200,53 +202,25 @@ function DownloadCodeButton({
   );
 }
 
-function ExpandCodeButton({
-  onExpand,
-  disabled,
-}: {
-  onExpand: () => void;
-  disabled?: boolean;
-}) {
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="size-7 rounded-md text-muted-foreground hover:bg-foreground/5 hover:text-foreground focus-visible:ring-1"
-          onClick={onExpand}
-          disabled={disabled}
-          aria-label="Expand code"
-        >
-          <Maximize2 className="size-3.5" aria-hidden />
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent side="bottom">Expand code</TooltipContent>
-    </Tooltip>
-  );
-}
-
-type CodeBlockActionsProps = {
-  code: string;
-  rawLanguage?: string;
-  onExpand?: () => void;
-  expandable?: boolean;
-};
-
-function CodeBlockActions({
+function KsemoCodeBlockHeader({
   code,
   rawLanguage,
-  onExpand,
-  expandable = false,
-}: CodeBlockActionsProps) {
+}: {
+  code: string;
+  rawLanguage?: string;
+}) {
   return (
-    <div className="flex shrink-0 items-center gap-0.5">
-      <CopyCodeButton code={code} />
-      <DownloadCodeButton code={code} rawLanguage={rawLanguage} />
-      {expandable && onExpand ? (
-        <ExpandCodeButton onExpand={onExpand} disabled={!code} />
-      ) : null}
+    <div className="flex items-center justify-between gap-3 border-b border-border/60 px-3 py-2">
+      <span className="flex min-w-0 items-center gap-2">
+        <LanguageIcon />
+        <span className="truncate font-mono text-xs font-medium lowercase tracking-wide text-muted-foreground">
+          {codeBlockLanguageLabel(rawLanguage)}
+        </span>
+      </span>
+      <div className="flex shrink-0 items-center gap-1.5">
+        <DownloadCodeButton code={code} rawLanguage={rawLanguage} />
+        <CopyCodeButton code={code} />
+      </div>
     </div>
   );
 }
@@ -254,13 +228,10 @@ function CodeBlockActions({
 function CodeSurface({
   code,
   rawLanguage,
-  expanded,
 }: {
   code: string;
   rawLanguage?: string;
-  expanded: boolean;
 }) {
-  const capped = !expanded && code.split("\n").length > COLLAPSED_LINE_LIMIT;
   const [html, setHtml] = useState<string>("");
 
   useEffect(() => {
@@ -285,13 +256,13 @@ function CodeSurface({
   }, [code, rawLanguage]);
 
   return (
-    <div
-      className="ksemo-code-body overflow-y-auto overscroll-contain"
-      style={capped ? { maxHeight: COLLAPSED_MAX_HEIGHT_PX } : undefined}
-    >
+    // Deliberately NOT a vertical scroll container. Horizontal overflow is
+    // handled by the <pre> itself so vertical wheel/trackpad movement always
+    // chains up to the main conversation scroller.
+    <div className="ksemo-code-body">
       {html ? (
         <div
-          className="[&>pre]:m-0 [&>pre]:bg-transparent [&>pre]:p-4"
+          className="[&>pre]:m-0 [&>pre]:bg-transparent"
           dangerouslySetInnerHTML={{ __html: html }}
         />
       ) : (
@@ -303,33 +274,6 @@ function CodeSurface({
   );
 }
 
-function KsemoCodeBlockHeader({
-  code,
-  rawLanguage,
-  expandable,
-  onExpand,
-}: {
-  code: string;
-  rawLanguage?: string;
-  expandable: boolean;
-  onExpand?: () => void;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-2 px-2.5 pb-1 pt-1.5">
-      <span className="flex min-w-0 items-center gap-1.5 font-mono text-[11px] lowercase tracking-wide text-muted-foreground">
-        <LanguageIcon />
-        <span className="truncate">{codeBlockLanguageLabel(rawLanguage)}</span>
-      </span>
-      <CodeBlockActions
-        code={code}
-        rawLanguage={rawLanguage}
-        expandable={expandable}
-        onExpand={onExpand}
-      />
-    </div>
-  );
-}
-
 export function KsemoCodeBlock({
   code,
   rawLanguage,
@@ -337,50 +281,16 @@ export function KsemoCodeBlock({
   code: string;
   rawLanguage?: string;
 }) {
-  const [expanded, setExpanded] = useState(false);
-  const expandable = code.split("\n").length > COLLAPSED_LINE_LIMIT;
-
-  useEffect(() => {
-    if (!expandable) setExpanded(false);
-  }, [expandable]);
-
-  const block = (
-    <div className="my-4 w-full overflow-hidden rounded-xl border border-border/70">
-      <KsemoCodeBlockHeader
-        code={code}
-        rawLanguage={rawLanguage}
-        expandable={expandable}
-        onExpand={() => setExpanded(true)}
-      />
-      <CodeSurface code={code} rawLanguage={rawLanguage} expanded={false} />
-    </div>
-  );
-
+  const { id } = normalizeLanguage(rawLanguage);
   return (
-    <>
-      {block}
-      <Dialog open={expanded} onOpenChange={setExpanded}>
-        <DialogContent
-          className="flex h-[86vh] w-[calc(100%-2rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl"
-          aria-describedby={undefined}
-        >
-          <DialogTitle className="sr-only">
-            Expanded {codeBlockLanguageLabel(rawLanguage).toLowerCase()} code
-          </DialogTitle>
-          <DialogDescription className="sr-only">
-            Full view of the code snippet with copy and download actions.
-          </DialogDescription>
-          <KsemoCodeBlockHeader
-            code={code}
-            rawLanguage={rawLanguage}
-            expandable={false}
-          />
-          <div className="min-h-0 flex-1">
-            <CodeSurface code={code} rawLanguage={rawLanguage} expanded />
-          </div>
-        </DialogContent>
-      </Dialog>
-    </>
+    <div
+      className="my-4 w-full overflow-hidden rounded-xl border border-border/70 bg-muted"
+      data-language={id || "text"}
+      aria-label={`${codeBlockLanguageLabel(rawLanguage)} code block`}
+    >
+      <KsemoCodeBlockHeader code={code} rawLanguage={rawLanguage} />
+      <CodeSurface code={code} rawLanguage={rawLanguage} />
+    </div>
   );
 }
 
@@ -422,7 +332,11 @@ function KsemoMarkdownCodeInner({
       | { position?: { start?: { line?: number }; end?: { line?: number } } }
       | undefined
   )?.position;
+  // A `language-*` class only ever comes from a fenced block, so it wins over
+  // the position heuristic even if the ast position is unavailable.
+  const fenceMatch = className?.match(FENCE_LANGUAGE_PATTERN);
   const isInline =
+    !fenceMatch &&
     position?.start?.line !== undefined &&
     position?.end?.line !== undefined &&
     position.start.line === position.end.line;
@@ -442,8 +356,7 @@ function KsemoMarkdownCodeInner({
     );
   }
 
-  const match = className?.match(FENCE_LANGUAGE_PATTERN);
-  const rawLanguage = match?.[1];
+  const rawLanguage = fenceMatch?.[1];
   const code = flattenCodeChildren(children).replace(/\n$/, "");
 
   return <KsemoCodeBlock code={code} rawLanguage={rawLanguage} />;

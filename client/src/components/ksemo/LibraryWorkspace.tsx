@@ -7,6 +7,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Loading } from "@/components/ui/loading";
 import { trpc } from "@/lib/trpc";
 import {
   extensionOfFilename,
@@ -445,9 +446,7 @@ export function LibraryWorkspace({
 
         <div className="mt-5 pb-10">
           {filesQuery.isLoading ? (
-            <div className="grid min-h-64 place-items-center text-sm text-muted-foreground">
-              Loading your private Library…
-            </div>
+            <Loading className="min-h-64" />
           ) : files.length ? (
             view === "grid" ? (
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">

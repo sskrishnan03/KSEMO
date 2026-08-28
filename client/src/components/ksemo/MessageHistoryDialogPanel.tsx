@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { Loading } from "@/components/ui/loading";
 import React from "react";
 
 export function MessageHistoryDialogPanel({
@@ -15,9 +16,7 @@ export function MessageHistoryDialogPanel({
   return (
     <div className="space-y-2">
       {loading ? (
-        <p className="py-8 text-center text-sm text-muted-foreground">
-          Loading version history…
-        </p>
+        <Loading className="py-8" />
       ) : versions.length ? (
         versions.map((version, index) => (
           <div key={version.id} className="rounded-xl border border-border p-3">

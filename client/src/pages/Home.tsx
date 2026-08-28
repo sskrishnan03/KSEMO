@@ -1,5 +1,6 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
+import { Loading } from "@/components/ui/loading";
 import {
   Dialog,
   DialogContent,
@@ -87,6 +88,46 @@ function getSavedAccounts(): SavedAccount[] {
   }
 }
 
+// The active conversation is remembered per account so a refresh restores the
+// same chat (never a random/new one). An explicit "New Chat" is recorded as a
+// sentinel so a refresh after New Chat stays on a fresh chat instead of
+// silently reopening the previous conversation.
+const ACTIVE_CONVERSATION_NEW_CHAT = "__new__";
+
+function activeConversationStorageKey(userId: number): string {
+  return `ksemo-active-conversation-id:${String(userId)}`;
+}
+
+function getStoredActiveConversationState(userId: number): {
+  conversationId: string | null;
+  newChatIntent: boolean;
+} {
+  try {
+    const value = localStorage.getItem(activeConversationStorageKey(userId));
+    if (value === null) return { conversationId: null, newChatIntent: false };
+    if (value === ACTIVE_CONVERSATION_NEW_CHAT)
+      return { conversationId: null, newChatIntent: true };
+    return { conversationId: value, newChatIntent: false };
+  } catch {
+    return { conversationId: null, newChatIntent: false };
+  }
+}
+
+function storeActiveConversationId(userId: number, id: string): void {
+  try {
+    localStorage.setItem(activeConversationStorageKey(userId), id);
+  } catch {}
+}
+
+function rememberNewChatIntent(userId: number): void {
+  try {
+    localStorage.setItem(
+      activeConversationStorageKey(userId),
+      ACTIVE_CONVERSATION_NEW_CHAT
+    );
+  } catch {}
+}
+
 export default function Home() {
   const { user, loading, logout } = useAuth();
   const [, setLocation] = useLocation();
@@ -146,10 +187,6 @@ export default function Home() {
     string | null
   >(null);
   const [chatMessages, setChatMessages] = useState<KsemoMessage[]>([]);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [generatingMessageId, setGeneratingMessageId] = useState<string | null>(
-    null
-  );
   const [composerValue, setComposerValue] = useState("");
   const [attachmentNotices, setAttachmentNotices] = useState<
     SelectedAttachment[]
@@ -197,11 +234,31 @@ export default function Home() {
   const [webSearchStatus, setWebSearchStatus] = useState<
     Record<string, "searching" | "reading" | "no-results" | "done">
   >({});
-  const streamAbortRef = useRef<AbortController | null>(null);
+  // One active stream per conversation, tracked by the conversation it targets
+  // (null = a brand-new conversation that the server has not assigned an id to
+  // yet). This lets the user switch chats freely while a response continues to
+  // stream in the background — the switch never aborts or loses generation.
+  const [streams, setStreams] = useState<
+    Array<{
+      turnId: number;
+      conversationId: string | null;
+      userMessageId: string | null;
+      assistantMessageId: string | null;
+      controller: AbortController;
+      active: boolean;
+    }>
+  >([]);
   const generationSequenceRef = useRef(0);
-  // State does not update until React renders. This ref closes the small
-  // double-submit window between a click/Enter event and that render.
-  const generationActiveRef = useRef(false);
+  // Mirrors activeConversationId so the streaming callbacks (which capture a
+  // stale closure) can check whether the user is still viewing the conversation
+  // the stream belongs to.
+  const activeConversationIdRef = useRef<string | null>(null);
+  // Imperative handle to the live streams so cleanup/new-chat/stop can abort the
+  // right controllers without waiting for a render.
+  const streamsRef = useRef(streams);
+  useEffect(() => {
+    streamsRef.current = streams;
+  }, [streams]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   // chatMessages is the single source of truth for the open conversation.
   // Server data only seeds it ONCE per conversation id (when it is opened) and
@@ -210,6 +267,18 @@ export default function Home() {
   // Tracks which account already auto-selected an initial conversation so that
   // switching accounts re-selects the new account's most recent chat.
   const initialSelectionUserIdRef = useRef<string | null>(null);
+
+  // Generation UI derives from the streams for the currently-viewed
+  // conversation, so switching chats never leaks one conversation's streaming
+  // state into another, and the composer/loading states stay accurate per chat.
+  const activeStream = streams.find(
+    stream =>
+      stream.active &&
+      (stream.conversationId === activeConversationId ||
+        (stream.conversationId === null && activeConversationId === null))
+  );
+  const isGenerating = Boolean(activeStream);
+  const generatingMessageId = activeStream?.assistantMessageId ?? null;
 
   const conversationQuery = trpc.conversation.list.useQuery(
     { scope: "active" },
@@ -271,6 +340,12 @@ export default function Home() {
       void logout();
     },
   });
+
+  // Keep a ref mirror of the viewed conversation so streaming callbacks can
+  // tell whether the user has switched away mid-stream (see sendMessage).
+  useEffect(() => {
+    activeConversationIdRef.current = activeConversationId;
+  }, [activeConversationId]);
 
   useEffect(() => {
     try {
@@ -397,23 +472,34 @@ export default function Home() {
   // chatMessages is the single source of truth for the open conversation's
   // messages. The server query only seeds it once per conversation and is
   // never allowed to overwrite messages that are currently streaming or that
-  // arrived back from a completed / failed generation.
+  // arrived back from a completed / failed generation. Seeding is not blocked
+  // while a response streams so that switching back into a still-generating
+  // conversation still loads its in-progress messages.
   useEffect(() => {
-    if (isGenerating) return;
     if (!activeConversationId) return;
     if (seededConversationIdRef.current === activeConversationId) return;
     if (activeQuery.isLoading || !activeQuery.data) return;
     seededConversationIdRef.current = activeConversationId;
-    setChatMessages(
-      activeQuery.data.messages.map(message => ({
-        id: message.id,
-        role: message.role,
-        content: message.content,
-        status: message.status,
-        attachments: message.attachments,
-      }))
-    );
-  }, [activeConversationId, activeQuery.data, activeQuery.isLoading, isGenerating]);
+    const serverMessages = activeQuery.data.messages.map(message => ({
+      id: message.id,
+      role: message.role,
+      content: message.content,
+      status: message.status,
+      attachments: message.attachments,
+    }));
+    setChatMessages(current => {
+      if (!current.length) return serverMessages;
+      const serverIds = new Set(serverMessages.map(message => message.id));
+      const localStreaming = current.filter(
+        message =>
+          message.status === "streaming" &&
+          message.id.startsWith("local-") &&
+          !serverIds.has(message.id)
+      );
+      if (!localStreaming.length) return serverMessages;
+      return [...serverMessages, ...localStreaming];
+    });
+  }, [activeConversationId, activeQuery.data, activeQuery.isLoading]);
 
   const visibleMessages = isAttachedMessagePreview
     ? [
@@ -518,6 +604,15 @@ export default function Home() {
         });
       return;
     }
+    const stored = getStoredActiveConversationState(user.id);
+    if (stored.newChatIntent) return;
+    if (
+      stored.conversationId &&
+      conversationQuery.data.some(item => item.id === stored.conversationId)
+    ) {
+      setActiveConversationId(stored.conversationId);
+      return;
+    }
     if (conversationQuery.data.length)
       setActiveConversationId(conversationQuery.data[0].id);
   }, [
@@ -566,7 +661,7 @@ export default function Home() {
 
   useEffect(
     () => () => {
-      streamAbortRef.current?.abort();
+      for (const stream of streamsRef.current) stream.controller.abort();
       window.speechSynthesis?.cancel();
     },
     []
@@ -579,9 +674,15 @@ export default function Home() {
       replaceUserMessageId?: string;
     } = {}
   ) {
-    if (generationActiveRef.current) return;
-    generationActiveRef.current = true;
     const conversationId = activeConversationId;
+    // Per-conversation double-submit guard: let other chats keep generating in
+    // the background, but never start a second stream in the same conversation.
+    if (
+      streamsRef.current.some(
+        stream => stream.active && stream.conversationId === conversationId
+      )
+    )
+      return;
     const knownMessages = chatMessages;
     const isRegeneration = Boolean(options.regenerateAssistantMessageId);
     const draftNow = Date.now();
@@ -602,13 +703,20 @@ export default function Home() {
     }) as KsemoMessage[];
     setChatMessages(drafts);
     if (selectedAttachments.length) setAttachmentNotices([]);
-    setIsGenerating(true);
-    setGeneratingMessageId(
-      options.regenerateAssistantMessageId ?? `local-assistant-${draftNow}`
-    );
     const controller = new AbortController();
-    streamAbortRef.current = controller;
     const turnSequence = ++generationSequenceRef.current;
+    const streamEntry = {
+      turnId: turnSequence,
+      conversationId,
+      userMessageId: null as string | null,
+      assistantMessageId: options.regenerateAssistantMessageId ?? `local-assistant-${draftNow}`,
+      controller,
+      active: true,
+    };
+    setStreams(current => [...current, streamEntry]);
+    // True when the user is still viewing the conversation this stream writes to.
+    const isViewingThisStream = () =>
+      activeConversationIdRef.current === streamEntry.conversationId;
 
     const startedAt = Date.now();
     let lastProgressAt = startedAt;
@@ -675,32 +783,47 @@ export default function Home() {
           if (eventName === "conversation") {
             lastProgressAt = Date.now();
             streamConversation = data as StreamConversation;
-            setGeneratingMessageId(data.assistantMessageId);
-            setActiveConversationId(data.conversationId);
-            // This conversation was just created server-side; the local drafts
-            // below are authoritative, so the seed effect must not overwrite
-            // them with a mid-stream database snapshot.
-            seededConversationIdRef.current = data.conversationId;
-            setChatMessages(current =>
-              current.map(message =>
-                message.id.startsWith("local-user")
-                  ? { ...message, id: data.userMessageId }
-                  : message.id.startsWith("local-assistant")
-                    ? { ...message, id: data.assistantMessageId }
-                    : message
-              )
-            );
+            // Whether the user is (still) looking at the conversation this new
+            // server conversation belongs to before we re-point the stream.
+            const wasViewing = isViewingThisStream();
+            streamEntry.conversationId = data.conversationId;
+            streamEntry.userMessageId = data.userMessageId;
+            streamEntry.assistantMessageId = data.assistantMessageId;
+            if (wasViewing) {
+              // Stay on this (fresh) conversation so the optimistic drafts keep
+              // rendering here with their real server ids.
+              setActiveConversationId(data.conversationId);
+              if (user?.id) storeActiveConversationId(user.id, data.conversationId);
+              // The local drafts below are authoritative, so the seed effect
+              // must not overwrite them with a mid-stream database snapshot.
+              seededConversationIdRef.current = data.conversationId;
+              setChatMessages(current =>
+                current.map(message =>
+                  message.id.startsWith("local-user")
+                    ? { ...message, id: data.userMessageId }
+                    : message.id.startsWith("local-assistant")
+                      ? { ...message, id: data.assistantMessageId }
+                      : message
+                )
+              );
+            }
             utils.conversation.list.invalidate();
           } else if (eventName === "assistant.delta") {
             lastProgressAt = Date.now();
             responseText += data.delta;
-            setChatMessages(current =>
-              current.map(message =>
-                message.id === data.messageId
-                  ? { ...message, content: `${message.content}${data.delta}` }
-                  : message
-              )
-            );
+            // Only mutate the visible conversation's messages when it is the one
+            // this stream belongs to. Otherwise the deltas ride along in
+            // responseText and are written by the seed/sync path when the user
+            // returns to (or already has open) that conversation.
+            if (isViewingThisStream()) {
+              setChatMessages(current =>
+                current.map(message =>
+                  message.id === data.messageId
+                    ? { ...message, content: `${message.content}${data.delta}` }
+                    : message
+                )
+              );
+            }
           } else if (eventName === "assistant.completed") {
             lastProgressAt = Date.now();
           } else if (eventName === "assistant.error") {
@@ -765,12 +888,14 @@ export default function Home() {
       clearInterval(watchdog);
     }
 
-    if (generationSequenceRef.current !== turnSequence) return;
-    clearInterval(watchdog);
-    setIsGenerating(false);
-    setGeneratingMessageId(null);
-    generationActiveRef.current = false;
-    if (streamAbortRef.current === controller) streamAbortRef.current = null;
+    // The stream is finished for this conversation. Mark it inactive so the
+    // derived generating state for this conversation switches off, then
+    // finalize it. Streams in other conversations are left untouched.
+    setStreams(current =>
+      current.map(stream =>
+        stream.turnId === turnSequence ? { ...stream, active: false } : stream
+      )
+    );
 
     const failureMessage =
       errorMessage ??
@@ -788,49 +913,65 @@ export default function Home() {
         ? "cancelled"
         : "completed";
 
-    if (!completedConversation) {
-      setComposerValue(current => (current ? current : content));
-      if (failureMessage) toast.error(failureMessage);
-      if (options.regenerateAssistantMessageId || options.replaceUserMessageId) {
-        // The turn ids are already server-recognized; keep the layout intact
-        // and mark the in-flight bubble as failed so Retry is available.
-        setChatMessages(current =>
-          current.map(message =>
-            message.role === "assistant" && message.status === "streaming"
-              ? { ...message, content: "", status: "failed" }
-              : message
-          )
-        );
-      } else {
-        // The request never produced a server conversation, so the optimistic
-        // drafts have no ids to keep. Remove them while preserving the user's
-        // wording in the composer for an easy retry.
-        setChatMessages(current =>
-          current.filter(message => !message.id.startsWith("local-"))
-        );
+    // Only touch the visible conversation's messages if the user is actually
+    // viewing it right now. If they switched away the server already owns the
+    // truth and the seed/sync path will surface the finished response.
+    if (isViewingThisStream()) {
+      if (!completedConversation) {
+        setComposerValue(current => (current ? current : content));
+        if (failureMessage) toast.error(failureMessage);
+        if (options.regenerateAssistantMessageId || options.replaceUserMessageId) {
+          // The turn ids are already server-recognized; keep the layout intact
+          // and mark the in-flight bubble as failed so Retry is available.
+          setChatMessages(current =>
+            current.map(message =>
+              message.role === "assistant" && message.status === "streaming"
+                ? { ...message, content: "", status: "failed" }
+                : message
+            )
+          );
+        } else {
+          // The request never produced a server conversation, so the optimistic
+          // drafts have no ids to keep. Remove them while preserving the user's
+          // wording in the composer for an easy retry.
+          setChatMessages(current =>
+            current.filter(message => !message.id.startsWith("local-"))
+          );
+        }
+        return;
       }
-      return;
+
+      if (failureMessage) toast.error(failureMessage);
+
+      setChatMessages(current =>
+        current.map(message =>
+          message.role === "assistant" && message.status === "streaming"
+            ? {
+                ...message,
+                content: responseText || message.content,
+                status: finalStatus,
+              }
+            : message
+        )
+      );
+    } else if (failureMessage) {
+      toast.error(failureMessage);
     }
 
-    if (failureMessage) toast.error(failureMessage);
+    if (completedConversation) {
+      // Refresh the caching query for this conversation so that returning to it
+      // shows the finished response immediately (server has already settled it).
+      await syncConversationFromServer(completedConversation.conversationId);
 
-    setChatMessages(current =>
-      current.map(message =>
-        message.role === "assistant" && message.status === "streaming"
-          ? {
-              ...message,
-              content: responseText || message.content,
-              status: finalStatus,
-            }
-          : message
+      if (
+        isViewingThisStream() &&
+        preferencesQuery.data?.autoPlayResponses &&
+        responseText &&
+        !failureMessage &&
+        !userStopped
       )
-    );
-
-    await syncConversationFromServer(completedConversation.conversationId);
-
-    if (generationSequenceRef.current !== turnSequence) return;
-    if (preferencesQuery.data?.autoPlayResponses && responseText && !failureMessage && !userStopped)
-      speak(responseText, completedConversation.assistantMessageId);
+        speak(responseText, completedConversation.assistantMessageId);
+    }
   }
 
   async function syncConversationFromServer(targetId: string) {
@@ -842,24 +983,39 @@ export default function Home() {
   }
 
   function stopGeneration() {
-    generationSequenceRef.current += 1;
-    streamAbortRef.current?.abort();
-    streamAbortRef.current = null;
-    generationActiveRef.current = false;
-    setIsGenerating(false);
-    setGeneratingMessageId(null);
+    // Stop only the stream for the currently-viewed conversation; any other
+    // conversations generating in the background are left untouched.
+    const target = activeConversationId;
+    for (const stream of streamsRef.current) {
+      if (stream.active && stream.conversationId === target) {
+        stream.controller.abort();
+        setStreams(current =>
+          current.map(item =>
+            item.turnId === stream.turnId ? { ...item, active: false } : item
+          )
+        );
+      }
+    }
   }
 
   function newChat() {
-    generationSequenceRef.current += 1;
-    streamAbortRef.current?.abort();
-    streamAbortRef.current = null;
-    generationActiveRef.current = false;
-    setIsGenerating(false);
-    setGeneratingMessageId(null);
+    // Starting a fresh chat aborts any stream targeting the current view so the
+    // composer is free, but never touches background streams in other chats.
+    const target = activeConversationId;
+    for (const stream of streamsRef.current) {
+      if (stream.active && stream.conversationId === target) {
+        stream.controller.abort();
+        setStreams(current =>
+          current.map(item =>
+            item.turnId === stream.turnId ? { ...item, active: false } : item
+          )
+        );
+      }
+    }
     seededConversationIdRef.current = null;
     setChatMessages([]);
     setActiveConversationId(null);
+    if (user?.id) rememberNewChatIntent(user.id);
     setPrimaryWorkspace(null);
     setWebSearchEnabled(false);
     setAttachmentNotices([]);
@@ -1236,14 +1392,14 @@ export default function Home() {
   }
 
   function selectConversation(id: string) {
-    if (isGenerating) {
-      toast.info("Finish or stop the current response before switching chats.");
-      return;
-    }
     if (id === activeConversationId) return;
+    // Switching is always allowed, even while another conversation's response
+    // is still streaming in the background. That stream keeps running and the
+    // finished response is saved to its original conversation.
     setChatMessages([]);
     setPrimaryWorkspace(null);
     setActiveConversationId(id);
+    if (user?.id) storeActiveConversationId(user.id, id);
     setWebSearchEnabled(false);
     setAttachmentNotices([]);
     setSidebarOpen(false);
@@ -1289,9 +1445,7 @@ export default function Home() {
 
   if (loading)
     return (
-      <div className="grid min-h-screen place-items-center bg-background">
-        <div className="size-7 animate-pulse rounded-xl bg-foreground" />
-      </div>
+      <Loading fullScreen />
     );
 
   if (!user || isSignedOutPreview) return <AuthStage />;
@@ -1400,11 +1554,7 @@ export default function Home() {
               )}
               aria-label="Conversation"
             >
-              {activeQuery.isLoading && activeConversationId && !isGenerating ? (
-                <div className="grid h-full place-items-center text-sm text-muted-foreground">
-                  Loading conversation…
-                </div>
-              ) : visibleMessages.length ? (
+              {visibleMessages.length ? (
                 <div className="mx-auto max-w-3xl space-y-7 px-4 pb-4 pt-6 sm:px-6 sm:pb-5 sm:pt-8">
                   {visibleMessages.map(message => (
                     <MessageContent
@@ -1436,6 +1586,8 @@ export default function Home() {
                   ))}
                   <div ref={messagesEndRef} />
                 </div>
+              ) : activeQuery.isLoading && activeConversationId && !isGenerating ? (
+                <Loading />
               ) : (
                 <EmptyState
                   greeting={timeGreeting()}

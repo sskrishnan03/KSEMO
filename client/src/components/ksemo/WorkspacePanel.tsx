@@ -7,6 +7,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Loading } from "@/components/ui/loading";
 import { trpc } from "@/lib/trpc";
 import {
   fileVisualFor,
@@ -160,7 +161,9 @@ export function WorkspacePanel({
                 aria-label="Search your Library"
               />
               <div className="mt-3 space-y-2">
-                {visibleFiles.length ? (
+                {filesQuery.isLoading ? (
+                  <Loading />
+                ) : visibleFiles.length ? (
                   visibleFiles.map(file => (
                     <div
                       key={file.id}

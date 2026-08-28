@@ -160,19 +160,28 @@
 .font-serif {
   font-family: "Newsreader", Georgia, serif;
 }
-.ksemo-markdown code {
+.ksemo-markdown :not(pre) > code {
   font-size: 0.84em;
 }
 
 /* ── KSEMO Code Block (client/src/components/ksemo/code-block.tsx) ─────────
-   Clean, simple code blocks with Shiki syntax highlighting. */
+   Clean, simple code blocks with Shiki syntax highlighting.
+
+   Scroll contract: the code surface (.ksemo-code-body) is deliberately not a
+   vertical scroll container and has no max-height, so its height always equals
+   the code content. Horizontal overflow is handled by the <pre> itself via
+   overflow-x: auto. A scroll container with no vertical overflow can never
+   capture the wheel, so vertical scrolling always chains up to the main
+   conversation scroller — code never traps the chat. */
 .ksemo-code-body pre {
   margin: 0 !important;
   background: transparent !important;
   border: none !important;
   border-radius: 0 !important;
-  padding: 0.75rem 1rem !important;
+  padding: 0.875rem 1.25rem !important;
   overflow-x: auto !important;
+  overflow-y: visible;
+  overscroll-x: contain;
   font-family:
     ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono",
     monospace !important;
@@ -180,6 +189,12 @@
   line-height: 20px !important;
   tab-size: 4;
   white-space: pre;
+}
+.ksemo-code-body pre code {
+  font-size: inherit;
+  font-weight: inherit;
+  color: inherit;
+  background-color: inherit;
 }
 
 /* Shiki syntax highlighting: light theme tokens */
@@ -304,4 +319,42 @@ html.ksemo-reduce-motion [data-state] .ksemo-orb-morph-b {
     transparent 40%,
     rgba(0, 0, 0, 0.6) 100%
   );
+}
+
+/* KSEMO loader — three loading dots */
+.loader {
+  width: 36px;
+  aspect-ratio: 4;
+  --_g: no-repeat radial-gradient(circle closest-side, currentColor 90%, transparent);
+  background:
+    var(--_g) 0% 50%,
+    var(--_g) 50% 50%,
+    var(--_g) 100% 50%;
+  background-size: calc(100% / 3) 100%;
+  animation: ksemoloader 1s infinite linear;
+}
+
+@keyframes ksemoloader {
+  33% {
+    background-size:
+      calc(100% / 3) 0%,
+      calc(100% / 3) 100%,
+      calc(100% / 3) 100%;
+  }
+  50% {
+    background-size:
+      calc(100% / 3) 100%,
+      calc(100% / 3) 0%,
+      calc(100% / 3) 100%;
+  }
+  66% {
+    background-size:
+      calc(100% / 3) 100%,
+      calc(100% / 3) 100%,
+      calc(100% / 3) 0%;
+  }
+}
+
+html.ksemo-reduce-motion .loader {
+  animation: none;
 }

@@ -16,6 +16,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Loading } from "@/components/ui/loading";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useTheme, type ThemeMode } from "@/contexts/ThemeContext";
@@ -1048,9 +1049,7 @@ function ArchivedChatsDialog({
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto p-3">
           {archivedQuery.isLoading ? (
-            <p className="py-6 text-center text-sm text-muted-foreground">
-              Loading…
-            </p>
+            <Loading className="py-6" />
           ) : !conversations.length ? (
             <div className="py-8 text-center">
               <Archive className="mx-auto size-6 text-muted-foreground" />
