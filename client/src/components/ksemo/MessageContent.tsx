@@ -29,8 +29,7 @@ import {
   Trash2,
   Volume2,
 } from "lucide-react";
-import React from "react";
-import { useState } from "react";
+import React, { memo, useMemo, useState } from "react";
 import { Streamdown } from "streamdown";
 import { KsemoMarkdownCode } from "./code-block";
 
@@ -47,7 +46,20 @@ type KsemoMessage = {
   }>;
 };
 
-export function MessageContent({
+// Stable Streamdown component map so the internal `marked.Lexer` cache is not
+// invalidated on every render (a fresh `components` object defeats Streamdown's
+// memo and forces a full re-parse of the message on each streaming flush).
+const KSEMO_MARKDOWN_COMPONENTS = { code: KsemoMarkdownCode };
+
+function sourceDomain(url: string): string {
+  try {
+    return new URL(url).hostname.replace("www.", "");
+  } catch {
+    return url;
+  }
+}
+
+export const MessageContent = memo(function MessageContent({
   message,
   onSpeak,
   onPause,
@@ -86,6 +98,14 @@ export function MessageContent({
 }) {
   const [copied, setCopied] = useState(false);
   const isUser = message.role === "user";
+
+  const visibleSources = useMemo(
+    () =>
+      (webSources ?? [])
+        .slice(0, 5)
+        .map(source => ({ ...source, domain: sourceDomain(source.url) })),
+    [webSources]
+  );
 
   async function copyMessage() {
     await navigator.clipboard.writeText(message.content);
@@ -179,7 +199,10 @@ export function MessageContent({
             <p className="whitespace-pre-wrap">{message.content}</p>
           ) : message.content ? (
             <div className="ksemo-markdown prose prose-neutral max-w-none text-[15px] leading-6 dark:prose-invert">
-              <Streamdown components={{ code: KsemoMarkdownCode }}>
+              <Streamdown
+                mode={message.status === "streaming" ? "streaming" : "static"}
+                components={KSEMO_MARKDOWN_COMPONENTS}
+              >
                 {message.content}
               </Streamdown>
             </div>
@@ -231,17 +254,11 @@ export function MessageContent({
             </span>
           </div>
         )}
-        {!isUser && webSources?.length ? (
+        {!isUser && (visibleSources.length || webSearchStatus) && (
           <div className="mb-1 space-y-1.5">
-            <div className="flex flex-wrap gap-1.5">
-              {webSources.slice(0, 5).map((source, index) => {
-                let domain = "";
-                try {
-                  domain = new URL(source.url).hostname.replace("www.", "");
-                } catch {
-                  domain = source.url;
-                }
-                return (
+            {visibleSources.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {visibleSources.map((source, index) => (
                   <Tooltip key={`${source.url}-${index}`}>
                     <TooltipTrigger asChild>
                       <a
@@ -252,7 +269,7 @@ export function MessageContent({
                       >
                         <Globe className="size-3 shrink-0" />
                         <span className="truncate">
-                          {source.title || domain}
+                          {source.title || source.domain}
                         </span>
                       </a>
                     </TooltipTrigger>
@@ -265,21 +282,21 @@ export function MessageContent({
                           </p>
                         )}
                         <p className="text-[10px] text-muted-foreground">
-                          {domain}
+                          {source.domain}
                         </p>
                       </div>
                     </TooltipContent>
                   </Tooltip>
-                );
-              })}
-              {webSources.length > 5 && (
-                <span className="inline-flex items-center rounded-full border border-border bg-muted/60 px-2 py-0.5 text-[11px] text-muted-foreground">
-                  +{webSources.length - 5} more
-                </span>
-              )}
-            </div>
+                ))}
+                {webSources && webSources.length > 5 && (
+                  <span className="inline-flex items-center rounded-full border border-border bg-muted/60 px-2 py-0.5 text-[11px] text-muted-foreground">
+                    +{webSources.length - 5} more
+                  </span>
+                )}
+              </div>
+            )}
           </div>
-        ) : null}
+        )}
         {!isUser && (message.content || message.status === "failed") && (
           <div className="mt-1.5 flex items-center gap-1">
             {message.content &&
@@ -333,7 +350,7 @@ export function MessageContent({
       </div>
     </article>
   );
-}
+});
 
 function MessageOverflow({
   message,

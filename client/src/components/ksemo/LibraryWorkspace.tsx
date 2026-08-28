@@ -30,7 +30,14 @@ import {
   Upload,
   X,
 } from "lucide-react";
-import React, { type ChangeEvent, useMemo, useRef, useState } from "react";
+import React, {
+  memo,
+  useCallback,
+  type ChangeEvent,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { toast } from "sonner";
 
 export type LibraryFilter = "all" | "favorites" | "images" | "files";
@@ -83,14 +90,11 @@ function bytesLabel(bytes: number) {
 async function fileToBase64(file: File) {
   const bytes = new Uint8Array(await file.arrayBuffer());
   let binary = "";
-  for (let offset = 0; offset < bytes.length; offset += 0x8000) {
-    for (
-      let index = offset;
-      index < Math.min(offset + 0x8000, bytes.length);
-      index += 1
-    )
-      binary += String.fromCharCode(bytes[index]);
-  }
+  for (let offset = 0; offset < bytes.length; offset += 0x8000)
+    binary += String.fromCharCode.apply(
+      null,
+      bytes.subarray(offset, offset + 0x8000) as unknown as number[]
+    );
   return window.btoa(binary);
 }
 
@@ -150,8 +154,10 @@ export function LibraryWorkspace({
     () => allFiles.filter(file => selectedIds.has(file.id)),
     [allFiles, selectedIds]
   );
-  const allVisibleSelected =
-    files.length > 0 && files.every(file => selectedIds.has(file.id));
+  const allVisibleSelected = useMemo(
+    () => files.length > 0 && files.every(file => selectedIds.has(file.id)),
+    [files, selectedIds]
+  );
 
   function queueUploads(picked: File[]) {
     if (!picked.length) return;
@@ -218,14 +224,28 @@ export function LibraryWorkspace({
     queueUploads(dropped);
   }
 
-  function toggleFile(id: string) {
+  const toggleFile = useCallback((id: string) => {
     setSelectedIds(current => {
       const next = new Set(current);
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
     });
-  }
+  }, []);
+
+  const toggleFavorite = useCallback(
+    (file: LibraryWorkspaceFile) =>
+      favoriteMutation.mutate({
+        id: file.id,
+        isFavorite: !file.isFavorite,
+      }),
+    [favoriteMutation]
+  );
+
+  const requestDelete = useCallback(
+    (file: LibraryWorkspaceFile) => setDeleteTarget([file]),
+    []
+  );
 
   function selectVisibleFiles() {
     setSelectedIds(current => selectVisibleLibraryItems(current, files));
@@ -455,15 +475,9 @@ export function LibraryWorkspace({
                     key={file.id}
                     file={file}
                     selected={selectedIds.has(file.id)}
-                    onToggle={() => toggleFile(file.id)}
-                    isFavorite={Boolean(file.isFavorite)}
-                    onToggleFavorite={() =>
-                      favoriteMutation.mutate({
-                        id: file.id,
-                        isFavorite: !file.isFavorite,
-                      })
-                    }
-                    onDelete={() => setDeleteTarget([file])}
+                    onToggle={toggleFile}
+                    onToggleFavorite={toggleFavorite}
+                    onDelete={requestDelete}
                   />
                 ))}
               </div>
@@ -474,15 +488,9 @@ export function LibraryWorkspace({
                     key={file.id}
                     file={file}
                     selected={selectedIds.has(file.id)}
-                    onToggle={() => toggleFile(file.id)}
-                    isFavorite={Boolean(file.isFavorite)}
-                    onToggleFavorite={() =>
-                      favoriteMutation.mutate({
-                        id: file.id,
-                        isFavorite: !file.isFavorite,
-                      })
-                    }
-                    onDelete={() => setDeleteTarget([file])}
+                    onToggle={toggleFile}
+                    onToggleFavorite={toggleFavorite}
+                    onDelete={requestDelete}
                   />
                 ))}
               </div>
@@ -660,32 +668,31 @@ function FilePreview({
   );
 }
 
-function LibraryGridCard({
+const LibraryGridCard = memo(function LibraryGridCard({
   file,
   selected,
   onToggle,
-  isFavorite = false,
   onToggleFavorite,
   onDelete,
 }: {
   file: LibraryWorkspaceFile;
   selected: boolean;
-  onToggle: () => void;
-  isFavorite?: boolean;
-  onToggleFavorite: () => void;
-  onDelete: () => void;
+  onToggle: (id: string) => void;
+  onToggleFavorite: (file: LibraryWorkspaceFile) => void;
+  onDelete: (file: LibraryWorkspaceFile) => void;
 }) {
   const image = file.mimeType?.startsWith("image/");
+  const isFavorite = Boolean(file.isFavorite);
   const visual = fileVisualFor(file.filename, file.mimeType);
   const selectWithKeyboard = (event: React.KeyboardEvent<HTMLElement>) => {
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
-      onToggle();
+      onToggle(file.id);
     }
   };
   return (
     <article
-      onClick={onToggle}
+      onClick={() => onToggle(file.id)}
       onKeyDown={selectWithKeyboard}
       role="button"
       tabIndex={0}
@@ -702,7 +709,7 @@ function LibraryGridCard({
         type="button"
         onClick={event => {
           event.stopPropagation();
-          onToggle();
+          onToggle(file.id);
         }}
         className={cn(
           "pointer-events-none absolute left-2.5 top-2.5 z-10 rounded-full bg-background/90 p-0.5 shadow-sm transition-[opacity,transform] duration-150 group-hover:pointer-events-auto group-hover:scale-100 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:scale-100 group-focus-within:opacity-100 group-active:pointer-events-auto group-active:scale-100 group-active:opacity-100 focus-visible:pointer-events-auto focus-visible:scale-100 focus-visible:opacity-100 max-lg:pointer-events-auto max-lg:scale-100 max-lg:opacity-100",
@@ -751,7 +758,7 @@ function LibraryGridCard({
               size="icon"
               onClick={event => {
                 event.stopPropagation();
-                onToggleFavorite();
+                onToggleFavorite(file);
               }}
               className={cn(
                 "size-7 rounded-lg",
@@ -772,7 +779,7 @@ function LibraryGridCard({
               size="icon"
               onClick={event => {
                 event.stopPropagation();
-                onDelete();
+                onDelete(file);
               }}
               className="size-7 rounded-lg text-muted-foreground max-lg:opacity-100 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 hover:text-destructive"
               aria-label={`Delete ${file.filename}`}
@@ -784,34 +791,33 @@ function LibraryGridCard({
       </div>
     </article>
   );
-}
+});
 
-function LibraryListRow({
+const LibraryListRow = memo(function LibraryListRow({
   file,
   selected,
   onToggle,
-  isFavorite = false,
   onToggleFavorite,
   onDelete,
 }: {
   file: LibraryWorkspaceFile;
   selected: boolean;
-  onToggle: () => void;
-  isFavorite?: boolean;
-  onToggleFavorite: () => void;
-  onDelete: () => void;
+  onToggle: (id: string) => void;
+  onToggleFavorite: (file: LibraryWorkspaceFile) => void;
+  onDelete: (file: LibraryWorkspaceFile) => void;
 }) {
   const image = file.mimeType?.startsWith("image/");
+  const isFavorite = Boolean(file.isFavorite);
   const visual = fileVisualFor(file.filename, file.mimeType);
   const selectWithKeyboard = (event: React.KeyboardEvent<HTMLElement>) => {
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
-      onToggle();
+      onToggle(file.id);
     }
   };
   return (
     <article
-      onClick={onToggle}
+      onClick={() => onToggle(file.id)}
       onKeyDown={selectWithKeyboard}
       role="button"
       tabIndex={0}
@@ -826,7 +832,7 @@ function LibraryListRow({
         type="button"
         onClick={event => {
           event.stopPropagation();
-          onToggle();
+          onToggle(file.id);
         }}
         className={cn(
           "pointer-events-none rounded-full p-0.5 transition-[opacity,transform] duration-150 group-hover:pointer-events-auto group-hover:scale-100 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:scale-100 group-focus-within:opacity-100 group-active:pointer-events-auto group-active:scale-100 group-active:opacity-100 focus-visible:pointer-events-auto focus-visible:scale-100 focus-visible:opacity-100 max-lg:pointer-events-auto max-lg:scale-100 max-lg:opacity-100",
@@ -867,7 +873,7 @@ function LibraryListRow({
           size="icon"
           onClick={event => {
             event.stopPropagation();
-            onToggleFavorite();
+            onToggleFavorite(file);
           }}
           className={cn(
             "size-8 rounded-lg",
@@ -886,7 +892,7 @@ function LibraryListRow({
           size="icon"
           onClick={event => {
             event.stopPropagation();
-            onDelete();
+            onDelete(file);
           }}
           className="size-8 rounded-lg text-muted-foreground hover:text-destructive"
           aria-label={`Delete ${file.filename}`}
@@ -896,7 +902,7 @@ function LibraryListRow({
       </div>
     </article>
   );
-}
+});
 
 const KIND_LABELS: Record<string, string> = {
   pdf: "PDF",

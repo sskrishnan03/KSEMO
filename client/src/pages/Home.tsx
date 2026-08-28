@@ -14,6 +14,7 @@ import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
 import { Menu } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { memo } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
 import { ChatComposer } from "../components/ksemo/ChatComposer";
@@ -31,6 +32,7 @@ import {
 } from "../components/ksemo/DialogPanels";
 import { MessageHistoryDialogPanel } from "../components/ksemo/MessageHistoryDialogPanel";
 import { useVoiceInput } from "../hooks/useVoiceInput";
+import { usePersistFn } from "../hooks/usePersistFn";
 import { WorkspacePanel } from "../components/ksemo/WorkspacePanel";
 import { LibraryWorkspace } from "../components/ksemo/LibraryWorkspace";
 import { SearchDialog } from "../components/ksemo/SearchWorkspace";
@@ -131,14 +133,16 @@ function rememberNewChatIntent(userId: number): void {
 export default function Home() {
   const { user, loading, logout } = useAuth();
   const [, setLocation] = useLocation();
+  const searchParams = useMemo(
+    () => new URLSearchParams(window.location.search),
+    []
+  );
   const isFreshChatPreview =
-    import.meta.env.DEV &&
-    new URLSearchParams(window.location.search).has("freshChatPreview");
+    import.meta.env.DEV && searchParams.has("freshChatPreview");
   const isSignedOutPreview =
-    import.meta.env.DEV &&
-    new URLSearchParams(window.location.search).has("signedOutPreview");
+    import.meta.env.DEV && searchParams.has("signedOutPreview");
   const workspacePreview = import.meta.env.DEV
-    ? new URLSearchParams(window.location.search).get("workspacePreview")
+    ? searchParams.get("workspacePreview")
     : null;
   const interactionPreview = import.meta.env.DEV
     ? new URLSearchParams(window.location.search).get("interactionPreview")
@@ -157,18 +161,12 @@ export default function Home() {
   const isAttachedMessagePreview = interactionPreview === "attachedMessage";
   const isMessagePreview = interactionPreview === "messages";
   const isCollapsedSidebarPreview =
-    import.meta.env.DEV &&
-    new URLSearchParams(window.location.search).has("sidebarCollapsedPreview");
+    import.meta.env.DEV && searchParams.has("sidebarCollapsedPreview");
   const isSidebarOpenPreview =
-    import.meta.env.DEV &&
-    new URLSearchParams(window.location.search).has("sidebarOpenPreview");
+    import.meta.env.DEV && searchParams.has("sidebarOpenPreview");
   const isProfileSupportPreview =
-    import.meta.env.DEV &&
-    new URLSearchParams(window.location.search).has("profileSupportPreview");
-  const sharedConversationId = useMemo(
-    () => new URLSearchParams(window.location.search).get("conversation"),
-    []
-  );
+    import.meta.env.DEV && searchParams.has("profileSupportPreview");
+  const sharedConversationId = searchParams.get("conversation");
   const inlineWorkspaceSection: "library" | null =
     workspacePreview === "files" ? "library" : null;
   const utils = trpc.useUtils();
@@ -260,6 +258,15 @@ export default function Home() {
     streamsRef.current = streams;
   }, [streams]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  // The chat pane is the scroll container; tracking closeness to the bottom lets
+  // us auto-scroll during generation without fighting the user's scroll wheel.
+  const messagesContainerRef = useRef<HTMLElement | null>(null);
+  const isNearBottomRef = useRef(true);
+  // Streaming deltas arrive much faster than frames (dozens per token burst).
+  // Batches them into one state commit per animation frame instead of forcing a
+  // full Home re-render for every token.
+  const pendingDeltasRef = useRef<Map<string, string>>(new Map());
+  const deltaFlushRafRef = useRef<number>(0);
   // chatMessages is the single source of truth for the open conversation.
   // Server data only seeds it ONCE per conversation id (when it is opened) and
   // is never allowed to overwrite messages that are currently streaming.
@@ -271,11 +278,15 @@ export default function Home() {
   // Generation UI derives from the streams for the currently-viewed
   // conversation, so switching chats never leaks one conversation's streaming
   // state into another, and the composer/loading states stay accurate per chat.
-  const activeStream = streams.find(
-    stream =>
-      stream.active &&
-      (stream.conversationId === activeConversationId ||
-        (stream.conversationId === null && activeConversationId === null))
+  const activeStream = useMemo(
+    () =>
+      streams.find(
+        stream =>
+          stream.active &&
+          (stream.conversationId === activeConversationId ||
+            (stream.conversationId === null && activeConversationId === null))
+      ),
+    [streams, activeConversationId]
   );
   const isGenerating = Boolean(activeStream);
   const generatingMessageId = activeStream?.assistantMessageId ?? null;
@@ -501,78 +512,86 @@ export default function Home() {
     });
   }, [activeConversationId, activeQuery.data, activeQuery.isLoading]);
 
-  const visibleMessages = isAttachedMessagePreview
-    ? [
+  const attachedMessagePreviewMessages: KsemoMessage[] = [
+    {
+      id: "media-user",
+      role: "user",
+      content: "What is in this image?",
+      status: "completed",
+      attachments: [
         {
-          id: "media-user",
-          role: "user" as const,
-          content: "What is in this image?",
-          status: "completed" as const,
-          attachments: [
-            {
-              id: "media-file",
-              filename: "workspace-photo.jpg",
-              mimeType: "image/jpeg",
-              url: "/ksemo-storage/workspace-photo.jpg",
-            },
-          ],
+          id: "media-file",
+          filename: "workspace-photo.jpg",
+          mimeType: "image/jpeg",
+          url: "/ksemo-storage/workspace-photo.jpg",
         },
-        {
-          id: "media-assistant",
-          role: "assistant" as const,
-          content:
-            "I can use the attached image as context when your selected model supports vision.",
-          status: "completed" as const,
-        },
-      ]
-    : isEditSavingPreview
-      ? [
-          {
-            id: "edited-user",
-            role: "user" as const,
-            content: "Can you make this answer more concise?",
-            status: "completed" as const,
-          },
-          {
-            id: "regenerating-assistant",
-            role: "assistant" as const,
-            content: "",
-            status: "streaming" as const,
-          },
-        ]
-      : isEditRegeneratedPreview
-        ? [
-            {
-              id: "edited-user",
-              role: "user" as const,
-              content: "Can you make this answer more concise?",
-              status: "completed" as const,
-            },
-            {
-              id: "regenerated-assistant",
-              role: "assistant" as const,
-              content:
-                "Yes. Here is the concise revision, rebuilt from your edited request without adding another user message.",
-              status: "completed" as const,
-            },
-          ]
-        : isMessagePreview
-          ? [
-              {
-                id: "preview-user",
-                role: "user" as const,
-                content: "Can you make this plan more concise?",
-                status: "completed" as const,
-              },
-              {
-                id: "preview-assistant",
-                role: "assistant" as const,
-                content:
-                  "Absolutely. I'll keep the main decisions, remove repetition, and make the next steps easier to scan.",
-                status: "completed" as const,
-              },
-            ]
-          : chatMessages;
+      ],
+    },
+    {
+      id: "media-assistant",
+      role: "assistant",
+      content:
+        "I can use the attached image as context when your selected model supports vision.",
+      status: "completed",
+    },
+  ];
+  const editSavingPreviewMessages: KsemoMessage[] = [
+    {
+      id: "edited-user",
+      role: "user",
+      content: "Can you make this answer more concise?",
+      status: "completed",
+    },
+    {
+      id: "regenerating-assistant",
+      role: "assistant",
+      content: "",
+      status: "streaming",
+    },
+  ];
+  const editRegeneratedPreviewMessages: KsemoMessage[] = [
+    {
+      id: "edited-user",
+      role: "user",
+      content: "Can you make this answer more concise?",
+      status: "completed",
+    },
+    {
+      id: "regenerated-assistant",
+      role: "assistant",
+      content:
+        "Yes. Here is the concise revision, rebuilt from your edited request without adding another user message.",
+      status: "completed",
+    },
+  ];
+  const messagePreviewMessages: KsemoMessage[] = [
+    {
+      id: "preview-user",
+      role: "user",
+      content: "Can you make this plan more concise?",
+      status: "completed",
+    },
+    {
+      id: "preview-assistant",
+      role: "assistant",
+      content:
+        "Absolutely. I'll keep the main decisions, remove repetition, and make the next steps easier to scan.",
+      status: "completed",
+    },
+  ];
+  const visibleMessages = useMemo(() => {
+    if (isAttachedMessagePreview) return attachedMessagePreviewMessages;
+    if (isEditSavingPreview) return editSavingPreviewMessages;
+    if (isEditRegeneratedPreview) return editRegeneratedPreviewMessages;
+    if (isMessagePreview) return messagePreviewMessages;
+    return chatMessages;
+  }, [
+    isAttachedMessagePreview,
+    isEditSavingPreview,
+    isEditRegeneratedPreview,
+    isMessagePreview,
+    chatMessages,
+  ]);
 
   useEffect(() => {
     if (!user?.id || !conversationQuery.data) return;
@@ -653,19 +672,53 @@ export default function Home() {
   }, [isGenerating]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({
-      behavior: "smooth",
-      block: "end",
+    const container = messagesContainerRef.current;
+    if (!container) return;
+    if (!isNearBottomRef.current) return;
+    container.scrollTo({
+      top: container.scrollHeight,
+      // While the response streams faster than a smooth tween can keep up,
+      // snap to the new content; smooth-scroll only on a settled message.
+      behavior: isGenerating ? "auto" : "smooth",
     });
   }, [visibleMessages, isGenerating]);
 
   useEffect(
     () => () => {
+      if (deltaFlushRafRef.current) cancelAnimationFrame(deltaFlushRafRef.current);
       for (const stream of streamsRef.current) stream.controller.abort();
       window.speechSynthesis?.cancel();
     },
     []
   );
+
+  function flushPendingDeltas() {
+    if (deltaFlushRafRef.current) {
+      cancelAnimationFrame(deltaFlushRafRef.current);
+      deltaFlushRafRef.current = 0;
+    }
+    const deltas = pendingDeltasRef.current;
+    if (!deltas.size) return;
+    pendingDeltasRef.current = new Map();
+    setChatMessages(current => {
+      let changed = false;
+      const next = current.map(message => {
+        const delta = deltas.get(message.id);
+        if (delta === undefined) return message;
+        changed = true;
+        return { ...message, content: message.content + delta };
+      });
+      return changed ? next : current;
+    });
+  }
+
+  function handleMessagesScroll() {
+    const el = messagesContainerRef.current;
+    if (!el) return;
+    // Within ~96px of the bottom counts as pinned to the newest message.
+    isNearBottomRef.current =
+      el.scrollHeight - el.scrollTop - el.clientHeight < 96;
+  }
 
   async function sendMessage(
     content: string,
@@ -763,13 +816,12 @@ export default function Home() {
       let buffer = "";
       const processEvents = (rawEvents: string[]) => {
         for (const rawEvent of rawEvents) {
-          const eventName = rawEvent
-            .split("\n")
+          const lines = rawEvent.split("\n");
+          const eventName = lines
             .find(line => line.startsWith("event:"))
             ?.slice(6)
             .trim();
-          const rawData = rawEvent
-            .split("\n")
+          const rawData = lines
             .find(line => line.startsWith("data:"))
             ?.slice(5)
             .trim();
@@ -816,13 +868,17 @@ export default function Home() {
             // responseText and are written by the seed/sync path when the user
             // returns to (or already has open) that conversation.
             if (isViewingThisStream()) {
-              setChatMessages(current =>
-                current.map(message =>
-                  message.id === data.messageId
-                    ? { ...message, content: `${message.content}${data.delta}` }
-                    : message
-                )
+              const pending = pendingDeltasRef.current;
+              pending.set(
+                data.messageId,
+                (pending.get(data.messageId) ?? "") + data.delta
               );
+              if (!deltaFlushRafRef.current) {
+                deltaFlushRafRef.current = requestAnimationFrame(() => {
+                  deltaFlushRafRef.current = 0;
+                  flushPendingDeltas();
+                });
+              }
             }
           } else if (eventName === "assistant.completed") {
             lastProgressAt = Date.now();
@@ -917,6 +973,9 @@ export default function Home() {
     // viewing it right now. If they switched away the server already owns the
     // truth and the seed/sync path will surface the finished response.
     if (isViewingThisStream()) {
+      // Drain any deltas still sitting in the rAF buffer so the final content
+      // below is complete and idempotent.
+      flushPendingDeltas();
       if (!completedConversation) {
         setComposerValue(current => (current ? current : content));
         if (failureMessage) toast.error(failureMessage);
@@ -1013,6 +1072,7 @@ export default function Home() {
       }
     }
     seededConversationIdRef.current = null;
+    isNearBottomRef.current = true;
     setChatMessages([]);
     setActiveConversationId(null);
     if (user?.id) rememberNewChatIntent(user.id);
@@ -1188,12 +1248,15 @@ export default function Home() {
     const assistantIndex = chatMessages.findIndex(
       item => item.id === message.id
     );
-    const sourceUser =
-      assistantIndex >= 0
-        ? [...chatMessages.slice(0, assistantIndex)]
-            .reverse()
-            .find(item => item.role === "user")
-        : undefined;
+    let sourceUser;
+    if (assistantIndex >= 0) {
+      for (let index = assistantIndex - 1; index >= 0; index -= 1) {
+        if (chatMessages[index].role === "user") {
+          sourceUser = chatMessages[index];
+          break;
+        }
+      }
+    }
     if (message.role !== "assistant" || !sourceUser) {
       toast.error("KSEMO could not find the user turn for this response.");
       return;
@@ -1217,8 +1280,12 @@ export default function Home() {
     try {
       const bytes = new Uint8Array(await file.arrayBuffer());
       let binary = "";
-      for (let index = 0; index < bytes.length; index += 1)
-        binary += String.fromCharCode(bytes[index]);
+      const CHUNK_SIZE = 0x8000;
+      for (let offset = 0; offset < bytes.length; offset += CHUNK_SIZE)
+        binary += String.fromCharCode.apply(
+          null,
+          bytes.subarray(offset, offset + CHUNK_SIZE) as unknown as number[]
+        );
       const uploaded = await composerFileUpload.mutateAsync({
         filename: file.name,
         mimeType: file.type,
@@ -1397,6 +1464,7 @@ export default function Home() {
     // is still streaming in the background. That stream keeps running and the
     // finished response is saved to its original conversation.
     setChatMessages([]);
+    isNearBottomRef.current = true;
     setPrimaryWorkspace(null);
     setActiveConversationId(id);
     if (user?.id) storeActiveConversationId(user.id, id);
@@ -1443,6 +1511,206 @@ export default function Home() {
     setSpeechState("idle");
   }
 
+  // Stable wrappers for every callback handed to memoized children. Without
+  // these, useMemo/React.memo boundaries would be defeated because Home
+  // recreates plain function declarations on each render.
+  const stableSendMessage = usePersistFn(sendMessage);
+  const stableStopGeneration = usePersistFn(stopGeneration);
+  const stableNewChat = usePersistFn(newChat);
+  const stableSelectConversation = usePersistFn(selectConversation);
+  const stableAttachFromComposer = usePersistFn(attachFromComposer);
+  const stableAttachLibraryFiles = usePersistFn(attachLibraryFiles);
+  const stableCaptureScreenshot = usePersistFn(captureScreenshot);
+  const stableLogout = usePersistFn(logout);
+  const stableSpeak = usePersistFn(speak);
+  const stablePauseSpeech = usePersistFn(pauseSpeech);
+  const stableResumeSpeech = usePersistFn(resumeSpeech);
+  const stableStopSpeech = usePersistFn(stopSpeech);
+  const stableEditMessage = usePersistFn(editMessage);
+  const stableRegenerateMessage = usePersistFn(regenerateMessage);
+  const stableShareMessage = usePersistFn(shareMessage);
+  const stableDeleteMessage = usePersistFn(deleteMessage);
+  const stableRestoreMessageVersion = usePersistFn(restoreMessageVersion);
+  const stableVoiceAction = usePersistFn(
+    voice.state === "recording" ? voice.stop : voice.start
+  );
+  const stableVoiceCancel = usePersistFn(voice.cancel);
+  const stableOnViewHistory = usePersistFn(
+    (userMessage: KsemoMessage) => setHistoryMessage(userMessage)
+  );
+  const stableOnFeedback = usePersistFn(
+    (messageId: string, value: "up" | "down") =>
+      messageFeedbackMutation.mutate({ messageId, value })
+  );
+  const stableOnClearAttachment = usePersistFn(
+    (fileId?: string) =>
+      setAttachmentNotices(current =>
+        fileId ? current.filter(file => file.fileId !== fileId) : []
+      )
+  );
+  const stableOnToggleWebSearch = usePersistFn(() =>
+    setWebSearchEnabled(current => !current)
+  );
+  const stableOnCloseSidebar = usePersistFn(() => setSidebarOpen(false));
+  const stableOnToggleCollapsed = usePersistFn(() =>
+    setSidebarCollapsed(current => !current)
+  );
+  const stableOnRename = usePersistFn(
+    (conversation: { id: string; title: string }) => {
+      setRenameTarget({ id: conversation.id, title: conversation.title });
+      setRenameValue(conversation.title);
+    }
+  );
+  const stableOnDuplicate = usePersistFn(
+    (conversation: { id: string }) =>
+      duplicateMutation.mutate({ id: conversation.id })
+  );
+  const stableOnArchive = usePersistFn(
+    (conversation: { id: string }) =>
+      archiveMutation.mutate({ id: conversation.id, isArchived: true })
+  );
+  const stableOnPin = usePersistFn(
+    (conversation: { id: string; isPinned: boolean }) =>
+      pinMutation.mutate({
+        id: conversation.id,
+        isPinned: !conversation.isPinned,
+      })
+  );
+  const stableOnShareConversation = usePersistFn(
+    (conversation: {
+      id: string;
+      title: string;
+      isPublic?: boolean;
+      shareToken?: string | null;
+    }) => {
+      setShareTarget({
+        id: conversation.id,
+        title: conversation.title,
+        isPublic: Boolean(conversation.isPublic),
+        shareToken: conversation.shareToken ?? null,
+      });
+      setShareEmail("");
+    }
+  );
+  const stableOnExport = usePersistFn(
+    (conversation: { id: string }, format: "pdf" | "word") =>
+      void exportConversation(conversation.id, format)
+  );
+  const stableOnDelete = usePersistFn(
+    (conversation: { id: string; title: string }) =>
+      setDeleteTarget({
+        kind: "conversation",
+        id: conversation.id,
+        title: conversation.title,
+      })
+  );
+  const stableOnSearch = usePersistFn(() => {
+    setSearchOpen(true);
+    setSidebarOpen(false);
+  });
+  const stableOnWorkspace = usePersistFn((_section: "files") => {
+    setPrimaryWorkspace("library");
+    setSidebarOpen(false);
+  });
+  const stableOnSettings = usePersistFn(() => setSettingsOpen(true));
+  const stableOnSupport = usePersistFn((topic: "faq" | "privacy" | "terms") =>
+    setLocation(`/support/${topic}`)
+  );
+  const stableOnSwitchAccount = usePersistFn(
+    (account: { id: string; email?: string | null }) => {
+      if (!account.email || account.email === user?.email) return;
+      setSwitchingAccountId(account.id);
+      switchAccountMutation.mutate({ email: account.email });
+    }
+  );
+  const stableOnAddAccount = usePersistFn(() => {
+    void logout();
+  });
+  const stableOnRemoveAccount = usePersistFn(
+    (account: { id: string }) => {
+      setSavedAccounts(prev => {
+        const next = prev.filter(a => a.id !== account.id);
+        localStorage.setItem(SAVED_ACCOUNTS_KEY, JSON.stringify(next));
+        return next;
+      });
+      toast.success("Account removed");
+    }
+  );
+  const stableOnSearchSelect = usePersistFn((id: string) => {
+    selectConversation(id);
+    setSearchOpen(false);
+  });
+  const stableSettingsOnOpenWorkspace = usePersistFn(
+    (_section: "files") => {
+      setSettingsOpen(false);
+      setPrimaryWorkspace("library");
+    }
+  );
+  const stableOnAllChatsDeleted = usePersistFn(() => {
+    newChat();
+    utils.conversation.list.invalidate();
+  });
+  const stableOnOpenSharedLinks = usePersistFn(() => {
+    setSettingsOpen(false);
+    setPrimaryWorkspace("library");
+  });
+  const stableOnDeleteAccount = usePersistFn(() => {
+    toast.info("Account deletion is not yet implemented.");
+  });
+  const stableShareOnOpenChange = usePersistFn((next: boolean) => {
+    if (!next) setShareTarget(null);
+  });
+  const stableShareOnCopy = usePersistFn(() => void copyConversationShareLink());
+  const stableShareOnEmail = usePersistFn(openEmailShare);
+  const stableShareOnSetPublic = usePersistFn(
+    (isPublic: boolean) => {
+      if (shareTarget)
+        publicShareMutation.mutate({ id: shareTarget.id, isPublic });
+    }
+  );
+  const stableWorkspaceOnOpenChange = usePersistFn((next: boolean) => {
+    if (!next && isWorkspaceDeletePreview)
+      window.history.replaceState({}, "", "/");
+  });
+  const stableRenameDialogOpen = usePersistFn((open: boolean) => {
+    if (!open) setRenameTarget(null);
+  });
+  const stableRenameAction = usePersistFn(() => {
+    const title = renameValue.trim();
+    if (renameTarget && title) {
+      renameMutation.mutate({ id: renameTarget.id, title });
+      setRenameTarget(null);
+    }
+  });
+  const stableEditDialogOpen = usePersistFn((open: boolean) => {
+    if (!open) setEditingMessage(null);
+  });
+  const stableEditAction = usePersistFn(() => void saveEditedMessage());
+  const stableEditSecondaryAction = usePersistFn(() => {
+    if (editingMessage) setHistoryMessage(editingMessage);
+  });
+  const stableHistoryOpen = usePersistFn((open: boolean) => {
+    if (!open) setHistoryMessage(null);
+  });
+  const stableDeleteDialogOpen = usePersistFn((open: boolean) => {
+    if (!open) setDeleteTarget(null);
+  });
+  const stableDeleteAction = usePersistFn(() => {
+    if (!deleteTarget) return;
+    if (deleteTarget.kind === "conversation") {
+      permanentDeleteMutation.mutate({ id: deleteTarget.id });
+      if (activeConversationId === deleteTarget.id) newChat();
+    } else {
+      messageRemoveMutation.mutate({ id: deleteTarget.id });
+      setChatMessages(current =>
+        current.filter(message => message.id !== deleteTarget.id)
+      );
+    }
+    setDeleteTarget(null);
+  });
+
+  const greeting = useMemo(timeGreeting, []);
+
   if (loading)
     return (
       <Loading fullScreen />
@@ -1457,75 +1725,28 @@ export default function Home() {
         activeConversationId={activeConversationId}
         open={sidebarOpen}
         collapsed={sidebarCollapsed}
-        onClose={() => setSidebarOpen(false)}
-        onToggleCollapsed={() => setSidebarCollapsed(current => !current)}
-        onNew={newChat}
-        onSelect={selectConversation}
-        onRename={conversation => {
-          setRenameTarget({ id: conversation.id, title: conversation.title });
-          setRenameValue(conversation.title);
-        }}
-        onDuplicate={conversation =>
-          duplicateMutation.mutate({ id: conversation.id })
-        }
-        onArchive={conversation =>
-          archiveMutation.mutate({ id: conversation.id, isArchived: true })
-        }
-        onPin={conversation =>
-          pinMutation.mutate({
-            id: conversation.id,
-            isPinned: !conversation.isPinned,
-          })
-        }
-        onShare={conversation => {
-          setShareTarget({
-            id: conversation.id,
-            title: conversation.title,
-            isPublic: Boolean(conversation.isPublic),
-            shareToken: conversation.shareToken ?? null,
-          });
-          setShareEmail("");
-        }}
-        onExport={(conversation, format) =>
-          void exportConversation(conversation.id, format)
-        }
-        onDelete={conversation =>
-          setDeleteTarget({
-            kind: "conversation",
-            id: conversation.id,
-            title: conversation.title,
-          })
-        }
-        onSearch={() => {
-          setSearchOpen(true);
-          setSidebarOpen(false);
-        }}
-        onWorkspace={section => {
-          setPrimaryWorkspace("library");
-          setSidebarOpen(false);
-        }}
+        onClose={stableOnCloseSidebar}
+        onToggleCollapsed={stableOnToggleCollapsed}
+        onNew={stableNewChat}
+        onSelect={stableSelectConversation}
+        onRename={stableOnRename}
+        onDuplicate={stableOnDuplicate}
+        onArchive={stableOnArchive}
+        onPin={stableOnPin}
+        onShare={stableOnShareConversation}
+        onExport={stableOnExport}
+        onDelete={stableOnDelete}
+        onSearch={stableOnSearch}
+        onWorkspace={stableOnWorkspace}
         previewSupportOpen={isProfileSupportPreview}
-        onSettings={() => setSettingsOpen(true)}
-        onSupport={topic => setLocation(`/support/${topic}`)}
-        onLogout={logout}
+        onSettings={stableOnSettings}
+        onSupport={stableOnSupport}
+        onLogout={stableLogout}
         accounts={savedAccounts}
         switchingAccountId={switchingAccountId}
-        onSwitchAccount={account => {
-          if (!account.email || account.email === user.email) return;
-          setSwitchingAccountId(account.id);
-          switchAccountMutation.mutate({ email: account.email });
-        }}
-        onAddAccount={() => {
-          void logout();
-        }}
-        onRemoveAccount={account => {
-          setSavedAccounts(prev => {
-            const next = prev.filter(a => a.id !== account.id);
-            localStorage.setItem(SAVED_ACCOUNTS_KEY, JSON.stringify(next));
-            return next;
-          });
-          toast.success("Account removed");
-        }}
+        onSwitchAccount={stableOnSwitchAccount}
+        onAddAccount={stableOnAddAccount}
+        onRemoveAccount={stableOnRemoveAccount}
         user={user}
       />
 
@@ -1548,6 +1769,8 @@ export default function Home() {
             </Button>
 
             <section
+              ref={messagesContainerRef}
+              onScroll={handleMessagesScroll}
               className={cn(
                 "min-h-0 flex-1",
                 visibleMessages.length ? "overflow-y-auto" : "overflow-hidden"
@@ -1560,26 +1783,22 @@ export default function Home() {
                     <MessageContent
                       key={message.id}
                       message={message}
-                      onSpeak={speak}
-                      onPause={pauseSpeech}
-                      onResume={resumeSpeech}
-                      onStop={stopSpeech}
+                      onSpeak={stableSpeak}
+                      onPause={stablePauseSpeech}
+                      onResume={stableResumeSpeech}
+                      onStop={stableStopSpeech}
                       isSpeaking={speakingMessageId === message.id}
                       speechState={speechState}
                       isCurrentGeneration={
                         isGenerating && generatingMessageId === message.id
                       }
-                      onEdit={editMessage}
-                      onRegenerate={regenerateMessage}
-                      onRetry={regenerateMessage}
-                      onShare={shareMessage}
-                      onDelete={deleteMessage}
-                      onViewHistory={userMessage =>
-                        setHistoryMessage(userMessage)
-                      }
-                      onFeedback={(messageId, value) =>
-                        messageFeedbackMutation.mutate({ messageId, value })
-                      }
+                      onEdit={stableEditMessage}
+                      onRegenerate={stableRegenerateMessage}
+                      onRetry={stableRegenerateMessage}
+                      onShare={stableShareMessage}
+                      onDelete={stableDeleteMessage}
+                      onViewHistory={stableOnViewHistory}
+                      onFeedback={stableOnFeedback}
                       webSources={webSourcesByMessage[message.id]}
                       webSearchStatus={webSearchStatus[message.id]}
                     />
@@ -1590,22 +1809,20 @@ export default function Home() {
                 <Loading />
               ) : (
                 <EmptyState
-                  greeting={timeGreeting()}
+                  greeting={greeting}
                   composer={
                     <ChatComposer
-                      onSend={sendMessage}
-                      onCancel={stopGeneration}
-                      onVoice={
-                        voice.state === "recording" ? voice.stop : voice.start
-                      }
-                      onCancelRecording={voice.cancel}
+                      onSend={stableSendMessage}
+                      onCancel={stableStopGeneration}
+                      onVoice={stableVoiceAction}
+                      onCancelRecording={stableVoiceCancel}
                       isGenerating={isGenerating}
                       isRecording={voice.state === "recording"}
                       isTranscribing={voice.state === "transcribing"}
                       recordingSeconds={voice.seconds}
                       value={composerValue}
                       onValueChange={setComposerValue}
-                      onAttachment={attachFromComposer}
+                      onAttachment={stableAttachFromComposer}
                       attachmentNotices={
                         isAttachmentPreview
                           ? [
@@ -1617,25 +1834,17 @@ export default function Home() {
                             ]
                           : attachmentNotices
                       }
-                      onClearAttachment={fileId =>
-                        setAttachmentNotices(current =>
-                          fileId
-                            ? current.filter(file => file.fileId !== fileId)
-                            : []
-                        )
-                      }
+                      onClearAttachment={stableOnClearAttachment}
                       libraryFiles={libraryFilesQuery.data}
-                      onLibraryFile={attachLibraryFiles}
+                      onLibraryFile={stableAttachLibraryFiles}
                       initialLibraryOpen={isLibraryPreview}
                       initialToolsOpen={isLibraryPreview}
                       menuPlacement="below"
                       showSafetyNote={false}
                       webSearchEnabled={webSearchEnabled}
-                      onToggleWebSearch={() =>
-                        setWebSearchEnabled(current => !current)
-                      }
+                      onToggleWebSearch={stableOnToggleWebSearch}
                       isCentered={true}
-                      onTakeScreenshot={captureScreenshot}
+                      onTakeScreenshot={stableCaptureScreenshot}
                     />
                   }
                 />
@@ -1644,19 +1853,17 @@ export default function Home() {
 
             {visibleMessages.length > 0 && (
               <ChatComposer
-                onSend={sendMessage}
-                onCancel={stopGeneration}
-                onVoice={
-                  voice.state === "recording" ? voice.stop : voice.start
-                }
-                onCancelRecording={voice.cancel}
+                onSend={stableSendMessage}
+                onCancel={stableStopGeneration}
+                onVoice={stableVoiceAction}
+                onCancelRecording={stableVoiceCancel}
                 isGenerating={isGenerating}
                 isRecording={voice.state === "recording"}
                 isTranscribing={voice.state === "transcribing"}
                 recordingSeconds={voice.seconds}
                 value={composerValue}
                 onValueChange={setComposerValue}
-                onAttachment={attachFromComposer}
+                onAttachment={stableAttachFromComposer}
                 attachmentNotices={
                   isAttachmentPreview
                     ? [
@@ -1668,21 +1875,15 @@ export default function Home() {
                       ]
                     : attachmentNotices
                 }
-                onClearAttachment={fileId =>
-                  setAttachmentNotices(current =>
-                    fileId ? current.filter(file => file.fileId !== fileId) : []
-                  )
-                }
+                onClearAttachment={stableOnClearAttachment}
                 libraryFiles={libraryFilesQuery.data}
-                onLibraryFile={attachLibraryFiles}
+                onLibraryFile={stableAttachLibraryFiles}
                 initialLibraryOpen={isLibraryPreview}
                 compactBottomSpacing
                 showSafetyNote
                 webSearchEnabled={webSearchEnabled}
-                onToggleWebSearch={() =>
-                  setWebSearchEnabled(current => !current)
-                }
-                onTakeScreenshot={captureScreenshot}
+                onToggleWebSearch={stableOnToggleWebSearch}
+                onTakeScreenshot={stableCaptureScreenshot}
               />
             )}
           </>
@@ -1693,48 +1894,29 @@ export default function Home() {
         open={searchOpen}
         onOpenChange={setSearchOpen}
         conversations={conversationQuery.data ?? []}
-        onSelectConversation={id => {
-          selectConversation(id);
-          setSearchOpen(false);
-        }}
+        onSelectConversation={stableOnSearchSelect}
       />
 
       <SettingsDialog
         open={settingsOpen || isSettingsPreview}
         onOpenChange={setSettingsOpen}
         user={user}
-        onSignOut={logout}
-        onOpenWorkspace={section => {
-          setSettingsOpen(false);
-          setPrimaryWorkspace("library");
-        }}
-        onAllChatsDeleted={() => {
-          newChat();
-          utils.conversation.list.invalidate();
-        }}
-        onOpenSharedLinks={() => {
-          setSettingsOpen(false);
-          setPrimaryWorkspace("library");
-        }}
-        onDeleteAccount={() => {
-          toast.info("Account deletion is not yet implemented.");
-        }}
+        onSignOut={stableLogout}
+        onOpenWorkspace={stableSettingsOnOpenWorkspace}
+        onAllChatsDeleted={stableOnAllChatsDeleted}
+        onOpenSharedLinks={stableOnOpenSharedLinks}
+        onDeleteAccount={stableOnDeleteAccount}
       />
       <WorkspacePanel
         open={isWorkspaceDeletePreview}
-        onOpenChange={next => {
-          if (!next && isWorkspaceDeletePreview)
-            window.history.replaceState({}, "", "/");
-        }}
+        onOpenChange={stableWorkspaceOnOpenChange}
         initialSection="files"
         activeConversationId={activeConversationId}
         initialDeletePreview={isWorkspaceDeletePreview}
       />
       <ShareConversationDialog
         open={Boolean(shareTarget) || isSharePreview}
-        onOpenChange={next => {
-          if (!next) setShareTarget(null);
-        }}
+        onOpenChange={stableShareOnOpenChange}
         title={shareTarget?.title ?? "your conversation"}
         shareUrl={
           shareTarget?.shareToken
@@ -1743,39 +1925,26 @@ export default function Home() {
         }
         email={shareEmail}
         onEmailChange={setShareEmail}
-        onCopy={() => void copyConversationShareLink()}
-        onEmail={openEmailShare}
-        onSetPublic={isPublic => {
-          if (shareTarget)
-            publicShareMutation.mutate({ id: shareTarget.id, isPublic });
-        }}
+        onCopy={stableShareOnCopy}
+        onEmail={stableShareOnEmail}
+        onSetPublic={stableShareOnSetPublic}
         enabled={Boolean(shareTarget) && !publicShareMutation.isPending}
         isPublic={Boolean(shareTarget?.isPublic)}
       />
       <KsemoTextDialog
         open={Boolean(renameTarget) || isRenamePreview}
-        onOpenChange={open => {
-          if (!open) setRenameTarget(null);
-        }}
+        onOpenChange={stableRenameDialogOpen}
         title="Rename conversation"
         description="Choose a clear title that helps you find this conversation later."
         label="Conversation title"
         value={isRenamePreview ? "Project planning" : renameValue}
         onValueChange={setRenameValue}
         actionLabel="Save name"
-        onAction={() => {
-          const title = renameValue.trim();
-          if (renameTarget && title) {
-            renameMutation.mutate({ id: renameTarget.id, title });
-            setRenameTarget(null);
-          }
-        }}
+        onAction={stableRenameAction}
       />
       <KsemoTextDialog
         open={Boolean(editingMessage) || isEditPreview}
-        onOpenChange={open => {
-          if (!open) setEditingMessage(null);
-        }}
+        onOpenChange={stableEditDialogOpen}
         title="Edit message"
         description="Your earlier version stays safely recorded. Saving updates the following KSEMO response from this exact edited message."
         label="Message"
@@ -1785,19 +1954,15 @@ export default function Home() {
         onValueChange={setEditValue}
         multiline
         actionLabel="Save"
-        onAction={() => void saveEditedMessage()}
+        onAction={stableEditAction}
         secondaryActionLabel={
           editingMessage ? "View version history" : undefined
         }
-        onSecondaryAction={() =>
-          editingMessage && setHistoryMessage(editingMessage)
-        }
+        onSecondaryAction={stableEditSecondaryAction}
       />
       <MessageHistoryDialog
         open={Boolean(historyMessage) || isHistoryPreview}
-        onOpenChange={open => {
-          if (!open) setHistoryMessage(null);
-        }}
+        onOpenChange={stableHistoryOpen}
         versions={
           isHistoryPreview
             ? [
@@ -1812,13 +1977,11 @@ export default function Home() {
         }
         loading={messageHistoryQuery.isLoading && !isHistoryPreview}
         restoring={messageRestoreMutation.isPending}
-        onRestore={restoreMessageVersion}
+        onRestore={stableRestoreMessageVersion}
       />
       <KsemoConfirmDialog
         open={Boolean(deleteTarget) || isDeletePreview}
-        onOpenChange={open => {
-          if (!open) setDeleteTarget(null);
-        }}
+        onOpenChange={stableDeleteDialogOpen}
         title={
           deleteTarget?.kind === "conversation" || isDeletePreview
             ? "Delete conversation?"
@@ -1830,19 +1993,7 @@ export default function Home() {
             : `This action permanently removes ${deleteTarget?.title ?? "this message"}.`
         }
         actionLabel="Delete permanently"
-        onAction={() => {
-          if (!deleteTarget) return;
-          if (deleteTarget.kind === "conversation") {
-            permanentDeleteMutation.mutate({ id: deleteTarget.id });
-            if (activeConversationId === deleteTarget.id) newChat();
-          } else {
-            messageRemoveMutation.mutate({ id: deleteTarget.id });
-            setChatMessages(current =>
-              current.filter(message => message.id !== deleteTarget.id)
-            );
-          }
-          setDeleteTarget(null);
-        }}
+        onAction={stableDeleteAction}
       />
     </div>
   );
@@ -1855,7 +2006,7 @@ function timeGreeting() {
   return "Good evening — what can I help you with?";
 }
 
-function EmptyState({
+const EmptyState = memo(function EmptyState({
   greeting,
   composer,
 }: {
@@ -1872,9 +2023,9 @@ function EmptyState({
       <div className="mx-auto w-full max-w-3xl">{composer}</div>
     </div>
   );
-}
+});
 
-function KsemoTextDialog({
+const KsemoTextDialog = memo(function KsemoTextDialog({
   open,
   onOpenChange,
   title,
@@ -1932,9 +2083,9 @@ function KsemoTextDialog({
       </DialogContent>
     </Dialog>
   );
-}
+});
 
-function MessageHistoryDialog({
+const MessageHistoryDialog = memo(function MessageHistoryDialog({
   open,
   onOpenChange,
   versions,
@@ -1970,9 +2121,9 @@ function MessageHistoryDialog({
       </DialogContent>
     </Dialog>
   );
-}
+});
 
-function KsemoConfirmDialog({
+const KsemoConfirmDialog = memo(function KsemoConfirmDialog({
   open,
   onOpenChange,
   title,
@@ -2004,4 +2155,4 @@ function KsemoConfirmDialog({
       </DialogContent>
     </Dialog>
   );
-}
+});

@@ -50,7 +50,6 @@ export function useAuth(options?: UseAuthOptions) {
   }, [logoutMutation, utils]);
 
   const state = useMemo(() => {
-    localStorage.setItem("ksemo-user-info", JSON.stringify(meQuery.data));
     return {
       user: meQuery.data ?? null,
       loading: meQuery.isLoading || logoutMutation.isPending,
@@ -64,6 +63,10 @@ export function useAuth(options?: UseAuthOptions) {
     logoutMutation.error,
     logoutMutation.isPending,
   ]);
+
+  useEffect(() => {
+    localStorage.setItem("ksemo-user-info", JSON.stringify(meQuery.data));
+  }, [meQuery.data]);
 
   useEffect(() => {
     if (!redirectOnUnauthenticated) return;
@@ -86,9 +89,11 @@ export function useAuth(options?: UseAuthOptions) {
     state.user,
   ]);
 
+  const refresh = useCallback(() => meQuery.refetch(), [meQuery]);
+
   return {
     ...state,
-    refresh: () => meQuery.refetch(),
+    refresh,
     logout,
   };
 }

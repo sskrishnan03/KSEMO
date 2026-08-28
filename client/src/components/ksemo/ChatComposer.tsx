@@ -29,6 +29,7 @@ import {
   X,
 } from "lucide-react";
 import React, {
+  memo,
   useEffect,
   useMemo,
   useRef,
@@ -39,7 +40,7 @@ import React, {
 export const getLibrarySubmenuClass = (isCentered: boolean) =>
   `absolute left-1/2 -translate-x-1/2 z-50 max-h-[calc(100dvh-${isCentered ? "12rem" : "6rem"})] w-full max-w-3xl rounded-xl border border-border bg-popover p-0 text-popover-foreground shadow-xl`;
 
-export function ChatComposer({
+export const ChatComposer = memo(function ChatComposer({
   onSend,
   onCancel,
   onVoice,
@@ -124,8 +125,14 @@ export function ChatComposer({
   useEffect(() => {
     const textarea = textareaRef.current;
     if (!textarea) return;
-    textarea.style.height = "0px";
-    textarea.style.height = `${Math.min(textarea.scrollHeight, 180)}px`;
+    const frame = requestAnimationFrame(() => {
+      const height = Math.min(textarea.scrollHeight, 180);
+      if (height !== textarea.clientHeight) {
+        textarea.style.height = "0px";
+        textarea.style.height = `${height}px`;
+      }
+    });
+    return () => cancelAnimationFrame(frame);
   }, [value]);
 
   useEffect(() => {
@@ -158,7 +165,7 @@ export function ChatComposer({
         compactBottomSpacing ? "pb-2 sm:pb-3" : "pb-5 sm:pb-7"
       )}
     >
-      <div className="relative rounded-[1.35rem] border border-border/90 bg-card p-2 shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-shadow focus-within:shadow-[0_12px_40px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.3)]">
+      <div className="relative rounded-[1.35rem] border border-border/90 bg-[oklch(0.975_0.002_80)] p-2 shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-shadow focus-within:shadow-[0_12px_40px_rgba(0,0,0,0.12)] dark:bg-[oklch(0.17_0.003_80)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.3)]">
         {libraryOpen && (
           <div
             ref={libraryPanelRef}
@@ -484,7 +491,7 @@ export function ChatComposer({
       )}
     </div>
   );
-}
+});
 
 export function LibraryPickerContent({
   files,

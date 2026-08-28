@@ -22,12 +22,11 @@ async function toBase64(blob: Blob) {
   const bytes = new Uint8Array(await blob.arrayBuffer());
   let binary = "";
   const chunk = 0x8000;
-  for (let offset = 0; offset < bytes.length; offset += chunk) {
-    const end = Math.min(offset + chunk, bytes.length);
-    for (let index = offset; index < end; index += 1) {
-      binary += String.fromCharCode(bytes[index]);
-    }
-  }
+  for (let offset = 0; offset < bytes.length; offset += chunk)
+    binary += String.fromCharCode.apply(
+      null,
+      bytes.subarray(offset, offset + chunk) as unknown as number[]
+    );
   return window.btoa(binary);
 }
 

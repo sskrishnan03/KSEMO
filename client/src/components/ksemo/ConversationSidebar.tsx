@@ -45,7 +45,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import React, { useRef, useState } from "react";
+import React, { memo, useMemo, useRef, useState } from "react";
 
 type Conversation = {
   id: string;
@@ -56,7 +56,7 @@ type Conversation = {
   shareToken?: string | null;
 };
 
-export function ConversationSidebar({
+export const ConversationSidebar = memo(function ConversationSidebar({
   conversations,
   activeConversationId,
   open,
@@ -121,8 +121,14 @@ export function ConversationSidebar({
   user: { id?: string | number; name?: string | null; email?: string | null };
   previewSupportOpen?: boolean;
 }) {
-  const pinned = conversations.filter(item => item.isPinned);
-  const recent = conversations.filter(item => !item.isPinned);
+  const pinned = useMemo(
+    () => conversations.filter(item => item.isPinned),
+    [conversations]
+  );
+  const recent = useMemo(
+    () => conversations.filter(item => !item.isPinned),
+    [conversations]
+  );
   const compact = collapsed;
 
   const asideRef = useRef<HTMLElement>(null);
@@ -485,9 +491,9 @@ export function ConversationSidebar({
       </aside>
     </>
   );
-}
+});
 
-function ConversationGroup({
+const ConversationGroup = memo(function ConversationGroup({
   label,
   conversations,
   activeConversationId,
@@ -569,9 +575,9 @@ function ConversationGroup({
       )}
     </section>
   );
-}
+});
 
-function ConversationActionsMenu({
+const ConversationActionsMenu = memo(function ConversationActionsMenu({
   conversation,
   onRename,
   onPin,
@@ -664,9 +670,9 @@ function ConversationActionsMenu({
       </DropdownMenuContent>
     </DropdownMenu>
   );
-}
+});
 
-function ConversationTitleButton({
+const ConversationTitleButton = memo(function ConversationTitleButton({
   conversation,
   onSelect,
 }: {
@@ -683,4 +689,4 @@ function ConversationTitleButton({
       <span className="min-w-0 truncate">{conversation.title}</span>
     </button>
   );
-}
+});

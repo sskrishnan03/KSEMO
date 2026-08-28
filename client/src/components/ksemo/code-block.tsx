@@ -6,8 +6,36 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { Check, Copy, Download } from "lucide-react";
-import React, { memo, useCallback, useEffect, useRef, useState } from "react";
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { codeToHtml } from "shiki";
+
+// Highlighted output cache. Re-tokenizing identical code on every render is the
+// single most expensive thing the chat does while a fenced block is on screen.
+// Keep a bounded LRU of {lang}:{code} -> html so repeated renders of settled
+// blocks are instant and never touch Shiki again.
+const HIGHLIGHT_CACHE = new Map<string, Promise<string>>();
+const HIGHLIGHT_CACHE_MAX = 100;
+
+function highlightCode(code: string, lang: string): Promise<string> {
+  const key = `${lang}:${code}`;
+  let pending = HIGHLIGHT_CACHE.get(key);
+  if (!pending) {
+    pending = codeToHtml(code, {
+      lang,
+      themes: { light: "github-light", dark: "github-dark" },
+      defaultColor: false,
+    });
+    pending.catch(() => {
+      HIGHLIGHT_CACHE.delete(key);
+    });
+    HIGHLIGHT_CACHE.set(key, pending);
+    if (HIGHLIGHT_CACHE.size > HIGHLIGHT_CACHE_MAX) {
+      const oldest = HIGHLIGHT_CACHE.keys().next().value;
+      if (oldest !== undefined) HIGHLIGHT_CACHE.delete(oldest);
+    }
+  }
+  return pending;
+}
 
 /**
  * Display name + download extension for the languages KSEMO recognises.
@@ -233,25 +261,33 @@ function CodeSurface({
   rawLanguage?: string;
 }) {
   const [html, setHtml] = useState<string>("");
+  const debounceRef = useRef<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     const lang = (rawLanguage ?? "").trim().toLowerCase();
     const validLang = lang && lang in LANGUAGE_META ? lang : "text";
 
-    codeToHtml(code, {
-      lang: validLang,
-      themes: { light: "github-light", dark: "github-dark" },
-      defaultColor: false,
-    })
-      .then(result => {
-        if (!cancelled) setHtml(result);
-      })
-      .catch(() => {
-        if (!cancelled) setHtml("");
-      });
+    const run = () => {
+      highlightCode(code, validLang)
+        .then(result => {
+          if (!cancelled) setHtml(result);
+        })
+        .catch(() => {
+          if (!cancelled) setHtml("");
+        });
+    };
+
+    // While the block is still being streamed the code changes on every flush;
+    // debounce so we highlight at most once after the text settles instead of
+    // re-tokenizing the whole growing block per token.
+    if (debounceRef.current !== null) window.clearTimeout(debounceRef.current);
+    debounceRef.current = window.setTimeout(run, 200);
+
     return () => {
       cancelled = true;
+      if (debounceRef.current !== null) window.clearTimeout(debounceRef.current);
+      debounceRef.current = null;
     };
   }, [code, rawLanguage]);
 
@@ -282,10 +318,15 @@ export function KsemoCodeBlock({
   rawLanguage?: string;
 }) {
   const { id } = normalizeLanguage(rawLanguage);
+  const blockStyle = useMemo(
+    () => ({ contentVisibility: "auto" as const, containIntrinsicSize: "auto 200px" as const }),
+    []
+  );
   return (
     <div
-      className="my-4 w-full overflow-hidden rounded-xl border border-border/70 bg-muted"
+      className="my-4 w-full overflow-hidden rounded-xl border border-border/70 bg-[oklch(0.975_0.002_80)] dark:bg-[oklch(0.17_0.003_80)]"
       data-language={id || "text"}
+      style={blockStyle}
       aria-label={`${codeBlockLanguageLabel(rawLanguage)} code block`}
     >
       <KsemoCodeBlockHeader code={code} rawLanguage={rawLanguage} />

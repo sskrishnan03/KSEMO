@@ -1,4 +1,4 @@
-import React from "react";
+import React, { memo } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -10,7 +10,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-export function ShareConversationDialog({
+export const ShareConversationDialog = memo(function ShareConversationDialog({
   open,
   onOpenChange,
   title,
@@ -60,7 +60,7 @@ export function ShareConversationDialog({
       </DialogContent>
     </Dialog>
   );
-}
+});
 
 export function ShareConversationPanel({
   shareUrl,

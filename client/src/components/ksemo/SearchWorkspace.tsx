@@ -10,7 +10,7 @@ import { Loading } from "@/components/ui/loading";
 import { cn } from "@/lib/utils";
 import { trpc } from "@/lib/trpc";
 import { MessageCircle, Search } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 
 type SearchResult = {
   conversationId: string;
@@ -26,7 +26,7 @@ function snippetFromContent(content: string, maxLen = 120): string {
   return clean.slice(0, maxLen) + "…";
 }
 
-export function SearchDialog({
+export const SearchDialog = memo(function SearchDialog({
   open,
   onOpenChange,
   conversations,
@@ -42,20 +42,29 @@ export function SearchDialog({
   onSelectConversation: (conversationId: string) => void;
 }) {
   const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const trimmed = query.trim().toLowerCase();
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (open) {
       setQuery("");
+      setDebouncedQuery("");
       setTimeout(() => inputRef.current?.focus(), 50);
     }
   }, [open]);
 
+  // The local title filter updates per keystroke, but the server search is
+  // debounced so typing a multi-word query only fires one network request.
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedQuery(query), 250);
+    return () => window.clearTimeout(timer);
+  }, [query]);
+
   const { data: serverData, isFetching: searchLoading } =
     trpc.conversation.search.useQuery(
-      { query: query.trim() },
-      { enabled: open && query.trim().length >= 1 }
+      { query: debouncedQuery.trim() },
+      { enabled: open && debouncedQuery.trim().length >= 1 }
     );
 
   const titleMatches = useMemo(() => {
@@ -184,4 +193,4 @@ export function SearchDialog({
       </DialogContent>
     </Dialog>
   );
-}
+});

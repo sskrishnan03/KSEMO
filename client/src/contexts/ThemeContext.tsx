@@ -85,18 +85,17 @@ export function ThemeProvider({
     setModeState(newMode);
   }, []);
 
-  const toggleTheme = switchable
-    ? () => {
-        setModeState(prev => (prev === "dark" ? "light" : "dark"));
-      }
-    : undefined;
+  const toggleTheme = useCallback(() => {
+    setModeState(prev => (prev === "dark" ? "light" : "dark"));
+  }, []);
+
+  const value = React.useMemo(
+    () => ({ mode, resolvedTheme, setMode, toggleTheme, switchable }),
+    [mode, resolvedTheme, setMode, toggleTheme, switchable]
+  );
 
   return (
-    <ThemeContext.Provider
-      value={{ mode, resolvedTheme, setMode, toggleTheme, switchable }}
-    >
-      {children}
-    </ThemeContext.Provider>
+    <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
   );
 }
 

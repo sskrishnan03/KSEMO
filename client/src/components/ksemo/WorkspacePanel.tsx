@@ -15,7 +15,13 @@ import {
   isSupportedUpload,
 } from "@/lib/fileIcons";
 import { Link2, Trash2, Upload } from "lucide-react";
-import React, { type ChangeEvent, useRef, useState } from "react";
+import React, {
+  memo,
+  type ChangeEvent,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { toast } from "sonner";
 
 export type WorkspaceSection = "files";
@@ -30,16 +36,14 @@ async function fileToBase64(file: File) {
   const bytes = new Uint8Array(await file.arrayBuffer());
   let binary = "";
   for (let offset = 0; offset < bytes.length; offset += 0x8000)
-    for (
-      let index = offset;
-      index < Math.min(offset + 0x8000, bytes.length);
-      index += 1
-    )
-      binary += String.fromCharCode(bytes[index]);
+    binary += String.fromCharCode.apply(
+      null,
+      bytes.subarray(offset, offset + 0x8000) as unknown as number[]
+    );
   return window.btoa(binary);
 }
 
-export function WorkspacePanel({
+export const WorkspacePanel = memo(function WorkspacePanel({
   open,
   onOpenChange,
   initialSection,
@@ -67,9 +71,13 @@ export function WorkspacePanel({
   const filesQuery = trpc.workspace.files.list.useQuery(undefined, {
     enabled: open,
   });
-  const visibleFiles = (filesQuery.data ?? []).filter(file =>
-    file.filename.toLowerCase().includes(libraryQuery.trim().toLowerCase())
-  );
+  const visibleFiles = useMemo(() => {
+    const normalized = libraryQuery.trim().toLowerCase();
+    if (!normalized) return filesQuery.data ?? [];
+    return (filesQuery.data ?? []).filter(file =>
+      file.filename.toLowerCase().includes(normalized)
+    );
+  }, [filesQuery.data, libraryQuery]);
 
   const fileUpload = trpc.workspace.files.upload.useMutation({
     onSuccess: () => {
@@ -263,7 +271,7 @@ export function WorkspacePanel({
       </Dialog>
     </>
   );
-}
+});
 
 export function WorkspaceDeleteConfirmPanel({
   onCancel,

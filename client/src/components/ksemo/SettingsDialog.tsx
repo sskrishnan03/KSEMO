@@ -40,7 +40,7 @@ import {
   User,
   Zap,
 } from "lucide-react";
-import React, { useEffect, useState } from "react";
+import React, { memo, useEffect, useState } from "react";
 
 type Preferences =
   | {
@@ -89,7 +89,7 @@ const settingsNavItems: Array<{
   { id: "feedback", label: "Feedback", icon: MessageSquare },
 ];
 
-export function SettingsDialog({
+export const SettingsDialog = memo(function SettingsDialog({
   open,
   onOpenChange,
   user,
@@ -258,7 +258,7 @@ export function SettingsDialog({
       </AlertDialog>
     </Dialog>
   );
-}
+});
 
 function AccountSection({ user }: { user: User }) {
   const formatDate = (d?: Date | string | null) => {
