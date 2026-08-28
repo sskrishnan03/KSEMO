@@ -367,9 +367,12 @@ const computeBackoffDelay = (
   return Math.min(Math.max(jittered, retryAfterMs ?? 0), RETRY_MAX_DELAY_MS);
 };
 
-// Statuses that cannot succeed on retry (bad key, bad request, missing model);
-// surface them immediately so the caller can fall through to the next provider.
-const NON_RETRYABLE_STATUSES = new Set([400, 401, 403, 404]);
+// Statuses that cannot succeed on retry (bad key, bad request, missing model,
+// or a provider overloaded with a 5xx "high demand"/unavailable response);
+// surface them immediately so the caller can fall through to the next provider
+// instead of sitting on a blank screen while the retry ladder grinds. 429 is
+// handled separately below (it retries once, then surfaces quickly).
+const NON_RETRYABLE_STATUSES = new Set([400, 401, 403, 404, 500, 502, 503, 504]);
 
 // Retries non-2xx responses and network errors with exponential backoff, then
 // returns the final Response so callers keep their existing error handling.
@@ -421,7 +424,7 @@ const fetchWithBackoff = async (
     : new Error("LLM request failed after exhausting retries");
 };
 
-const DEFAULT_LLM_MODEL = "gemini-flash-latest";
+const DEFAULT_LLM_MODEL = "gemini-3.6-flash";
 
 // Separate free-tier quota bucket on the primary provider; used automatically
 // when the requested model is unavailable or rate-limited.

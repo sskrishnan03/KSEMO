@@ -1,5 +1,4 @@
 import { useAuth } from "@/_core/hooks/useAuth";
-import { keepPreviousData } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -204,11 +203,23 @@ export default function Home() {
   // double-submit window between a click/Enter event and that render.
   const generationActiveRef = useRef(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const initialConversationResolvedRef = useRef(false);
+  // chatMessages is the single source of truth for the open conversation.
+  // Server data only seeds it ONCE per conversation id (when it is opened) and
+  // is never allowed to overwrite messages that are currently streaming.
+  const seededConversationIdRef = useRef<string | null>(null);
+  // Tracks which account already auto-selected an initial conversation so that
+  // switching accounts re-selects the new account's most recent chat.
+  const initialSelectionUserIdRef = useRef<string | null>(null);
 
   const conversationQuery = trpc.conversation.list.useQuery(
     { scope: "active" },
-    { enabled: Boolean(user) }
+    {
+      enabled: Boolean(user),
+      // Keep the previous list while refetching so the sidebar never flashes
+      // empty, but never show another account's conversations.
+      placeholderData: previousData =>
+        previousData && user ? previousData : undefined,
+    }
   );
   const activeQuery = trpc.conversation.get.useQuery(
     { id: activeConversationId ?? "unselected" },
@@ -235,8 +246,13 @@ export default function Home() {
     onSuccess: async () => {
       await utils.auth.me.invalidate();
       await utils.conversation.list.invalidate();
+      seededConversationIdRef.current = null;
+      initialSelectionUserIdRef.current = null;
+      setChatMessages([]);
       setActiveConversationId(null);
       setPrimaryWorkspace(null);
+      setWebSearchEnabled(false);
+      setAttachmentNotices([]);
       setSwitchingAccountId(null);
       toast.success("Switched account");
     },
@@ -281,6 +297,18 @@ export default function Home() {
       return next;
     });
   }, [user?.email, user?.id, user?.name]);
+
+  // When the session ends, forget the previous account's chat state so nothing
+  // leaks into the next session.
+  useEffect(() => {
+    if (user) return;
+    seededConversationIdRef.current = null;
+    initialSelectionUserIdRef.current = null;
+    setChatMessages([]);
+    setActiveConversationId(null);
+    setWebSearchEnabled(false);
+    setAttachmentNotices([]);
+  }, [user]);
   const renameMutation = trpc.conversation.rename.useMutation({
     onSuccess: () => utils.conversation.list.invalidate(),
   });
@@ -366,27 +394,26 @@ export default function Home() {
       setComposerValue(current => (current ? `${current} ${text}` : text)),
     onError: message => toast.error(message),
   });
-  const serverMessages = useMemo<KsemoMessage[]>(
-    () =>
-      (activeQuery.data?.messages ?? []).map(message => ({
+  // chatMessages is the single source of truth for the open conversation's
+  // messages. The server query only seeds it once per conversation and is
+  // never allowed to overwrite messages that are currently streaming or that
+  // arrived back from a completed / failed generation.
+  useEffect(() => {
+    if (isGenerating) return;
+    if (!activeConversationId) return;
+    if (seededConversationIdRef.current === activeConversationId) return;
+    if (activeQuery.isLoading || !activeQuery.data) return;
+    seededConversationIdRef.current = activeConversationId;
+    setChatMessages(
+      activeQuery.data.messages.map(message => ({
         id: message.id,
         role: message.role,
         content: message.content,
         status: message.status,
         attachments: message.attachments,
-      })),
-    [activeQuery.data?.messages]
-  );
-
-  useEffect(() => {
-    if (!activeConversationId) {
-      setChatMessages([]);
-      return;
-    }
-    if (!isGenerating) {
-      setChatMessages(serverMessages);
-    }
-  }, [activeConversationId, serverMessages, isGenerating]);
+      }))
+    );
+  }, [activeConversationId, activeQuery.data, activeQuery.isLoading, isGenerating]);
 
   const visibleMessages = isAttachedMessagePreview
     ? [
@@ -462,9 +489,17 @@ export default function Home() {
           : chatMessages;
 
   useEffect(() => {
-    if (initialConversationResolvedRef.current || !conversationQuery.data)
+    if (!user?.id || !conversationQuery.data) return;
+    const userId = String(user.id);
+    if (initialSelectionUserIdRef.current === userId) return;
+    if (
+      activeConversationId &&
+      conversationQuery.data.some(item => item.id === activeConversationId)
+    ) {
+      initialSelectionUserIdRef.current = userId;
       return;
-    initialConversationResolvedRef.current = true;
+    }
+    initialSelectionUserIdRef.current = userId;
     if (isFreshChatPreview) return;
     if (sharedConversationId) {
       void utils.conversation.get
@@ -485,7 +520,14 @@ export default function Home() {
     }
     if (conversationQuery.data.length)
       setActiveConversationId(conversationQuery.data[0].id);
-  }, [isFreshChatPreview, sharedConversationId, utils.conversation.get]);
+  }, [
+    user?.id,
+    activeConversationId,
+    conversationQuery.data,
+    isFreshChatPreview,
+    sharedConversationId,
+    utils.conversation.get,
+  ]);
 
   useEffect(() => {
     document.documentElement.classList.toggle(
@@ -635,6 +677,10 @@ export default function Home() {
             streamConversation = data as StreamConversation;
             setGeneratingMessageId(data.assistantMessageId);
             setActiveConversationId(data.conversationId);
+            // This conversation was just created server-side; the local drafts
+            // below are authoritative, so the seed effect must not overwrite
+            // them with a mid-stream database snapshot.
+            seededConversationIdRef.current = data.conversationId;
             setChatMessages(current =>
               current.map(message =>
                 message.id.startsWith("local-user")
@@ -743,9 +789,26 @@ export default function Home() {
         : "completed";
 
     if (!completedConversation) {
-      if (!userStopped)
-        setComposerValue(current => (current ? current : content));
+      setComposerValue(current => (current ? current : content));
       if (failureMessage) toast.error(failureMessage);
+      if (options.regenerateAssistantMessageId || options.replaceUserMessageId) {
+        // The turn ids are already server-recognized; keep the layout intact
+        // and mark the in-flight bubble as failed so Retry is available.
+        setChatMessages(current =>
+          current.map(message =>
+            message.role === "assistant" && message.status === "streaming"
+              ? { ...message, content: "", status: "failed" }
+              : message
+          )
+        );
+      } else {
+        // The request never produced a server conversation, so the optimistic
+        // drafts have no ids to keep. Remove them while preserving the user's
+        // wording in the composer for an easy retry.
+        setChatMessages(current =>
+          current.filter(message => !message.id.startsWith("local-"))
+        );
+      }
       return;
     }
 
@@ -754,7 +817,11 @@ export default function Home() {
     setChatMessages(current =>
       current.map(message =>
         message.role === "assistant" && message.status === "streaming"
-          ? { ...message, content: responseText || message.content, status: finalStatus }
+          ? {
+              ...message,
+              content: responseText || message.content,
+              status: finalStatus,
+            }
           : message
       )
     );
@@ -790,9 +857,17 @@ export default function Home() {
     generationActiveRef.current = false;
     setIsGenerating(false);
     setGeneratingMessageId(null);
+    seededConversationIdRef.current = null;
     setChatMessages([]);
     setActiveConversationId(null);
     setPrimaryWorkspace(null);
+    setWebSearchEnabled(false);
+    setAttachmentNotices([]);
+    setWebSourcesByMessage({});
+    setWebSearchStatus({});
+    window.speechSynthesis?.cancel();
+    setSpeakingMessageId(null);
+    setSpeechState("idle");
     setSidebarOpen(false);
   }
 
@@ -904,6 +979,11 @@ export default function Home() {
       });
       setHistoryMessage(null);
       setEditingMessage(null);
+      setChatMessages(current =>
+        current.map(item =>
+          item.id === message.id ? { ...item, content } : item
+        )
+      );
       if (!result.regenerated) toast.success("Message version restored.");
     } catch {
       // The mutation reports a recoverable error to the user.
@@ -937,6 +1017,11 @@ export default function Home() {
         },
       });
       setEditingMessage(null);
+      setChatMessages(current =>
+        current.map(item =>
+          item.id === message.id ? { ...item, content } : item
+        )
+      );
       if (!result.regenerated) toast.success("Your message was updated.");
     } catch {
       // The mutation-level error message already informs the user.
@@ -955,6 +1040,12 @@ export default function Home() {
         : undefined;
     if (message.role !== "assistant" || !sourceUser) {
       toast.error("KSEMO could not find the user turn for this response.");
+      return;
+    }
+    if (message.id.startsWith("local-")) {
+      // A retry of a response that never reached the server: re-send the
+      // source turn normally so a real conversation is created.
+      void sendMessage(sourceUser.content);
       return;
     }
     void sendMessage(sourceUser.content, {
@@ -1149,9 +1240,12 @@ export default function Home() {
       toast.info("Finish or stop the current response before switching chats.");
       return;
     }
+    if (id === activeConversationId) return;
     setChatMessages([]);
     setPrimaryWorkspace(null);
     setActiveConversationId(id);
+    setWebSearchEnabled(false);
+    setAttachmentNotices([]);
     setSidebarOpen(false);
   }
 
@@ -1306,7 +1400,7 @@ export default function Home() {
               )}
               aria-label="Conversation"
             >
-              {activeQuery.isLoading && activeConversationId ? (
+              {activeQuery.isLoading && activeConversationId && !isGenerating ? (
                 <div className="grid h-full place-items-center text-sm text-muted-foreground">
                   Loading conversation…
                 </div>
@@ -1448,7 +1542,7 @@ export default function Home() {
         onOpenChange={setSearchOpen}
         conversations={conversationQuery.data ?? []}
         onSelectConversation={id => {
-          setActiveConversationId(id);
+          selectConversation(id);
           setSearchOpen(false);
         }}
       />
@@ -1463,7 +1557,7 @@ export default function Home() {
           setPrimaryWorkspace("library");
         }}
         onAllChatsDeleted={() => {
-          setActiveConversationId(null);
+          newChat();
           utils.conversation.list.invalidate();
         }}
         onOpenSharedLinks={() => {
@@ -1589,7 +1683,12 @@ export default function Home() {
           if (deleteTarget.kind === "conversation") {
             permanentDeleteMutation.mutate({ id: deleteTarget.id });
             if (activeConversationId === deleteTarget.id) newChat();
-          } else messageRemoveMutation.mutate({ id: deleteTarget.id });
+          } else {
+            messageRemoveMutation.mutate({ id: deleteTarget.id });
+            setChatMessages(current =>
+              current.filter(message => message.id !== deleteTarget.id)
+            );
+          }
           setDeleteTarget(null);
         }}
       />
