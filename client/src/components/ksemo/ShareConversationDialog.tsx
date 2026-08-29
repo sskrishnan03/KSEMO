@@ -39,7 +39,7 @@ export const ShareConversationDialog = memo(function ShareConversationDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="rounded-2xl sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="font-serif text-2xl tracking-[-0.03em]">
+          <DialogTitle className="text-xl font-semibold tracking-[-0.02em]">
             Share conversation
           </DialogTitle>
           <DialogDescription>

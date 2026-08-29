@@ -9,15 +9,34 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { startLogin } from "@/const";
 import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
-import { Menu } from "lucide-react";
+import {
+  Archive,
+  FileText,
+  Files,
+  Menu,
+  MoreHorizontal,
+  Share2,
+  Trash2,
+} from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { memo } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
 import { ChatComposer } from "../components/ksemo/ChatComposer";
+import {
+  ChatFilesDialog,
+  type ChatFile,
+} from "../components/ksemo/ChatFilesDialog";
 import AuthStage from "./AuthStage";
 import { ConversationSidebar } from "../components/ksemo/ConversationSidebar";
 import {
@@ -26,10 +45,8 @@ import {
 } from "../components/ksemo/MessageContent";
 import { SettingsDialog } from "../components/ksemo/SettingsDialog";
 import { ShareConversationDialog } from "../components/ksemo/ShareConversationDialog";
-import {
-  KsemoConfirmDialogPanel,
-  KsemoTextDialogPanel,
-} from "../components/ksemo/DialogPanels";
+import { ConfirmDeleteDialog } from "../components/ksemo/ConfirmDeleteDialog";
+import { KsemoTextDialogPanel } from "../components/ksemo/DialogPanels";
 import { MessageHistoryDialogPanel } from "../components/ksemo/MessageHistoryDialogPanel";
 import { useVoiceInput } from "../hooks/useVoiceInput";
 import { usePersistFn } from "../hooks/usePersistFn";
@@ -229,6 +246,7 @@ export default function Home() {
     null
   );
   const [searchOpen, setSearchOpen] = useState(false);
+  const [chatFilesOpen, setChatFilesOpen] = useState(false);
   const activePrimaryWorkspace = primaryWorkspace ?? inlineWorkspaceSection;
   const [shareTarget, setShareTarget] = useState<{
     id: string;
@@ -621,6 +639,26 @@ export default function Home() {
     isMessagePreview,
     chatMessages,
   ]);
+
+  const chatFiles = useMemo<ChatFile[]>(() => {
+    const seen = new Set<string>();
+    const files: ChatFile[] = [];
+    for (const message of chatMessages) {
+      for (const attachment of message.attachments ?? []) {
+        if (!attachment.id) continue;
+        const key = attachment.id || attachment.url;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        files.push({
+          id: attachment.id,
+          filename: attachment.filename,
+          mimeType: attachment.mimeType,
+          url: attachment.url,
+        });
+      }
+    }
+    return files;
+  }, [chatMessages]);
 
   useEffect(() => {
     if (!user?.id || !conversationQuery.data) return;
@@ -1704,6 +1742,12 @@ export default function Home() {
       setPrimaryWorkspace("library");
     }
   );
+  const stableOnOpenArchivedConversation = usePersistFn(
+    (conversationId: string) => {
+      setSettingsOpen(false);
+      selectConversation(conversationId);
+    }
+  );
   const stableOnAllChatsDeleted = usePersistFn(() => {
     newChat();
     utils.conversation.list.invalidate();
@@ -1825,6 +1869,85 @@ export default function Home() {
             >
               <Menu className="size-4" />
             </Button>
+
+            {visibleMessages.length > 0 && (
+              <div className="absolute right-4 top-4 z-10">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-9 rounded-xl"
+                      aria-label="Chat actions"
+                    >
+                      <MoreHorizontal className="size-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    <DropdownMenuItem
+                      disabled={!activeConversationId}
+                      onSelect={() => {
+                        if (activeConversationId)
+                          stableOnArchive({ id: activeConversationId });
+                      }}
+                    >
+                      <Archive className="mr-2 size-4" />
+                      Archive
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      disabled={!activeConversationId}
+                      onSelect={() => {
+                        if (activeConversationId) {
+                          const conv = activeQuery.data?.conversation;
+                          stableOnShareConversation(
+                            conv
+                              ? {
+                                  id: activeConversationId,
+                                  title: conv.title,
+                                  isPublic: conv.isPublic,
+                                  shareToken: conv.shareToken,
+                                }
+                              : {
+                                  id: activeConversationId,
+                                  title: "this conversation",
+                                }
+                          );
+                        }
+                      }}
+                    >
+                      <Share2 className="mr-2 size-4" />
+                      Share
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => setChatFilesOpen(true)}>
+                      <Files className="mr-2 size-4" />
+                      View files in this chat
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      disabled={!activeConversationId}
+                      className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+                      onSelect={() => {
+                        if (activeConversationId)
+                          stableOnDelete({
+                            id: activeConversationId,
+                            title:
+                              activeQuery.data?.conversation?.title ??
+                              "this conversation",
+                          });
+                      }}
+                    >
+                      <Trash2 className="mr-2 size-4" />
+                      Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <ChatFilesDialog
+                  open={chatFilesOpen}
+                  onOpenChange={setChatFilesOpen}
+                  files={chatFiles}
+                />
+              </div>
+            )}
 
             <section
               ref={messagesContainerRef}
@@ -1963,6 +2086,7 @@ export default function Home() {
         onOpenWorkspace={stableSettingsOnOpenWorkspace}
         onAllChatsDeleted={stableOnAllChatsDeleted}
         onOpenSharedLinks={stableOnOpenSharedLinks}
+        onOpenConversation={stableOnOpenArchivedConversation}
         onDeleteAccount={stableOnDeleteAccount}
       />
       <WorkspacePanel
@@ -2037,7 +2161,7 @@ export default function Home() {
         restoring={messageRestoreMutation.isPending}
         onRestore={stableRestoreMessageVersion}
       />
-      <KsemoConfirmDialog
+      <ConfirmDeleteDialog
         open={Boolean(deleteTarget) || isDeletePreview}
         onOpenChange={stableDeleteDialogOpen}
         title={
@@ -2050,8 +2174,8 @@ export default function Home() {
             ? `“${deleteTarget?.title ?? "Project planning"}” and its messages will be permanently removed.`
             : `This action permanently removes ${deleteTarget?.title ?? "this message"}.`
         }
-        actionLabel="Delete permanently"
-        onAction={stableDeleteAction}
+        confirmLabel="Delete"
+        onConfirm={stableDeleteAction}
       />
     </div>
   );
@@ -2175,40 +2299,6 @@ const MessageHistoryDialog = memo(function MessageHistoryDialog({
           loading={loading}
           restoring={restoring}
           onRestore={onRestore}
-        />
-      </DialogContent>
-    </Dialog>
-  );
-});
-
-const KsemoConfirmDialog = memo(function KsemoConfirmDialog({
-  open,
-  onOpenChange,
-  title,
-  description,
-  actionLabel,
-  onAction,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  title: string;
-  description: string;
-  actionLabel: string;
-  onAction: () => void;
-}) {
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="rounded-2xl sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="text-xl font-semibold tracking-[-0.02em]">
-            {title}
-          </DialogTitle>
-          <DialogDescription>{description}</DialogDescription>
-        </DialogHeader>
-        <KsemoConfirmDialogPanel
-          actionLabel={actionLabel}
-          onCancel={() => onOpenChange(false)}
-          onAction={onAction}
         />
       </DialogContent>
     </Dialog>

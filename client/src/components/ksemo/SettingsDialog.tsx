@@ -1,14 +1,5 @@
 import { Button } from "@/components/ui/button";
 import {
-  AlertDialog,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -19,11 +10,18 @@ import { Input } from "@/components/ui/input";
 import { Loading } from "@/components/ui/loading";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useTheme, type ThemeMode } from "@/contexts/ThemeContext";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
+import { ConfirmDeleteDialog } from "./ConfirmDeleteDialog";
 import {
   Archive,
+  ArchiveRestore,
   Bug,
   ExternalLink,
   KeyRound,
@@ -98,6 +96,7 @@ export const SettingsDialog = memo(function SettingsDialog({
   onAllChatsDeleted,
   onOpenSharedLinks,
   onDeleteAccount,
+  onOpenConversation,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -107,11 +106,27 @@ export const SettingsDialog = memo(function SettingsDialog({
   onAllChatsDeleted: () => void;
   onOpenSharedLinks?: () => void;
   onDeleteAccount?: () => void;
+  onOpenConversation?: (conversationId: string) => void;
 }) {
   const [activeTab, setActiveTab] = useState<SettingsTab>("account");
   const [archivedOpen, setArchivedOpen] = useState(false);
   const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
   const [confirmDeleteAccount, setConfirmDeleteAccount] = useState(false);
+  const utils = trpc.useUtils();
+  const removeAllMutation = trpc.conversation.removeAll.useMutation({
+    onSuccess: result => {
+      utils.conversation.list.invalidate();
+      toast.success(
+        result.removed === 1
+          ? "1 chat deleted"
+          : `${result.removed} chats deleted`
+      );
+      setConfirmDeleteAll(false);
+      onOpenChange(false);
+      onAllChatsDeleted();
+    },
+    onError: () => toast.error("Could not delete all chats."),
+  });
 
   useEffect(() => {
     if (open) setActiveTab("account");
@@ -210,52 +225,34 @@ export const SettingsDialog = memo(function SettingsDialog({
         </div>
       </DialogContent>
 
-      <ArchivedChatsDialog open={archivedOpen} onOpenChange={setArchivedOpen} />
-      <AlertDialog open={confirmDeleteAll} onOpenChange={setConfirmDeleteAll}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete all chats?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This permanently removes every conversation, including archived
-              ones. This cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <DeleteAllConfirm
-            onDone={() => {
-              setConfirmDeleteAll(false);
-              onOpenChange(false);
-              onAllChatsDeleted();
-            }}
-            onCancel={() => setConfirmDeleteAll(false)}
-          />
-        </AlertDialogContent>
-      </AlertDialog>
-      <AlertDialog open={confirmDeleteAccount} onOpenChange={setConfirmDeleteAccount}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Account?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Permanently delete your account and associated data. Deletions are
-              immediate and cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setConfirmDeleteAccount(false)}>
-              Cancel
-            </AlertDialogCancel>
-            <Button
-              className="bg-destructive text-white hover:bg-destructive/90"
-              onClick={() => {
-                setConfirmDeleteAccount(false);
-                onOpenChange(false);
-                onDeleteAccount?.();
-              }}
-            >
-              Delete Account
-            </Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ArchivedChatsDialog
+        open={archivedOpen}
+        onOpenChange={setArchivedOpen}
+        onCloseSettings={() => onOpenChange(false)}
+        onOpenConversation={onOpenConversation}
+      />
+      <ConfirmDeleteDialog
+        open={confirmDeleteAll}
+        onOpenChange={setConfirmDeleteAll}
+        title="Delete all chats?"
+        description="Every conversation, including archived ones, will be permanently removed."
+        confirmLabel="Delete"
+        confirmKeyword="DELETE"
+        busy={removeAllMutation.isPending}
+        onConfirm={() => removeAllMutation.mutate()}
+      />
+      <ConfirmDeleteDialog
+        open={confirmDeleteAccount}
+        onOpenChange={setConfirmDeleteAccount}
+        title="Delete account?"
+        description="Your account and all associated data will be permanently removed."
+        confirmLabel="Delete"
+        confirmKeyword="DELETE"
+        onConfirm={() => {
+          onOpenChange(false);
+          onDeleteAccount?.();
+        }}
+      />
     </Dialog>
   );
 });
@@ -749,18 +746,21 @@ function DataSection({
         </p>
       </div>
       <div className="space-y-2">
-        <button
-          onClick={onOpenArchived}
-          className="flex w-full items-center justify-between rounded-xl border border-border p-3.5 text-left transition-colors hover:bg-muted/50"
-        >
+        <div className="flex w-full items-center justify-between rounded-xl border border-border p-3.5 text-left">
           <div>
             <p className="text-sm font-medium">Archived chats</p>
             <p className="mt-0.5 text-xs text-muted-foreground">
               Hidden from sidebar, kept safe
             </p>
           </div>
-          <Archive className="size-4 text-muted-foreground" />
-        </button>
+          <button
+            type="button"
+            onClick={onOpenArchived}
+            className="rounded-lg bg-foreground px-2.5 py-1 text-[11px] font-semibold text-background transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          >
+            Manage
+          </button>
+        </div>
         <button
           onClick={() => onOpenWorkspace("files")}
           className="flex w-full items-center justify-between rounded-xl border border-border p-3.5 text-left transition-colors hover:bg-muted/50"
@@ -944,91 +944,38 @@ function FeedbackSection() {
   );
 }
 
-function DeleteAllConfirm({
-  onDone,
-  onCancel,
-}: {
-  onDone: () => void;
-  onCancel: () => void;
-}) {
-  const [confirmText, setConfirmText] = useState("");
-  const utils = trpc.useUtils();
-  const removeAllMutation = trpc.conversation.removeAll.useMutation({
-    onSuccess: result => {
-      utils.conversation.list.invalidate();
-      toast.success(
-        result.removed === 1
-          ? "1 chat deleted"
-          : `${result.removed} chats deleted`
-      );
-      onDone();
-    },
-    onError: () => toast.error("Could not delete all chats."),
-  });
-
-  const matches = confirmText.trim() === "DELETE";
-
-  return (
-    <>
-      <div className="px-6 pb-4">
-        <p className="text-sm text-muted-foreground">
-          Type{" "}
-          <span className="font-mono font-medium text-foreground">DELETE</span>{" "}
-          to confirm:
-        </p>
-        <Input
-          autoFocus
-          value={confirmText}
-          onChange={e => setConfirmText(e.target.value)}
-          className="mt-2 h-9 rounded-lg font-mono text-sm"
-          placeholder="DELETE"
-          onKeyDown={e => {
-            if (e.key === "Enter" && matches) {
-              e.preventDefault();
-              removeAllMutation.mutate();
-            }
-          }}
-        />
-      </div>
-      <AlertDialogFooter>
-        <AlertDialogCancel onClick={onCancel}>Cancel</AlertDialogCancel>
-        <Button
-          className="bg-destructive text-white hover:bg-destructive/90"
-          disabled={!matches || removeAllMutation.isPending}
-          onClick={() => {
-            if (matches) removeAllMutation.mutate();
-          }}
-        >
-          {removeAllMutation.isPending ? "Deleting…" : "Delete everything"}
-        </Button>
-      </AlertDialogFooter>
-    </>
-  );
-}
-
 function ArchivedChatsDialog({
   open,
   onOpenChange,
+  onCloseSettings,
+  onOpenConversation,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onCloseSettings?: () => void;
+  onOpenConversation?: (conversationId: string) => void;
 }) {
   const archivedQuery = trpc.conversation.list.useQuery(
     { scope: "archived" },
     { enabled: open }
   );
   const utils = trpc.useUtils();
+  const [deleteTarget, setDeleteTarget] = useState<{
+    id: string;
+    title: string;
+  } | null>(null);
   const restoreMutation = trpc.conversation.setArchived.useMutation({
     onSuccess: () => {
       utils.conversation.list.invalidate();
-      toast.success("Chat restored");
+      toast.success("Chat restored to your sidebar");
     },
     onError: () => toast.error("Could not restore chat."),
   });
   const deleteMutation = trpc.conversation.remove.useMutation({
     onSuccess: () => {
       utils.conversation.list.invalidate();
-      toast.success("Chat deleted");
+      if (deleteTarget) setDeleteTarget(null);
+      toast.success("Chat deleted permanently");
     },
     onError: () => toast.error("Could not delete chat."),
   });
@@ -1038,64 +985,110 @@ function ArchivedChatsDialog({
     updatedAt?: Date | string | null;
   }>;
 
+  const openChat = (id: string) => {
+    onOpenConversation?.(id);
+    onOpenChange(false);
+    onCloseSettings?.();
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[32rem] w-[calc(100%-1.5rem)] max-w-lg flex-col gap-0 overflow-hidden rounded-2xl p-0">
-        <div className="shrink-0 border-b border-border px-4 pb-3 pt-4">
-          <p className="text-base font-semibold">Archived chats</p>
-          <p className="text-xs text-muted-foreground">
-            Restore or delete permanently.
-          </p>
-        </div>
-        <div className="min-h-0 flex-1 overflow-y-auto p-3">
-          {archivedQuery.isLoading ? (
-            <Loading className="py-6" />
-          ) : !conversations.length ? (
-            <div className="py-8 text-center">
-              <Archive className="mx-auto size-6 text-muted-foreground" />
-              <p className="mt-3 text-sm font-medium">Nothing archived</p>
-            </div>
-          ) : (
-            <ul className="space-y-1.5">
-              {conversations.map(c => (
-                <li
-                  key={c.id}
-                  className="flex items-center gap-2 rounded-xl border border-border px-3 py-2"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-[13px] font-medium">
-                      {c.title}
-                    </p>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="size-7 shrink-0 rounded-lg"
-                    disabled={restoreMutation.isPending}
-                    onClick={() =>
-                      restoreMutation.mutate({
-                        id: c.id,
-                        isArchived: false,
-                      })
-                    }
-                  >
-                    <span className="text-xs">Restore</span>
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="size-7 shrink-0 rounded-lg text-destructive"
-                    disabled={deleteMutation.isPending}
-                    onClick={() => deleteMutation.mutate({ id: c.id })}
-                  >
-                    <Trash2 className="size-3.5" />
-                  </Button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="flex max-h-[32rem] w-[calc(100%-1.5rem)] max-w-lg flex-col gap-0 overflow-hidden rounded-2xl p-0">
+          <div className="shrink-0 border-b border-border px-4 pb-3 pt-4">
+            <p className="text-base font-semibold">Archived chats</p>
+            <p className="text-xs text-muted-foreground">
+              Tap a chat to open it, restore to unarchive, or delete
+              permanently.
+            </p>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto p-3">
+            {archivedQuery.isLoading ? (
+              <Loading className="py-6" />
+            ) : !conversations.length ? (
+              <div className="py-8 text-center">
+                <Archive className="mx-auto size-6 text-muted-foreground" />
+                <p className="mt-3 text-sm font-medium">Nothing archived</p>
+              </div>
+            ) : (
+              <ul className="space-y-1.5">
+                {conversations.map(c => (
+                  <li key={c.id}>
+                    <div className="group flex items-center gap-2 rounded-xl border border-border px-3 py-2 transition-colors hover:bg-muted/60">
+                      <button
+                        onClick={() => openChat(c.id)}
+                        className="min-w-0 flex-1 rounded-lg py-0.5 text-left focus-visible:ring-0 focus-visible:outline-none"
+                      >
+                        <p className="truncate text-[13px] font-medium">
+                          {c.title}
+                        </p>
+                        <p className="mt-0.5 text-[11px] text-muted-foreground">
+                          Archived
+                        </p>
+                      </button>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            aria-label="Unarchive chat"
+                            className="size-8 shrink-0 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
+                            disabled={restoreMutation.isPending}
+                            onClick={() =>
+                              restoreMutation.mutate({
+                                id: c.id,
+                                isArchived: false,
+                              })
+                            }
+                          >
+                            <ArchiveRestore className="size-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom">
+                          Unarchive
+                        </TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            aria-label="Delete chat"
+                            className="size-8 shrink-0 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                            disabled={deleteMutation.isPending}
+                            onClick={() =>
+                              setDeleteTarget({ id: c.id, title: c.title })
+                            }
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom">
+                          Delete
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <ConfirmDeleteDialog
+        open={Boolean(deleteTarget)}
+        onOpenChange={openState => {
+          if (!openState) setDeleteTarget(null);
+        }}
+        title="Delete this chat?"
+        description={`“${deleteTarget?.title ?? "This chat"}” will be permanently removed.`}
+        confirmLabel="Delete"
+        busy={deleteMutation.isPending}
+        onConfirm={() => {
+          if (deleteTarget) deleteMutation.mutate({ id: deleteTarget.id });
+        }}
+      />
+    </>
   );
 }

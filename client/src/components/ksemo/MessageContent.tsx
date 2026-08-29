@@ -12,11 +12,11 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { getFileKind } from "@/lib/fileKinds";
 import {
   Check,
   Copy,
   Ellipsis,
-  FileText,
   Globe,
   History,
   Loader2,
@@ -148,8 +148,9 @@ export const MessageContent = memo(function MessageContent({
       >
         {isUser && message.attachments?.length ? (
           <div className="mb-2 flex max-w-full flex-wrap justify-end gap-2">
-            {message.attachments.map(file =>
-              file.mimeType?.startsWith("image/") ? (
+            {message.attachments.map(file => {
+              const kind = getFileKind(file.filename, file.mimeType);
+              return file.mimeType?.startsWith("image/") ? (
                 <button
                   key={file.id}
                   type="button"
@@ -172,19 +173,23 @@ export const MessageContent = memo(function MessageContent({
                   className="overflow-hidden rounded-xl border border-border bg-muted/50 text-left shadow-sm"
                 >
                   <span className="flex min-w-44 items-center gap-2 p-2.5">
-                    <FileText className="size-4 shrink-0 text-muted-foreground" />
+                    <span
+                      className={`flex size-8 shrink-0 items-center justify-center rounded-lg ${kind.colorClass}`}
+                    >
+                      <kind.icon className="size-4" />
+                    </span>
                     <span className="min-w-0">
                       <span className="block truncate text-xs font-medium">
                         {file.filename}
                       </span>
-                      <span className="mt-0.5 block text-[10px] text-muted-foreground">
-                        File attached
+                      <span className="mt-0.5 block text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                        {kind.label}
                       </span>
                     </span>
                   </span>
                 </a>
-              )
-            )}
+              );
+            })}
           </div>
         ) : null}
         <div

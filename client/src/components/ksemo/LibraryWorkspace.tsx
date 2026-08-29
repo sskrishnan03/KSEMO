@@ -2,13 +2,11 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Loading } from "@/components/ui/loading";
 import { trpc } from "@/lib/trpc";
+import { ConfirmDeleteDialog } from "./ConfirmDeleteDialog";
 import {
   extensionOfFilename,
   fileVisualFor,
@@ -504,38 +502,25 @@ export function LibraryWorkspace({
         </div>
       </div>
 
-      <Dialog
+      <ConfirmDeleteDialog
         open={Boolean(deleteTarget)}
         onOpenChange={open => {
           if (!open) setDeleteTarget(null);
         }}
-      >
-        <DialogContent className="rounded-2xl sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-xl font-semibold tracking-[-0.02em]">
-              Delete{" "}
-              {deleteTarget?.length === 1 ? "this file" : "selected files"}?
-            </DialogTitle>
-            <DialogDescription>
-              {deleteTarget?.length === 1
-                ? `“${deleteTarget[0]?.filename}” will be permanently removed from your private Library. This can't be undone.`
-                : `${deleteTarget?.length ?? 0} items will be permanently removed from your private Library. This can't be undone.`}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex justify-end gap-2">
-            <Button variant="ghost" onClick={() => setDeleteTarget(null)}>
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={confirmRemoval}
-              disabled={removeMutation.isPending}
-            >
-              {removeMutation.isPending ? "Deleting…" : "Delete permanently"}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+        title={
+          deleteTarget?.length === 1
+            ? "Delete this file?"
+            : "Delete selected files?"
+        }
+        description={
+          deleteTarget?.length === 1
+            ? `“${deleteTarget[0]?.filename}” will be permanently removed from your private Library.`
+            : `${deleteTarget?.length ?? 0} items will be permanently removed from your private Library.`
+        }
+        confirmLabel="Delete"
+        busy={removeMutation.isPending}
+        onConfirm={confirmRemoval}
+      />
     </main>
   );
 }

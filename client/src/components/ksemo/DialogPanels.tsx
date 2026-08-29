@@ -43,42 +43,17 @@ export function KsemoTextDialogPanel({
         )}
       </div>
       <div className="flex justify-end gap-2">
-        <Button variant="ghost" onClick={onCancel}>
+        <Button
+          variant="ghost"
+          onClick={onCancel}
+          className="outline-none focus-visible:ring-0 focus-visible:border-transparent"
+        >
           Cancel
         </Button>
         <Button
           onClick={onAction}
           disabled={!value.trim()}
           className="rounded-xl bg-foreground text-background hover:bg-foreground/90"
-        >
-          {actionLabel}
-        </Button>
-      </div>
-    </>
-  );
-}
-
-export function KsemoConfirmDialogPanel({
-  actionLabel,
-  onCancel,
-  onAction,
-}: {
-  actionLabel: string;
-  onCancel: () => void;
-  onAction: () => void;
-}) {
-  return (
-    <>
-      <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs leading-5 text-muted-foreground">
-        This action cannot be undone.
-      </div>
-      <div className="flex justify-end gap-2">
-        <Button variant="ghost" onClick={onCancel}>
-          Cancel
-        </Button>
-        <Button
-          onClick={onAction}
-          className="rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90"
         >
           {actionLabel}
         </Button>

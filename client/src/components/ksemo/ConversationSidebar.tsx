@@ -277,7 +277,7 @@ export const ConversationSidebar = memo(function ConversationSidebar({
                   variant="ghost"
                   size="icon"
                   onClick={onClose}
-                  className="size-8 rounded-lg lg:hidden"
+                  className="size-8 rounded-lg text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-0 focus-visible:border-transparent lg:hidden"
                   aria-label="Close navigation"
                 >
                   <PanelLeftClose className="size-4" />
@@ -417,7 +417,7 @@ export const ConversationSidebar = memo(function ConversationSidebar({
                               event.stopPropagation();
                               onRemoveAccount?.(account);
                             }}
-                            className="ml-1 rounded-md p-0.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                            className="ml-1 rounded-md p-0.5 text-muted-foreground outline-none transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:ring-0"
                             aria-label={`Remove ${account.name || account.email}`}
                           >
                             <X className="size-3" />

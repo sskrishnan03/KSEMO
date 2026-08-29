@@ -14,13 +14,10 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { filterLibraryItems } from "@/lib/ksemoInteraction";
+import { getFileKind, IMAGE_EXT } from "@/lib/fileKinds";
 import {
   ArrowUp,
   Check,
-  File,
-  FileArchive,
-  FileImage,
-  FileSpreadsheet,
   FileText,
   FileUp,
   Globe,
@@ -29,7 +26,6 @@ import {
   Mic,
   MonitorUp,
   Plus,
-  Presentation,
   Square,
   X,
 } from "lucide-react";
@@ -44,40 +40,6 @@ import React, {
 
 export const getLibrarySubmenuClass = (isCentered: boolean) =>
   `absolute left-1/2 -translate-x-1/2 z-50 max-h-[calc(100dvh-${isCentered ? "12rem" : "6rem"})] w-full max-w-3xl rounded-xl border border-border bg-popover p-0 text-popover-foreground shadow-xl`;
-
-const IMAGE_EXT = /\.(png|jpe?g|webp|gif|bmp|svg|avif)$/i;
-
-type FileKind = {
-  label: string;
-  icon: React.ComponentType<{ className?: string }>;
-  colorClass: string;
-};
-
-function getFileKind(name: string, mimeType?: string): FileKind {
-  const mime = (mimeType ?? "").toLowerCase();
-  if (/pdf$/.test(mime) || /\.pdf$/i.test(name)) {
-    return { label: "PDF", icon: FileText, colorClass: "bg-red-500/10 text-red-500" };
-  }
-  if (/(spreadsheetml\.sheet$|excel$|officedocument\.spreadsheetml)/.test(mime) || /\.(xlsx|xls|csv|tsv)$/i.test(name)) {
-    return { label: "Sheet", icon: FileSpreadsheet, colorClass: "bg-emerald-500/10 text-emerald-500" };
-  }
-  if (/(ppt|presentationml)/.test(mime) || /\.pptx?$/i.test(name)) {
-    return { label: "Slides", icon: Presentation, colorClass: "bg-orange-500/10 text-orange-500" };
-  }
-  if (/(wordprocessingml|document$|msword)/.test(mime) || /\.docx?$/i.test(name)) {
-    return { label: "Word", icon: FileText, colorClass: "bg-blue-500/10 text-blue-500" };
-  }
-  if (/zip|compressed|tar|gzip/.test(mime) || /\.(zip|rar|7z|tar|gz)$/i.test(name)) {
-    return { label: "Archive", icon: FileArchive, colorClass: "bg-amber-500/10 text-amber-500" };
-  }
-  if (/^image\//.test(mime) || IMAGE_EXT.test(name)) {
-    return { label: "Image", icon: FileImage, colorClass: "bg-violet-500/10 text-violet-500" };
-  }
-  if (/text\//.test(mime) || /\.(txt|md|markdown|json|log|xml|yml|yaml)$/i.test(name)) {
-    return { label: "Text", icon: FileText, colorClass: "bg-slate-500/10 text-slate-500" };
-  }
-  return { label: "File", icon: File, colorClass: "bg-muted text-muted-foreground" };
-}
 
 export const ChatComposer = memo(function ChatComposer({
   onSend,
@@ -278,7 +240,7 @@ export const ChatComposer = memo(function ChatComposer({
                   {onClearAttachment && (
                     <button
                       onClick={() => onClearAttachment(item.fileId)}
-                      className="absolute right-1 top-1 flex size-6 items-center justify-center rounded-full border border-border bg-background/80 text-foreground opacity-0 shadow-md backdrop-blur transition-opacity hover:bg-background group-hover:opacity-100"
+                      className="absolute right-1 top-1 flex size-6 items-center justify-center rounded-full border border-border bg-background/80 text-foreground opacity-0 shadow-md backdrop-blur outline-none transition-opacity hover:bg-background focus-visible:ring-0 group-hover:opacity-100"
                       aria-label="Remove screenshot"
                     >
                       <X className="size-3.5" />
@@ -310,7 +272,7 @@ export const ChatComposer = memo(function ChatComposer({
                   {onClearAttachment && (
                     <button
                       onClick={() => onClearAttachment(item.fileId)}
-                      className="ml-1 flex size-6 shrink-0 items-center justify-center rounded-full text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-foreground group-hover:opacity-100"
+                      className="ml-1 flex size-6 shrink-0 items-center justify-center rounded-full text-muted-foreground opacity-0 outline-none transition-opacity hover:bg-muted hover:text-foreground focus-visible:ring-0 group-hover:opacity-100"
                       aria-label="Remove screenshot"
                     >
                       <X className="size-3.5" />
@@ -369,7 +331,7 @@ export const ChatComposer = memo(function ChatComposer({
                       variant="ghost"
                       size="icon"
                       onClick={onCancelRecording}
-                      className="size-7 rounded-full"
+                      className="size-7 rounded-full outline-none focus-visible:ring-0 focus-visible:border-transparent"
                       aria-label="Cancel recording"
                     >
                       <X className="size-3.5" />
@@ -500,7 +462,7 @@ export const ChatComposer = memo(function ChatComposer({
                         variant="ghost"
                         size="icon"
                         onClick={onToggleWebSearch}
-                        className="size-6 rounded-lg text-muted-foreground hover:bg-background hover:text-foreground"
+                        className="size-6 rounded-lg text-muted-foreground outline-none hover:bg-background hover:text-foreground focus-visible:ring-0 focus-visible:border-transparent"
                         aria-label="Cancel web search"
                       >
                         <X className="size-3" />

@@ -1,7 +1,7 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { KsemoConfirmDialogPanel, KsemoTextDialogPanel } from "./DialogPanels";
+import { KsemoTextDialogPanel } from "./DialogPanels";
 
 describe("KSEMO branded action dialog panels", () => {
   it("renders the shared in-product rename and edit form controls", () => {
@@ -18,18 +18,6 @@ describe("KSEMO branded action dialog panels", () => {
     expect(markup).toContain("Conversation title");
     expect(markup).toContain("Save name");
     expect(markup).toContain("Cancel");
-  });
-
-  it("renders the in-product irreversible delete confirmation", () => {
-    const markup = renderToStaticMarkup(
-      createElement(KsemoConfirmDialogPanel, {
-        actionLabel: "Delete permanently",
-        onCancel: () => undefined,
-        onAction: () => undefined,
-      })
-    );
-    expect(markup).toContain("This action cannot be undone.");
-    expect(markup).toContain("Delete permanently");
   });
 
   it("renders the branded multiline message-edit surface", () => {

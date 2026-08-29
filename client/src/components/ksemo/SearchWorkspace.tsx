@@ -5,11 +5,10 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { Loading } from "@/components/ui/loading";
 import { cn } from "@/lib/utils";
 import { trpc } from "@/lib/trpc";
-import { MessageCircle, Search } from "lucide-react";
+import { MessageCircle, Search, X } from "lucide-react";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 
 type SearchResult = {
@@ -110,23 +109,33 @@ export const SearchDialog = memo(function SearchDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[70dvh] w-[min(55vw,580px)] max-sm:w-[calc(100%-2rem)] flex-col gap-0 overflow-hidden rounded-2xl p-0">
+      <DialogContent className="top-[9dvh]! flex max-h-[70dvh] w-[min(55vw,580px)] translate-y-0! max-sm:w-[calc(100%-2rem)] flex-col gap-0 overflow-hidden rounded-2xl p-0">
         <DialogTitle className="sr-only">Search</DialogTitle>
         <DialogDescription className="sr-only">
           Search conversations and messages
         </DialogDescription>
 
-        <div className="shrink-0 border-b border-border px-4 pb-3 pt-4 pr-12">
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
+        <div className="shrink-0 border-b border-border px-3 py-2">
+          <div className="flex h-10 items-center gap-2 px-1">
+            <Search className="size-4 shrink-0 text-muted-foreground" />
+            <input
               ref={inputRef}
               value={query}
               onChange={e => setQuery(e.target.value)}
-              className="h-10 rounded-xl pl-9 text-sm"
               placeholder="Search chats and messages…"
               aria-label="Search conversations and messages"
+              className="h-full w-full min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
             />
+            {query && (
+              <button
+                type="button"
+                onClick={() => setQuery("")}
+                className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-0"
+                aria-label="Clear search"
+              >
+                <X className="size-3.5" />
+              </button>
+            )}
           </div>
         </div>
 

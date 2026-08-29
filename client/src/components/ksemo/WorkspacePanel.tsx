@@ -23,6 +23,7 @@ import React, {
   useState,
 } from "react";
 import { toast } from "sonner";
+import { ConfirmDeleteDialog } from "./ConfirmDeleteDialog";
 
 export type WorkspaceSection = "files";
 
@@ -245,57 +246,16 @@ export const WorkspacePanel = memo(function WorkspacePanel({
           </div>
         </DialogContent>
       </Dialog>
-      <Dialog
+      <ConfirmDeleteDialog
         open={Boolean(deleteTarget)}
         onOpenChange={next => {
           if (!next) setDeleteTarget(null);
         }}
-      >
-        <DialogContent className="rounded-2xl sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-xl font-semibold tracking-[-0.02em]">
-              Remove {deleteTarget?.kind ?? "item"}?
-            </DialogTitle>
-            <DialogDescription>
-              "{deleteTarget?.label}" will be permanently removed from your
-              KSEMO workspace.
-            </DialogDescription>
-          </DialogHeader>
-          {deleteTarget && (
-            <WorkspaceDeleteConfirmPanel
-              onCancel={() => setDeleteTarget(null)}
-              onConfirm={confirmDelete}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
+        title={`Remove ${deleteTarget?.kind ?? "item"}?`}
+        description={`“${deleteTarget?.label}” will be permanently removed from your KSEMO workspace.`}
+        confirmLabel="Delete"
+        onConfirm={confirmDelete}
+      />
     </>
   );
 });
-
-export function WorkspaceDeleteConfirmPanel({
-  onCancel,
-  onConfirm,
-}: {
-  onCancel: () => void;
-  onConfirm: () => void;
-}) {
-  return (
-    <>
-      <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-muted-foreground">
-        This action cannot be undone.
-      </div>
-      <div className="flex justify-end gap-2">
-        <Button variant="ghost" onClick={onCancel}>
-          Cancel
-        </Button>
-        <Button
-          onClick={onConfirm}
-          className="rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90"
-        >
-          Delete permanently
-        </Button>
-      </div>
-    </>
-  );
-}

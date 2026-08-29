@@ -571,7 +571,7 @@ function FaqAssistant() {
             <Button
               variant="ghost"
               size="icon"
-              className="size-7 rounded-lg"
+              className="size-7 rounded-lg text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-0 focus-visible:border-transparent"
               onClick={() => setOpen(false)}
               aria-label="Close assistant"
             >
