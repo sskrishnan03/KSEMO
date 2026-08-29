@@ -10,6 +10,7 @@ import {
   preferenceRouter,
   voiceRouter,
 } from "./routers/ksemo";
+import { memoryRouter } from "./routers/memory";
 import { workspaceRouter } from "./routers/product";
 
 export const appRouter = router({
@@ -30,6 +31,7 @@ export const appRouter = router({
   feedback: feedbackRouter,
   message: messageRouter,
   preferences: preferenceRouter,
+  memory: memoryRouter,
   voice: voiceRouter,
   workspace: workspaceRouter,
 });

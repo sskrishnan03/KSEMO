@@ -54,7 +54,7 @@ export const conversationRouter = router({
     .input(
       z
         .object({
-          scope: z.enum(["active", "archived", "trash"]).default("active"),
+          scope: z.enum(["active", "archived", "trash", "shared"]).default("active"),
         })
         .optional()
     )

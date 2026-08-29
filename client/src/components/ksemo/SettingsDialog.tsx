@@ -17,28 +17,33 @@ import {
 } from "@/components/ui/tooltip";
 import { useTheme, type ThemeMode } from "@/contexts/ThemeContext";
 import { trpc } from "@/lib/trpc";
+import { createPublicConversationUrl } from "@/lib/ksemoInteraction";
 import { toast } from "sonner";
 import { ConfirmDeleteDialog } from "./ConfirmDeleteDialog";
 import {
   Archive,
   ArchiveRestore,
+  Brain,
   Bug,
+  Copy,
   ExternalLink,
   KeyRound,
   Lightbulb,
+  Link2,
   LogOut,
   MessageSquare,
   Palette,
-  Share2,
   ShieldCheck,
   ShieldOff,
   Settings2,
   Star,
   Trash2,
+  Unlink,
   User,
   Zap,
 } from "lucide-react";
 import React, { memo, useEffect, useState } from "react";
+import { MemorySection } from "./MemorySection";
 
 type Preferences =
   | {
@@ -51,6 +56,7 @@ type Preferences =
   | null
   | undefined;
 type User = {
+  id?: number;
   name?: string | null;
   email?: string | null;
   role?: string | null;
@@ -59,7 +65,13 @@ type User = {
   lastSignedIn?: Date | string | null;
 };
 
-type SettingsTab = "account" | "security" | "appearance" | "data" | "feedback";
+type SettingsTab =
+  | "account"
+  | "security"
+  | "appearance"
+  | "data"
+  | "memory"
+  | "feedback";
 
 export const settingsSections: Array<{
   id: string;
@@ -84,6 +96,7 @@ const settingsNavItems: Array<{
   { id: "security", label: "Security", icon: ShieldCheck },
   { id: "appearance", label: "Appearance", icon: Palette },
   { id: "data", label: "Data Control", icon: Trash2 },
+  { id: "memory", label: "Memory", icon: Brain },
   { id: "feedback", label: "Feedback", icon: MessageSquare },
 ];
 
@@ -92,24 +105,21 @@ export const SettingsDialog = memo(function SettingsDialog({
   onOpenChange,
   user,
   onSignOut,
-  onOpenWorkspace,
   onAllChatsDeleted,
-  onOpenSharedLinks,
-  onDeleteAccount,
+  onAccountDeleted,
   onOpenConversation,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   user: User;
   onSignOut: () => void;
-  onOpenWorkspace: (section: "files") => void;
   onAllChatsDeleted: () => void;
-  onOpenSharedLinks?: () => void;
-  onDeleteAccount?: () => void;
+  onAccountDeleted?: () => void;
   onOpenConversation?: (conversationId: string) => void;
 }) {
   const [activeTab, setActiveTab] = useState<SettingsTab>("account");
   const [archivedOpen, setArchivedOpen] = useState(false);
+  const [sharedOpen, setSharedOpen] = useState(false);
   const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
   const [confirmDeleteAccount, setConfirmDeleteAccount] = useState(false);
   const utils = trpc.useUtils();
@@ -126,6 +136,19 @@ export const SettingsDialog = memo(function SettingsDialog({
       onAllChatsDeleted();
     },
     onError: () => toast.error("Could not delete all chats."),
+  });
+  const deleteAccountMutation = trpc.auth.deleteAccount.useMutation({
+    onSuccess: () => {
+      setConfirmDeleteAccount(false);
+      onOpenChange(false);
+      onAccountDeleted?.();
+    },
+    onError: () => {
+      setConfirmDeleteAccount(false);
+      toast.error(
+        "Your account could not be deleted right now. Please try again."
+      );
+    },
   });
 
   useEffect(() => {
@@ -207,27 +230,38 @@ export const SettingsDialog = memo(function SettingsDialog({
 
           <div className="flex min-h-0 flex-1 flex-col">
             <div className="min-h-0 flex-1 overflow-y-auto p-4 md:p-5">
-              {activeTab === "account" && <AccountSection user={user} />}
+              {activeTab === "account" && (
+                <AccountSection
+                  user={user}
+                  deleteBusy={deleteAccountMutation.isPending}
+                  onDeleteAccount={() => setConfirmDeleteAccount(true)}
+                />
+              )}
               {activeTab === "security" && <SecuritySection user={user} />}
               {activeTab === "appearance" && <AppearanceSection />}
               {activeTab === "data" && (
                 <DataSection
-                  onOpenWorkspace={onOpenWorkspace}
                   onOpenArchived={() => setArchivedOpen(true)}
+                  onOpenShared={() => setSharedOpen(true)}
                   onDeleteAll={() => setConfirmDeleteAll(true)}
-                  onOpenSharedLinks={onOpenSharedLinks}
-                  onDeleteAccount={() => setConfirmDeleteAccount(true)}
                 />
               )}
+              {activeTab === "memory" && <MemorySection />}
               {activeTab === "feedback" && <FeedbackSection />}
             </div>
           </div>
         </div>
       </DialogContent>
 
-      <ArchivedChatsDialog
+      <ManagedChatsDialog
         open={archivedOpen}
         onOpenChange={setArchivedOpen}
+        onCloseSettings={() => onOpenChange(false)}
+        onOpenConversation={onOpenConversation}
+      />
+      <SharedChatsDialog
+        open={sharedOpen}
+        onOpenChange={setSharedOpen}
         onCloseSettings={() => onOpenChange(false)}
         onOpenConversation={onOpenConversation}
       />
@@ -245,91 +279,194 @@ export const SettingsDialog = memo(function SettingsDialog({
         open={confirmDeleteAccount}
         onOpenChange={setConfirmDeleteAccount}
         title="Delete account?"
-        description="Your account and all associated data will be permanently removed."
-        confirmLabel="Delete"
-        confirmKeyword="DELETE"
-        onConfirm={() => {
-          onOpenChange(false);
-          onDeleteAccount?.();
-        }}
+        description="Your account and all of your data — conversations, files, projects and settings — will be permanently removed. This cannot be undone."
+        confirmLabel="Delete account"
+        busyLabel="Deleting account…"
+        busy={deleteAccountMutation.isPending}
+        onConfirm={() => deleteAccountMutation.mutate()}
       />
     </Dialog>
   );
 });
 
-function AccountSection({ user }: { user: User }) {
-  const formatDate = (d?: Date | string | null) => {
-    if (!d) return "—";
-    const date = typeof d === "string" ? new Date(d) : d;
-    return date.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
-  };
-  const loginLabel =
-    user.loginMethod === "google"
-      ? "Google"
-      : user.loginMethod === "email"
-        ? "Email & password"
-        : user.loginMethod || "—";
+function AccountSection({
+  user,
+  deleteBusy,
+  onDeleteAccount,
+}: {
+  user: User;
+  deleteBusy: boolean;
+  onDeleteAccount: () => void;
+}) {
+  const utils = trpc.useUtils();
+  const [name, setName] = useState(user.name ?? "");
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">(
+    "idle"
+  );
+  useEffect(() => {
+    setName(user.name ?? "");
+  }, [user.name]);
+  const updateProfileMutation = trpc.auth.updateProfile.useMutation({
+    onMutate: () => setSaveState("saving"),
+    onSuccess: () => {
+      utils.auth.me.invalidate();
+      setSaveState("saved");
+    },
+    onError: () => {
+      setSaveState("idle");
+      toast.error("Could not save your name.");
+    },
+  });
+  useEffect(() => {
+    const trimmed = name.trim();
+    if (!trimmed) {
+      setSaveState("idle");
+      return;
+    }
+    if (trimmed === user.name) {
+      setSaveState("idle");
+      return;
+    }
+    setSaveState("saving");
+    const timer = setTimeout(() => {
+      updateProfileMutation.mutate({ name: trimmed });
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [name]);
+  const createdLabel = user.createdAt
+    ? new Date(user.createdAt).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      })
+    : "—";
 
   return (
     <div className="space-y-4">
       <div>
-        <h3 className="text-base font-semibold tracking-[-0.02em]">Account</h3>
+        <h3 className="text-base font-semibold tracking-[-0.02em]">
+          Your account
+        </h3>
         <p className="mt-1 text-sm text-muted-foreground">
-          Your account details and information.
+          Manage your account information.
         </p>
       </div>
+
       <div className="flex items-center gap-3.5 rounded-xl border border-border p-4">
         <div className="flex size-11 items-center justify-center rounded-xl bg-muted text-sm font-bold">
-          {user.name?.trim().charAt(0).toUpperCase() || "U"}
+          {(name.trim() || user.name || "U").charAt(0).toUpperCase()}
         </div>
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold">
-            {user.name || "KSEMO user"}
+            {name.trim() || "KSEMO user"}
           </p>
           <p className="mt-0.5 truncate text-xs text-muted-foreground">
             {user.email || "Signed in"}
           </p>
         </div>
       </div>
-      <div className="space-y-2">
-        <div className="flex items-center justify-between rounded-xl border border-border px-4 py-3">
-          <p className="text-sm text-muted-foreground">Email</p>
-          <p className="truncate text-sm font-medium">{user.email || "—"}</p>
-        </div>
-        <div className="flex items-center justify-between rounded-xl border border-border px-4 py-3">
-          <p className="text-sm text-muted-foreground">Role</p>
-          <p className="truncate text-sm font-medium capitalize">
-            {user.role || "user"}
+
+      <div className="space-y-4">
+        <div className="space-y-1.5">
+          <Label htmlFor="account-full-name" className="text-xs">
+            Full name
+          </Label>
+          <Input
+            id="account-full-name"
+            value={name}
+            maxLength={120}
+            onChange={e => setName(e.target.value)}
+            placeholder="Your name"
+            className="h-9 rounded-lg text-sm"
+          />
+          <p className="text-[11px] text-muted-foreground">
+            {saveState === "saving"
+              ? "Saving…"
+              : saveState === "saved"
+                ? "Saved"
+                : "Represents you across KSEMO"}
           </p>
         </div>
-        <div className="flex items-center justify-between rounded-xl border border-border px-4 py-3">
-          <p className="text-sm text-muted-foreground">Sign-in method</p>
-          <p className="truncate text-sm font-medium">{loginLabel}</p>
-        </div>
-        <div className="flex items-center justify-between rounded-xl border border-border px-4 py-3">
-          <p className="text-sm text-muted-foreground">Member since</p>
-          <p className="truncate text-sm font-medium">
-            {formatDate(user.createdAt)}
+
+        <div className="space-y-1.5">
+          <Label className="text-xs">Email</Label>
+          <p className="truncate text-sm font-medium text-foreground">
+            {user.email || "—"}
           </p>
         </div>
-        <div className="flex items-center justify-between rounded-xl border border-border px-4 py-3">
-          <p className="text-sm text-muted-foreground">Last signed in</p>
-          <p className="truncate text-sm font-medium">
-            {formatDate(user.lastSignedIn)}
+
+        <div className="space-y-1.5">
+          <Label className="text-xs">Account created</Label>
+          <p className="text-sm font-medium text-foreground">{createdLabel}</p>
+        </div>
+      </div>
+
+      <div className="flex w-full items-center justify-between gap-3 rounded-xl border border-destructive/30 bg-destructive/5 p-3.5">
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-destructive">Delete account</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Removes your account and all associated data
           </p>
         </div>
+        <button
+          type="button"
+          disabled={deleteBusy}
+          onClick={onDeleteAccount}
+          className="shrink-0 inline-flex items-center rounded-lg bg-destructive px-3 py-1.5 text-[11px] font-semibold text-white transition-opacity hover:opacity-90 disabled:pointer-events-none disabled:opacity-60"
+        >
+          {deleteBusy ? "Deleting…" : "Delete Account"}
+        </button>
       </div>
     </div>
   );
 }
 
 function SecuritySection({ user }: { user: User }) {
-  const hasPassword = !!user.loginMethod;
   const isGoogle = user.loginMethod === "google";
+  const hasPassword =
+    user.loginMethod === "password" || user.loginMethod === "email";
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const changePasswordMutation = trpc.auth.changePassword.useMutation({
+    onSuccess: () => {
+      toast.success("Password updated. Use it the next time you sign in.");
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setFormError(null);
+    },
+    onError: error => {
+      setFormError(error.message);
+      toast.error(error.message);
+    },
+  });
+
+  const canSubmit =
+    !changePasswordMutation.isPending &&
+    currentPassword.length >= 8 &&
+    newPassword.length >= 8 &&
+    confirmPassword.length >= 8;
+
+  const handleSubmitPassword = () => {
+    if (newPassword !== confirmPassword) {
+      setFormError("The new password and its confirmation don't match.");
+      toast.error("The new password and its confirmation don't match.");
+      return;
+    }
+    if (newPassword === currentPassword) {
+      setFormError("New password must be different from your current one.");
+      toast.error("New password must be different from your current one.");
+      return;
+    }
+    setFormError(null);
+    changePasswordMutation.mutate({
+      currentPassword,
+      newPassword,
+    });
+  };
 
   return (
     <div className="space-y-4">
@@ -350,24 +487,106 @@ function SecuritySection({ user }: { user: User }) {
               <p className="text-sm font-medium">Password</p>
               <p className="mt-0.5 text-xs text-muted-foreground">
                 {isGoogle
-                  ? "You sign in with Google. No local password set."
-                  : "Reset your password via email."}
+                  ? "You sign in with Google. No local password is set, so a reset here doesn't apply."
+                  : "Reset your password below. Your new password will be used the next time you sign in."}
               </p>
             </div>
-            {!isGoogle && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="shrink-0 rounded-lg text-xs"
-                disabled={!user.email}
-                onClick={() => {
-                  window.location.href = "/forgot-password";
-                }}
-              >
-                Reset password
-              </Button>
-            )}
           </div>
+
+          {isGoogle ? (
+            <div className="mt-3.5 rounded-lg bg-muted/60 px-3.5 py-3 text-xs text-muted-foreground">
+              <p>
+                You signed in through Google, which keeps your password with
+                Google. Use Google's account settings to manage it.
+              </p>
+            </div>
+          ) : (
+            <div className="mt-3.5 space-y-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="account-current-password" className="text-xs">
+                  Current password
+                </Label>
+                <Input
+                  id="account-current-password"
+                  type="password"
+                  value={currentPassword}
+                  onChange={e => setCurrentPassword(e.target.value)}
+                  className="h-9 rounded-lg text-sm"
+                  placeholder="Your current password"
+                  autoComplete="current-password"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="account-new-password" className="text-xs">
+                  New password
+                </Label>
+                <Input
+                  id="account-new-password"
+                  type="password"
+                  value={newPassword}
+                  onChange={e => setNewPassword(e.target.value)}
+                  className="h-9 rounded-lg text-sm"
+                  placeholder="At least 8 characters"
+                  autoComplete="new-password"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="account-confirm-password" className="text-xs">
+                  Confirm new password
+                </Label>
+                <Input
+                  id="account-confirm-password"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={e => setConfirmPassword(e.target.value)}
+                  className="h-9 rounded-lg text-sm"
+                  placeholder="Repeat the new password"
+                  autoComplete="new-password"
+                  onKeyDown={e => {
+                    if (e.key === "Enter" && canSubmit)
+                      handleSubmitPassword();
+                  }}
+                />
+              </div>
+
+              {formError && (
+                <p className="text-xs font-medium text-destructive">
+                  {formError}
+                </p>
+              )}
+
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={!canSubmit}
+                    onClick={handleSubmitPassword}
+                    className="inline-flex items-center rounded-lg bg-foreground px-3.5 py-2 text-xs font-semibold text-background transition-opacity hover:opacity-90 disabled:pointer-events-none disabled:opacity-50"
+                  >
+                    {changePasswordMutation.isPending
+                      ? "Updating…"
+                      : "Reset password"}
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    window.location.href = "/forgot-password";
+                  }}
+                  className="text-xs font-medium text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline"
+                >
+                  Forgot password?
+                </button>
+              </div>
+
+              {!hasPassword && (
+                <p className="text-xs text-muted-foreground">
+                  No password is linked to this account yet. Use the password
+                  reset link to create one.
+                </p>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="rounded-xl border border-border p-4">
@@ -723,18 +942,51 @@ function AppearanceSection() {
 }
 
 function DataSection({
-  onOpenWorkspace,
   onOpenArchived,
+  onOpenShared,
   onDeleteAll,
-  onOpenSharedLinks,
-  onDeleteAccount,
 }: {
-  onOpenWorkspace: (section: "files") => void;
   onOpenArchived: () => void;
+  onOpenShared: () => void;
   onDeleteAll: () => void;
-  onOpenSharedLinks?: () => void;
-  onDeleteAccount?: () => void;
 }) {
+  const exportQuery = trpc.workspace.data.exportAll.useQuery(undefined, {
+    enabled: false,
+  });
+  const [exportBusy, setExportBusy] = useState(false);
+
+  const handleExport = async () => {
+    if (exportBusy) return;
+    setExportBusy(true);
+    try {
+      const result = await exportQuery.refetch();
+      if (result.data) {
+        const stamp = new Date().toISOString().slice(0, 10);
+        const blob = new Blob([JSON.stringify(result.data, null, 2)], {
+          type: "application/json",
+        });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `ksemo-data-${stamp}.json`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+        toast.success("Your data export is ready to download.");
+      } else {
+        toast.error("Could not export your data right now.");
+      }
+    } catch {
+      toast.error("Could not export your data right now.");
+    } finally {
+      setExportBusy(false);
+    }
+  };
+
+  const manageButtonClass =
+    "shrink-0 rounded-lg bg-foreground px-3 py-1.5 text-[11px] font-semibold text-background transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
+
   return (
     <div className="space-y-4">
       <div>
@@ -742,56 +994,64 @@ function DataSection({
           Data Control
         </h3>
         <p className="mt-1 text-sm text-muted-foreground">
-          Manage your conversations and uploaded files.
+          Manage your conversations, uploaded files, and personal data.
         </p>
       </div>
+
       <div className="space-y-2">
-        <div className="flex w-full items-center justify-between rounded-xl border border-border p-3.5 text-left">
-          <div>
+        <div className="flex w-full items-center justify-between gap-3 rounded-xl border border-border p-3.5">
+          <div className="min-w-0">
             <p className="text-sm font-medium">Archived chats</p>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              Hidden from sidebar, kept safe
+              Hidden from your sidebar, kept safe
             </p>
           </div>
           <button
             type="button"
             onClick={onOpenArchived}
-            className="rounded-lg bg-foreground px-2.5 py-1 text-[11px] font-semibold text-background transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            className={manageButtonClass}
           >
             Manage
           </button>
         </div>
-        <button
-          onClick={() => onOpenWorkspace("files")}
-          className="flex w-full items-center justify-between rounded-xl border border-border p-3.5 text-left transition-colors hover:bg-muted/50"
-        >
-          <div>
-            <p className="text-sm font-medium">Library</p>
+
+        <div className="flex w-full items-center justify-between gap-3 rounded-xl border border-border p-3.5">
+          <div className="min-w-0">
+            <p className="text-sm font-medium">Shared chats</p>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              Manage uploaded files and images
+              Chats you made public — copy a link or stop sharing
             </p>
           </div>
-          <ExternalLink className="size-4 text-muted-foreground" />
-        </button>
-        <button
-          onClick={onOpenSharedLinks}
-          className="flex w-full items-center justify-between rounded-xl border border-border p-3.5 text-left transition-colors hover:bg-muted/50"
-        >
-          <div>
-            <p className="text-sm font-medium">See Shared Links</p>
+          <button
+            type="button"
+            onClick={onOpenShared}
+            className={manageButtonClass}
+          >
+            Manage
+          </button>
+        </div>
+
+        <div className="flex w-full items-center justify-between gap-3 rounded-xl border border-border p-3.5">
+          <div className="min-w-0">
+            <p className="text-sm font-medium">Download my data</p>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              See all the shared links you have created. You can also delete
-              them and revoke access here.
+              Export all of your conversations, files, and account data as a
+              JSON file
             </p>
           </div>
-          <Share2 className="size-4 text-muted-foreground" />
-        </button>
+          <button
+            type="button"
+            disabled={exportBusy}
+            onClick={() => void handleExport()}
+            className="shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-foreground px-3 py-1.5 text-[11px] font-semibold text-background transition-opacity hover:opacity-90 disabled:pointer-events-none disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          >
+            {exportBusy ? "Exporting…" : "Export"}
+          </button>
+        </div>
       </div>
-      <button
-        onClick={onDeleteAll}
-        className="flex w-full items-center justify-between rounded-xl border border-destructive/30 bg-destructive/5 p-3.5 text-left transition-colors hover:bg-destructive/10"
-      >
-        <div>
+
+      <div className="flex w-full items-center justify-between gap-3 rounded-xl border border-destructive/30 bg-destructive/5 p-3.5">
+        <div className="min-w-0">
           <p className="text-sm font-medium text-destructive">
             Delete all chats
           </p>
@@ -799,23 +1059,14 @@ function DataSection({
             Permanent, cannot be undone
           </p>
         </div>
-        <Trash2 className="size-4 text-destructive" />
-      </button>
-      <button
-        onClick={onDeleteAccount}
-        className="flex w-full items-center justify-between rounded-xl border border-destructive/30 bg-destructive/5 p-3.5 text-left transition-colors hover:bg-destructive/10"
-      >
-        <div>
-          <p className="text-sm font-medium text-destructive">
-            Delete Account
-          </p>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            Permanently delete your account and associated data. Deletions are
-            immediate and cannot be undone.
-          </p>
-        </div>
-        <Trash2 className="size-4 text-destructive" />
-      </button>
+        <button
+          type="button"
+          onClick={onDeleteAll}
+          className="shrink-0 rounded-lg bg-destructive px-3 py-1.5 text-[11px] font-semibold text-white transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        >
+          Delete all
+        </button>
+      </div>
     </div>
   );
 }
@@ -944,7 +1195,7 @@ function FeedbackSection() {
   );
 }
 
-function ArchivedChatsDialog({
+function ManagedChatsDialog({
   open,
   onOpenChange,
   onCloseSettings,
@@ -955,7 +1206,7 @@ function ArchivedChatsDialog({
   onCloseSettings?: () => void;
   onOpenConversation?: (conversationId: string) => void;
 }) {
-  const archivedQuery = trpc.conversation.list.useQuery(
+  const chatsQuery = trpc.conversation.list.useQuery(
     { scope: "archived" },
     { enabled: open }
   );
@@ -979,7 +1230,7 @@ function ArchivedChatsDialog({
     },
     onError: () => toast.error("Could not delete chat."),
   });
-  const conversations = (archivedQuery.data ?? []) as Array<{
+  const conversations = (chatsQuery.data ?? []) as Array<{
     id: string;
     title: string;
     updatedAt?: Date | string | null;
@@ -989,6 +1240,12 @@ function ArchivedChatsDialog({
     onOpenConversation?.(id);
     onOpenChange(false);
     onCloseSettings?.();
+  };
+
+  const restorePending = restoreMutation.isPending;
+
+  const restoreChat = (id: string) => {
+    restoreMutation.mutate({ id, isArchived: false });
   };
 
   return (
@@ -1003,7 +1260,7 @@ function ArchivedChatsDialog({
             </p>
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto p-3">
-            {archivedQuery.isLoading ? (
+            {chatsQuery.isLoading ? (
               <Loading className="py-6" />
             ) : !conversations.length ? (
               <div className="py-8 text-center">
@@ -1033,13 +1290,8 @@ function ArchivedChatsDialog({
                             size="icon"
                             aria-label="Unarchive chat"
                             className="size-8 shrink-0 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
-                            disabled={restoreMutation.isPending}
-                            onClick={() =>
-                              restoreMutation.mutate({
-                                id: c.id,
-                                isArchived: false,
-                              })
-                            }
+                            disabled={restorePending}
+                            onClick={() => restoreChat(c.id)}
                           >
                             <ArchiveRestore className="size-4" />
                           </Button>
@@ -1056,6 +1308,190 @@ function ArchivedChatsDialog({
                             aria-label="Delete chat"
                             className="size-8 shrink-0 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                             disabled={deleteMutation.isPending}
+                            onClick={() =>
+                              setDeleteTarget({ id: c.id, title: c.title })
+                            }
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom">
+                          Delete
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <ConfirmDeleteDialog
+        open={Boolean(deleteTarget)}
+        onOpenChange={openState => {
+          if (!openState) setDeleteTarget(null);
+        }}
+        title="Delete this chat?"
+        description={`“${deleteTarget?.title ?? "This chat"}” will be permanently removed.`}
+        confirmLabel="Delete"
+        busy={deleteMutation.isPending}
+        onConfirm={() => {
+          if (deleteTarget) deleteMutation.mutate({ id: deleteTarget.id });
+        }}
+      />
+    </>
+  );
+}
+
+function SharedChatsDialog({
+  open,
+  onOpenChange,
+  onCloseSettings,
+  onOpenConversation,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onCloseSettings?: () => void;
+  onOpenConversation?: (conversationId: string) => void;
+}) {
+  const chatsQuery = trpc.conversation.list.useQuery(
+    { scope: "shared" },
+    { enabled: open }
+  );
+  const utils = trpc.useUtils();
+  const [deleteTarget, setDeleteTarget] = useState<{
+    id: string;
+    title: string;
+  } | null>(null);
+  const [copyPending, setCopyPending] = useState(false);
+  const unpublishMutation = trpc.conversation.configurePublicShare.useMutation({
+    onSuccess: () => {
+      utils.conversation.list.invalidate();
+      toast.success("Chat is no longer shared");
+    },
+    onError: () => toast.error("Could not stop sharing this chat."),
+  });
+  const deleteMutation = trpc.conversation.remove.useMutation({
+    onSuccess: () => {
+      utils.conversation.list.invalidate();
+      if (deleteTarget) setDeleteTarget(null);
+      toast.success("Chat deleted permanently");
+    },
+    onError: () => toast.error("Could not delete chat."),
+  });
+  const conversations = (chatsQuery.data ?? []) as Array<{
+    id: string;
+    title: string;
+    shareToken?: string | null;
+    updatedAt?: Date | string | null;
+  }>;
+
+  const openChat = (id: string) => {
+    onOpenConversation?.(id);
+    onOpenChange(false);
+    onCloseSettings?.();
+  };
+
+  const copyLink = async (shareToken: string | null | undefined) => {
+    if (!shareToken) return;
+    setCopyPending(true);
+    try {
+      await navigator.clipboard.writeText(
+        createPublicConversationUrl(window.location.origin, shareToken)
+      );
+      toast.success("Link copied to clipboard");
+    } catch {
+      toast.error("Could not copy the link");
+    } finally {
+      setCopyPending(false);
+    }
+  };
+
+  const busy =
+    unpublishMutation.isPending ||
+    deleteMutation.isPending ||
+    copyPending;
+
+  return (
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="flex max-h-[32rem] w-[calc(100%-1.5rem)] max-w-lg flex-col gap-0 overflow-hidden rounded-2xl p-0">
+          <div className="shrink-0 border-b border-border px-4 pb-3 pt-4">
+            <p className="text-base font-semibold">Shared chats</p>
+            <p className="text-xs text-muted-foreground">
+              Everything you've shared with a public link. Tap a chat to open
+              it, copy its link, stop sharing, or delete it permanently.
+            </p>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto p-3">
+            {chatsQuery.isLoading ? (
+              <Loading className="py-6" />
+            ) : !conversations.length ? (
+              <div className="py-8 text-center">
+                <Link2 className="mx-auto size-6 text-muted-foreground" />
+                <p className="mt-3 text-sm font-medium">Nothing shared yet</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Chats you make public will show up here.
+                </p>
+              </div>
+            ) : (
+              <ul className="space-y-1.5">
+                {conversations.map(c => (
+                  <li key={c.id}>
+                    <div className="flex items-center gap-2 rounded-xl border border-border px-3 py-2 transition-colors hover:bg-muted/60">
+                      <button
+                        onClick={() => openChat(c.id)}
+                        className="min-w-0 flex-1 rounded-lg py-0.5 text-left focus-visible:ring-0 focus-visible:outline-none"
+                      >
+                        <p className="truncate text-[13px] font-medium">
+                          {c.title}
+                        </p>
+                        <p className="mt-0.5 text-[11px] text-muted-foreground">
+                          Public link active
+                        </p>
+                      </button>
+                      <button
+                        type="button"
+                        disabled={!c.shareToken || busy}
+                        onClick={() => copyLink(c.shareToken)}
+                        aria-label="Copy public link"
+                        className="shrink-0 inline-flex items-center gap-1 rounded-lg bg-foreground px-2.5 py-1.5 text-[11px] font-semibold text-background transition-opacity hover:opacity-90 disabled:pointer-events-none disabled:opacity-50"
+                      >
+                        <Copy className="size-3" />
+                        Copy link
+                      </button>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            aria-label="Stop sharing"
+                            className="size-8 shrink-0 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
+                            disabled={busy}
+                            onClick={() =>
+                              unpublishMutation.mutate({
+                                id: c.id,
+                                isPublic: false,
+                              })
+                            }
+                          >
+                            <Unlink className="size-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom">
+                          Stop sharing
+                        </TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            aria-label="Delete chat"
+                            className="size-8 shrink-0 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                            disabled={busy}
                             onClick={() =>
                               setDeleteTarget({ id: c.id, title: c.title })
                             }

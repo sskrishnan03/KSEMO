@@ -468,4 +468,97 @@ export const workspaceRouter = router({
         return { success: true } as const;
       }),
   }),
+  data: router({
+    // Full personal-data export. Returns every conversation (with messages),
+    // project, and uploaded-file listing so users can download their own data
+    // from Data Control. File bytes stay in storage — only metadata is returned.
+    exportAll: protectedProcedure.query(async ({ ctx }) => {
+      const userId = ctx.user.id;
+
+      const [conversationsRes, projectsRes, filesRes, memoriesRes] =
+        await Promise.all([
+          supabase
+            .from("conversations")
+            .select("*")
+            .eq("user_id", userId)
+            .order("updated_at", { ascending: false }),
+          supabase
+            .from("projects")
+            .select("*")
+            .eq("user_id", userId)
+            .order("updated_at", { ascending: false }),
+          supabase
+            .from("files")
+            .select(
+              "id,filename,mime_type,size_bytes,url,is_favorite,created_at,updated_at"
+            )
+            .eq("user_id", userId)
+            .order("created_at", { ascending: false }),
+          supabase
+            .from("memories")
+            .select("*")
+            .eq("user_id", userId)
+            .order("created_at", { ascending: false }),
+        ]);
+
+      if (conversationsRes.error)
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to export conversations",
+        });
+      if (projectsRes.error)
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to export projects",
+        });
+      if (filesRes.error)
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to export files",
+        });
+      if (memoriesRes.error)
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to export memories",
+        });
+
+      const conversations = (conversationsRes.data || []) as unknown as Array<
+        Record<string, unknown>
+      >;
+      const messagesByConversation: Record<string, unknown[]> = {};
+      for (const conversation of conversations) {
+        const { data, error } = await supabase
+          .from("messages")
+          .select("*")
+          .eq("conversation_id", conversation.id)
+          .order("created_at", { ascending: true });
+        if (error)
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to export messages",
+          });
+        messagesByConversation[String(conversation.id)] = data || [];
+      }
+
+      return {
+        exportedAt: new Date(),
+        profile: {
+          name: ctx.user.name,
+          email: ctx.user.email,
+          role: ctx.user.role,
+          loginMethod: ctx.user.loginMethod,
+          createdAt: ctx.user.createdAt,
+          lastSignedIn: ctx.user.lastSignedIn,
+        },
+        projects: projectsRes.data || [],
+        conversations: conversations.map(conversation => ({
+          conversation,
+          messages:
+            messagesByConversation[String(conversation.id)] ?? [],
+        })),
+        files: filesRes.data || [],
+        memories: memoriesRes.data || [],
+      };
+    }),
+  }),
 });

@@ -1,5 +1,11 @@
 // TypeScript types matching the Supabase database schema
 
+import type {
+  MemoryCategoryId,
+  MemoryConsentStatus,
+  MemorySource,
+} from "@shared/memory";
+
 // Application-facing types (camelCase) - what the rest of the app expects
 export type User = {
   id: number;
@@ -39,6 +45,37 @@ export type InsertUserPreference = Partial<
   Omit<UserPreference, "userId" | "createdAt" | "updatedAt">
 > & {
   userId: number;
+};
+
+export type MemorySettings = {
+  userId: number;
+  memoryEnabled: boolean;
+  generateFromChats: boolean;
+  sensitiveMemoryEnabled: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type Memory = {
+  id: string;
+  userId: number;
+  title: string;
+  content: string;
+  category: MemoryCategoryId;
+  isSensitive: boolean;
+  source: MemorySource;
+  sourceConversationId: string | null;
+  consentStatus: MemoryConsentStatus;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type InsertMemory = Partial<
+  Omit<Memory, "id" | "createdAt" | "updatedAt">
+> & {
+  userId: number;
+  title: string;
+  content: string;
 };
 
 export type Project = {
@@ -81,6 +118,12 @@ export type InsertConversation = Partial<
   userId: number;
 };
 
+export type Source = {
+  title: string;
+  url: string;
+  snippet?: string | null;
+};
+
 export type Message = {
   id: string;
   conversationId: string;
@@ -88,6 +131,7 @@ export type Message = {
   content: string;
   model: string | null;
   status: "sending" | "streaming" | "completed" | "failed" | "cancelled";
+  sources: Source[];
   createdAt: Date;
   updatedAt: Date;
 };
@@ -265,6 +309,29 @@ export type DbUserPreference = {
   updated_at: string;
 };
 
+export type DbMemorySettings = {
+  user_id: number;
+  memory_enabled: boolean;
+  generate_from_chats: boolean;
+  sensitive_memory_enabled: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type DbMemory = {
+  id: string;
+  user_id: number;
+  title: string;
+  content: string;
+  category: string;
+  is_sensitive: boolean;
+  source: MemorySource;
+  source_conversation_id: string | null;
+  consent_status: MemoryConsentStatus;
+  created_at: string;
+  updated_at: string;
+};
+
 // Helper function to convert DB row to app type
 export function dbToUser(db: DbUser): User {
   return {
@@ -329,6 +396,33 @@ export function dbToUserPreference(db: DbUserPreference): UserPreference {
   };
 }
 
+export function dbToMemorySettings(db: DbMemorySettings): MemorySettings {
+  return {
+    userId: db.user_id,
+    memoryEnabled: db.memory_enabled,
+    generateFromChats: db.generate_from_chats,
+    sensitiveMemoryEnabled: db.sensitive_memory_enabled,
+    createdAt: new Date(db.created_at),
+    updatedAt: new Date(db.updated_at),
+  };
+}
+
+export function dbToMemory(db: DbMemory): Memory {
+  return {
+    id: db.id,
+    userId: db.user_id,
+    title: db.title,
+    content: db.content,
+    category: db.category as MemoryCategoryId,
+    isSensitive: db.is_sensitive,
+    source: db.source,
+    sourceConversationId: db.source_conversation_id,
+    consentStatus: db.consent_status,
+    createdAt: new Date(db.created_at),
+    updatedAt: new Date(db.updated_at),
+  };
+}
+
 // Helper function to convert app type to DB format
 export function userToDb(user: Partial<User>): Partial<DbUser> {
   const db: Partial<DbUser> = {};
@@ -382,5 +476,42 @@ export function messageToDb(msg: Partial<Message>): Partial<DbMessage> {
     db.created_at = msg.createdAt.toISOString();
   if (msg.updatedAt !== undefined)
     db.updated_at = msg.updatedAt.toISOString();
+  return db;
+}
+
+export function memorySettingsToDb(
+  settings: Partial<MemorySettings>
+): Partial<DbMemorySettings> {
+  const db: Partial<DbMemorySettings> = {};
+  if (settings.userId !== undefined) db.user_id = settings.userId;
+  if (settings.memoryEnabled !== undefined)
+    db.memory_enabled = settings.memoryEnabled;
+  if (settings.generateFromChats !== undefined)
+    db.generate_from_chats = settings.generateFromChats;
+  if (settings.sensitiveMemoryEnabled !== undefined)
+    db.sensitive_memory_enabled = settings.sensitiveMemoryEnabled;
+  if (settings.createdAt !== undefined)
+    db.created_at = settings.createdAt.toISOString();
+  if (settings.updatedAt !== undefined)
+    db.updated_at = settings.updatedAt.toISOString();
+  return db;
+}
+
+export function memoryToDb(memory: Partial<Memory>): Partial<DbMemory> {
+  const db: Partial<DbMemory> = {};
+  if (memory.userId !== undefined) db.user_id = memory.userId;
+  if (memory.title !== undefined) db.title = memory.title;
+  if (memory.content !== undefined) db.content = memory.content;
+  if (memory.category !== undefined) db.category = memory.category;
+  if (memory.isSensitive !== undefined) db.is_sensitive = memory.isSensitive;
+  if (memory.source !== undefined) db.source = memory.source;
+  if (memory.sourceConversationId !== undefined)
+    db.source_conversation_id = memory.sourceConversationId;
+  if (memory.consentStatus !== undefined)
+    db.consent_status = memory.consentStatus;
+  if (memory.createdAt !== undefined)
+    db.created_at = memory.createdAt.toISOString();
+  if (memory.updatedAt !== undefined)
+    db.updated_at = memory.updatedAt.toISOString();
   return db;
 }

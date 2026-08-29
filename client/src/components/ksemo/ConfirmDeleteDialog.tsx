@@ -18,6 +18,7 @@ type Props = {
   confirmLabel?: string;
   confirmKeyword?: string;
   busy?: boolean;
+  busyLabel?: string;
   onConfirm: () => void;
 };
 
@@ -29,6 +30,7 @@ export function ConfirmDeleteDialog({
   confirmLabel,
   confirmKeyword,
   busy,
+  busyLabel,
   onConfirm,
 }: Props) {
   const [typed, setTyped] = useState("");
@@ -97,7 +99,7 @@ export function ConfirmDeleteDialog({
             }}
             className="rounded-lg bg-destructive text-white hover:bg-destructive/90"
           >
-            {busy ? "Deleting…" : confirmLabel ?? "Delete"}
+            {busy ? busyLabel ?? "Deleting…" : confirmLabel ?? "Delete"}
           </Button>
         </div>
       </AlertDialogContent>

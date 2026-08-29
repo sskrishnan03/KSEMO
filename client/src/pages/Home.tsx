@@ -25,9 +25,9 @@ import {
   Files,
   Menu,
   MoreHorizontal,
-  Share2,
   Trash2,
 } from "lucide-react";
+import { ShareIcon } from "../components/ksemo/icons";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { memo } from "react";
 import { toast } from "sonner";
@@ -308,7 +308,14 @@ export default function Home() {
   // The chat pane is the scroll container; tracking closeness to the bottom lets
   // us auto-scroll during generation without fighting the user's scroll wheel.
   const messagesContainerRef = useRef<HTMLElement | null>(null);
+  // The inner thread wrapper; observing its height lets us re-pin the view to
+  // the newest message when media renders after the initial paint.
+  const messagesBodyRef = useRef<HTMLDivElement | null>(null);
   const isNearBottomRef = useRef(true);
+  // While "true", the next scroll to the end is treated as the user opening or
+  // re-opening a conversation and snaps (instead of animating) to the last
+  // message, so the view never lands partway through the thread.
+  const pendingOpenScrollRef = useRef(false);
   // Streaming deltas arrive much faster than frames (dozens per token burst).
   // Batches them into one state commit per animation frame instead of forcing a
   // full Home re-render for every token.
@@ -538,6 +545,10 @@ export default function Home() {
     if (seededConversationIdRef.current === activeConversationId) return;
     if (activeQuery.isLoading || !activeQuery.data) return;
     seededConversationIdRef.current = activeConversationId;
+    // The conversation's full history is about to render into an empty thread,
+    // so the next scroll must snap to the newest message rather than animate.
+    pendingOpenScrollRef.current = true;
+    isNearBottomRef.current = true;
     const serverMessages = activeQuery.data.messages.map(message => ({
       id: message.id,
       role: message.role,
@@ -691,6 +702,9 @@ export default function Home() {
       return;
     }
     const stored = getStoredActiveConversationState(user.id);
+    // Restore where the user left off: if they were in a specific chat, reopen
+    // it (so a refresh doesn't lose their place). A new-chat marker or no saved
+    // session keeps them on a fresh new chat.
     if (stored.newChatIntent) return;
     if (
       stored.conversationId &&
@@ -699,8 +713,7 @@ export default function Home() {
       setActiveConversationId(stored.conversationId);
       return;
     }
-    if (conversationQuery.data.length)
-      setActiveConversationId(conversationQuery.data[0].id);
+    if (activeConversationId === null) rememberNewChatIntent(user.id);
   }, [
     user?.id,
     activeConversationId,
@@ -708,6 +721,7 @@ export default function Home() {
     isFreshChatPreview,
     sharedConversationId,
     utils.conversation.get,
+    rememberNewChatIntent,
   ]);
 
   useEffect(() => {
@@ -738,17 +752,49 @@ export default function Home() {
     return () => window.removeEventListener("keydown", handleShortcut);
   }, [isGenerating]);
 
-  useEffect(() => {
+  // Scrolls the conversation thread to its newest message. Prefers the end
+  // sentinel so it always lands exactly on the last item of the thread.
+  function scrollChatToEnd(mode: "auto" | "smooth") {
     const container = messagesContainerRef.current;
-    if (!container) return;
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({
+        behavior: mode,
+        block: "end",
+      });
+    } else {
+      container?.scrollTo({ top: container.scrollHeight, behavior: mode });
+    }
+  }
+
+  // Scrolls on every conversation open / switch and whenever the thread changes.
+  // Opening snaps straight to the last message (so async content that renders
+  // after the first paint cannot leave the view in the middle of the thread);
+  // new content that arrives while reading is only followed when the user is
+  // already near the bottom.
+  useEffect(() => {
+    if (!activeConversationId) return;
     if (!isNearBottomRef.current) return;
-    container.scrollTo({
-      top: container.scrollHeight,
-      // While the response streams faster than a smooth tween can keep up,
-      // snap to the new content; smooth-scroll only on a settled message.
-      behavior: isGenerating ? "auto" : "smooth",
+    const opening = pendingOpenScrollRef.current;
+    const container = messagesContainerRef.current;
+    const threadRendered =
+      container !== null && container.scrollHeight > container.clientHeight;
+    if (opening && threadRendered) pendingOpenScrollRef.current = false;
+    scrollChatToEnd(opening || isGenerating ? "auto" : "smooth");
+  }, [visibleMessages, isGenerating, activeConversationId]);
+
+  // While the view is pinned near the bottom, keep it glued there even when
+  // media (images, highlighted code, web fonts) loads and grows the thread
+  // after the fact. Scrolling up to read older messages breaks the pin.
+  useEffect(() => {
+    const body = messagesBodyRef.current;
+    if (!body) return;
+    const observer = new ResizeObserver(() => {
+      if (!isNearBottomRef.current) return;
+      scrollChatToEnd("auto");
     });
-  }, [visibleMessages, isGenerating]);
+    observer.observe(body);
+    return () => observer.disconnect();
+  }, [visibleMessages.length]);
 
   useEffect(
     () => () => {
@@ -1140,6 +1186,7 @@ export default function Home() {
     }
     seededConversationIdRef.current = null;
     isNearBottomRef.current = true;
+    pendingOpenScrollRef.current = true;
     setChatMessages([]);
     setActiveConversationId(null);
     if (user?.id) rememberNewChatIntent(user.id);
@@ -1207,21 +1254,25 @@ export default function Home() {
     window.location.href = `mailto:${encodeURIComponent(shareEmail.trim())}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   }
 
-  async function shareMessage(message: KsemoMessage) {
-    try {
-      if (navigator.share)
-        await navigator.share({
-          title: "KSEMO message",
-          text: message.content,
-        });
-      else {
-        await navigator.clipboard.writeText(message.content);
-        toast.success("Message copied for sharing");
-      }
-    } catch (error) {
-      if ((error as DOMException)?.name !== "AbortError")
-        toast.error("KSEMO could not share that message.");
-    }
+  function openShareDialog(conversation: {
+    id: string;
+    title: string;
+    isPublic?: boolean;
+    shareToken?: string | null;
+  }) {
+    setShareTarget({
+      id: conversation.id,
+      title: conversation.title,
+      isPublic: Boolean(conversation.isPublic),
+      shareToken: conversation.shareToken ?? null,
+    });
+    setShareEmail("");
+  }
+
+  async function shareMessage(_message: KsemoMessage) {
+    const conversation = activeQuery.data?.conversation;
+    if (!conversation?.id) return;
+    openShareDialog(conversation);
   }
 
   function deleteMessage(message: KsemoMessage) {
@@ -1555,12 +1606,19 @@ export default function Home() {
   }
 
   function selectConversation(id: string) {
-    if (id === activeConversationId) return;
+    if (id === activeConversationId) {
+      // Clicking the chat that is already open still jumps straight to the
+      // newest message (e.g. after scrolling up to read older messages).
+      isNearBottomRef.current = true;
+      scrollChatToEnd("auto");
+      return;
+    }
     // Switching is always allowed, even while another conversation's response
     // is still streaming in the background. That stream keeps running and the
     // finished response is saved to its original conversation.
     setChatMessages([]);
     isNearBottomRef.current = true;
+    pendingOpenScrollRef.current = true;
     setPrimaryWorkspace(null);
     setActiveConversationId(id);
     if (user?.id) storeActiveConversationId(user.id, id);
@@ -1736,12 +1794,6 @@ export default function Home() {
     selectConversation(id);
     setSearchOpen(false);
   });
-  const stableSettingsOnOpenWorkspace = usePersistFn(
-    (_section: "files") => {
-      setSettingsOpen(false);
-      setPrimaryWorkspace("library");
-    }
-  );
   const stableOnOpenArchivedConversation = usePersistFn(
     (conversationId: string) => {
       setSettingsOpen(false);
@@ -1752,12 +1804,28 @@ export default function Home() {
     newChat();
     utils.conversation.list.invalidate();
   });
-  const stableOnOpenSharedLinks = usePersistFn(() => {
+  const stableOnAccountDeleted = usePersistFn(() => {
     setSettingsOpen(false);
-    setPrimaryWorkspace("library");
-  });
-  const stableOnDeleteAccount = usePersistFn(() => {
-    toast.info("Account deletion is not yet implemented.");
+    newChat();
+    if (user?.id != null || user?.email) {
+      setSavedAccounts(prev => {
+        const next = prev.filter(
+          account =>
+            account.id !== String(user.id) && account.email !== user.email
+        );
+        try {
+          localStorage.setItem(SAVED_ACCOUNTS_KEY, JSON.stringify(next));
+        } catch {}
+        return next;
+      });
+    }
+    try {
+      localStorage.removeItem("ksemo-user-info");
+    } catch {}
+    try {
+      sessionStorage.removeItem("ksemo-cookie");
+    } catch {}
+    void logout();
   });
   const stableShareOnOpenChange = usePersistFn((next: boolean) => {
     if (!next) setShareTarget(null);
@@ -1915,8 +1983,8 @@ export default function Home() {
                         }
                       }}
                     >
-                      <Share2 className="mr-2 size-4" />
-                      Share
+                      <ShareIcon className="mr-2 size-4" />
+                        Share
                     </DropdownMenuItem>
                     <DropdownMenuItem onSelect={() => setChatFilesOpen(true)}>
                       <Files className="mr-2 size-4" />
@@ -1959,7 +2027,10 @@ export default function Home() {
               aria-label="Conversation"
             >
               {visibleMessages.length ? (
-                <div className="mx-auto max-w-3xl space-y-7 px-4 pb-4 pt-6 sm:px-6 sm:pb-5 sm:pt-8">
+                <div
+                  ref={messagesBodyRef}
+                  className="mx-auto max-w-3xl space-y-7 px-4 pb-4 pt-6 sm:px-6 sm:pb-5 sm:pt-8"
+                >
                   {visibleMessages.map(message => (
                     <MessageContent
                       key={message.id}
@@ -2083,11 +2154,9 @@ export default function Home() {
         onOpenChange={setSettingsOpen}
         user={user}
         onSignOut={stableLogout}
-        onOpenWorkspace={stableSettingsOnOpenWorkspace}
         onAllChatsDeleted={stableOnAllChatsDeleted}
-        onOpenSharedLinks={stableOnOpenSharedLinks}
         onOpenConversation={stableOnOpenArchivedConversation}
-        onDeleteAccount={stableOnDeleteAccount}
+        onAccountDeleted={stableOnAccountDeleted}
       />
       <WorkspacePanel
         open={isWorkspaceDeletePreview}

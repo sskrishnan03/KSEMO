@@ -22,13 +22,13 @@ import {
   Loader2,
   Pencil,
   RotateCcw,
-  Share2,
   Square,
   ThumbsDown,
   ThumbsUp,
   Trash2,
   Volume2,
 } from "lucide-react";
+import { ShareIcon } from "./icons";
 import React, { memo, useMemo, useState } from "react";
 import { Streamdown } from "streamdown";
 import { KsemoMarkdownCode } from "./code-block";
@@ -234,7 +234,7 @@ export const MessageContent = memo(function MessageContent({
               copyMessage
             )}
             {onShare &&
-              action("Share message", <Share2 className="size-3.5" />, () =>
+              action("Share message", <ShareIcon className="size-3.5" />, () =>
                 onShare(message)
               )}
             {onEdit &&
@@ -316,7 +316,7 @@ export const MessageContent = memo(function MessageContent({
               )}
             {message.content &&
               onShare &&
-              action("Share response", <Share2 className="size-3.5" />, () =>
+              action("Share response", <ShareIcon className="size-3.5" />, () =>
                 onShare(message)
               )}
             {message.status !== "failed" &&

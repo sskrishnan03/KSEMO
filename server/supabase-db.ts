@@ -13,17 +13,26 @@ import {
   Attachment,
   Task,
   TaskActivity,
+  Memory,
+  MemorySettings,
+  InsertMemory,
   dbToUser,
   dbToConversation,
   dbToMessage,
   dbToUserPreference,
+  dbToMemory,
+  dbToMemorySettings,
   userToDb,
   conversationToDb,
   messageToDb,
+  memoryToDb,
+  memorySettingsToDb,
   type DbUser,
   type DbConversation,
   type DbMessage,
   type DbUserPreference,
+  type DbMemory,
+  type DbMemorySettings,
 } from "../supabase-schema/04-types";
 
 // Re-export types for external use
@@ -40,6 +49,9 @@ export type {
   Attachment,
   Task,
   TaskActivity,
+  Memory,
+  MemorySettings,
+  InsertMemory,
 };
 
 // Export the supabase client for direct access when needed
@@ -241,13 +253,35 @@ export async function getUserByEmail(email: string): Promise<User | undefined> {
   return dbToUser(data as DbUser);
 }
 
+export async function updateUserProfile(
+  userId: number,
+  name: string
+): Promise<User | undefined> {
+  const { data, error } = await supabase
+    .from("users")
+    .update({
+      name,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", userId)
+    .select()
+    .single();
+
+  if (error) {
+    if (error.code === "PGRST116") return undefined;
+    handleSupabaseError(error, "updateUserProfile");
+  }
+
+  return dbToUser(data as DbUser);
+}
+
 // ============================================
 // CONVERSATION FUNCTIONS
 // ============================================
 
 export async function listConversationsForUser(
   userId: number,
-  scope: "active" | "archived" | "trash" = "active"
+  scope: "active" | "archived" | "trash" | "shared" = "active"
 ): Promise<Conversation[]> {
   let query = supabase.from("conversations").select("*").eq("user_id", userId);
 
@@ -255,6 +289,8 @@ export async function listConversationsForUser(
     query = query.not("deleted_at", "is", null);
   } else if (scope === "archived") {
     query = query.eq("is_archived", true).is("deleted_at", null);
+  } else if (scope === "shared") {
+    query = query.eq("is_public", true).is("deleted_at", null);
   } else {
     query = query.eq("is_archived", false).is("deleted_at", null);
   }
@@ -428,6 +464,25 @@ export async function deleteAllConversationsForUser(
   }
 
   return data?.length ?? 0;
+}
+
+// Deletes the user row. Every table that references users cascades
+// (preferences, projects, conversations, messages, files, tasks, etc.),
+// so one delete removes all of the user's data.
+export async function deleteUserAccount(userId: number): Promise<boolean> {
+  const { data, error } = await supabase
+    .from("users")
+    .delete()
+    .eq("id", userId)
+    .select("id")
+    .single();
+
+  if (error) {
+    if (error.code === "PGRST116") return false;
+    handleSupabaseError(error, "deleteUserAccount");
+  }
+
+  return Boolean(data);
 }
 
 export async function moveConversationToTrash(
@@ -775,6 +830,201 @@ export async function upsertUserPreferences(
   }
 
   return getUserPreferences(userId);
+}
+
+// ============================================
+// MEMORY FUNCTIONS
+// ============================================
+
+export type MemorySettingsValues = Partial<
+  Omit<MemorySettings, "userId" | "createdAt" | "updatedAt">
+>;
+
+export type MemoryInput = Partial<
+  Omit<Memory, "id" | "userId" | "createdAt" | "updatedAt">
+> & {
+  title: string;
+  content: string;
+};
+
+function defaultMemorySettings(userId: number): MemorySettings {
+  const now = new Date();
+  return {
+    userId,
+    memoryEnabled: false,
+    generateFromChats: false,
+    sensitiveMemoryEnabled: false,
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+export async function getMemorySettings(
+  userId: number
+): Promise<MemorySettings | undefined> {
+  const { data, error } = await supabase
+    .from("memory_settings")
+    .select("*")
+    .eq("user_id", userId)
+    .single();
+
+  if (error) {
+    if (error.code === "PGRST116") return undefined;
+    handleSupabaseError(error, "getMemorySettings");
+  }
+
+  return dbToMemorySettings(data as DbMemorySettings);
+}
+
+export async function upsertMemorySettings(
+  userId: number,
+  values: MemorySettingsValues
+): Promise<MemorySettings> {
+  const existing = await getMemorySettings(userId);
+  const merged: MemorySettings = {
+    ...defaultMemorySettings(userId),
+    ...(existing ? { ...existing, userId } : {}),
+    userId,
+    memoryEnabled: values.memoryEnabled ?? existing?.memoryEnabled ?? false,
+    generateFromChats:
+      values.generateFromChats ?? existing?.generateFromChats ?? false,
+    sensitiveMemoryEnabled:
+      values.sensitiveMemoryEnabled ??
+      existing?.sensitiveMemoryEnabled ??
+      false,
+  };
+
+  const { data, error } = await supabase
+    .from("memory_settings")
+    .upsert(memorySettingsToDb(merged))
+    .select()
+    .single();
+
+  if (error) {
+    handleSupabaseError(error, "upsertMemorySettings");
+  }
+
+  return dbToMemorySettings(data as DbMemorySettings);
+}
+
+export async function listUserMemories(
+  userId: number,
+  opts?: { query?: string; category?: string }
+): Promise<Memory[]> {
+  let query = supabase
+    .from("memories")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false });
+
+  if (opts?.category) {
+    query = query.eq("category", opts.category);
+  }
+  if (opts?.query && opts.query.trim()) {
+    const needle = opts.query.trim().replace(/[%_]/g, "");
+    query = query.or(
+      `title.ilike.%${needle}%,content.ilike.%${needle}%`
+    );
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    handleSupabaseError(error, "listUserMemories");
+  }
+
+  return (data as DbMemory[]).map(dbToMemory);
+}
+
+export async function createUserMemory(
+  userId: number,
+  input: MemoryInput
+): Promise<Memory | undefined> {
+  const dbValues: any = {
+    user_id: userId,
+    title: input.title.trim(),
+    content: input.content.trim(),
+    category: input.category ?? "general",
+    is_sensitive: input.isSensitive ?? false,
+    source: input.source ?? "manual",
+    source_conversation_id: input.sourceConversationId ?? null,
+    consent_status: input.consentStatus ?? "explicit",
+  };
+
+  const { data, error } = await supabase
+    .from("memories")
+    .insert(dbValues)
+    .select()
+    .single();
+
+  if (error) {
+    handleSupabaseError(error, "createUserMemory");
+  }
+
+  return data ? dbToMemory(data as DbMemory) : undefined;
+}
+
+export async function updateUserMemory(
+  userId: number,
+  id: string,
+  input: Partial<{
+    title: string;
+    content: string;
+    category: string;
+    isSensitive: boolean;
+  }>
+): Promise<Memory | undefined> {
+  const dbValues: any = {};
+  if (input.title !== undefined) dbValues.title = input.title.trim();
+  if (input.content !== undefined) dbValues.content = input.content.trim();
+  if (input.category !== undefined) dbValues.category = input.category;
+  if (input.isSensitive !== undefined)
+    dbValues.is_sensitive = input.isSensitive;
+
+  const { data, error } = await supabase
+    .from("memories")
+    .update(dbValues)
+    .eq("user_id", userId)
+    .eq("id", id)
+    .select()
+    .single();
+
+  if (error) {
+    if (error.code === "PGRST116") return undefined;
+    handleSupabaseError(error, "updateUserMemory");
+  }
+
+  return data ? dbToMemory(data as DbMemory) : undefined;
+}
+
+export async function deleteUserMemory(
+  userId: number,
+  id: string
+): Promise<boolean> {
+  const { error, count } = await supabase
+    .from("memories")
+    .delete({ count: "exact" })
+    .eq("user_id", userId)
+    .eq("id", id);
+
+  if (error) {
+    handleSupabaseError(error, "deleteUserMemory");
+  }
+
+  return (count ?? 0) > 0;
+}
+
+export async function deleteAllUserMemories(userId: number): Promise<number> {
+  const { error, count } = await supabase
+    .from("memories")
+    .delete({ count: "exact" })
+    .eq("user_id", userId);
+
+  if (error) {
+    handleSupabaseError(error, "deleteAllUserMemories");
+  }
+
+  return count ?? 0;
 }
 
 // ============================================

@@ -43,6 +43,20 @@ CREATE TABLE user_preferences (
 );
 
 -- ============================================
+-- MEMORY SETTINGS TABLE
+-- Single row per user. Defaults are all OFF: memory is opt-in and is never
+-- generated or retrieved until the user enables it.
+-- ============================================
+CREATE TABLE memory_settings (
+    user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    memory_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+    generate_from_chats BOOLEAN NOT NULL DEFAULT FALSE,
+    sensitive_memory_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ============================================
 -- PROJECTS TABLE
 -- ============================================
 CREATE TABLE projects (
@@ -85,6 +99,31 @@ CREATE INDEX idx_conversations_deleted_at ON conversations(deleted_at);
 CREATE INDEX idx_conversations_is_pinned ON conversations(is_pinned);
 
 -- ============================================
+-- MEMORIES TABLE
+-- Persisted, user-controlled memories. Deletes are hard deletes: the row is
+-- actually removed so a deleted memory can never be retrieved again.
+-- ============================================
+CREATE TABLE memories (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title VARCHAR(160) NOT NULL,
+    content TEXT NOT NULL,
+    category VARCHAR(40) NOT NULL DEFAULT 'general'
+        CHECK (category IN ('general', 'preference', 'personal', 'health', 'religion', 'politics', 'financial', 'relationship')),
+    is_sensitive BOOLEAN NOT NULL DEFAULT FALSE,
+    source VARCHAR(20) NOT NULL DEFAULT 'manual'
+        CHECK (source IN ('manual', 'chat')),
+    source_conversation_id UUID REFERENCES conversations(id) ON DELETE SET NULL,
+    consent_status VARCHAR(20) NOT NULL DEFAULT 'explicit'
+        CHECK (consent_status IN ('explicit', 'silent')),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_memories_user_id ON memories(user_id);
+CREATE INDEX idx_memories_user_category ON memories(user_id, category);
+
+-- ============================================
 -- MESSAGES TABLE
 -- ============================================
 CREATE TABLE messages (
@@ -94,6 +133,7 @@ CREATE TABLE messages (
     content TEXT NOT NULL,
     model VARCHAR(160),
     status VARCHAR(20) DEFAULT 'sending' CHECK (status IN ('sending', 'streaming', 'completed', 'failed', 'cancelled')),
+    sources JSONB NOT NULL DEFAULT '[]'::jsonb,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -232,6 +272,10 @@ $$ language 'plpgsql';
 CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_user_preferences_updated_at BEFORE UPDATE ON user_preferences
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_memory_settings_updated_at BEFORE UPDATE ON memory_settings
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_memories_updated_at BEFORE UPDATE ON memories
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_projects_updated_at BEFORE UPDATE ON projects
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
@@ -381,6 +425,43 @@ CREATE POLICY "Users can upsert own preferences"
     ON user_preferences FOR ALL
     USING (user_id = get_current_user_id())
     WITH CHECK (user_id = get_current_user_id());
+
+-- ============================================
+-- MEMORY POLICIES
+-- ============================================
+DROP POLICY IF EXISTS "Users can view own memory settings" ON memory_settings;
+DROP POLICY IF EXISTS "Users can upsert own memory settings" ON memory_settings;
+
+CREATE POLICY "Users can view own memory settings"
+    ON memory_settings FOR SELECT
+    USING (user_id = get_current_user_id());
+
+CREATE POLICY "Users can upsert own memory settings"
+    ON memory_settings FOR ALL
+    USING (user_id = get_current_user_id())
+    WITH CHECK (user_id = get_current_user_id());
+
+DROP POLICY IF EXISTS "Users can view own memories" ON memories;
+DROP POLICY IF EXISTS "Users can insert own memories" ON memories;
+DROP POLICY IF EXISTS "Users can update own memories" ON memories;
+DROP POLICY IF EXISTS "Users can delete own memories" ON memories;
+
+CREATE POLICY "Users can view own memories"
+    ON memories FOR SELECT
+    USING (user_id = get_current_user_id());
+
+CREATE POLICY "Users can insert own memories"
+    ON memories FOR INSERT
+    WITH CHECK (user_id = get_current_user_id());
+
+CREATE POLICY "Users can update own memories"
+    ON memories FOR UPDATE
+    USING (user_id = get_current_user_id())
+    WITH CHECK (user_id = get_current_user_id());
+
+CREATE POLICY "Users can delete own memories"
+    ON memories FOR DELETE
+    USING (user_id = get_current_user_id());
 
 -- ============================================
 -- PROJECTS POLICIES

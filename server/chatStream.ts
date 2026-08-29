@@ -16,6 +16,7 @@ import { sdk } from "./_core/sdk";
 import { resolveStoragePath } from "./storage";
 import fs from "fs";
 import { composeWebSearchContext, performWebSearch } from "./webSearch";
+import { buildUserMemoryContext } from "./memory/retrieval";
 
 const BASE_SYSTEM_INSTRUCTION =
   "You are KSEMO, a thoughtful and reliable AI assistant. Be clear, accurate, respectful, and practical. Use Markdown when it improves readability. Never claim to have completed work you cannot verify. You can perform math, logic, code analysis, and general reasoning directly — do not refuse calculation or analysis questions. When asked about the current time or date, state that you do not have access to a real-time clock but you can help with time-zone conversions, date math, and scheduling if the user provides a reference time or zone.";
@@ -338,6 +339,9 @@ export function registerChatStream(app: Express) {
         const preferences = await retryPreparation("preferences lookup", () =>
           getUserPreferences(user.id)
         );
+        const memoryContext = await retryPreparation("memory context", () =>
+          buildUserMemoryContext(user.id, content ?? "")
+        );
         const assistantContext = await retryPreparation(
           "message context setup",
           () =>
@@ -453,6 +457,7 @@ export function registerChatStream(app: Express) {
       `The current date and time is: ${currentTimeString}. Use this to answer questions about time, dates, and scheduling. You may be asked about mathematical equations, code analysis, general reasoning, and anything else — always attempt to answer helpfully.`,
       personaInstruction,
       preferences?.customInstructions?.trim(),
+      memoryContext,
     ]
       .filter(Boolean)
       .join("\n\n");

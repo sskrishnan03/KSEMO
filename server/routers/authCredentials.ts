@@ -7,7 +7,7 @@ import { supabase } from "../supabase-db";
 import { getSessionCookieOptions } from "../_core/cookies";
 import { isMailerConfigured, sendPasswordResetEmail } from "../_core/mailer";
 import { sdk } from "../_core/sdk";
-import { publicProcedure } from "../_core/trpc";
+import { protectedProcedure, publicProcedure } from "../_core/trpc";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000;
@@ -273,9 +273,106 @@ export const resetPasswordProcedure = publicProcedure
     return { success: true as const };
   });
 
+// Change password while signed in. Verifies the current password before
+// writing the new one so an open session cannot silently change credentials.
+export const changePasswordProcedure = protectedProcedure
+  .input(
+    z.object({
+      currentPassword: passwordInput,
+      newPassword: passwordInput,
+    })
+  )
+  .mutation(async ({ ctx, input }) => {
+    const user = ctx.user;
+
+    if (user.loginMethod === "google" || !user.passwordHash) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message:
+          "This account sign in with Google and has no local password to change.",
+      });
+    }
+
+    if (!verifyPassword(input.currentPassword, user.passwordHash)) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Current password is incorrect.",
+      });
+    }
+
+    const { error: updateError } = await supabase
+      .from("users")
+      .update({
+        password_hash: hashPassword(input.newPassword),
+        reset_token_hash: null,
+        reset_token_expires_at: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", user.id);
+
+    if (updateError) {
+      console.error("[Auth] Failed to change password:", updateError);
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: "Failed to update your password.",
+      });
+    }
+
+    return { success: true as const };
+  });
+
+// Updates the signed-in user's display name. Email is deliberately left
+// untouched because it is the account's login identifier.
+export const updateProfileProcedure = protectedProcedure
+  .input(z.object({ name: z.string().trim().min(1, "Enter your name.").max(120) }))
+  .mutation(async ({ ctx, input }) => {
+    const updated = await db.updateUserProfile(ctx.user.id, input.name);
+    if (!updated) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "This account could not be found.",
+      });
+    }
+    return {
+      success: true as const,
+      user: { id: updated.id, name: updated.name, email: updated.email },
+    };
+  });
+
+// Permanently deletes the account. All user data is removed via the
+// database cascade, then the session cookie is cleared so the client falls
+// back to the sign-in screen.
+export const deleteAccountProcedure = protectedProcedure.mutation(
+  async ({ ctx }) => {
+    try {
+      const deleted = await db.deleteUserAccount(ctx.user.id);
+      if (!deleted) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "This account could not be found.",
+        });
+      }
+    } catch (error) {
+      if (error instanceof TRPCError) throw error;
+      console.error("[Auth] Failed to delete account:", error);
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: "Your account could not be deleted right now. Please try again.",
+      });
+    }
+
+    const cookieOptions = getSessionCookieOptions(ctx.req);
+    ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
+
+    return { success: true as const };
+  });
+
 export const authCredentialsRouterProcedures = {
   signUp: signUpProcedure,
   signIn: signInProcedure,
   requestPasswordReset: requestPasswordResetProcedure,
   resetPassword: resetPasswordProcedure,
+  changePassword: changePasswordProcedure,
+  updateProfile: updateProfileProcedure,
+  deleteAccount: deleteAccountProcedure,
 };

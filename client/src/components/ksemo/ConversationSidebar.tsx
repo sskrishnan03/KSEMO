@@ -39,12 +39,12 @@ import {
   Plus,
   Search,
   Settings2,
-  Share2,
   ShieldCheck,
   SquarePen,
   Trash2,
   X,
 } from "lucide-react";
+import { ShareIcon } from "./icons";
 import React, { memo, useMemo, useRef, useState } from "react";
 
 type Conversation = {
@@ -628,7 +628,7 @@ const ConversationActionsMenu = memo(function ConversationActionsMenu({
           {conversation.isPinned ? "Unpin" : "Pin"}
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => onShare(conversation)}>
-          <Share2 className="mr-2 size-3.5" />
+          <ShareIcon className="mr-2 size-3.5" />
           Share
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => onArchive(conversation)}>
