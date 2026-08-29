@@ -13,7 +13,8 @@ import {
 } from "./supabase-db";
 import { streamLLM, type Message } from "./_core/llm";
 import { sdk } from "./_core/sdk";
-import { storageGetSignedUrl, requestBaseUrl } from "./storage";
+import { resolveStoragePath } from "./storage";
+import fs from "fs";
 import { composeWebSearchContext, performWebSearch } from "./webSearch";
 
 const BASE_SYSTEM_INSTRUCTION =
@@ -21,6 +22,38 @@ const BASE_SYSTEM_INSTRUCTION =
 
 // Per-file cap on extracted document text injected into the model context.
 const FILE_TEXT_PER_FILE_CHARS = 12_000;
+
+// The Gemini/OpenAI-compatible provider cannot resolve localhost or relative
+// storage URLs, so images are read from disk and sent inline as base64 data
+// URIs instead of remote image_urls that the model could never fetch.
+async function storageImageDataUri(
+  storageKey: string,
+  mimeType: string
+): Promise<string | null> {
+  try {
+    const absolute = resolveStoragePath(storageKey);
+    const stat = await fs.promises.stat(absolute);
+    if (stat.size > MAX_INLINE_IMAGE_BYTES) return null;
+    const buffer = await fs.promises.readFile(absolute);
+    return `data:${mimeType || "image/png"};base64,${buffer.toString("base64")}`;
+  } catch (error) {
+    console.warn(
+      `[ChatStream] could not read stored image ${storageKey}`,
+      error
+    );
+    return null;
+  }
+}
+
+// Largest single image (in bytes) sent inline to the model. Google's vision
+// models cap inline image sizes; anything larger is skipped so a single huge
+// screenshot cannot fail the whole turn.
+const MAX_INLINE_IMAGE_BYTES = 18 * 1024 * 1024;
+
+// Maximum number of files attached to a single user message and sent to the
+// model in one turn. Keeps the request within the model's vision/input limits
+// while still allowing a generous number of images and files per message.
+const MAX_ATTACHMENTS_PER_MESSAGE = 12;
 
 function createTitle(content: string) {
   const cleaned = content.replace(/\s+/g, " ").trim();
@@ -221,7 +254,7 @@ export function registerChatStream(app: Express) {
         });
         for (const fileId of Array.from(
           new Set(body.attachmentFileIds ?? [])
-        ).slice(0, 6)) {
+        ).slice(0, MAX_ATTACHMENTS_PER_MESSAGE)) {
           const attached = await attachFileToMessageForUser({
             id: crypto.randomUUID(),
             fileId,
@@ -305,7 +338,6 @@ export function registerChatStream(app: Express) {
         const preferences = await retryPreparation("preferences lookup", () =>
           getUserPreferences(user.id)
         );
-        const fileUrlBase = requestBaseUrl(req);
         const assistantContext = await retryPreparation(
           "message context setup",
           () =>
@@ -344,31 +376,36 @@ export function registerChatStream(app: Express) {
                     : [];
                   for (const file of media) {
                     if (file.mimeType.startsWith("image/")) {
-                      contentParts.push({
-                        type: "image_url",
-                        image_url: {
-                          url: await storageGetSignedUrl(
-                            file.storageKey,
-                            fileUrlBase
-                          ),
-                          detail: "auto",
-                        },
-                      });
+                      const dataUri = await storageImageDataUri(
+                        file.storageKey,
+                        file.mimeType
+                      );
+                      if (dataUri) {
+                        contentParts.push({
+                          type: "image_url",
+                          image_url: {
+                            url: dataUri,
+                            detail: "auto",
+                          },
+                        });
+                      } else {
+                        contentParts.push({
+                          type: "text",
+                          text: `Attached image: ${file.filename} (${file.mimeType}). The image bytes could not be loaded, but it is stored in your private library.`,
+                        });
+                      }
                     } else if (file.mimeType === "application/pdf") {
-                      contentParts.push({
-                        type: "file_url",
-                        file_url: {
-                          url: await storageGetSignedUrl(
-                            file.storageKey,
-                            fileUrlBase
-                          ),
-                          mime_type: "application/pdf",
-                        },
-                      });
+                      // The model cannot fetch a private/localhost PDF URL, so
+                      // only the extracted text is sent for analysis.
                       if (file.contentText) {
                         contentParts.push({
                           type: "text",
                           text: `Extracted text of ${file.filename}:\n\n${file.contentText.slice(0, FILE_TEXT_PER_FILE_CHARS)}`,
+                        });
+                      } else {
+                        contentParts.push({
+                          type: "text",
+                          text: `Attached PDF: ${file.filename}. Its text could not be extracted; it is stored in your private library.`,
                         });
                       }
                     } else if (file.contentText) {

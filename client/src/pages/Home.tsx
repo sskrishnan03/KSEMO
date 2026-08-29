@@ -73,6 +73,35 @@ type SelectedAttachment = {
   linked: boolean;
 };
 
+// Returns true when an attachment with the same filename is already selected,
+// so re-pasted or re-uploaded files/images are silently deduplicated instead
+// of stacking identical copies.
+function hasDuplicateAttachment(
+  current: SelectedAttachment[],
+  name: string
+): boolean {
+  const key = name.trim().toLowerCase();
+  return current.some(item => item.name.trim().toLowerCase() === key);
+}
+
+// Appends new attachments while ignoring any whose filename is already in the
+// selected list, preserving the first copy only.
+function appendUniqueAttachments(
+  current: SelectedAttachment[],
+  additions: SelectedAttachment[]
+): SelectedAttachment[] {
+  const seen = new Set(current.map(item => item.name.trim().toLowerCase()));
+  const result = [...current];
+  for (const addition of additions) {
+    const key = addition.name.trim().toLowerCase();
+    if (!seen.has(key)) {
+      seen.add(key);
+      result.push(addition);
+    }
+  }
+  return result;
+}
+
 type SavedAccount = {
   id: string;
   name?: string | null;
@@ -1273,8 +1302,12 @@ export default function Home() {
   }
 
   async function attachFromComposer(file: File) {
-    if (file.size > 8 * 1024 * 1024 || !file.type) {
-      toast.error("Choose a recognized file smaller than 8 MB.");
+    if (file.size > 25 * 1024 * 1024 || !file.type) {
+      toast.error("Choose a recognized file smaller than 25 MB.");
+      return;
+    }
+    if (hasDuplicateAttachment(attachmentNotices, file.name)) {
+      toast.info(`"${file.name}" is already attached.`);
       return;
     }
     try {
@@ -1296,7 +1329,8 @@ export default function Home() {
           fileId: uploaded.id,
           conversationId: activeConversationId,
         });
-        setAttachmentNotices([
+        setAttachmentNotices(current => [
+          ...current,
           {
             fileId: uploaded.id,
             name: file.name,
@@ -1309,7 +1343,8 @@ export default function Home() {
           "File added to your library. Send your message to include it in this conversation."
         );
       } else {
-        setAttachmentNotices([
+        setAttachmentNotices(current => [
+          ...current,
           {
             fileId: uploaded.id,
             name: file.name,
@@ -1401,16 +1436,17 @@ export default function Home() {
     mimeType?: string;
     url?: string;
   }) {
-    setAttachmentNotices(current => [
-      ...current,
-      {
-        fileId: file.id,
-        name: file.filename,
-        mimeType: file.mimeType,
-        url: file.url ?? "",
-        linked: Boolean(activeConversationId),
-      },
-    ]);
+    setAttachmentNotices(current =>
+      appendUniqueAttachments(current, [
+        {
+          fileId: file.id,
+          name: file.filename,
+          mimeType: file.mimeType,
+          url: file.url ?? "",
+          linked: Boolean(activeConversationId),
+        },
+      ])
+    );
   }
 
   function attachLibraryFiles(
@@ -1428,10 +1464,25 @@ export default function Home() {
       url: file.url ?? "",
       linked: Boolean(activeConversationId),
     }));
-    setAttachmentNotices(current => [...current, ...newAttachments]);
-    toast.success(
-      `${files.length} file${files.length > 1 ? "s" : ""} selected. Send your message to include ${files.length > 1 ? "them" : "it"} in this conversation.`
+    setAttachmentNotices(current =>
+      appendUniqueAttachments(current, newAttachments)
     );
+    const existing = new Set(
+      attachmentNotices.map(item => item.name.trim().toLowerCase())
+    );
+    const addedCount = newAttachments.filter(file => {
+      const key = file.name.trim().toLowerCase();
+      if (existing.has(key)) return false;
+      existing.add(key);
+      return true;
+    }).length;
+    if (addedCount > 0) {
+      toast.success(
+        `${addedCount} file${addedCount > 1 ? "s" : ""} selected. Send your message to include ${addedCount > 1 ? "them" : "it"} in this conversation.`
+      );
+    } else {
+      toast.info("Those files are already attached.");
+    }
   }
 
   function startChatWithLibraryFiles(
@@ -1444,8 +1495,15 @@ export default function Home() {
   ) {
     if (!files.length) return;
     newChat();
+    const seen = new Set<string>();
+    const unique = files.filter(file => {
+      const key = file.filename.trim().toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
     setAttachmentNotices(
-      files.map(file => ({
+      unique.map(file => ({
         fileId: file.id,
         name: file.filename,
         mimeType: file.mimeType,
@@ -1454,7 +1512,7 @@ export default function Home() {
       }))
     );
     toast.success(
-      `${files.length} ${files.length === 1 ? "Library item is" : "Library items are"} ready for a new chat.`
+      `${unique.length} ${unique.length === 1 ? "file is" : "files are"} ready for a new chat.`
     );
   }
 

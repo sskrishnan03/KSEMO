@@ -17,6 +17,10 @@ import { filterLibraryItems } from "@/lib/ksemoInteraction";
 import {
   ArrowUp,
   Check,
+  File,
+  FileArchive,
+  FileImage,
+  FileSpreadsheet,
   FileText,
   FileUp,
   Globe,
@@ -25,6 +29,7 @@ import {
   Mic,
   MonitorUp,
   Plus,
+  Presentation,
   Square,
   X,
 } from "lucide-react";
@@ -39,6 +44,40 @@ import React, {
 
 export const getLibrarySubmenuClass = (isCentered: boolean) =>
   `absolute left-1/2 -translate-x-1/2 z-50 max-h-[calc(100dvh-${isCentered ? "12rem" : "6rem"})] w-full max-w-3xl rounded-xl border border-border bg-popover p-0 text-popover-foreground shadow-xl`;
+
+const IMAGE_EXT = /\.(png|jpe?g|webp|gif|bmp|svg|avif)$/i;
+
+type FileKind = {
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  colorClass: string;
+};
+
+function getFileKind(name: string, mimeType?: string): FileKind {
+  const mime = (mimeType ?? "").toLowerCase();
+  if (/pdf$/.test(mime) || /\.pdf$/i.test(name)) {
+    return { label: "PDF", icon: FileText, colorClass: "bg-red-500/10 text-red-500" };
+  }
+  if (/(spreadsheetml\.sheet$|excel$|officedocument\.spreadsheetml)/.test(mime) || /\.(xlsx|xls|csv|tsv)$/i.test(name)) {
+    return { label: "Sheet", icon: FileSpreadsheet, colorClass: "bg-emerald-500/10 text-emerald-500" };
+  }
+  if (/(ppt|presentationml)/.test(mime) || /\.pptx?$/i.test(name)) {
+    return { label: "Slides", icon: Presentation, colorClass: "bg-orange-500/10 text-orange-500" };
+  }
+  if (/(wordprocessingml|document$|msword)/.test(mime) || /\.docx?$/i.test(name)) {
+    return { label: "Word", icon: FileText, colorClass: "bg-blue-500/10 text-blue-500" };
+  }
+  if (/zip|compressed|tar|gzip/.test(mime) || /\.(zip|rar|7z|tar|gz)$/i.test(name)) {
+    return { label: "Archive", icon: FileArchive, colorClass: "bg-amber-500/10 text-amber-500" };
+  }
+  if (/^image\//.test(mime) || IMAGE_EXT.test(name)) {
+    return { label: "Image", icon: FileImage, colorClass: "bg-violet-500/10 text-violet-500" };
+  }
+  if (/text\//.test(mime) || /\.(txt|md|markdown|json|log|xml|yml|yaml)$/i.test(name)) {
+    return { label: "Text", icon: FileText, colorClass: "bg-slate-500/10 text-slate-500" };
+  }
+  return { label: "File", icon: File, colorClass: "bg-muted text-muted-foreground" };
+}
 
 export const ChatComposer = memo(function ChatComposer({
   onSend,
@@ -153,9 +192,20 @@ export const ChatComposer = memo(function ChatComposer({
   }
 
   function selectFile(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
+    const files = Array.from(event.target.files ?? []);
     event.target.value = "";
-    if (file) onAttachment?.(file);
+    for (const file of files) onAttachment?.(file);
+  }
+
+  function handlePaste(event: React.ClipboardEvent<HTMLTextAreaElement>) {
+    const items = Array.from(event.clipboardData?.items ?? []);
+    const files = items
+      .filter(item => item.kind === "file")
+      .map(item => item.getAsFile())
+      .filter((file): file is File => file !== null);
+    if (!files.length) return;
+    event.preventDefault();
+    for (const file of files) onAttachment?.(file);
   }
 
   return (
@@ -201,66 +251,81 @@ export const ChatComposer = memo(function ChatComposer({
         <input
           ref={fileInputRef}
           type="file"
+          multiple
           onChange={selectFile}
-          accept=".pdf,.txt,.md,.csv,.json,.png,.jpg,.jpeg,.webp,.docx"
+          accept="image/*,.pdf,.txt,.md,.csv,.json,.docx,.xlsx,.pptx,.zip,.webp,.gif"
           className="sr-only"
         />
         {visibleAttachmentNotices.length > 0 && (
-          <div className="mx-2 mb-2 mt-1 flex flex-wrap gap-2">
-            {visibleAttachmentNotices.map(item => (
-              <div
-                key={item.fileId}
-                className="group relative flex max-w-52 flex-1 items-center gap-2 rounded-xl border border-border bg-muted/50 p-2 text-left shadow-sm"
-              >
-                {item.url && /(png|jpe?g|webp|gif)$/i.test(item.name) ? (
+          <div className="mx-2 mb-2 mt-1 flex items-center gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {visibleAttachmentNotices.map(item => {
+              const isImage =
+                (item.url || item.mimeType) &&
+                (IMAGE_EXT.test(item.name) ||
+                  (item.mimeType ?? "").startsWith("image/"));
+              const kind = getFileKind(item.name, item.mimeType);
+              return isImage && item.url ? (
+                <div
+                  key={item.fileId}
+                  className="group relative size-14 shrink-0 overflow-hidden rounded-xl border border-border shadow-sm"
+                  title={item.name}
+                >
                   <img
                     src={item.url}
-                    alt=""
-                    className="size-10 shrink-0 rounded-lg object-cover"
+                    alt={item.name}
+                    className="h-full w-full object-cover"
                   />
-                ) : (
-                  <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-background text-muted-foreground">
-                    {/(png|jpe?g|webp|gif)$/i.test(item.name) ? (
-                      <Image className="size-4" />
-                    ) : (
-                      <FileText className="size-4" />
-                    )}
-                  </span>
-                )}
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-xs font-medium text-foreground">
-                    {item.name}
-                  </p>
-                  <p className="mt-0.5 text-[10px] leading-4 text-muted-foreground">
-                    {item.linked ? "Ready in this chat" : "Saved to Library"}
-                  </p>
+                  {onClearAttachment && (
+                    <button
+                      onClick={() => onClearAttachment(item.fileId)}
+                      className="absolute right-1 top-1 flex size-6 items-center justify-center rounded-full border border-border bg-background/80 text-foreground opacity-0 shadow-md backdrop-blur transition-opacity hover:bg-background group-hover:opacity-100"
+                      aria-label="Remove screenshot"
+                    >
+                      <X className="size-3.5" />
+                    </button>
+                  )}
                 </div>
-                {onClearAttachment && (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => onClearAttachment(item.fileId)}
-                        className="size-7 shrink-0 rounded-lg"
-                        aria-label="Remove screenshot"
-                      >
-                        <X className="size-3.5" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top">
-                      Remove selected file
-                    </TooltipContent>
-                  </Tooltip>
-                )}
-              </div>
-            ))}
+              ) : (
+                <div
+                  key={item.fileId}
+                  className="group flex h-14 shrink-0 items-center gap-2.5 rounded-2xl border border-border bg-muted/50 py-2 pl-2 pr-3 shadow-sm transition-colors hover:bg-muted/80"
+                  title={`${item.name} · ${
+                    item.linked ? "Ready in this chat" : "Saved to Library"
+                  }`}
+                >
+                  <span
+                    className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${kind.colorClass}`}
+                  >
+                    <kind.icon className="size-5" />
+                  </span>
+                  <span className="flex min-w-0 flex-col">
+                    <span className="max-w-[140px] truncate text-xs font-semibold text-foreground">
+                      {item.name}
+                    </span>
+                    <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                      {kind.label}
+                      {item.linked ? " · linked" : " · library"}
+                    </span>
+                  </span>
+                  {onClearAttachment && (
+                    <button
+                      onClick={() => onClearAttachment(item.fileId)}
+                      className="ml-1 flex size-6 shrink-0 items-center justify-center rounded-full text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-foreground group-hover:opacity-100"
+                      aria-label="Remove screenshot"
+                    >
+                      <X className="size-3.5" />
+                    </button>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
         <Textarea
           ref={textareaRef}
           value={value}
           onChange={event => onValueChange(event.target.value)}
+          onPaste={handlePaste}
           onKeyDown={event => {
             if (event.key === "Enter" && !event.shiftKey) {
               event.preventDefault();
