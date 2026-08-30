@@ -1,6 +1,12 @@
--- KSEMO Supabase Database Schema (consolidated)
--- Single file: tables, RLS policies, functions, and library lite.
--- Run this entire file in the Supabase SQL Editor.
+-- ============================================
+-- KSEMO CONSOLIDATED DATABASE SCHEMA
+-- ============================================
+-- This is a single comprehensive SQL file that contains the entire database schema
+-- for the KSEMO project. It consolidates all tables, relationships, indexes, triggers,
+-- row-level security policies, and functions into one file.
+--
+-- Run this entire file in the Supabase SQL Editor to set up the complete database.
+-- ============================================
 
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -17,6 +23,8 @@ CREATE TABLE users (
     password_hash TEXT,
     reset_token_hash TEXT,
     reset_token_expires_at TIMESTAMPTZ,
+    magic_link_token_hash TEXT,
+    magic_link_expires_at TIMESTAMPTZ,
     role VARCHAR(20) DEFAULT 'user' CHECK (role IN ('user', 'admin')),
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
@@ -26,6 +34,8 @@ CREATE TABLE users (
 CREATE INDEX idx_users_open_id ON users(open_id);
 CREATE INDEX idx_users_email ON users(email);
 CREATE INDEX idx_users_role ON users(role);
+CREATE INDEX idx_users_magic_link_token_hash ON users(magic_link_token_hash);
+CREATE UNIQUE INDEX idx_users_email_unique ON users(email);
 
 -- ============================================
 -- USER PREFERENCES TABLE
@@ -122,6 +132,27 @@ CREATE TABLE memories (
 
 CREATE INDEX idx_memories_user_id ON memories(user_id);
 CREATE INDEX idx_memories_user_category ON memories(user_id, category);
+
+-- ============================================
+-- CONVERSATION MEMORIES TABLE
+-- Facts extracted from conversations for AI personalization
+-- ============================================
+CREATE TABLE conversation_memories (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    conversation_id UUID REFERENCES conversations(id) ON DELETE CASCADE,
+    content TEXT NOT NULL,
+    category VARCHAR(40) NOT NULL DEFAULT 'general'
+        CHECK (category IN ('general', 'preference', 'personal', 'health', 'religion', 'politics', 'financial', 'relationship')),
+    importance INTEGER,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    last_used_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_conversation_memories_user ON conversation_memories(user_id);
+CREATE INDEX idx_conversation_memories_user_category ON conversation_memories(user_id, category);
+CREATE INDEX idx_conversation_memories_conversation ON conversation_memories(conversation_id);
 
 -- ============================================
 -- MESSAGES TABLE
@@ -276,6 +307,8 @@ CREATE TRIGGER update_memory_settings_updated_at BEFORE UPDATE ON memory_setting
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_memories_updated_at BEFORE UPDATE ON memories
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_conversation_memories_updated_at BEFORE UPDATE ON conversation_memories
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_projects_updated_at BEFORE UPDATE ON projects
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_conversations_updated_at BEFORE UPDATE ON conversations
@@ -313,57 +346,6 @@ CREATE INDEX idx_messages_content_gin ON messages USING gin(to_tsvector('english
 CREATE INDEX idx_conversations_title_gin ON conversations USING gin(to_tsvector('english', title));
 
 -- ============================================
--- ROW LEVEL SECURITY
--- ============================================
-DROP POLICY IF EXISTS "Users can view own profile" ON users;
-DROP POLICY IF EXISTS "Users can update own profile" ON users;
-DROP POLICY IF EXISTS "Users can insert own profile" ON users;
-DROP POLICY IF EXISTS "Service role full access" ON users;
-
-DROP POLICY IF EXISTS "Users can view own preferences" ON user_preferences;
-DROP POLICY IF EXISTS "Users can upsert own preferences" ON user_preferences;
-
-DROP POLICY IF EXISTS "Users can view own projects" ON projects;
-DROP POLICY IF EXISTS "Users can insert own projects" ON projects;
-DROP POLICY IF EXISTS "Users can update own projects" ON projects;
-DROP POLICY IF EXISTS "Users can delete own projects" ON projects;
-
-DROP POLICY IF EXISTS "Users can view own conversations" ON conversations;
-DROP POLICY IF EXISTS "Users can insert own conversations" ON conversations;
-DROP POLICY IF EXISTS "Users can update own conversations" ON conversations;
-DROP POLICY IF EXISTS "Users can delete own conversations" ON conversations;
-DROP POLICY IF EXISTS "Public can view shared conversations" ON conversations;
-
-DROP POLICY IF EXISTS "Users can view own conversation messages" ON messages;
-DROP POLICY IF EXISTS "Users can insert messages to own conversations" ON messages;
-DROP POLICY IF EXISTS "Users can update messages in own conversations" ON messages;
-DROP POLICY IF EXISTS "Users can delete messages from own conversations" ON messages;
-DROP POLICY IF EXISTS "Public can view messages from shared conversations" ON messages;
-
-DROP POLICY IF EXISTS "Users can view own message versions" ON message_versions;
-DROP POLICY IF EXISTS "Users can insert versions for own messages" ON message_versions;
-
-DROP POLICY IF EXISTS "Users can view own message feedback" ON message_feedback;
-DROP POLICY IF EXISTS "Users can upsert own message feedback" ON message_feedback;
-
-DROP POLICY IF EXISTS "Users can view own files" ON files;
-DROP POLICY IF EXISTS "Users can insert own files" ON files;
-DROP POLICY IF EXISTS "Users can update own files" ON files;
-DROP POLICY IF EXISTS "Users can delete own files" ON files;
-
-DROP POLICY IF EXISTS "Users can view own attachments" ON attachments;
-DROP POLICY IF EXISTS "Users can insert own attachments" ON attachments;
-
-DROP POLICY IF EXISTS "Users can view own tasks" ON tasks;
-DROP POLICY IF EXISTS "Users can insert own tasks" ON tasks;
-DROP POLICY IF EXISTS "Users can update own tasks" ON tasks;
-DROP POLICY IF EXISTS "Users can delete own tasks" ON tasks;
-
-DROP POLICY IF EXISTS "Users can view own task activities" ON task_activities;
-DROP POLICY IF EXISTS "Users can insert own task activities" ON task_activities;
-DROP POLICY IF EXISTS "Users can update own task activities" ON task_activities;
-
--- ============================================
 -- HELPER FUNCTION FOR USER ID LOOKUP
 -- ============================================
 CREATE OR REPLACE FUNCTION get_current_user_id()
@@ -382,8 +364,11 @@ $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 -- ============================================
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_preferences ENABLE ROW LEVEL SECURITY;
+ALTER TABLE memory_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE projects ENABLE ROW LEVEL SECURITY;
 ALTER TABLE conversations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE memories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE conversation_memories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE message_versions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE message_feedback ENABLE ROW LEVEL SECURITY;
@@ -426,11 +411,8 @@ CREATE POLICY "Users can upsert own preferences"
     WITH CHECK (user_id = get_current_user_id());
 
 -- ============================================
--- MEMORY POLICIES
+-- MEMORY SETTINGS POLICIES
 -- ============================================
-DROP POLICY IF EXISTS "Users can view own memory settings" ON memory_settings;
-DROP POLICY IF EXISTS "Users can upsert own memory settings" ON memory_settings;
-
 CREATE POLICY "Users can view own memory settings"
     ON memory_settings FOR SELECT
     USING (user_id = get_current_user_id());
@@ -440,11 +422,9 @@ CREATE POLICY "Users can upsert own memory settings"
     USING (user_id = get_current_user_id())
     WITH CHECK (user_id = get_current_user_id());
 
-DROP POLICY IF EXISTS "Users can view own memories" ON memories;
-DROP POLICY IF EXISTS "Users can insert own memories" ON memories;
-DROP POLICY IF EXISTS "Users can update own memories" ON memories;
-DROP POLICY IF EXISTS "Users can delete own memories" ON memories;
-
+-- ============================================
+-- MEMORIES POLICIES
+-- ============================================
 CREATE POLICY "Users can view own memories"
     ON memories FOR SELECT
     USING (user_id = get_current_user_id());
@@ -460,6 +440,26 @@ CREATE POLICY "Users can update own memories"
 
 CREATE POLICY "Users can delete own memories"
     ON memories FOR DELETE
+    USING (user_id = get_current_user_id());
+
+-- ============================================
+-- CONVERSATION MEMORIES POLICIES
+-- ============================================
+CREATE POLICY "Users can view own conversation memories"
+    ON conversation_memories FOR SELECT
+    USING (user_id = get_current_user_id());
+
+CREATE POLICY "Users can insert own conversation memories"
+    ON conversation_memories FOR INSERT
+    WITH CHECK (user_id = get_current_user_id());
+
+CREATE POLICY "Users can update own conversation memories"
+    ON conversation_memories FOR UPDATE
+    USING (user_id = get_current_user_id())
+    WITH CHECK (user_id = get_current_user_id());
+
+CREATE POLICY "Users can delete own conversation memories"
+    ON conversation_memories FOR DELETE
     USING (user_id = get_current_user_id());
 
 -- ============================================
@@ -769,10 +769,6 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Get public conversation by share token
--- The live conversations.title / conversation_type and messages.role are
--- VARCHAR, so every column is cast to TEXT to match the RETURNS TABLE types
--- (otherwise Postgres fails with 42804 "structure of query does not match
--- function result type" and the whole share link errors).
 CREATE OR REPLACE FUNCTION get_public_conversation_by_token(
     p_share_token TEXT
 )
@@ -1011,3 +1007,7 @@ BEGIN
     LIMIT 1;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ============================================
+-- END OF CONSOLIDATED DATABASE SCHEMA
+-- ============================================
