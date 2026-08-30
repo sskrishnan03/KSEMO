@@ -308,7 +308,7 @@ function SettingsSearch({
             type="button"
             onClick={() => setQuery("")}
             aria-label="Clear settings search"
-            className="absolute top-1/2 right-2 flex size-6 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+            className="absolute top-1/2 right-2 flex size-6 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-[#0A0A0A] hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
           >
             <X className="size-3.5" />
           </button>
@@ -334,7 +334,7 @@ function SettingsSearch({
                       onMouseEnter={() => setHighlighted(index)}
                       onClick={() => select(entry.tab)}
                       className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors ${
-                        index === highlighted ? "bg-muted" : "hover:bg-muted/60"
+                        index === highlighted ? "bg-[#0A0A0A]" : "hover:bg-[#0A0A0A]"
                       }`}
                     >
                       <Icon className="size-4 shrink-0 text-muted-foreground" />
@@ -424,7 +424,7 @@ export const SettingsDialog = memo(function SettingsDialog({
         </DialogHeader>
 
         <div className="flex min-h-0 flex-1 flex-col md:flex-row">
-          <aside className="hidden md:flex w-56 shrink-0 flex-col border-r border-border bg-[oklch(0.975_0.002_80)] px-3 py-3 dark:bg-[oklch(0.17_0.003_80)]">
+          <aside className="hidden md:flex w-56 shrink-0 flex-col border-r border-border bg-[oklch(0.975_0.002_80)] px-3 py-3 dark:bg-[#000000]">
             <div className="mb-3 flex items-center gap-2 px-2 pb-2">
               <Settings2 className="size-4 text-muted-foreground" />
               <span className="text-sm font-semibold tracking-[-0.02em]">
@@ -442,8 +442,8 @@ export const SettingsDialog = memo(function SettingsDialog({
                     onClick={() => setActiveTab(item.id)}
                     className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm transition-colors outline-none focus-visible:ring-0 focus-visible:outline-none ${
                       active
-                        ? "bg-muted font-medium text-foreground"
-                        : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
+                        ? "bg-[#0A0A0A] font-medium text-foreground"
+                        : "text-muted-foreground hover:bg-[#0A0A0A] hover:text-foreground"
                     }`}
                   >
                     <Icon className="size-4 shrink-0" />
@@ -458,7 +458,7 @@ export const SettingsDialog = memo(function SettingsDialog({
                   onOpenChange(false);
                   onSignOut();
                 }}
-                className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm text-destructive transition-colors outline-none hover:bg-destructive/10 focus-visible:ring-0 focus-visible:outline-none"
+                className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm text-destructive transition-colors outline-none hover:bg-[#0A0A0A] focus-visible:ring-0 focus-visible:outline-none"
               >
                 <LogOut className="size-4 shrink-0" />
                 Sign out
@@ -466,7 +466,7 @@ export const SettingsDialog = memo(function SettingsDialog({
             </div>
           </aside>
 
-          <nav className="flex md:hidden overflow-x-auto border-b border-border bg-[oklch(0.975_0.002_80)] px-2 py-1.5 dark:bg-[oklch(0.17_0.003_80)]">
+          <nav className="flex md:hidden overflow-x-auto border-b border-border bg-[oklch(0.975_0.002_80)] px-2 py-1.5 dark:bg-[#000000]">
             {settingsNavItems.map(item => {
               const Icon = item.icon;
               const active = activeTab === item.id;
@@ -476,8 +476,8 @@ export const SettingsDialog = memo(function SettingsDialog({
                   onClick={() => setActiveTab(item.id)}
                   className={`flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs transition-colors outline-none focus-visible:ring-0 focus-visible:outline-none ${
                     active
-                      ? "bg-muted font-medium text-foreground"
-                      : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
+                      ? "bg-[#0A0A0A] font-medium text-foreground"
+                      : "text-muted-foreground hover:bg-[#0A0A0A] hover:text-foreground"
                   }`}
                 >
                   <Icon className="size-3.5 shrink-0" />
@@ -1545,7 +1545,7 @@ function FeedbackSection() {
                     className={`flex items-center gap-2 rounded-xl border p-2.5 text-left text-sm transition-colors ${
                       active
                         ? "border-primary bg-primary/5 font-medium text-foreground"
-                        : "border-border text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                        : "border-border text-muted-foreground hover:bg-[#0A0A0A] hover:text-foreground"
                     }`}
                   >
                     <Icon className="size-4 shrink-0" />
@@ -1584,7 +1584,7 @@ function FeedbackSection() {
               size="sm"
               onClick={handleSubmit}
               disabled={!feedbackText.trim() || !category || sendFeedback.isPending}
-              className="rounded-lg bg-foreground text-background hover:bg-foreground/90"
+              className="rounded-lg bg-foreground text-background hover:bg-[#0A0A0A]"
             >
               {sendFeedback.isPending ? "Sending…" : "Send feedback"}
             </Button>
@@ -1671,7 +1671,7 @@ function ManagedChatsDialog({
               <ul className="space-y-1.5">
                 {conversations.map(c => (
                   <li key={c.id}>
-                    <div className="group flex items-center gap-2 rounded-xl border border-border px-3 py-2 transition-colors hover:bg-muted/60">
+                    <div className="group flex items-center gap-2 rounded-xl border border-border px-3 py-2 transition-colors hover:bg-[#0A0A0A]">
                       <button
                         onClick={() => openChat(c.id)}
                         className="min-w-0 flex-1 rounded-lg py-0.5 text-left focus-visible:ring-0 focus-visible:outline-none"
@@ -1689,7 +1689,7 @@ function ManagedChatsDialog({
                             variant="ghost"
                             size="icon"
                             aria-label="Unarchive chat"
-                            className="size-8 shrink-0 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
+                            className="size-8 shrink-0 rounded-lg text-muted-foreground hover:bg-[#0A0A0A] hover:text-foreground"
                             disabled={restorePending}
                             onClick={() => restoreChat(c.id)}
                           >
@@ -1704,7 +1704,7 @@ function ManagedChatsDialog({
                             variant="ghost"
                             size="icon"
                             aria-label="Delete chat"
-                            className="size-8 shrink-0 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                            className="size-8 shrink-0 rounded-lg text-muted-foreground hover:bg-[#0A0A0A] hover:text-destructive"
                             disabled={deleteMutation.isPending}
                             onClick={() =>
                               setDeleteTarget({ id: c.id, title: c.title })
@@ -1834,7 +1834,7 @@ function SharedChatsDialog({
               <ul className="space-y-1.5">
                 {conversations.map(c => (
                   <li key={c.id}>
-                    <div className="flex items-center gap-2 rounded-xl border border-border px-3 py-2 transition-colors hover:bg-muted/60">
+                    <div className="flex items-center gap-2 rounded-xl border border-border px-3 py-2 transition-colors hover:bg-[#0A0A0A]">
                       <button
                         onClick={() => openChat(c.id)}
                         className="min-w-0 flex-1 rounded-lg py-0.5 text-left focus-visible:ring-0 focus-visible:outline-none"
@@ -1862,7 +1862,7 @@ function SharedChatsDialog({
                             variant="ghost"
                             size="icon"
                             aria-label="Stop sharing"
-                            className="size-8 shrink-0 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
+                            className="size-8 shrink-0 rounded-lg text-muted-foreground hover:bg-[#0A0A0A] hover:text-foreground"
                             disabled={busy}
                             onClick={() =>
                               unpublishMutation.mutate({
@@ -1884,7 +1884,7 @@ function SharedChatsDialog({
                             variant="ghost"
                             size="icon"
                             aria-label="Delete chat"
-                            className="size-8 shrink-0 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                            className="size-8 shrink-0 rounded-lg text-muted-foreground hover:bg-[#0A0A0A] hover:text-destructive"
                             disabled={busy}
                             onClick={() =>
                               setDeleteTarget({ id: c.id, title: c.title })

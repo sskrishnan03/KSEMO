@@ -53,7 +53,7 @@ export function KsemoTextDialogPanel({
         <Button
           onClick={onAction}
           disabled={!value.trim()}
-          className="rounded-xl bg-foreground text-background hover:bg-foreground/90"
+          className="rounded-xl bg-foreground text-background hover:bg-[#0A0A0A]"
         >
           {actionLabel}
         </Button>

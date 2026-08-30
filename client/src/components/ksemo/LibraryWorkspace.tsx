@@ -330,7 +330,7 @@ export function LibraryWorkspace({
               Back to chat
             </Button>
             <Button
-              className="rounded-xl bg-foreground text-background hover:bg-foreground/90"
+              className="rounded-xl bg-foreground text-background hover:bg-[#0A0A0A]"
               onClick={() => fileInputRef.current?.click()}
               disabled={uploadMutation.isPending}
             >
@@ -541,7 +541,7 @@ function FilterButton({
         "rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
         active
           ? "bg-foreground text-background"
-          : "text-muted-foreground hover:bg-muted hover:text-foreground"
+          : "text-muted-foreground hover:bg-[#0A0A0A] hover:text-foreground"
       )}
     >
       {label}
@@ -566,7 +566,7 @@ function ViewButton({
         "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
         active
           ? "bg-foreground text-background"
-          : "text-muted-foreground hover:bg-muted hover:text-foreground"
+          : "text-muted-foreground hover:bg-[#0A0A0A] hover:text-foreground"
       )}
       aria-pressed={active}
     >

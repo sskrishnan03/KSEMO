@@ -166,7 +166,7 @@ function CopyCodeButton({ code }: { code: string }) {
             "size-7 rounded-md transition-colors focus-visible:ring-1",
             copied
               ? "text-foreground"
-              : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
+              : "text-muted-foreground hover:bg-[#0A0A0A] hover:text-foreground"
           )}
           onClick={copy}
           disabled={!code}
@@ -215,7 +215,7 @@ function DownloadCodeButton({
           type="button"
           variant="ghost"
           size="icon"
-          className="size-7 rounded-md text-muted-foreground hover:bg-foreground/5 hover:text-foreground focus-visible:ring-1"
+          className="size-7 rounded-md text-muted-foreground hover:bg-[#0A0A0A] hover:text-foreground focus-visible:ring-1"
           onClick={download}
           disabled={!code}
           aria-label="Download code"

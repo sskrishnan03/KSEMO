@@ -130,7 +130,7 @@ export const SearchDialog = memo(function SearchDialog({
               <button
                 type="button"
                 onClick={() => setQuery("")}
-                className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-0"
+                className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-[#0A0A0A] hover:text-foreground focus-visible:ring-0"
                 aria-label="Clear search"
               >
                 <X className="size-3.5" />
@@ -149,7 +149,7 @@ export const SearchDialog = memo(function SearchDialog({
                   <button
                     key={result.conversationId}
                     onClick={() => handleSelect(result.conversationId)}
-                    className="group flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-muted/70"
+                    className="group flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-[#0A0A0A]"
                   >
                     <MessageCircle className="size-[18px] shrink-0 stroke-[2.4] text-foreground/85 transition-colors group-hover:text-foreground" />
                     <div className="min-w-0 flex-1">
@@ -183,7 +183,7 @@ export const SearchDialog = memo(function SearchDialog({
                   <button
                     key={c.id}
                     onClick={() => handleSelect(c.id)}
-                    className="group flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-muted/70"
+                    className="group flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-[#0A0A0A]"
                   >
                     <MessageCircle className="size-[18px] shrink-0 stroke-[2.4] text-foreground/85 transition-colors group-hover:text-foreground" />
                     <span className="truncate text-[13px] leading-5">

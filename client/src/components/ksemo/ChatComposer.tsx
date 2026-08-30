@@ -131,11 +131,13 @@ export const ChatComposer = memo(function ChatComposer({
     const textarea = textareaRef.current;
     if (!textarea) return;
     const frame = requestAnimationFrame(() => {
-      const height = Math.min(textarea.scrollHeight, 180);
-      if (height !== textarea.clientHeight) {
-        textarea.style.height = "0px";
-        textarea.style.height = `${height}px`;
-      }
+      // Reset to auto first to allow shrinking
+      textarea.style.height = "auto";
+      // Then set to actual scrollHeight with max constraint
+      const height = Math.min(textarea.scrollHeight, 128);
+      // Ensure minimum height of 40px for consistent layout
+      const finalHeight = Math.max(height, 40);
+      textarea.style.height = `${finalHeight}px`;
     });
     return () => cancelAnimationFrame(frame);
   }, [value]);
@@ -181,7 +183,7 @@ export const ChatComposer = memo(function ChatComposer({
         compactBottomSpacing ? "pb-2 sm:pb-3" : "pb-5 sm:pb-7"
       )}
     >
-      <div className="relative rounded-[1.35rem] border border-border/90 bg-[oklch(0.975_0.002_80)] p-2 shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-shadow focus-within:shadow-[0_12px_40px_rgba(0,0,0,0.12)] dark:bg-[oklch(0.17_0.003_80)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.3)]">
+      <div className="relative rounded-[1.35rem] border border-[#242424] bg-[#0B0B0B] p-2 shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-shadow focus-within:shadow-[0_12px_40px_rgba(0,0,0,0.12)]">
         {libraryOpen && (
           <div
             ref={libraryPanelRef}
@@ -223,7 +225,7 @@ export const ChatComposer = memo(function ChatComposer({
           className="sr-only"
         />
         {visibleAttachmentNotices.length > 0 && (
-          <div className="mx-2 mb-2 mt-1 flex items-center gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="mx-1 mb-1 flex items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {visibleAttachmentNotices.map(item => {
               const isImage =
                 (item.url || item.mimeType) &&
@@ -233,7 +235,7 @@ export const ChatComposer = memo(function ChatComposer({
               return isImage && item.url ? (
                 <div
                   key={item.fileId}
-                  className="group relative size-14 shrink-0 overflow-hidden rounded-xl border border-border shadow-sm"
+                  className="group relative size-10 shrink-0 overflow-hidden rounded-lg border border-border shadow-sm"
                 >
                   <img
                     src={item.url}
@@ -243,28 +245,28 @@ export const ChatComposer = memo(function ChatComposer({
                   {onClearAttachment && (
                     <button
                       onClick={() => onClearAttachment(item.fileId)}
-                      className="absolute right-1 top-1 flex size-6 items-center justify-center rounded-full border border-border bg-background/80 text-foreground opacity-0 shadow-md backdrop-blur outline-none transition-opacity hover:bg-background focus-visible:ring-0 group-hover:opacity-100"
+                      className="absolute right-0.5 top-0.5 flex size-4 items-center justify-center rounded-full border border-border bg-background/80 text-foreground opacity-0 shadow-md backdrop-blur outline-none transition-opacity hover:bg-[#0A0A0A] focus-visible:ring-0 group-hover:opacity-100"
                       aria-label="Remove screenshot"
                     >
-                      <X className="size-3.5" />
+                      <X className="size-2.5" />
                     </button>
                   )}
                 </div>
               ) : (
                 <div
                   key={item.fileId}
-                  className="group flex h-14 shrink-0 items-center gap-2.5 rounded-2xl border border-border bg-muted/50 py-2 pl-2 pr-3 shadow-sm transition-colors hover:bg-muted/80"
+                  className="group flex h-10 shrink-0 items-center gap-2 rounded-lg border border-border bg-transparent py-1.5 px-2 shadow-sm transition-colors hover:bg-[#0A0A0A]"
                 >
                   <span
-                    className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${kind.colorClass}`}
+                    className={`flex size-6 shrink-0 items-center justify-center rounded-lg ${kind.colorClass}`}
                   >
-                    <kind.icon className="size-5" />
+                    <kind.icon className="size-3" />
                   </span>
                   <span className="flex min-w-0 flex-col">
-                    <span className="max-w-[140px] truncate text-xs font-semibold text-foreground">
+                    <span className="max-w-[120px] truncate text-[10px] font-semibold text-foreground">
                       {item.name}
                     </span>
-                    <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                    <span className="text-[9px] font-medium uppercase tracking-wide text-muted-foreground">
                       {kind.label}
                       {item.linked ? " · linked" : " · library"}
                     </span>
@@ -272,10 +274,10 @@ export const ChatComposer = memo(function ChatComposer({
                   {onClearAttachment && (
                     <button
                       onClick={() => onClearAttachment(item.fileId)}
-                      className="ml-1 flex size-6 shrink-0 items-center justify-center rounded-full text-muted-foreground opacity-0 outline-none transition-opacity hover:bg-muted hover:text-foreground focus-visible:ring-0 group-hover:opacity-100"
+                      className="ml-1 flex size-4 shrink-0 items-center justify-center rounded-full text-muted-foreground opacity-0 outline-none transition-opacity hover:bg-[#0A0A0A] hover:text-foreground focus-visible:ring-0 group-hover:opacity-100"
                       aria-label="Remove screenshot"
                     >
-                      <X className="size-3.5" />
+                      <X className="size-2.5" />
                     </button>
                   )}
                 </div>
@@ -283,170 +285,170 @@ export const ChatComposer = memo(function ChatComposer({
             })}
           </div>
         )}
-        <Textarea
-          ref={textareaRef}
-          value={value}
-          onChange={event => onValueChange(event.target.value)}
-          onPaste={handlePaste}
-          onKeyDown={event => {
-            if (event.key === "Enter" && !event.shiftKey) {
-              event.preventDefault();
-              submit();
+        <div className="flex items-end gap-2 bg-transparent">
+          <Textarea
+            ref={textareaRef}
+            value={value}
+            onChange={event => onValueChange(event.target.value)}
+            onPaste={handlePaste}
+            onKeyDown={event => {
+              if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                submit();
+              }
+            }}
+            disabled={isGenerating || isRecording || isTranscribing}
+            placeholder={
+              isRecording
+                ? "Listening…"
+                : isTranscribing
+                  ? "Transcribing your recording…"
+                  : "Ask KSEMO anything…"
             }
-          }}
-          disabled={isGenerating || isRecording || isTranscribing}
-          placeholder={
-            isRecording
-              ? "Listening…"
-              : isTranscribing
-                ? "Transcribing your recording…"
-                : "Ask KSEMO anything…"
-          }
-          className="min-h-12 max-h-44 resize-none border-0 bg-transparent px-3 pt-3 text-[15px] leading-6 shadow-none focus-visible:ring-0"
-          aria-label="Message KSEMO"
-        />
-        <div className="flex min-h-10 items-center justify-between px-1 pt-1">
-          {isRecording ? (
-            <div className="flex items-center gap-1.5">
-              <div className="flex h-9 items-center gap-2 rounded-full border border-border bg-muted px-2">
-                <span
-                  className="flex items-center gap-0.5 px-1"
-                  aria-label={`Recording ${recordingSeconds} seconds`}
-                >
-                  {[4, 8, 12, 7, 15, 9, 5, 11].map((height, index) => (
-                    <span
-                      key={index}
-                      className="w-px animate-pulse rounded-full bg-muted-foreground"
-                      style={{ height, animationDelay: `${index * 70}ms` }}
-                    />
-                  ))}
-                </span>
-                <span className="text-[11px] font-medium tabular-nums text-muted-foreground">
-                  {String(Math.floor(recordingSeconds / 60)).padStart(2, "0")}:
-                  {String(recordingSeconds % 60).padStart(2, "0")}
-                </span>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={onCancelRecording}
-                      className="size-7 rounded-full outline-none focus-visible:ring-0 focus-visible:border-transparent"
-                      aria-label="Cancel recording"
-                    >
-                      <X className="size-3.5" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom">
-                    Discard recording
-                  </TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      size="icon"
-                      onClick={onVoice}
-                      className="size-7 rounded-full bg-foreground text-background hover:bg-foreground/90"
-                      aria-label="Finish recording"
-                    >
-                      <Check className="size-3.5" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom">
-                    Transcribe recording
-                  </TooltipContent>
-                </Tooltip>
-              </div>
-            </div>
-          ) : (
-            <div className="flex items-center gap-1">
-              <DropdownMenu
-                open={toolsOpen && !libraryOpen}
-                onOpenChange={setToolsOpen}
-              >
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <DropdownMenuTrigger asChild>
+            className="min-h-10 max-h-32 resize-none border-0 !bg-transparent px-2 py-2 text-[14px] leading-5 shadow-none focus-visible:ring-0 focus-visible:ring-0 placeholder:text-muted-foreground dark:!bg-transparent flex-1"
+            aria-label="Message KSEMO"
+          />
+          <div className="flex items-center gap-1 bg-transparent">
+            {isRecording ? (
+              <div className="flex items-center gap-1">
+                <div className="flex h-7 items-center gap-1.5 rounded-full border border-border bg-transparent px-2">
+                  <span
+                    className="flex items-center gap-0.5 px-0.5"
+                    aria-label={`Recording ${recordingSeconds} seconds`}
+                  >
+                    {[4, 8, 12, 7, 15, 9, 5, 11].map((height, index) => (
+                      <span
+                        key={index}
+                        className="w-px animate-pulse rounded-full bg-muted-foreground"
+                        style={{ height, animationDelay: `${index * 70}ms` }}
+                      />
+                    ))}
+                  </span>
+                  <span className="text-[10px] font-medium tabular-nums text-muted-foreground">
+                    {String(Math.floor(recordingSeconds / 60)).padStart(2, "0")}:
+                    {String(recordingSeconds % 60).padStart(2, "0")}
+                  </span>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="size-9 rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground"
-                        aria-label="Open composer tools"
+                        onClick={onCancelRecording}
+                        className="size-6 rounded-full outline-none focus-visible:ring-0 focus-visible:border-transparent"
+                        aria-label="Cancel recording"
                       >
-                        <Plus className="size-4" />
+                        <X className="size-3" />
                       </Button>
-                    </DropdownMenuTrigger>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom">
-                    Add a file or browse Library
-                  </TooltipContent>
-                </Tooltip>
-                <DropdownMenuContent
-                  align="start"
-                  side={menuPlacement === "below" ? "bottom" : "top"}
-                  sideOffset={10}
-                  collisionPadding={12}
-                  className="w-56 rounded-xl"
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">
+                      Discard recording
+                    </TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        size="icon"
+                        onClick={onVoice}
+                        className="size-6 rounded-full bg-foreground text-background hover:bg-[#0A0A0A]"
+                        aria-label="Finish recording"
+                      >
+                        <Check className="size-3" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">
+                      Transcribe recording
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+              </div>
+            ) : (
+              <>
+                <DropdownMenu
+                  open={toolsOpen && !libraryOpen}
+                  onOpenChange={setToolsOpen}
                 >
-                  <DropdownMenuItem
-                    onClick={() => fileInputRef.current?.click()}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="size-8 rounded-lg text-muted-foreground hover:bg-[#0A0A0A] hover:text-foreground"
+                          aria-label="Open composer tools"
+                        >
+                          <Plus className="size-3.5" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">
+                      Add a file or browse Library
+                    </TooltipContent>
+                  </DropdownMenu>
+                  <DropdownMenuContent
+                    align="start"
+                    side={menuPlacement === "bottom" ? "bottom" : "top"}
+                    sideOffset={10}
+                    collisionPadding={12}
+                    className="w-56 rounded-xl"
                   >
-                    <FileUp className="mr-2 size-4" /> Upload files
-                  </DropdownMenuItem>
-                  {onTakeScreenshot && (
+                    <DropdownMenuItem
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <FileUp className="mr-2 size-4" /> Upload files
+                    </DropdownMenuItem>
+                    {onTakeScreenshot && (
+                      <DropdownMenuItem
+                        onSelect={() => {
+                          setToolsOpen(false);
+                          onTakeScreenshot();
+                        }}
+                      >
+                        <MonitorUp className="mr-2 size-4" />
+                        Take Screenshot
+                      </DropdownMenuItem>
+                    )}
                     <DropdownMenuItem
                       onSelect={() => {
+                        setLibraryOpen(true);
                         setToolsOpen(false);
-                        onTakeScreenshot();
                       }}
                     >
-                      <MonitorUp className="mr-2 size-4" />
-                      Take Screenshot
+                      <Library className="mr-2 size-4" />
+                      Browse Library
                     </DropdownMenuItem>
-                  )}
-                  <DropdownMenuItem
-                    onSelect={() => {
-                      setLibraryOpen(true);
-                      setToolsOpen(false);
-                    }}
-                  >
-                    <Library className="mr-2 size-4" />
-                    Browse Library
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-              {!isGenerating && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={onVoice}
-                      disabled={isTranscribing}
-                      className="size-9 rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground"
-                      aria-label="Use voice input"
-                    >
-                      <Mic className="size-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom">
-                    Record a voice message
-                  </TooltipContent>
-                </Tooltip>
-              )}
-            </div>
-          )}
-          <div className="ml-auto flex items-center">
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                {!isGenerating && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={onVoice}
+                        disabled={isTranscribing}
+                        className="size-8 rounded-lg text-muted-foreground hover:bg-[#0A0A0A] hover:text-foreground"
+                        aria-label="Use voice input"
+                      >
+                        <Mic className="size-3.5" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">
+                      Record a voice message
+                    </TooltipContent>
+                  </Tooltip>
+                )}
+              </>
+            )}
             {isGenerating ? (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
                     onClick={onCancel}
                     size="icon"
-                    className="size-9 rounded-xl bg-foreground text-background hover:bg-foreground/90"
+                    className="size-8 rounded-lg bg-foreground text-background hover:bg-[#0A0A0A]"
                     aria-label="Stop generating"
                   >
-                    <Square className="size-3.5 fill-current" />
+                    <Square className="size-3 fill-current" />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom">Stop generating</TooltipContent>
@@ -462,10 +464,10 @@ export const ChatComposer = memo(function ChatComposer({
                       isTranscribing
                     }
                     size="icon"
-                    className="size-9 rounded-xl bg-foreground text-background hover:bg-foreground/90 disabled:bg-muted disabled:text-muted-foreground"
+                    className="size-8 rounded-lg bg-foreground text-background hover:bg-[#0A0A0A] disabled:bg-muted disabled:text-muted-foreground"
                     aria-label="Send message"
                   >
-                    <ArrowUp className="size-[18px]" />
+                    <ArrowUp className="size-[16px]" />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom">Send message</TooltipContent>
@@ -560,83 +562,73 @@ export function LibraryPickerContent({
         {selectedFiles.size > 0 && (
           <Button
             onClick={handleConfirm}
-            className="h-8 rounded-xl bg-foreground text-background hover:bg-foreground/90 text-sm px-4"
+            className="h-8 rounded-xl bg-foreground text-background hover:bg-[#0A0A0A] text-sm px-4"
             size="sm"
           >
             Add to chat
           </Button>
         )}
       </div>
-      <div className={cn(listMaxHeightClass, "space-y-1 overflow-y-auto pr-1")}>
-        {files.length ? (
-          files.map(file => {
-            const isImage =
-              (file.url || file.mimeType) &&
-              (IMAGE_EXT.test(file.filename) ||
-                (file.mimeType ?? "").startsWith("image/"));
-            const kind = getFileKind(file.filename, file.mimeType);
-            return (
-              <button
-                key={file.id}
-                onClick={() => toggleFileSelection(file.id)}
-                className={cn(
-                  "flex w-full items-center gap-2 rounded-lg p-2 text-left transition-colors hover:bg-muted/50",
-                  selectedFiles.has(file.id) ? "bg-primary/5" : ""
-                )}
-              >
-                {isImage && file.url ? (
-                  <span className="size-8 shrink-0 overflow-hidden rounded-md">
+      <div className={cn("overflow-y-auto", listMaxHeightClass)}>
+        {files.length === 0 ? (
+          <div className="py-8 text-center text-sm text-muted-foreground">
+            {query ? "No files match your search" : "No files in library"}
+          </div>
+        ) : (
+          <div className="space-y-1">
+            {files.map(file => {
+              const isImage =
+                (file.url || file.mimeType) &&
+                (IMAGE_EXT.test(file.filename) ||
+                  (file.mimeType ?? "").startsWith("image/"));
+              const kind = getFileKind(file.filename, file.mimeType);
+              const isSelected = selectedFiles.has(file.id);
+              return (
+                <button
+                  key={file.id}
+                  onClick={() => toggleFileSelection(file.id)}
+                  className={cn(
+                    "flex w-full items-center gap-2 rounded-lg p-2 text-left transition-colors",
+                    isSelected
+                      ? "bg-muted/50 hover:bg-[#0A0A0A]"
+                      : "hover:bg-[#0A0A0A]"
+                  )}
+                >
+                  {isImage && file.url ? (
                     <img
                       src={file.url}
                       alt={file.filename}
-                      className="h-full w-full object-cover"
+                      className="size-10 shrink-0 rounded-md object-cover"
                     />
-                  </span>
-                ) : (
-                  <span
-                    className={`flex size-8 shrink-0 items-center justify-center rounded-md ${kind.colorClass}`}
-                  >
-                    <kind.icon className="size-4" />
-                  </span>
-                )}
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-xs font-medium">
-                    {file.filename}
-                  </span>
-                  <span className="mt-0.5 block text-[10px] text-muted-foreground">
-                    {isImage ? "Image" : kind.label}
-                    {file.sizeBytes
-                      ? ` · ${Math.max(1, Math.round(file.sizeBytes / 1024))} KB`
-                      : ""}
-                  </span>
-                </span>
-                <button
-                  onClick={e => {
-                    e.stopPropagation();
-                    toggleFileSelection(file.id);
-                  }}
-                  className={cn(
-                    "flex size-6 shrink-0 items-center justify-center rounded-md transition-colors",
-                    selectedFiles.has(file.id)
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted/50 text-muted-foreground hover:bg-muted"
-                  )}
-                >
-                  {selectedFiles.has(file.id) ? (
-                    <Check className="size-3.5" />
                   ) : (
-                    <Plus className="size-3.5" />
+                    <span
+                      className={`flex size-10 shrink-0 items-center justify-center rounded-md ${kind.colorClass}`}
+                    >
+                      <kind.icon className="size-5" />
+                    </span>
+                  )}
+                  <div className="flex min-w-0 flex-1 flex-col">
+                    <span className="truncate text-sm font-medium text-foreground">
+                      {file.filename}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {kind.label}
+                      {file.sizeBytes && (
+                        <span className="ml-1">
+                          ({(file.sizeBytes / 1024).toFixed(1)} KB)
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                  {isSelected && (
+                    <div className="flex size-5 items-center justify-center rounded-full bg-foreground text-background">
+                      <Check className="size-3" />
+                    </div>
                   )}
                 </button>
-              </button>
-            );
-          })
-        ) : (
-          <p className="px-3 py-4 text-center text-xs text-muted-foreground">
-            {query
-              ? "No Library items match that search."
-              : "Your Library is empty."}
-          </p>
+              );
+            })}
+          </div>
         )}
       </div>
     </div>

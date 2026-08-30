@@ -94,7 +94,7 @@ export const MessageContent = memo(function MessageContent({
   if (message.role === "system" || message.role === "tool") return null;
 
   const actionClass =
-    "size-7 rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground";
+    "size-7 rounded-md text-muted-foreground transition-colors hover:bg-[#0A0A0A] hover:text-foreground";
   const action = (label: string, icon: React.ReactNode, click: () => void) => (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -302,7 +302,7 @@ function MessageOverflow({
             <Button
               variant="ghost"
               size="icon"
-              className="size-8 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
+              className="size-8 rounded-lg text-muted-foreground hover:bg-[#0A0A0A] hover:text-foreground"
               aria-label="More message actions"
               data-has-delete={onDelete ? "true" : "false"}
             >

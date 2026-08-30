@@ -87,7 +87,7 @@ export function ConfirmDeleteDialog({
         <div className="flex justify-end gap-2">
           <AlertDialogCancel
             onClick={() => onOpenChange(false)}
-            className="border-transparent bg-transparent shadow-none outline-none hover:bg-muted hover:text-foreground focus-visible:ring-0 focus-visible:border-transparent"
+            className="border-transparent bg-transparent shadow-none outline-none hover:bg-[#0A0A0A] hover:text-foreground focus-visible:ring-0 focus-visible:border-transparent"
           >
             Cancel
           </AlertDialogCancel>
