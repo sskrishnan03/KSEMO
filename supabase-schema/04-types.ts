@@ -306,9 +306,8 @@ export type DbUserPreference = {
 export type DbMemorySettings = {
   user_id: number;
   memory_enabled: boolean;
-  auto_suggest: boolean | null;
-  auto_save_inferred: boolean | null;
-  show_memory_usage: boolean | null;
+  generate_from_chats: boolean | null;
+  sensitive_memory_enabled: boolean | null;
   created_at: string;
   updated_at: string;
 };
@@ -396,9 +395,8 @@ export function dbToMemorySettings(db: DbMemorySettings): MemorySettings {
   return {
     userId: db.user_id,
     memoryEnabled: db.memory_enabled,
-    // These are legacy flags with no live storage; they are always off.
-    generateFromChats: false,
-    sensitiveMemoryEnabled: false,
+    generateFromChats: Boolean(db.generate_from_chats),
+    sensitiveMemoryEnabled: Boolean(db.sensitive_memory_enabled),
     createdAt: new Date(db.created_at),
     updatedAt: new Date(db.updated_at),
   };
@@ -479,14 +477,16 @@ export function messageToDb(msg: Partial<Message>): Partial<DbMessage> {
 export function memorySettingsToDb(
   settings: Partial<MemorySettings>
 ): Partial<DbMemorySettings> {
-  // The live memory_settings table only carries {user_id, memory_enabled,
-  // created_at, updated_at} plus nullable legacy flags. Writing any other
-  // column is a PostgREST error (PGRST204), which used to make every
-  // settings save fail. Only touch columns that exist.
+  // Maps the app MemorySettings onto the live memory_settings table. Only
+  // columns that exist in the schema are written to avoid PostgREST errors.
   const db: Partial<DbMemorySettings> = {};
   if (settings.userId !== undefined) db.user_id = settings.userId;
   if (settings.memoryEnabled !== undefined)
     db.memory_enabled = settings.memoryEnabled;
+  if (settings.generateFromChats !== undefined)
+    db.generate_from_chats = settings.generateFromChats;
+  if (settings.sensitiveMemoryEnabled !== undefined)
+    db.sensitive_memory_enabled = settings.sensitiveMemoryEnabled;
   if (settings.createdAt !== undefined)
     db.created_at = settings.createdAt.toISOString();
   if (settings.updatedAt !== undefined)

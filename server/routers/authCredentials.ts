@@ -72,17 +72,35 @@ export const signInProcedure = publicProcedure
   .input(
     z.object({
       email: emailInput,
+      password: passwordInput,
     })
   )
   .mutation(async ({ ctx, input }) => {
     const user = await findUserByEmail(input.email);
 
-    // For email-only sign in, if user exists, sign them in directly
+    // For email/password sign in, the account must exist.
     if (!user) {
       throw new TRPCError({
         code: "UNAUTHORIZED",
         message:
           "No account found with this email. Please create an account first.",
+      });
+    }
+
+    // Google-only accounts have no local password to verify against.
+    if (!user.passwordHash) {
+      throw new TRPCError({
+        code: "UNAUTHORIZED",
+        message:
+          "This account signs in with Google. Sign in with Google instead.",
+      });
+    }
+
+    // Verify the supplied password before issuing a session.
+    if (!verifyPassword(input.password, user.passwordHash)) {
+      throw new TRPCError({
+        code: "UNAUTHORIZED",
+        message: "Incorrect password. Please try again.",
       });
     }
 

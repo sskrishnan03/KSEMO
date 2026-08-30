@@ -25,10 +25,18 @@ export const memoryRouter = router({
       }) satisfies MemorySettings;
     }),
     update: protectedProcedure
-      .input(z.object({ memoryEnabled: z.boolean() }))
+      .input(
+        z.object({
+          memoryEnabled: z.boolean().optional(),
+          generateFromChats: z.boolean().optional(),
+          sensitiveMemoryEnabled: z.boolean().optional(),
+        })
+      )
       .mutation(async ({ ctx, input }) =>
         upsertMemorySettings(ctx.user.id, {
           memoryEnabled: input.memoryEnabled,
+          generateFromChats: input.generateFromChats,
+          sensitiveMemoryEnabled: input.sensitiveMemoryEnabled,
         })
       ),
   }),

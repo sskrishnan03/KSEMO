@@ -76,8 +76,11 @@ function SignInForm({
   const utils = trpc.useUtils();
 
   const [email, setEmail] = useState("");
-  const [remember, setRemember] = useState(false);
-  const [fieldError, setFieldError] = useState<string | null>(null);
+  const [password, setPassword] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<{
+    email?: string;
+    password?: string;
+  }>({});
   const [formError, setFormError] = useState<string | null>(null);
 
   const signIn = trpc.auth.signIn.useMutation({
@@ -94,12 +97,14 @@ function SignInForm({
     event.preventDefault();
     setFormError(null);
 
-    if (!EMAIL_PATTERN.test(email.trim())) {
-      setFieldError("Enter a valid email address.");
-      return;
-    }
-    setFieldError(null);
-    signIn.mutate({ email: email.trim() });
+    const errors: typeof fieldErrors = {};
+    if (!EMAIL_PATTERN.test(email.trim()))
+      errors.email = "Enter a valid email address.";
+    if (password.length < 8) errors.password = "At least 8 characters.";
+    setFieldErrors(errors);
+    if (Object.keys(errors).length > 0) return;
+
+    signIn.mutate({ email: email.trim(), password });
   }
 
   return (
@@ -112,25 +117,19 @@ function SignInForm({
         placeholder="you@example.com"
         value={email}
         onChange={event => setEmail(event.target.value)}
-        error={fieldError}
+        error={fieldErrors.email}
         disabled={signIn.isPending}
         autoFocus
       />
-      <div className="flex items-center gap-2 px-1">
-        <Checkbox
-          id="signin-remember"
-          checked={remember}
-          onCheckedChange={checked => setRemember(checked === true)}
-          disabled={signIn.isPending}
-          className="mt-0.5"
-        />
-        <label
-          htmlFor="signin-remember"
-          className="cursor-pointer text-xs leading-5 text-muted-foreground"
-        >
-          Remember me
-        </label>
-      </div>
+      <AuthPasswordField
+        label="Password"
+        autoComplete="current-password"
+        placeholder="Your password"
+        value={password}
+        onChange={event => setPassword(event.target.value)}
+        error={fieldErrors.password}
+        disabled={signIn.isPending}
+      />
       <AuthError message={formError} />
       <Button
         type="submit"
@@ -549,7 +548,7 @@ export default function AuthStage() {
                     </h1>
                   </div>
                   <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-muted-foreground">
-                    Enter your email to sign in to your account.
+                    Enter your email and password to sign in to your account.
                   </p>
                 </div>
 

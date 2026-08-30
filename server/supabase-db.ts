@@ -1,5 +1,6 @@
 // Supabase database implementation for KSEMO
 import { createClient } from "@supabase/supabase-js";
+import { isMemoryCategory } from "@shared/memory";
 import {
   User,
   InsertUser,
@@ -172,6 +173,10 @@ export async function upsertUser(user: InsertUser): Promise<void> {
         name: dbValues.name ?? existingUser.name,
         email: dbValues.email ?? existingUser.email,
         login_method: dbValues.login_method ?? existingUser.login_method,
+        password_hash:
+          dbValues.password_hash !== undefined
+            ? dbValues.password_hash
+            : existingUser.password_hash,
         last_signed_in: dbValues.last_signed_in,
         updated_at: new Date().toISOString(),
       })
@@ -196,6 +201,7 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       name: dbValues.name,
       email: dbValues.email,
       login_method: dbValues.login_method,
+      password_hash: dbValues.password_hash ?? null,
       last_signed_in: dbValues.last_signed_in,
     };
 
@@ -818,15 +824,39 @@ export async function upsertUserPreferences(
   userId: number,
   values: Partial<Omit<UserPreference, "userId" | "createdAt" | "updatedAt">>
 ): Promise<UserPreference | undefined> {
+  const existing = await getUserPreferences(userId);
+
   const dbValues: any = {
     user_id: userId,
-    selected_model: values.selectedModel || null,
-    persona: values.persona || "balanced",
-    custom_instructions: values.customInstructions || null,
-    speech_rate: values.speechRate || 100,
-    auto_play_responses: values.autoPlayResponses || false,
-    reduce_motion: values.reduceMotion || false,
+    // Only write fields that were explicitly provided, so a partial update
+    // (e.g. changing just the persona) never wipes the saved model, speech
+    // rate, or accessibility toggles.
+    ...(values.selectedModel !== undefined && {
+      selected_model: values.selectedModel ?? null,
+    }),
+    ...(values.persona !== undefined && { persona: values.persona }),
+    ...(values.customInstructions !== undefined && {
+      custom_instructions: values.customInstructions ?? null,
+    }),
+    ...(values.speechRate !== undefined && { speech_rate: values.speechRate }),
+    ...(values.autoPlayResponses !== undefined && {
+      auto_play_responses: values.autoPlayResponses,
+    }),
+    ...(values.reduceMotion !== undefined && {
+      reduce_motion: values.reduceMotion,
+    }),
   };
+
+  // For a brand-new row, seed the defaults the schema would otherwise provide
+  // so the row is valid before any partial update is applied.
+  if (!existing) {
+    dbValues.selected_model = dbValues.selected_model ?? null;
+    dbValues.persona = dbValues.persona ?? "balanced";
+    dbValues.custom_instructions = dbValues.custom_instructions ?? null;
+    dbValues.speech_rate = dbValues.speech_rate ?? 100;
+    dbValues.auto_play_responses = dbValues.auto_play_responses ?? false;
+    dbValues.reduce_motion = dbValues.reduce_motion ?? false;
+  }
 
   const { error } = await supabase
     .from("user_preferences")
@@ -940,38 +970,12 @@ export async function listUserMemories(
 // stored for that conversation so re-processing a chat never duplicates rows.
 export type MemoryFactToSave = { content: string; category?: string };
 
-const LIVE_MEMORY_CATEGORIES = new Set([
-  "instruction",
-  "preference",
-  "interest",
-  "goal",
-  "personal_info",
-]);
-
-// The live conversation_memories table enforces a CHECK on category that only
-// allows the categories above. Map KSEMO's app-level categories onto that set
-// so inserts never fail the constraint while durable facts stay retrievable.
+// The conversation_memories table enforces a CHECK on category using KSEMO's
+// canonical app-level categories (shared/memory). Store them as-is so reads
+// map cleanly back to MemoryCategoryId without lossy conversion.
 function liveMemoryCategoryFor(category?: string | null): string {
-  if (!category) return "instruction";
-  const mapped: Record<string, string> = {
-    general: "instruction",
-    fact: "instruction",
-    instruction: "instruction",
-    preference: "preference",
-    interest: "interest",
-    interests: "interest",
-    goal: "goal",
-    personal: "personal_info",
-    personal_info: "personal_info",
-    health: "personal_info",
-    religion: "personal_info",
-    politics: "personal_info",
-    financial: "personal_info",
-    relationship: "personal_info",
-  };
-  const resolved = mapped[category];
-  if (resolved && LIVE_MEMORY_CATEGORIES.has(resolved)) return resolved;
-  return LIVE_MEMORY_CATEGORIES.has(category) ? category : "instruction";
+  if (category && isMemoryCategory(category)) return category;
+  return "general";
 }
 
 export async function saveUserMemoryFacts(

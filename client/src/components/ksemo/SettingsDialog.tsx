@@ -11,6 +11,15 @@ import { Loading } from "@/components/ui/loading";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
+import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
@@ -23,16 +32,21 @@ import { ConfirmDeleteDialog } from "./ConfirmDeleteDialog";
 import {
   Archive,
   ArchiveRestore,
+  Bot,
   Brain,
   Bug,
   Copy,
   ExternalLink,
+  Folder,
+  FolderPlus,
+  HelpCircle,
   KeyRound,
   Lightbulb,
   Link2,
   LogOut,
   MessageSquare,
   Palette,
+  Pencil,
   Search,
   ShieldCheck,
   ShieldOff,
@@ -68,7 +82,14 @@ type User = {
 };
 
 type SettingsTab =
-  "account" | "security" | "appearance" | "data" | "memory" | "feedback";
+  | "account"
+  | "security"
+  | "appearance"
+  | "assistant"
+  | "projects"
+  | "data"
+  | "memory"
+  | "feedback";
 
 export const settingsSections: Array<{
   id: string;
@@ -92,6 +113,8 @@ const settingsNavItems: Array<{
   { id: "account", label: "Account", icon: User },
   { id: "security", label: "Security", icon: ShieldCheck },
   { id: "appearance", label: "Appearance", icon: Palette },
+  { id: "assistant", label: "Assistant", icon: Bot },
+  { id: "projects", label: "Projects", icon: Folder },
   { id: "data", label: "Data Control", icon: Trash2 },
   { id: "memory", label: "Memory", icon: Brain },
   { id: "feedback", label: "Feedback", icon: MessageSquare },
@@ -525,6 +548,8 @@ export const SettingsDialog = memo(function SettingsDialog({
               )}
               {activeTab === "security" && <SecuritySection user={user} />}
               {activeTab === "appearance" && <AppearanceSection />}
+              {activeTab === "assistant" && <AssistantSection />}
+              {activeTab === "projects" && <ProjectsSection />}
               {activeTab === "data" && (
                 <DataSection
                   onOpenArchived={() => setArchivedOpen(true)}
@@ -1373,11 +1398,574 @@ function AppearanceSection() {
   );
 }
 
+const personaOptions: Array<{ id: string; label: string; hint: string }> = [
+  { id: "balanced", label: "Balanced", hint: "Clear, helpful, and well-rounded" },
+  { id: "concise", label: "Concise", hint: "Short, to-the-point answers" },
+  { id: "creative", label: "Creative", hint: "Imaginative and expressive" },
+  { id: "analytical", label: "Analytical", hint: "Detailed and logical" },
+];
+
+function AssistantSection() {
+  const preferencesQuery = trpc.preferences.get.useQuery();
+  const modelsQuery = trpc.preferences.models.useQuery();
+  const utils = trpc.useUtils();
+
+  // Seeded from the server and refreshed whenever the cached preference data
+  // changes, so switching away and back shows the latest saved values.
+  const [draft, setDraft] = useState({
+    selectedModel: "",
+    persona: "balanced",
+    customInstructions: "",
+    speechRate: 100,
+    autoPlayResponses: false,
+    reduceMotion: false,
+  });
+
+  useEffect(() => {
+    const data = preferencesQuery.data;
+    if (!data) return;
+    setDraft({
+      selectedModel: data.selectedModel ?? "",
+      persona: data.persona,
+      customInstructions: data.customInstructions ?? "",
+      speechRate: data.speechRate,
+      autoPlayResponses: data.autoPlayResponses,
+      reduceMotion: data.reduceMotion,
+    });
+  }, [preferencesQuery.data]);
+
+  const saveMutation = trpc.preferences.update.useMutation({
+    onSuccess: () => {
+      utils.preferences.get.invalidate();
+      toast.success("Preferences saved");
+    },
+    onError: error =>
+      toast.error(error.message || "Could not save your preferences."),
+  });
+
+  const saveEnabled =
+    !preferencesQuery.isLoading &&
+    !saveMutation.isPending;
+
+  const patch = (values: Partial<typeof draft>) =>
+    setDraft(current => ({ ...current, ...values }));
+
+  const save = () =>
+    saveMutation.mutate({
+      selectedModel: draft.selectedModel || null,
+      persona: draft.persona as "balanced" | "concise" | "creative" | "analytical",
+      customInstructions: draft.customInstructions.trim() || null,
+      speechRate: draft.speechRate,
+      autoPlayResponses: draft.autoPlayResponses,
+      reduceMotion: draft.reduceMotion,
+    });
+
+  const models = modelsQuery.data ?? [];
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <h3 className="text-base font-semibold tracking-[-0.02em]">
+          Assistant
+        </h3>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Choose how your AI assistant behaves, speaks, and responds.
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        <Label className="text-sm">AI model</Label>
+        {modelsQuery.isLoading ? (
+          <p className="text-xs text-muted-foreground">Loading models…</p>
+        ) : models.length > 0 ? (
+          <Select
+            value={draft.selectedModel}
+            onValueChange={value => patch({ selectedModel: value })}
+          >
+            <SelectTrigger className="w-full rounded-xl">
+              <SelectValue placeholder="Select a model" />
+            </SelectTrigger>
+            <SelectContent>
+              {models.map(model => (
+                <SelectItem key={model.id} value={model.id}>
+                  {model.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            No models are currently available from the provider.
+          </p>
+        )}
+      </div>
+
+      <div className="space-y-2">
+        <Label className="text-sm">Response style</Label>
+        <div className="grid grid-cols-2 gap-2">
+          {personaOptions.map(option => {
+            const active = draft.persona === option.id;
+            return (
+              <button
+                key={option.id}
+                type="button"
+                onClick={() => patch({ persona: option.id })}
+                className={`rounded-xl border p-3 text-left transition-colors ${
+                  active
+                    ? "border-primary bg-primary/5"
+                    : "border-border hover:bg-muted/50"
+                }`}
+              >
+                <p className="text-sm font-medium">{option.label}</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  {option.hint}
+                </p>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="assistant-instructions" className="text-sm">
+          Custom instructions
+        </Label>
+        <Textarea
+          id="assistant-instructions"
+          value={draft.customInstructions}
+          onChange={event => patch({ customInstructions: event.target.value })}
+          maxLength={2000}
+          className="min-h-24 rounded-xl border border-border text-sm"
+          placeholder="Add specific rules or context for how KSEMO should answer, e.g. 'Always reply in short, friendly sentences.'"
+        />
+        <p className="text-right text-[11px] text-muted-foreground">
+          {draft.customInstructions.length}/2000
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <Label htmlFor="assistant-speech" className="text-sm">
+            Speech rate
+          </Label>
+          <span className="text-xs text-muted-foreground">
+            {draft.speechRate}%
+          </span>
+        </div>
+        <Slider
+          id="assistant-speech"
+          min={60}
+          max={180}
+          step={1}
+          value={[draft.speechRate]}
+          onValueChange={values => patch({ speechRate: values[0] ?? 100 })}
+          className="py-2"
+          aria-label="Speech rate"
+        />
+        <p className="text-xs text-muted-foreground">
+          How quickly spoken AI responses are read aloud.
+        </p>
+      </div>
+
+      <div className="flex items-center justify-between gap-3 rounded-xl border border-border p-3.5">
+        <div>
+          <p className="text-sm font-medium">Auto-play responses</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Read every AI reply aloud as it finishes streaming.
+          </p>
+        </div>
+        <Switch
+          checked={draft.autoPlayResponses}
+          onCheckedChange={value => patch({ autoPlayResponses: value })}
+          aria-label="Auto-play responses"
+        />
+      </div>
+
+      <div className="flex items-center justify-between gap-3 rounded-xl border border-border p-3.5">
+        <div>
+          <p className="text-sm font-medium">Reduce motion</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Prefer calm, minimal transitions throughout the app.
+          </p>
+        </div>
+        <Switch
+          checked={draft.reduceMotion}
+          onCheckedChange={value => patch({ reduceMotion: value })}
+          aria-label="Reduce motion"
+        />
+      </div>
+
+      <div className="flex items-center justify-end gap-2 border-t border-border pt-4">
+        <Button
+          size="sm"
+          onClick={save}
+          disabled={!saveEnabled}
+          className="rounded-lg bg-foreground text-background hover:bg-foreground/90"
+        >
+          {saveMutation.isPending ? "Saving…" : "Save preferences"}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+type ProjectRow = {
+  id: string;
+  user_id: number;
+  name: string;
+  description: string | null;
+  instructions: string | null;
+  is_archived: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+type ProjectConversationRow = {
+  id: string;
+  user_id: number;
+  project_id: string | null;
+  title: string;
+  conversation_type: string | null;
+  is_pinned: boolean;
+  is_archived: boolean;
+  is_public: boolean;
+  share_token: string | null;
+  deleted_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+function ProjectsSection() {
+  const utils = trpc.useUtils();
+  const projectsQuery = trpc.workspace.projects.list.useQuery();
+  const conversationsQuery = trpc.conversation.list.useQuery(undefined, {
+    enabled: true,
+  });
+
+  const [creating, setCreating] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newDescription, setNewDescription] = useState("");
+  const [newInstructions, setNewInstructions] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editInstructions, setEditInstructions] = useState("");
+  const [assignProject, setAssignProject] = useState("");
+
+  const invalidate = () => {
+    utils.workspace.projects.list.invalidate();
+    utils.conversation.list.invalidate();
+  };
+
+  const createMutation = trpc.workspace.projects.create.useMutation({
+    onSuccess: () => {
+      invalidate();
+      setCreating(false);
+      setNewName("");
+      setNewDescription("");
+      setNewInstructions("");
+      toast.success("Project created");
+    },
+    onError: error => toast.error(error.message || "Could not create project."),
+  });
+
+  const updateMutation = trpc.workspace.projects.update.useMutation({
+    onSuccess: () => {
+      invalidate();
+      setEditingId(null);
+      toast.success("Project updated");
+    },
+    onError: error => toast.error(error.message || "Could not update project."),
+  });
+
+  const archiveMutation = trpc.workspace.projects.archive.useMutation({
+    onSuccess: () => {
+      invalidate();
+      toast.success("Project archived");
+    },
+    onError: error => toast.error(error.message || "Could not archive project."),
+  });
+
+  const removeMutation = trpc.workspace.projects.remove.useMutation({
+    onSuccess: () => {
+      invalidate();
+      toast.success("Project deleted");
+    },
+    onError: error => toast.error(error.message || "Could not delete project."),
+  });
+
+  const setConvMutation = trpc.workspace.projects.setConversation.useMutation({
+    onSuccess: () => {
+      invalidate();
+      setAssignProject("");
+      toast.success("Conversation moved");
+    },
+    onError: error => toast.error(error.message || "Could not move conversation."),
+  });
+
+  const submitCreate = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!newName.trim()) return;
+    createMutation.mutate({
+      name: newName.trim(),
+      description: newDescription.trim() || null,
+      instructions: newInstructions.trim() || null,
+    });
+  };
+
+  const startEdit = (project: ProjectRow) => {
+    setEditingId(project.id);
+    setEditName(project.name);
+    setEditDescription(project.description ?? "");
+    setEditInstructions(project.instructions ?? "");
+  };
+
+  const submitEdit = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!editingId || !editName.trim()) return;
+    updateMutation.mutate({
+      id: editingId,
+      name: editName.trim(),
+      description: editDescription.trim() || null,
+      instructions: editInstructions.trim() || null,
+    });
+  };
+
+  const availableConversations = (conversationsQuery.data ?? []).filter(
+    conversation => !conversation.isArchived && !conversation.deletedAt
+  );
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <h3 className="text-base font-semibold tracking-[-0.02em]">Projects</h3>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Group related conversations into named projects, each with its own
+          description and AI instructions.
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => setCreating(current => !current)}
+          className="w-full rounded-xl"
+        >
+          <FolderPlus className="mr-2 size-4" />
+          {creating ? "Cancel" : "New project"}
+        </Button>
+
+        {creating && (
+          <form
+            onSubmit={submitCreate}
+            className="space-y-3 rounded-xl border border-border p-3.5"
+          >
+            <div className="space-y-1.5">
+              <Label className="text-sm">Name</Label>
+              <Input
+                value={newName}
+                onChange={event => setNewName(event.target.value)}
+                className="h-9 rounded-lg"
+                placeholder="e.g. Work, Research, Travel"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-sm">Description</Label>
+              <Input
+                value={newDescription}
+                onChange={event => setNewDescription(event.target.value)}
+                className="h-9 rounded-lg"
+                placeholder="What is this project about?"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-sm">AI instructions</Label>
+              <Textarea
+                value={newInstructions}
+                onChange={event => setNewInstructions(event.target.value)}
+                maxLength={4000}
+                className="min-h-20 rounded-xl border border-border text-sm"
+                placeholder="Optional instructions for how the assistant should act within this project."
+              />
+            </div>
+            <Button
+              size="sm"
+              type="submit"
+              disabled={!newName.trim() || createMutation.isPending}
+              className="w-full rounded-lg bg-foreground text-background hover:bg-foreground/90"
+            >
+              {createMutation.isPending ? "Creating…" : "Create project"}
+            </Button>
+          </form>
+        )}
+      </div>
+
+      {projectsQuery.isLoading ? (
+        <Loading className="py-8" />
+      ) : (projectsQuery.data ?? []).length === 0 ? (
+        <p className="rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+          No projects yet. Create one to start grouping conversations.
+        </p>
+      ) : (
+        <div className="space-y-3">
+          {(projectsQuery.data ?? []).map(project => {
+            const isEditing = editingId === project.id;
+            return (
+              <div
+                key={project.id}
+                className="rounded-xl border border-border p-3.5"
+              >
+                {isEditing ? (
+                  <form onSubmit={submitEdit} className="space-y-3">
+                    <Input
+                      value={editName}
+                      onChange={event => setEditName(event.target.value)}
+                      className="h-9 rounded-lg"
+                      aria-label="Project name"
+                    />
+                    <Input
+                      value={editDescription}
+                      onChange={event =>
+                        setEditDescription(event.target.value)
+                      }
+                      className="h-9 rounded-lg"
+                      placeholder="Description"
+                    />
+                    <Textarea
+                      value={editInstructions}
+                      onChange={event => setEditInstructions(event.target.value)}
+                      maxLength={4000}
+                      className="min-h-20 rounded-xl border border-border text-sm"
+                      placeholder="AI instructions"
+                    />
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        type="submit"
+                        disabled={!editName.trim() || updateMutation.isPending}
+                        className="rounded-lg bg-foreground text-background hover:bg-foreground/90"
+                      >
+                        Save
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        type="button"
+                        onClick={() => setEditingId(null)}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </form>
+                ) : (
+                  <>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">
+                          {project.name}
+                        </p>
+                        {project.description ? (
+                          <p className="mt-0.5 text-xs text-muted-foreground">
+                            {project.description}
+                          </p>
+                        ) : null}
+                      </div>
+                      <div className="flex shrink-0 items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => startEdit(project)}
+                          aria-label={`Edit ${project.name}`}
+                        >
+                          <Pencil className="size-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() =>
+                            archiveMutation.mutate({
+                              id: project.id,
+                              isArchived: true,
+                            })
+                          }
+                          aria-label={`Archive ${project.name}`}
+                          title="Archive"
+                        >
+                          <Archive className="size-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => removeMutation.mutate({ id: project.id })}
+                          aria-label={`Delete ${project.name}`}
+                          title="Delete"
+                        >
+                          <Trash2 className="size-4" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 border-t border-border pt-3">
+                      <Label className="text-xs text-muted-foreground">
+                        Move a conversation into this project
+                      </Label>
+                      <div className="mt-1.5 flex gap-2">
+                        <Select
+                          value={assignProject}
+                          onValueChange={setAssignProject}
+                        >
+                          <SelectTrigger size="sm" className="w-full">
+                            <SelectValue placeholder="Select conversation" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {availableConversations.map(conversation => (
+                              <SelectItem
+                                key={conversation.id}
+                                value={conversation.id}
+                              >
+                                {conversation.title || "Untitled conversation"}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          size="sm"
+                          disabled={
+                            !assignProject || setConvMutation.isPending
+                          }
+                          onClick={() =>
+                            setConvMutation.mutate({
+                              conversationId: assignProject,
+                              projectId: project.id,
+                            })
+                          }
+                          className="shrink-0 rounded-lg"
+                        >
+                          Add
+                        </Button>
+                      </div>
+                      {availableConversations.length === 0 && (
+                        <p className="mt-1 text-[11px] text-muted-foreground">
+                          No active conversations available to assign.
+                        </p>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function DataSection({
   onOpenArchived,
   onOpenShared,
-  onDeleteAll,
-}: {
+  onDeleteAll,}: {
   onOpenArchived: () => void;
   onOpenShared: () => void;
   onDeleteAll: () => void;
@@ -1505,24 +2093,33 @@ function DataSection({
 
 const feedbackCategories = [
   { id: "bug", label: "Bug report", icon: Bug },
-  { id: "feature", label: "Feature request", icon: Lightbulb },
-  { id: "improvement", label: "Improvement", icon: Zap },
-  { id: "general", label: "General feedback", icon: Star },
+  { id: "idea", label: "Feature request", icon: Lightbulb },
+  { id: "question", label: "Question", icon: HelpCircle },
+  { id: "praise", label: "General feedback", icon: Star },
 ] as const;
 
+type FeedbackCategoryId = (typeof feedbackCategories)[number]["id"];
+
 function FeedbackSection() {
-  const [category, setCategory] = useState<string>("");
-  const [email, setEmail] = useState("");
+  const [category, setCategory] = useState<FeedbackCategoryId | "">("");
   const [feedbackText, setFeedbackText] = useState("");
   const [submitted, setSubmitted] = useState(false);
 
+  const sendFeedback = trpc.feedback.send.useMutation({
+    onSuccess: () => {
+      toast.success("Thanks for your feedback!");
+      setCategory("");
+      setFeedbackText("");
+      setSubmitted(true);
+    },
+    onError: error => {
+      toast.error(error.message || "Could not send your feedback.");
+    },
+  });
+
   const handleSubmit = () => {
     if (!feedbackText.trim() || !category) return;
-    toast.success("Thanks for your feedback!");
-    setCategory("");
-    setEmail("");
-    setFeedbackText("");
-    setSubmitted(true);
+    sendFeedback.mutate({ category, message: feedbackText.trim() });
   };
 
   return (
@@ -1575,19 +2172,6 @@ function FeedbackSection() {
             </div>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="feedback-email" className="text-sm">
-              Email <span className="text-muted-foreground">(optional)</span>
-            </Label>
-            <Input
-              id="feedback-email"
-              type="email"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              className="h-9 rounded-lg text-sm"
-              placeholder="We'll only use this to follow up"
-            />
-          </div>
-          <div className="space-y-2">
             <Label htmlFor="feedback-text" className="text-sm">
               Your feedback
             </Label>
@@ -1600,11 +2184,11 @@ function FeedbackSection() {
               placeholder={
                 category === "bug"
                   ? "Describe the issue: what happened, what you expected, and steps to reproduce…"
-                  : category === "feature"
+                  : category === "idea"
                     ? "Describe the feature you'd like to see and why it would be useful…"
-                    : category === "improvement"
-                      ? "What could be better and how would you improve it…"
-                      : "Share your thoughts, ideas, or anything else…"
+                    : category === "question"
+                      ? "Ask us anything or share what you'd like to know about KSEMO…"
+                      : "Share your thoughts, praise, or ideas for improving KSEMO…"
               }
             />
             <p className="text-right text-[11px] text-muted-foreground">
@@ -1615,10 +2199,10 @@ function FeedbackSection() {
             <Button
               size="sm"
               onClick={handleSubmit}
-              disabled={!feedbackText.trim() || !category}
+              disabled={!feedbackText.trim() || !category || sendFeedback.isPending}
               className="rounded-lg bg-foreground text-background hover:bg-foreground/90"
             >
-              Send feedback
+              {sendFeedback.isPending ? "Sending…" : "Send feedback"}
             </Button>
           </div>
         </div>
