@@ -39,10 +39,8 @@ import {
 } from "../components/ksemo/ChatFilesDialog";
 import AuthStage from "./AuthStage";
 import { ConversationSidebar } from "../components/ksemo/ConversationSidebar";
-import {
-  MessageContent,
-  type KsemoMessage,
-} from "../components/ksemo/MessageContent";
+import { MessageContent, type KsemoMessage } from "../components/ksemo/MessageContent";
+
 import { SettingsDialog } from "../components/ksemo/SettingsDialog";
 import { ShareConversationDialog } from "../components/ksemo/ShareConversationDialog";
 import { ConfirmDeleteDialog } from "../components/ksemo/ConfirmDeleteDialog";
@@ -73,6 +71,7 @@ type StreamConversation = {
 // provider, dropped socket behind a proxy) would spin the composer forever.
 const STREAM_IDLE_TIMEOUT_MS = 45_000;
 const STREAM_MAX_DURATION_MS = 300_000;
+
 const REFRESH_TIMEOUT_MS = 20_000;
 
 function withDeadline<T>(promise: Promise<T>, ms: number): Promise<T | null> {
@@ -810,11 +809,12 @@ export default function Home() {
     let stalled = false;
     let userStopped = false;
     let errorMessage: string | null = null;
+    const maxDuration = STREAM_MAX_DURATION_MS;
     const watchdog = window.setInterval(() => {
       const now = Date.now();
       if (
         now - lastProgressAt > STREAM_IDLE_TIMEOUT_MS ||
-        now - startedAt > STREAM_MAX_DURATION_MS
+        now - startedAt > maxDuration
       ) {
         stalled = true;
         controller.abort();
@@ -859,35 +859,38 @@ export default function Home() {
             ?.slice(5)
             .trim();
           if (!eventName || !rawData) continue;
-          let data: Record<string, string>;
+          let data: Record<string, unknown>;
           try {
-            data = JSON.parse(rawData) as Record<string, string>;
+            data = JSON.parse(rawData) as Record<string, unknown>;
           } catch {
             continue;
           }
+          const str = (value: unknown): string =>
+            typeof value === "string" ? value : "";
           if (eventName === "conversation") {
             lastProgressAt = Date.now();
-            streamConversation = data as StreamConversation;
+            const conv = data as unknown as StreamConversation;
+            streamConversation = conv;
             // Whether the user is (still) looking at the conversation this new
             // server conversation belongs to before we re-point the stream.
             const wasViewing = isViewingThisStream();
-            streamEntry.conversationId = data.conversationId;
-            streamEntry.userMessageId = data.userMessageId;
-            streamEntry.assistantMessageId = data.assistantMessageId;
+            streamEntry.conversationId = conv.conversationId;
+            streamEntry.userMessageId = conv.userMessageId;
+            streamEntry.assistantMessageId = conv.assistantMessageId;
             if (wasViewing) {
               // Stay on this (fresh) conversation so the optimistic drafts keep
               // rendering here with their real server ids.
-              setActiveConversationId(data.conversationId);
-              if (user?.id) storeActiveConversationId(user.id, data.conversationId);
+              setActiveConversationId(conv.conversationId);
+              if (user?.id) storeActiveConversationId(user.id, conv.conversationId);
               // The local drafts below are authoritative, so the seed effect
               // must not overwrite them with a mid-stream database snapshot.
-              seededConversationIdRef.current = data.conversationId;
+              seededConversationIdRef.current = conv.conversationId;
               setChatMessages(current =>
                 current.map(message =>
                   message.id.startsWith("local-user")
-                    ? { ...message, id: data.userMessageId }
+                    ? { ...message, id: conv.userMessageId }
                     : message.id.startsWith("local-assistant")
-                      ? { ...message, id: data.assistantMessageId }
+                      ? { ...message, id: conv.assistantMessageId }
                       : message
                 )
               );
@@ -895,17 +898,16 @@ export default function Home() {
             utils.conversation.list.invalidate();
           } else if (eventName === "assistant.delta") {
             lastProgressAt = Date.now();
-            responseText += data.delta;
+            const delta = str(data.delta);
+            const messageId = str(data.messageId);
+            responseText += delta;
             // Only mutate the visible conversation's messages when it is the one
             // this stream belongs to. Otherwise the deltas ride along in
             // responseText and are written by the seed/sync path when the user
             // returns to (or already has open) that conversation.
             if (isViewingThisStream()) {
               const pending = pendingDeltasRef.current;
-              pending.set(
-                data.messageId,
-                (pending.get(data.messageId) ?? "") + data.delta
-              );
+              pending.set(messageId, (pending.get(messageId) ?? "") + delta);
               if (!deltaFlushRafRef.current) {
                 deltaFlushRafRef.current = requestAnimationFrame(() => {
                   deltaFlushRafRef.current = 0;
@@ -918,7 +920,7 @@ export default function Home() {
           } else if (eventName === "assistant.error") {
             lastProgressAt = Date.now();
             errorMessage =
-              data.message || "KSEMO could not complete this response.";
+              str(data.message) || "KSEMO could not complete this response.";
           }
         }
       };
@@ -1277,6 +1279,8 @@ export default function Home() {
     });
   }
 
+
+
   async function attachFromComposer(file: File) {
     if (file.size > 25 * 1024 * 1024 || !file.type) {
       toast.error("Choose a recognized file smaller than 25 MB.");
@@ -1555,6 +1559,9 @@ export default function Home() {
   // these, useMemo/React.memo boundaries would be defeated because Home
   // recreates plain function declarations on each render.
   const stableSendMessage = usePersistFn(sendMessage);
+  const stableComposerSend = usePersistFn((content: string) =>
+    void sendMessage(content)
+  );
   const stableStopGeneration = usePersistFn(stopGeneration);
   const stableNewChat = usePersistFn(newChat);
   const stableSelectConversation = usePersistFn(selectConversation);
@@ -1883,28 +1890,30 @@ export default function Home() {
                   ref={messagesBodyRef}
                   className="mx-auto max-w-3xl space-y-7 px-4 pb-4 pt-6 sm:px-6 sm:pb-5 sm:pt-8"
                 >
-                  {visibleMessages.map(message => (
-                    <MessageContent
-                      key={message.id}
-                      message={message}
-                      onSpeak={stableSpeak}
-                      onPause={stablePauseSpeech}
-                      onResume={stableResumeSpeech}
-                      onStop={stableStopSpeech}
-                      isSpeaking={speakingMessageId === message.id}
-                      speechState={speechState}
-                      isCurrentGeneration={
-                        isGenerating && generatingMessageId === message.id
-                      }
-                      onEdit={stableEditMessage}
-                      onRegenerate={stableRegenerateMessage}
-                      onRetry={stableRegenerateMessage}
-                      onShare={stableShareMessage}
-                      onDelete={stableDeleteMessage}
-                      onViewHistory={stableOnViewHistory}
-                      onFeedback={stableOnFeedback}
-                    />
-                  ))}
+                  {visibleMessages.map(message => {
+                    return (
+                      <MessageContent
+                        key={message.id}
+                        message={message}
+                        onSpeak={stableSpeak}
+                        onPause={stablePauseSpeech}
+                        onResume={stableResumeSpeech}
+                        onStop={stableStopSpeech}
+                        isSpeaking={speakingMessageId === message.id}
+                        speechState={speechState}
+                        isCurrentGeneration={
+                          isGenerating && generatingMessageId === message.id
+                        }
+                        onEdit={stableEditMessage}
+                        onRegenerate={stableRegenerateMessage}
+                        onRetry={stableRegenerateMessage}
+                        onShare={stableShareMessage}
+                        onDelete={stableDeleteMessage}
+                        onViewHistory={stableOnViewHistory}
+                        onFeedback={stableOnFeedback}
+                      />
+                    );
+                  })}
                   <div ref={messagesEndRef} />
                 </div>
               ) : activeQuery.isLoading && activeConversationId && !isGenerating ? (
@@ -1914,7 +1923,7 @@ export default function Home() {
                   greeting={greeting}
                   composer={
                     <ChatComposer
-                      onSend={stableSendMessage}
+                      onSend={stableComposerSend}
                       onCancel={stableStopGeneration}
                       onVoice={stableVoiceAction}
                       onCancelRecording={stableVoiceCancel}
@@ -1953,7 +1962,7 @@ export default function Home() {
 
             {visibleMessages.length > 0 && (
               <ChatComposer
-                onSend={stableSendMessage}
+                onSend={stableComposerSend}
                 onCancel={stableStopGeneration}
                 onVoice={stableVoiceAction}
                 onCancelRecording={stableVoiceCancel}
@@ -1979,6 +1988,7 @@ export default function Home() {
                 libraryFiles={libraryFilesQuery.data}
                 onLibraryFile={stableAttachLibraryFiles}
                 initialLibraryOpen={isLibraryPreview}
+                menuPlacement="below"
                 compactBottomSpacing
                 showSafetyNote
                 onTakeScreenshot={stableCaptureScreenshot}

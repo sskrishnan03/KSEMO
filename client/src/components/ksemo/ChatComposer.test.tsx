@@ -53,7 +53,7 @@ describe("ChatComposer", () => {
       })
     );
     expect(markup).toContain("brief.pdf");
-    expect(markup).toContain("Ready in this chat");
+    expect(markup).toContain("linked");
     expect(markup).toContain('aria-label="Remove screenshot"');
     expect(markup.indexOf("brief.pdf")).toBeLessThan(
       markup.indexOf('aria-label="Message KSEMO"')

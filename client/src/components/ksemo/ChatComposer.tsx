@@ -234,7 +234,6 @@ export const ChatComposer = memo(function ChatComposer({
                 <div
                   key={item.fileId}
                   className="group relative size-14 shrink-0 overflow-hidden rounded-xl border border-border shadow-sm"
-                  title={item.name}
                 >
                   <img
                     src={item.url}
@@ -255,9 +254,6 @@ export const ChatComposer = memo(function ChatComposer({
                 <div
                   key={item.fileId}
                   className="group flex h-14 shrink-0 items-center gap-2.5 rounded-2xl border border-border bg-muted/50 py-2 pl-2 pr-3 shadow-sm transition-colors hover:bg-muted/80"
-                  title={`${item.name} · ${
-                    item.linked ? "Ready in this chat" : "Saved to Library"
-                  }`}
                 >
                   <span
                     className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${kind.colorClass}`}

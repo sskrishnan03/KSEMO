@@ -397,18 +397,11 @@ export const messageRouter = router({
           code: "NOT_FOUND",
           message: "Message not found",
         });
-      if (message.role !== "assistant")
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Feedback is available for assistant responses only.",
-        });
-      await setMessageFeedbackForUser({
-        id: crypto.randomUUID(),
-        messageId: message.id,
+      return setMessageFeedbackForUser({
+        messageId: input.messageId,
         userId: ctx.user.id,
         value: input.value,
       });
-      return { success: true } as const;
     }),
 });
 

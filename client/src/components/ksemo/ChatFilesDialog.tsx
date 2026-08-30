@@ -107,7 +107,6 @@ export const ChatFilesDialog = memo(function ChatFilesDialog({
                       href={file.url}
                       target="_blank"
                       rel="noreferrer"
-                      title={`Open ${file.filename}`}
                       className="flex items-center gap-3 rounded-xl px-2.5 py-2 transition-colors hover:bg-muted/60"
                     >
                       {image ? (

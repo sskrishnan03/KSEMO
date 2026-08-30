@@ -69,6 +69,7 @@ export type InvokeParams = {
   model?: string;
   thinking?: Record<string, unknown>;
   reasoning?: Record<string, unknown>;
+  signal?: AbortSignal;
 };
 
 export type StreamDelta = {
@@ -447,6 +448,7 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     reasoning,
     maxTokens,
     max_tokens,
+    signal,
   } = params;
 
   const payload: Record<string, unknown> = {
@@ -499,6 +501,7 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
         "content-type": "application/json",
         authorization: `Bearer ${target.apiKey}`,
       },
+      signal,
       body: JSON.stringify(
         target.model ? { ...payload, model: target.model } : payload
       ),

@@ -161,7 +161,6 @@ export function registerChatStream(app: Express) {
       content?: string;
       regenerateAssistantMessageId?: string;
       attachmentFileIds?: string[];
-      mode?: string;
     };
     let content = body.content?.trim();
     const hasAttachments = (body.attachmentFileIds?.length ?? 0) > 0;
@@ -474,6 +473,7 @@ export function registerChatStream(app: Express) {
           { role: "system", content: systemInstruction },
           ...filteredAssistantContext,
         ];
+
         try {
           responseText = await runGeneration(
             preferences?.selectedModel ?? undefined,
