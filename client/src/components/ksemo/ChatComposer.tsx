@@ -18,10 +18,7 @@ import { getFileKind, IMAGE_EXT } from "@/lib/fileKinds";
 import {
   ArrowUp,
   Check,
-  FileText,
   FileUp,
-  Globe,
-  Image,
   Library,
   Mic,
   MonitorUp,
@@ -63,8 +60,6 @@ export const ChatComposer = memo(function ChatComposer({
   menuPlacement = "above",
   compactBottomSpacing = false,
   showSafetyNote = true,
-  webSearchEnabled = false,
-  onToggleWebSearch,
   isCentered = false,
   onTakeScreenshot,
 }: {
@@ -79,8 +74,19 @@ export const ChatComposer = memo(function ChatComposer({
   value: string;
   onValueChange: (value: string) => void;
   onAttachment?: (file: File) => void;
-  attachmentNotice?: { name: string; linked: boolean; mimeType?: string; url?: string } | null;
-  attachmentNotices?: Array<{ fileId: string; name: string; linked: boolean; mimeType?: string; url?: string }>;
+  attachmentNotice?: {
+    name: string;
+    linked: boolean;
+    mimeType?: string;
+    url?: string;
+  } | null;
+  attachmentNotices?: Array<{
+    fileId: string;
+    name: string;
+    linked: boolean;
+    mimeType?: string;
+    url?: string;
+  }>;
   onClearAttachment?: (fileId?: string) => void;
   libraryFiles?: Array<{
     id: string;
@@ -102,8 +108,6 @@ export const ChatComposer = memo(function ChatComposer({
   menuPlacement?: "above" | "below";
   compactBottomSpacing?: boolean;
   showSafetyNote?: boolean;
-  webSearchEnabled?: boolean;
-  onToggleWebSearch?: () => void;
   isCentered?: boolean;
   onTakeScreenshot?: () => void;
 }) {
@@ -337,7 +341,9 @@ export const ChatComposer = memo(function ChatComposer({
                       <X className="size-3.5" />
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent side="bottom">Discard recording</TooltipContent>
+                  <TooltipContent side="bottom">
+                    Discard recording
+                  </TooltipContent>
                 </Tooltip>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -355,127 +361,84 @@ export const ChatComposer = memo(function ChatComposer({
                   </TooltipContent>
                 </Tooltip>
               </div>
-              {webSearchEnabled && (
-                <div className="flex h-9 items-center gap-1.5 rounded-xl border border-border bg-muted pl-2.5 pr-1.5">
-                  <Globe className="size-3.5 text-muted-foreground" />
-                  <span className="text-xs font-medium text-foreground">
-                    Web search
-                  </span>
-                </div>
-              )}
             </div>
           ) : (
             <div className="flex items-center gap-1">
               <DropdownMenu
-              open={toolsOpen && !libraryOpen}
-              onOpenChange={setToolsOpen}
-            >
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="size-9 rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground"
-                      aria-label="Open composer tools"
-                    >
-                      <Plus className="size-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                </TooltipTrigger>
-                <TooltipContent side="bottom">
-                  Add a file or browse Library
-                </TooltipContent>
-              </Tooltip>
-              <DropdownMenuContent
-                align="start"
-                side={menuPlacement === "below" ? "bottom" : "top"}
-                sideOffset={10}
-                collisionPadding={12}
-                className="w-56 rounded-xl"
+                open={toolsOpen && !libraryOpen}
+                onOpenChange={setToolsOpen}
               >
-                <DropdownMenuItem onClick={() => fileInputRef.current?.click()}>
-                  <FileUp className="mr-2 size-4" /> Upload files
-                </DropdownMenuItem>
-                {onTakeScreenshot && (
-                  <DropdownMenuItem
-                    onSelect={() => {
-                      setToolsOpen(false);
-                      onTakeScreenshot();
-                    }}
-                  >
-                    <MonitorUp className="mr-2 size-4" />
-                    Take Screenshot
-                  </DropdownMenuItem>
-                )}
-                <DropdownMenuItem
-                  onSelect={() => {
-                    setLibraryOpen(true);
-                    setToolsOpen(false);
-                  }}
-                >
-                  <Library className="mr-2 size-4" />
-                  Browse Library
-                </DropdownMenuItem>
-                {onToggleWebSearch && (
-                  <DropdownMenuItem
-                    onSelect={() => {
-                      onToggleWebSearch();
-                      setToolsOpen(false);
-                    }}
-                  >
-                    <Globe className="mr-2 size-4" />
-                    Web search
-                  </DropdownMenuItem>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-            {!isGenerating && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={onVoice}
-                    disabled={isTranscribing}
-                    className="size-9 rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground"
-                    aria-label="Use voice input"
-                  >
-                    <Mic className="size-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom">
-                  Record a voice message
-                </TooltipContent>
-              </Tooltip>
-            )}
-            {webSearchEnabled && (
-              <div className="flex h-9 items-center gap-1.5 rounded-xl border border-border bg-muted pl-2.5 pr-1.5">
-                <Globe className="size-3.5 text-muted-foreground" />
-                <span className="text-xs font-medium text-foreground">
-                  Web search
-                </span>
-                {onToggleWebSearch && (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <DropdownMenuTrigger asChild>
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={onToggleWebSearch}
-                        className="size-6 rounded-lg text-muted-foreground outline-none hover:bg-background hover:text-foreground focus-visible:ring-0 focus-visible:border-transparent"
-                        aria-label="Cancel web search"
+                        className="size-9 rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground"
+                        aria-label="Open composer tools"
                       >
-                        <X className="size-3" />
+                        <Plus className="size-4" />
                       </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom">
-                      Cancel web search
-                    </TooltipContent>
-                  </Tooltip>
-                )}
-              </div>
-            )}
-          </div>
+                    </DropdownMenuTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    Add a file or browse Library
+                  </TooltipContent>
+                </Tooltip>
+                <DropdownMenuContent
+                  align="start"
+                  side={menuPlacement === "below" ? "bottom" : "top"}
+                  sideOffset={10}
+                  collisionPadding={12}
+                  className="w-56 rounded-xl"
+                >
+                  <DropdownMenuItem
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <FileUp className="mr-2 size-4" /> Upload files
+                  </DropdownMenuItem>
+                  {onTakeScreenshot && (
+                    <DropdownMenuItem
+                      onSelect={() => {
+                        setToolsOpen(false);
+                        onTakeScreenshot();
+                      }}
+                    >
+                      <MonitorUp className="mr-2 size-4" />
+                      Take Screenshot
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      setLibraryOpen(true);
+                      setToolsOpen(false);
+                    }}
+                  >
+                    <Library className="mr-2 size-4" />
+                    Browse Library
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              {!isGenerating && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={onVoice}
+                      disabled={isTranscribing}
+                      className="size-9 rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground"
+                      aria-label="Use voice input"
+                    >
+                      <Mic className="size-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    Record a voice message
+                  </TooltipContent>
+                </Tooltip>
+              )}
+            </div>
           )}
           <div className="ml-auto flex items-center">
             {isGenerating ? (
@@ -497,7 +460,11 @@ export const ChatComposer = memo(function ChatComposer({
                 <TooltipTrigger asChild>
                   <Button
                     onClick={submit}
-                    disabled={!value.trim() && !visibleAttachmentNotices.length || isRecording || isTranscribing}
+                    disabled={
+                      (!value.trim() && !visibleAttachmentNotices.length) ||
+                      isRecording ||
+                      isTranscribing
+                    }
                     size="icon"
                     className="size-9 rounded-xl bg-foreground text-background hover:bg-foreground/90 disabled:bg-muted disabled:text-muted-foreground"
                     aria-label="Send message"
@@ -606,53 +573,68 @@ export function LibraryPickerContent({
       </div>
       <div className={cn(listMaxHeightClass, "space-y-1 overflow-y-auto pr-1")}>
         {files.length ? (
-          files.map(file => (
-            <button
-              key={file.id}
-              onClick={() => toggleFileSelection(file.id)}
-              className={cn(
-                "flex w-full items-center gap-2 rounded-lg p-2 text-left transition-colors hover:bg-muted/50",
-                selectedFiles.has(file.id) ? "bg-primary/5" : ""
-              )}
-            >
-              <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted/50 text-muted-foreground">
-                {file.mimeType?.startsWith("image/") ? (
-                  <Image className="size-3" />
-                ) : (
-                  <FileText className="size-3" />
-                )}
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-xs font-medium">
-                  {file.filename}
-                </span>
-                <span className="mt-0.5 block text-[10px] text-muted-foreground">
-                  {file.mimeType?.startsWith("image/") ? "Image" : "File"}
-                  {file.sizeBytes
-                    ? ` · ${Math.max(1, Math.round(file.sizeBytes / 1024))} KB`
-                    : ""}
-                </span>
-              </span>
+          files.map(file => {
+            const isImage =
+              (file.url || file.mimeType) &&
+              (IMAGE_EXT.test(file.filename) ||
+                (file.mimeType ?? "").startsWith("image/"));
+            const kind = getFileKind(file.filename, file.mimeType);
+            return (
               <button
-                onClick={e => {
-                  e.stopPropagation();
-                  toggleFileSelection(file.id);
-                }}
+                key={file.id}
+                onClick={() => toggleFileSelection(file.id)}
                 className={cn(
-                  "flex size-6 shrink-0 items-center justify-center rounded-md transition-colors",
-                  selectedFiles.has(file.id)
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted/50 text-muted-foreground hover:bg-muted"
+                  "flex w-full items-center gap-2 rounded-lg p-2 text-left transition-colors hover:bg-muted/50",
+                  selectedFiles.has(file.id) ? "bg-primary/5" : ""
                 )}
               >
-                {selectedFiles.has(file.id) ? (
-                  <Check className="size-3.5" />
+                {isImage && file.url ? (
+                  <span className="size-8 shrink-0 overflow-hidden rounded-md">
+                    <img
+                      src={file.url}
+                      alt={file.filename}
+                      className="h-full w-full object-cover"
+                    />
+                  </span>
                 ) : (
-                  <Plus className="size-3.5" />
+                  <span
+                    className={`flex size-8 shrink-0 items-center justify-center rounded-md ${kind.colorClass}`}
+                  >
+                    <kind.icon className="size-4" />
+                  </span>
                 )}
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-xs font-medium">
+                    {file.filename}
+                  </span>
+                  <span className="mt-0.5 block text-[10px] text-muted-foreground">
+                    {isImage ? "Image" : kind.label}
+                    {file.sizeBytes
+                      ? ` · ${Math.max(1, Math.round(file.sizeBytes / 1024))} KB`
+                      : ""}
+                  </span>
+                </span>
+                <button
+                  onClick={e => {
+                    e.stopPropagation();
+                    toggleFileSelection(file.id);
+                  }}
+                  className={cn(
+                    "flex size-6 shrink-0 items-center justify-center rounded-md transition-colors",
+                    selectedFiles.has(file.id)
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted/50 text-muted-foreground hover:bg-muted"
+                  )}
+                >
+                  {selectedFiles.has(file.id) ? (
+                    <Check className="size-3.5" />
+                  ) : (
+                    <Plus className="size-3.5" />
+                  )}
+                </button>
               </button>
-            </button>
-          ))
+            );
+          })
         ) : (
           <p className="px-3 py-4 text-center text-xs text-muted-foreground">
             {query

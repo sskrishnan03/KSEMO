@@ -15,8 +15,8 @@ import { streamLLM, type Message } from "./_core/llm";
 import { sdk } from "./_core/sdk";
 import { resolveStoragePath } from "./storage";
 import fs from "fs";
-import { composeWebSearchContext, performWebSearch } from "./webSearch";
 import { buildUserMemoryContext } from "./memory/retrieval";
+import { memorizeConversation } from "./memory/autoMemorize";
 
 const BASE_SYSTEM_INSTRUCTION =
   "You are KSEMO, a thoughtful and reliable AI assistant. Be clear, accurate, respectful, and practical. Use Markdown when it improves readability. Never claim to have completed work you cannot verify. You can perform math, logic, code analysis, and general reasoning directly — do not refuse calculation or analysis questions. When asked about the current time or date, state that you do not have access to a real-time clock but you can help with time-zone conversions, date math, and scheduling if the user provides a reference time or zone.";
@@ -162,7 +162,6 @@ export function registerChatStream(app: Express) {
       regenerateAssistantMessageId?: string;
       attachmentFileIds?: string[];
       mode?: string;
-      webSearch?: boolean;
     };
     let content = body.content?.trim();
     const hasAttachments = (body.attachmentFileIds?.length ?? 0) > 0;
@@ -190,7 +189,10 @@ export function registerChatStream(app: Express) {
           return;
         }
       } else {
-        if (body.regenerateAssistantMessageId || (!content && !hasAttachments)) {
+        if (
+          body.regenerateAssistantMessageId ||
+          (!content && !hasAttachments)
+        ) {
           res.status(400).json({
             error: "A saved conversation is required to regenerate a response.",
           });
@@ -352,7 +354,12 @@ export function registerChatStream(app: Express) {
                     message.role === "user" || message.role === "assistant"
                 )
                 .slice(-30)
-                .filter(message => message.content.length > 0 || (message.role === "user" && historyForContext.indexOf(message) >= 0))
+                .filter(
+                  message =>
+                    message.content.length > 0 ||
+                    (message.role === "user" &&
+                      historyForContext.indexOf(message) >= 0)
+                )
                 .map(async message => {
                   if (message.role !== "user")
                     return {
@@ -363,8 +370,7 @@ export function registerChatStream(app: Express) {
                     message.id,
                     user.id
                   );
-                  if (!media.length && !message.content)
-                    return null;
+                  if (!media.length && !message.content) return null;
                   const contentParts: Array<
                     | { type: "text"; text: string }
                     | {
@@ -440,85 +446,32 @@ export function registerChatStream(app: Express) {
           analytical:
             "Reason carefully, state assumptions, and organize analysis clearly.",
         }[preferences?.persona ?? "balanced"];
-    const now = new Date();
-    const currentTimeString = now.toLocaleString("en-US", {
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-      hour12: true,
-      timeZoneName: "short",
-    });
-    const systemInstruction = [
-      BASE_SYSTEM_INSTRUCTION,
-      `The current date and time is: ${currentTimeString}. Use this to answer questions about time, dates, and scheduling. You may be asked about mathematical equations, code analysis, general reasoning, and anything else — always attempt to answer helpfully.`,
-      personaInstruction,
-      preferences?.customInstructions?.trim(),
-      memoryContext,
-    ]
-      .filter(Boolean)
-      .join("\n\n");
-
-        // WEB SEARCH: when the user toggled it on in the composer, retrieve
-        // fresh results for this turn and hand them to the model. Failures
-        // degrade silently to a normal answer.
-        let webSearchContext: string | null = null;
-        if (body.webSearch) {
-          const searchQuery =
-            (body.regenerateAssistantMessageId
-              ? [...historyForContext]
-                  .reverse()
-                  .find(message => message.role === "user")?.content
-              : content) ?? "";
-          if (searchQuery) {
-            writeEvent(res, "web.searching", {
-              messageId: assistantMessageId,
-              status: "searching",
-            });
-            const searchResults = await performWebSearch(searchQuery);
-            if (searchResults.length > 0) {
-              writeEvent(res, "web.searching", {
-                messageId: assistantMessageId,
-                status: "reading",
-              });
-            }
-            webSearchContext = composeWebSearchContext(
-              searchQuery,
-              searchResults
-            );
-            writeEvent(res, "web.sources", {
-              messageId: assistantMessageId,
-              query: searchQuery,
-              sources: searchResults.map(result => ({
-                title: result.title,
-                url: result.url,
-                snippet: result.snippet,
-              })),
-            });
-            if (!searchResults.length) {
-              writeEvent(res, "web.searching", {
-                messageId: assistantMessageId,
-                status: "no-results",
-              });
-            }
-          }
-        }
+        const now = new Date();
+        const currentTimeString = now.toLocaleString("en-US", {
+          weekday: "long",
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+          hour12: true,
+          timeZoneName: "short",
+        });
+        const systemInstruction = [
+          BASE_SYSTEM_INSTRUCTION,
+          `The current date and time is: ${currentTimeString}. Use this to answer questions about time, dates, and scheduling. You may be asked about mathematical equations, code analysis, general reasoning, and anything else — always attempt to answer helpfully.`,
+          personaInstruction,
+          preferences?.customInstructions?.trim(),
+          memoryContext,
+        ]
+          .filter(Boolean)
+          .join("\n\n");
 
         let generationError: unknown = null;
         let usedFallbackModel = false;
         const chatMessages: Message[] = [
           { role: "system", content: systemInstruction },
-          ...(webSearchContext
-            ? [
-                {
-                  role: "system" as const,
-                  content: webSearchContext,
-                },
-              ]
-            : []),
           ...filteredAssistantContext,
         ];
         try {
@@ -605,6 +558,9 @@ export function registerChatStream(app: Express) {
                 model: QUOTA_FALLBACK_MODEL,
               });
             }
+            // Capture durable facts from this conversation in the background;
+            // this never blocks the response (see memorizeConversation).
+            void memorizeConversation(user.id, conversation.id);
           }
         }
       } catch (error) {

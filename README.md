@@ -35,7 +35,7 @@ KSEMO is designed around one core idea: talking to AI should feel as natural as 
 
 The experience begins on the authentication page, where you can sign in with Google or use email and password. Once inside, you land on a clean, focused chat interface with a collapsible sidebar for navigating all your conversations. Every chat is searchable, sortable, and organized.
 
-From the main interface, you can start a new conversation instantly, attach files for the AI to analyze, toggle web search for real-time information, or switch to voice mode for hands-free interaction. The AI responds with streaming text, supports markdown and syntax-highlighted code, and lets you edit, regenerate, or version-track any message.
+From the main interface, you can start a new conversation instantly, attach files for the AI to analyze, or switch to voice mode for hands-free interaction. The AI responds with streaming text, supports markdown and syntax-highlighted code, and lets you edit, regenerate, or version-track any message.
 
 Beyond simple chat, KSEMO includes a personal file library for managing uploaded documents, a project system for grouping related conversations, export capabilities for saving chats as PDF or Word documents, and public sharing for when you want to share a conversation with others. User preferences let you tune the AI's personality, choose between multiple Gemini models, and customize the interface to match your workflow.
 
@@ -67,10 +67,6 @@ Full control over every conversation: create, rename, duplicate, archive, pin, t
 
 Edit any user message and the AI automatically regenerates its response. Every edit is tracked in a version history, and you can restore any previous version of a message with one click. Regenerate assistant responses independently to explore different answers.
 
-**Web Search Integration**
-
-Toggle web search on any message to give the AI access to real-time information from the internet. Supports multiple search providers — SerpApi, Tavily, Brave Search, and Serper — with source citations shown in the UI and real-time status indicators.
-
 **Conversation Export and Sharing**
 
 Export any conversation as a formatted PDF or Word document. Share conversations publicly via unique tokens — anyone with the link can view the full conversation on a dedicated public page without needing an account.
@@ -81,7 +77,7 @@ Group related conversations into named projects with project-specific AI instruc
 
 **Authentication and Security**
 
-Sign in with Google OAuth 2.0 with CSRF protection, or use email and password with scrypt hashing. JWT sessions work across browsers with a Bearer token fallback for Safari ITP and private browsing. Password reset flows are handled via styled HTML emails. Switch between up to two saved accounts without re-entering credentials.
+Sign in with Google OAuth 2.0 with CSRF protection, or use email and password with scrypt hashing. JWT sessions work across browsers with a Bearer token fallback for Safari ITP and private browsing. Password reset flows are handled via styled HTML emails.
 
 **User Settings and Personalization**
 
@@ -97,7 +93,7 @@ Open the application and sign in with Google or your email and password. You wil
 
 **2. Start a Conversation**
 
-Type a message in the composer at the bottom of the screen. The AI responds in real time with streaming text. Toggle web search on to give the AI access to current information, or attach a file to provide document context.
+Type a message in the composer at the bottom of the screen. The AI responds in real time with streaming text. Attach a file to provide document context.
 
 **3. Use Voice Mode**
 
@@ -163,7 +159,6 @@ SMTP_PASS=your_smtp_password
 SMTP_FROM=your_email_address
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=465
-SERPAPI_API_KEY=your_serpapi_key
 ```
 
 **Initialize the Database**
@@ -199,10 +194,6 @@ Click the attachment button in the composer to upload a file. Documents are auto
 **Use Voice Input**
 
 Click the microphone to record your message. KSEMO transcribes your speech using Gemini's multimodal AI and sends it as a text message. Enable auto-play to hear AI responses read aloud.
-
-**Search the Web**
-
-Toggle the web search switch before sending a message to give the AI access to real-time internet information. Search results are injected as context and source citations appear in the response.
 
 **Organize Conversations**
 
@@ -315,7 +306,6 @@ KSEMO/
 │   ├── chatStream.ts                # SSE streaming endpoint
 │   ├── fileExtract.ts               # Document text extraction
 │   ├── storage.ts                   # File storage
-│   └── webSearch.ts                 # Multi-provider web search
 │
 ├── shared/                          # Shared code (client + server)
 │   ├── types.ts                     # Shared type definitions

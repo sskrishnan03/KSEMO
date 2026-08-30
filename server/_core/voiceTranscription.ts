@@ -6,11 +6,17 @@
 const GEMINI_BASE_URL =
   process.env.LLM_BASE_URL?.replace(/\/openai\/?$/, "") ??
   "https://generativelanguage.googleapis.com/v1beta";
+// Ordered by transcription speed as a best effort; each fallback is only used
+// when the previous model is busy or unavailable on the configured API key.
 const TRANSCRIBE_MODELS = [
+  "gemini-2.0-flash",
   "gemini-3.7-flash",
   "gemini-3.6-flash",
-  "gemini-2.0-flash",
 ];
+
+// Hard cap on total transcription time so the UI never hangs on an unresponsive
+// model; the remaining budget is shared across model fallbacks.
+const TRANSCRIPTION_DEADLINE_MS = 30_000;
 
 export type TranscribeOptions = {
   audio: Buffer;
@@ -125,20 +131,45 @@ export async function transcribeAudio(
 
     let response: Response | null = null;
     let lastError = "";
+    const deadline = Date.now() + TRANSCRIPTION_DEADLINE_MS;
     for (const model of TRANSCRIBE_MODELS) {
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) {
+        lastError = lastError || "Transcription request timed out";
+        break;
+      }
       const url = `${GEMINI_BASE_URL.replace(/\/+$/, "")}/models/${model}:generateContent`;
-      response = await fetch(url, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          "x-goog-api-key": apiKey,
-        },
-        body,
-      });
+      try {
+        response = await fetch(url, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "x-goog-api-key": apiKey,
+          },
+          body,
+          signal: AbortSignal.timeout(Math.min(20_000, remaining)),
+        });
+      } catch (error) {
+        lastError =
+          error instanceof Error && error.name === "TimeoutError"
+            ? "Transcription request timed out"
+            : error instanceof Error
+              ? error.message
+              : "Transcription request failed";
+        break;
+      }
       if (response.ok) break;
       const errorText = await response.text().catch(() => "");
       lastError = `${response.status} ${response.statusText}${errorText ? `: ${errorText}` : ""}`;
-      if (response.status !== 503 && response.status !== 429) break;
+      // Retry the next model on contention (429/503) or if this model isn't
+      // available on the configured key (400/404).
+      if (
+        response.status !== 503 &&
+        response.status !== 429 &&
+        response.status !== 400 &&
+        response.status !== 404
+      )
+        break;
     }
 
     if (!response || !response.ok) {

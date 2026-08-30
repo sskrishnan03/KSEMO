@@ -17,7 +17,6 @@ import {
 import { cn } from "@/lib/utils";
 import {
   Archive,
-  Check,
   ChevronDown,
   ChevronRight,
   ChevronsLeft,
@@ -30,19 +29,16 @@ import {
   HelpCircle,
   Library,
   Headset,
-  Loader2,
   LogOut,
   MessageCircle,
   PanelLeftClose,
   Pencil,
   Pin,
-  Plus,
   Search,
   Settings2,
   ShieldCheck,
   SquarePen,
   Trash2,
-  X,
 } from "lucide-react";
 import { ShareIcon } from "./icons";
 import React, { memo, useMemo, useRef, useState } from "react";
@@ -77,11 +73,6 @@ export const ConversationSidebar = memo(function ConversationSidebar({
   onSettings,
   onSupport,
   onLogout,
-  accounts = [],
-  onSwitchAccount,
-  onAddAccount,
-  onRemoveAccount,
-  switchingAccountId,
   user,
   previewSupportOpen = false,
 }: {
@@ -105,19 +96,6 @@ export const ConversationSidebar = memo(function ConversationSidebar({
   onSettings: () => void;
   onSupport: (topic: "faq" | "privacy" | "terms") => void;
   onLogout: () => void;
-  accounts?: Array<{ id: string; name?: string | null; email?: string | null }>;
-  onSwitchAccount?: (account: {
-    id: string;
-    name?: string | null;
-    email?: string | null;
-  }) => void;
-  onAddAccount?: () => void;
-  onRemoveAccount?: (account: {
-    id: string;
-    name?: string | null;
-    email?: string | null;
-  }) => void;
-  switchingAccountId?: string | null;
   user: { id?: string | number; name?: string | null; email?: string | null };
   previewSupportOpen?: boolean;
 }) {
@@ -354,88 +332,17 @@ export const ConversationSidebar = memo(function ConversationSidebar({
               collisionPadding={12}
               className="max-h-[calc(100dvh-1.5rem)] w-60 overflow-y-auto rounded-2xl border-border/80 p-1.5 shadow-xl"
             >
-              <DropdownMenuSub>
-                <DropdownMenuSubTrigger className="h-auto items-center justify-between px-2.5 py-2.5 focus-visible:ring-0 focus-visible:outline-none">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                      Logged in as
-                    </p>
-                    <p className="mt-0.5 truncate text-sm font-semibold">
-                      {user.name || "KSEMO user"}
-                    </p>
-                    <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                      {user.email || "Account"}
-                    </p>
-                  </div>
-                </DropdownMenuSubTrigger>
-                <DropdownMenuSubContent
-                  sideOffset={8}
-                  collisionPadding={12}
-                  className="max-h-[calc(100dvh-1.5rem)] w-60 overflow-y-auto rounded-2xl p-1.5"
-                >
-                  <p className="px-2.5 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                    Accounts ({accounts.length}/2)
-                  </p>
-                  {accounts.map(account => {
-                    const selected =
-                      account.id === String(user.id) ||
-                      account.email === user.email;
-                    const switching = switchingAccountId === account.id;
-                    return (
-                      <DropdownMenuItem
-                        key={account.id}
-                        disabled={selected || switching}
-                        onClick={() => onSwitchAccount?.(account)}
-                        className="h-11 rounded-xl px-2.5 focus-visible:ring-0 focus-visible:outline-none"
-                      >
-                        <span className="mr-2.5 flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-[10px] font-bold text-primary">
-                          {switching ? (
-                            <Loader2 className="size-3.5 animate-spin" />
-                          ) : (
-                            account.name?.trim().charAt(0).toUpperCase() ||
-                            account.email?.charAt(0).toUpperCase() ||
-                            "U"
-                          )}
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-xs font-semibold">
-                            {account.name || "KSEMO user"}
-                          </span>
-                          <span className="block truncate text-[10px] text-muted-foreground">
-                            {switching ? "Switching…" : account.email}
-                          </span>
-                        </span>
-                        {selected ? (
-                          <Check
-                            className="size-3.5 text-primary"
-                            aria-label="Current account"
-                          />
-                        ) : switching ? null : (
-                          <button
-                            type="button"
-                            onClick={event => {
-                              event.stopPropagation();
-                              onRemoveAccount?.(account);
-                            }}
-                            className="ml-1 rounded-md p-0.5 text-muted-foreground outline-none transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:ring-0"
-                            aria-label={`Remove ${account.name || account.email}`}
-                          >
-                            <X className="size-3" />
-                          </button>
-                        )}
-                      </DropdownMenuItem>
-                    );
-                  })}
-                  {onAddAccount && (
-                    <DropdownMenuItem
-                      onClick={onAddAccount}
-                      className="mt-1 h-9 rounded-xl text-xs font-medium focus-visible:ring-0 focus-visible:outline-none"
-                    >
-                      <Plus className="mr-2 size-3.5" /> Add account
-                    </DropdownMenuItem>
-                  )}
-                </DropdownMenuSubContent>
-              </DropdownMenuSub>
+              <div className="px-2.5 py-2.5">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                  Logged in as
+                </p>
+                <p className="mt-0.5 truncate text-sm font-semibold">
+                  {user.name || "KSEMO user"}
+                </p>
+                <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                  {user.email || "Account"}
+                </p>
+              </div>
               <DropdownMenuItem
                 onClick={onSettings}
                 className="focus-visible:ring-0 focus-visible:outline-none"

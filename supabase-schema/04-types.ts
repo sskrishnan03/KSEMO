@@ -5,6 +5,7 @@ import type {
   MemoryConsentStatus,
   MemorySource,
 } from "@shared/memory";
+import { isSensitiveMemoryCategory } from "@shared/memory";
 
 // Application-facing types (camelCase) - what the rest of the app expects
 export type User = {
@@ -118,12 +119,6 @@ export type InsertConversation = Partial<
   userId: number;
 };
 
-export type Source = {
-  title: string;
-  url: string;
-  snippet?: string | null;
-};
-
 export type Message = {
   id: string;
   conversationId: string;
@@ -131,7 +126,6 @@ export type Message = {
   content: string;
   model: string | null;
   status: "sending" | "streaming" | "completed" | "failed" | "cancelled";
-  sources: Source[];
   createdAt: Date;
   updatedAt: Date;
 };
@@ -312,24 +306,26 @@ export type DbUserPreference = {
 export type DbMemorySettings = {
   user_id: number;
   memory_enabled: boolean;
-  generate_from_chats: boolean;
-  sensitive_memory_enabled: boolean;
+  auto_suggest: boolean | null;
+  auto_save_inferred: boolean | null;
+  show_memory_usage: boolean | null;
   created_at: string;
   updated_at: string;
 };
 
+// Live storage lives in the conversation_memories table: facts extracted from
+// the user's chats. There is no title/is_sensitive/source/consent columns on
+// that table, so those app-level concepts are derived at mapping time.
 export type DbMemory = {
   id: string;
+  conversation_id: string | null;
   user_id: number;
-  title: string;
   content: string;
   category: string;
-  is_sensitive: boolean;
-  source: MemorySource;
-  source_conversation_id: string | null;
-  consent_status: MemoryConsentStatus;
+  importance: number | null;
   created_at: string;
   updated_at: string;
+  last_used_at: string | null;
 };
 
 // Helper function to convert DB row to app type
@@ -400,8 +396,9 @@ export function dbToMemorySettings(db: DbMemorySettings): MemorySettings {
   return {
     userId: db.user_id,
     memoryEnabled: db.memory_enabled,
-    generateFromChats: db.generate_from_chats,
-    sensitiveMemoryEnabled: db.sensitive_memory_enabled,
+    // These are legacy flags with no live storage; they are always off.
+    generateFromChats: false,
+    sensitiveMemoryEnabled: false,
     createdAt: new Date(db.created_at),
     updatedAt: new Date(db.updated_at),
   };
@@ -411,13 +408,15 @@ export function dbToMemory(db: DbMemory): Memory {
   return {
     id: db.id,
     userId: db.user_id,
-    title: db.title,
+    // The conversation_memories table has no title column; the content itself
+    // is used so retrieval scoring still has text to match against.
+    title: db.content,
     content: db.content,
     category: db.category as MemoryCategoryId,
-    isSensitive: db.is_sensitive,
-    source: db.source,
-    sourceConversationId: db.source_conversation_id,
-    consentStatus: db.consent_status,
+    isSensitive: isSensitiveMemoryCategory(db.category),
+    source: db.conversation_id ? "chat" : "manual",
+    sourceConversationId: db.conversation_id,
+    consentStatus: "silent",
     createdAt: new Date(db.created_at),
     updatedAt: new Date(db.updated_at),
   };
@@ -472,24 +471,22 @@ export function messageToDb(msg: Partial<Message>): Partial<DbMessage> {
   if (msg.content !== undefined) db.content = msg.content;
   if (msg.model !== undefined) db.model = msg.model;
   if (msg.status !== undefined) db.status = msg.status;
-  if (msg.createdAt !== undefined)
-    db.created_at = msg.createdAt.toISOString();
-  if (msg.updatedAt !== undefined)
-    db.updated_at = msg.updatedAt.toISOString();
+  if (msg.createdAt !== undefined) db.created_at = msg.createdAt.toISOString();
+  if (msg.updatedAt !== undefined) db.updated_at = msg.updatedAt.toISOString();
   return db;
 }
 
 export function memorySettingsToDb(
   settings: Partial<MemorySettings>
 ): Partial<DbMemorySettings> {
+  // The live memory_settings table only carries {user_id, memory_enabled,
+  // created_at, updated_at} plus nullable legacy flags. Writing any other
+  // column is a PostgREST error (PGRST204), which used to make every
+  // settings save fail. Only touch columns that exist.
   const db: Partial<DbMemorySettings> = {};
   if (settings.userId !== undefined) db.user_id = settings.userId;
   if (settings.memoryEnabled !== undefined)
     db.memory_enabled = settings.memoryEnabled;
-  if (settings.generateFromChats !== undefined)
-    db.generate_from_chats = settings.generateFromChats;
-  if (settings.sensitiveMemoryEnabled !== undefined)
-    db.sensitive_memory_enabled = settings.sensitiveMemoryEnabled;
   if (settings.createdAt !== undefined)
     db.created_at = settings.createdAt.toISOString();
   if (settings.updatedAt !== undefined)
@@ -498,17 +495,15 @@ export function memorySettingsToDb(
 }
 
 export function memoryToDb(memory: Partial<Memory>): Partial<DbMemory> {
+  // Maps an app Memory onto the conversation_memories table. Only writes
+  // columns that exist there; title/is_sensitive/source/consent_status are
+  // not columns on that table.
   const db: Partial<DbMemory> = {};
   if (memory.userId !== undefined) db.user_id = memory.userId;
-  if (memory.title !== undefined) db.title = memory.title;
+  if (memory.sourceConversationId !== undefined)
+    db.conversation_id = memory.sourceConversationId;
   if (memory.content !== undefined) db.content = memory.content;
   if (memory.category !== undefined) db.category = memory.category;
-  if (memory.isSensitive !== undefined) db.is_sensitive = memory.isSensitive;
-  if (memory.source !== undefined) db.source = memory.source;
-  if (memory.sourceConversationId !== undefined)
-    db.source_conversation_id = memory.sourceConversationId;
-  if (memory.consentStatus !== undefined)
-    db.consent_status = memory.consentStatus;
   if (memory.createdAt !== undefined)
     db.created_at = memory.createdAt.toISOString();
   if (memory.updatedAt !== undefined)

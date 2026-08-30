@@ -17,9 +17,7 @@ import {
   Check,
   Copy,
   Ellipsis,
-  Globe,
   History,
-  Loader2,
   Pencil,
   RotateCcw,
   Square,
@@ -29,7 +27,7 @@ import {
   Volume2,
 } from "lucide-react";
 import { ShareIcon } from "./icons";
-import React, { memo, useMemo, useState } from "react";
+import React, { memo, useState } from "react";
 import { Streamdown } from "streamdown";
 import { KsemoMarkdownCode } from "./code-block";
 
@@ -51,14 +49,6 @@ type KsemoMessage = {
 // memo and forces a full re-parse of the message on each streaming flush).
 const KSEMO_MARKDOWN_COMPONENTS = { code: KsemoMarkdownCode };
 
-function sourceDomain(url: string): string {
-  try {
-    return new URL(url).hostname.replace("www.", "");
-  } catch {
-    return url;
-  }
-}
-
 export const MessageContent = memo(function MessageContent({
   message,
   onSpeak,
@@ -75,8 +65,6 @@ export const MessageContent = memo(function MessageContent({
   onShare,
   onDelete,
   onViewHistory,
-  webSources,
-  webSearchStatus,
 }: {
   message: KsemoMessage;
   onSpeak: (text: string, messageId: string) => void;
@@ -93,19 +81,9 @@ export const MessageContent = memo(function MessageContent({
   onShare?: (message: KsemoMessage) => void;
   onDelete?: (message: KsemoMessage) => void;
   onViewHistory?: (message: KsemoMessage) => void;
-  webSources?: Array<{ title: string; url: string; snippet?: string }>;
-  webSearchStatus?: "searching" | "reading" | "no-results" | "done";
 }) {
   const [copied, setCopied] = useState(false);
   const isUser = message.role === "user";
-
-  const visibleSources = useMemo(
-    () =>
-      (webSources ?? [])
-        .slice(0, 5)
-        .map(source => ({ ...source, domain: sourceDomain(source.url) })),
-    [webSources]
-  );
 
   async function copyMessage() {
     await navigator.clipboard.writeText(message.content);
@@ -247,59 +225,6 @@ export const MessageContent = memo(function MessageContent({
                 <History className="size-3.5" />,
                 () => onViewHistory(message)
               )}
-          </div>
-        )}
-        {!isUser && webSearchStatus && webSearchStatus !== "done" && (
-          <div className="mb-1.5 flex items-center gap-2 text-xs text-muted-foreground">
-            <Loader2 className="size-3.5 animate-spin" />
-            <span>
-              {webSearchStatus === "searching" && "Searching the web…"}
-              {webSearchStatus === "reading" && "Reading relevant sources…"}
-              {webSearchStatus === "no-results" && "No results found"}
-            </span>
-          </div>
-        )}
-        {!isUser && (visibleSources.length || webSearchStatus) && (
-          <div className="mb-1 space-y-1.5">
-            {visibleSources.length > 0 && (
-              <div className="flex flex-wrap gap-1.5">
-                {visibleSources.map((source, index) => (
-                  <Tooltip key={`${source.url}-${index}`}>
-                    <TooltipTrigger asChild>
-                      <a
-                        href={source.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex max-w-[15rem] items-center gap-1 rounded-full border border-border bg-muted/60 px-2 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                      >
-                        <Globe className="size-3 shrink-0" />
-                        <span className="truncate">
-                          {source.title || source.domain}
-                        </span>
-                      </a>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom" className="max-w-xs">
-                      <div className="space-y-1">
-                        <p className="text-xs font-medium">{source.title}</p>
-                        {source.snippet && (
-                          <p className="text-[10px] text-muted-foreground line-clamp-2">
-                            {source.snippet}
-                          </p>
-                        )}
-                        <p className="text-[10px] text-muted-foreground">
-                          {source.domain}
-                        </p>
-                      </div>
-                    </TooltipContent>
-                  </Tooltip>
-                ))}
-                {webSources && webSources.length > 5 && (
-                  <span className="inline-flex items-center rounded-full border border-border bg-muted/60 px-2 py-0.5 text-[11px] text-muted-foreground">
-                    +{webSources.length - 5} more
-                  </span>
-                )}
-              </div>
-            )}
           </div>
         )}
         {!isUser && (message.content || message.status === "failed") && (

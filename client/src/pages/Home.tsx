@@ -20,11 +20,11 @@ import { startLogin } from "@/const";
 import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
 import {
-  Archive,
   FileText,
   Files,
   Menu,
   MoreHorizontal,
+  Pin,
   Trash2,
 } from "lucide-react";
 import { ShareIcon } from "../components/ksemo/icons";
@@ -119,24 +119,7 @@ function appendUniqueAttachments(
   return result;
 }
 
-type SavedAccount = {
-  id: string;
-  name?: string | null;
-  email?: string | null;
-};
-
-const SAVED_ACCOUNTS_KEY = "ksemo-saved-accounts";
-
-function getSavedAccounts(): SavedAccount[] {
-  try {
-    const parsed = JSON.parse(localStorage.getItem(SAVED_ACCOUNTS_KEY) ?? "[]");
-    return Array.isArray(parsed) ? parsed.slice(0, 2) : [];
-  } catch {
-    return [];
-  }
-}
-
-// The active conversation is remembered per account so a refresh restores the
+// The active conversation is remembered per user so a refresh restores the
 // same chat (never a random/new one). An explicit "New Chat" is recorded as a
 // sentinel so a refresh after New Chat stays on a fresh chat instead of
 // silently reopening the previous conversation.
@@ -216,8 +199,6 @@ export default function Home() {
   const inlineWorkspaceSection: "library" | null =
     workspacePreview === "files" ? "library" : null;
   const utils = trpc.useUtils();
-  const [savedAccounts, setSavedAccounts] =
-    useState<SavedAccount[]>(getSavedAccounts);
   const [sidebarOpen, setSidebarOpen] = useState(isSidebarOpenPreview);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     if (isCollapsedSidebarPreview) return true;
@@ -272,13 +253,6 @@ export default function Home() {
     id: string;
     title: string;
   } | null>(null);
-  const [webSearchEnabled, setWebSearchEnabled] = useState(false);
-  const [webSourcesByMessage, setWebSourcesByMessage] = useState<
-    Record<string, Array<{ title: string; url: string; snippet?: string }>>
-  >({});
-  const [webSearchStatus, setWebSearchStatus] = useState<
-    Record<string, "searching" | "reading" | "no-results" | "done">
-  >({});
   // One active stream per conversation, tracked by the conversation it targets
   // (null = a brand-new conversation that the server has not assigned an id to
   // yet). This lets the user switch chats freely while a response continues to
@@ -325,8 +299,8 @@ export default function Home() {
   // Server data only seeds it ONCE per conversation id (when it is opened) and
   // is never allowed to overwrite messages that are currently streaming.
   const seededConversationIdRef = useRef<string | null>(null);
-  // Tracks which account already auto-selected an initial conversation so that
-  // switching accounts re-selects the new account's most recent chat.
+  // Tracks whether the current user already auto-selected an initial
+  // conversation so the auto-open effect runs once per session.
   const initialSelectionUserIdRef = useRef<string | null>(null);
 
   // Generation UI derives from the streams for the currently-viewed
@@ -350,7 +324,7 @@ export default function Home() {
     {
       enabled: Boolean(user),
       // Keep the previous list while refetching so the sidebar never flashes
-      // empty, but never show another account's conversations.
+      // empty.
       placeholderData: previousData =>
         previousData && user ? previousData : undefined,
     }
@@ -373,38 +347,6 @@ export default function Home() {
     },
     onError: () => toast.error("Settings could not be saved."),
   });
-  const [switchingAccountId, setSwitchingAccountId] = useState<string | null>(
-    null
-  );
-  const switchAccountMutation = trpc.auth.signIn.useMutation({
-    onSuccess: async () => {
-      await utils.auth.me.invalidate();
-      await utils.conversation.list.invalidate();
-      seededConversationIdRef.current = null;
-      initialSelectionUserIdRef.current = null;
-      setChatMessages([]);
-      setActiveConversationId(null);
-      setPrimaryWorkspace(null);
-      setWebSearchEnabled(false);
-      setAttachmentNotices([]);
-      setSwitchingAccountId(null);
-      toast.success("Switched account");
-    },
-    onError: (_error, variables) => {
-      setSwitchingAccountId(null);
-      if (variables?.email) {
-        setSavedAccounts(prev => {
-          const next = prev.filter(a => a.email !== variables.email);
-          localStorage.setItem(SAVED_ACCOUNTS_KEY, JSON.stringify(next));
-          return next;
-        });
-      }
-      toast.error(
-        "That account could not be switched. Signing out so you can sign in again."
-      );
-      void logout();
-    },
-  });
 
   // Keep a ref mirror of the viewed conversation so streaming callbacks can
   // tell whether the user has switched away mid-stream (see sendMessage).
@@ -418,35 +360,14 @@ export default function Home() {
     } catch {}
   }, [sidebarCollapsed]);
 
-  useEffect(() => {
-    if (!user?.id) return;
-    const current: SavedAccount = {
-      id: String(user.id),
-      name: user.name,
-      email: user.email,
-    };
-    setSavedAccounts(previous => {
-      const next = [
-        current,
-        ...previous.filter(
-          account =>
-            account.id !== current.id && account.email !== current.email
-        ),
-      ].slice(0, 2);
-      localStorage.setItem(SAVED_ACCOUNTS_KEY, JSON.stringify(next));
-      return next;
-    });
-  }, [user?.email, user?.id, user?.name]);
-
-  // When the session ends, forget the previous account's chat state so nothing
-  // leaks into the next session.
+  // When the session ends, forget the previous session's chat state so nothing
+  // leaks into the next one.
   useEffect(() => {
     if (user) return;
     seededConversationIdRef.current = null;
     initialSelectionUserIdRef.current = null;
     setChatMessages([]);
     setActiveConversationId(null);
-    setWebSearchEnabled(false);
     setAttachmentNotices([]);
   }, [user]);
   const renameMutation = trpc.conversation.rename.useMutation({
@@ -918,7 +839,6 @@ export default function Home() {
           attachmentFileIds: selectedAttachments.length
             ? selectedAttachments.map(file => file.fileId)
             : undefined,
-          webSearch: webSearchEnabled && !isRegeneration ? true : undefined,
         }),
       });
       if (!response.ok || !response.body) {
@@ -999,36 +919,6 @@ export default function Home() {
             lastProgressAt = Date.now();
             errorMessage =
               data.message || "KSEMO could not complete this response.";
-          } else if (eventName === "web.sources") {
-            lastProgressAt = Date.now();
-            const payload = data as unknown as {
-              messageId: string;
-              sources?: Array<{ title: string; url: string; snippet?: string }>;
-            };
-            if (payload.messageId) {
-              setWebSearchStatus(current => ({
-                ...current,
-                [payload.messageId]: "done",
-              }));
-              if (payload.sources?.length) {
-                setWebSourcesByMessage(current => ({
-                  ...current,
-                  [payload.messageId]: payload.sources ?? [],
-                }));
-              }
-            }
-          } else if (eventName === "web.searching") {
-            lastProgressAt = Date.now();
-            const payload = data as unknown as {
-              messageId: string;
-              status: "searching" | "reading" | "no-results";
-            };
-            if (payload.messageId) {
-              setWebSearchStatus(current => ({
-                ...current,
-                [payload.messageId]: payload.status,
-              }));
-            }
           }
         }
       };
@@ -1191,10 +1081,7 @@ export default function Home() {
     setActiveConversationId(null);
     if (user?.id) rememberNewChatIntent(user.id);
     setPrimaryWorkspace(null);
-    setWebSearchEnabled(false);
     setAttachmentNotices([]);
-    setWebSourcesByMessage({});
-    setWebSearchStatus({});
     window.speechSynthesis?.cancel();
     setSpeakingMessageId(null);
     setSpeechState("idle");
@@ -1622,7 +1509,6 @@ export default function Home() {
     setPrimaryWorkspace(null);
     setActiveConversationId(id);
     if (user?.id) storeActiveConversationId(user.id, id);
-    setWebSearchEnabled(false);
     setAttachmentNotices([]);
     setSidebarOpen(false);
   }
@@ -1702,9 +1588,6 @@ export default function Home() {
         fileId ? current.filter(file => file.fileId !== fileId) : []
       )
   );
-  const stableOnToggleWebSearch = usePersistFn(() =>
-    setWebSearchEnabled(current => !current)
-  );
   const stableOnCloseSidebar = usePersistFn(() => setSidebarOpen(false));
   const stableOnToggleCollapsed = usePersistFn(() =>
     setSidebarCollapsed(current => !current)
@@ -1770,26 +1653,6 @@ export default function Home() {
   const stableOnSupport = usePersistFn((topic: "faq" | "privacy" | "terms") =>
     setLocation(`/support/${topic}`)
   );
-  const stableOnSwitchAccount = usePersistFn(
-    (account: { id: string; email?: string | null }) => {
-      if (!account.email || account.email === user?.email) return;
-      setSwitchingAccountId(account.id);
-      switchAccountMutation.mutate({ email: account.email });
-    }
-  );
-  const stableOnAddAccount = usePersistFn(() => {
-    void logout();
-  });
-  const stableOnRemoveAccount = usePersistFn(
-    (account: { id: string }) => {
-      setSavedAccounts(prev => {
-        const next = prev.filter(a => a.id !== account.id);
-        localStorage.setItem(SAVED_ACCOUNTS_KEY, JSON.stringify(next));
-        return next;
-      });
-      toast.success("Account removed");
-    }
-  );
   const stableOnSearchSelect = usePersistFn((id: string) => {
     selectConversation(id);
     setSearchOpen(false);
@@ -1807,18 +1670,6 @@ export default function Home() {
   const stableOnAccountDeleted = usePersistFn(() => {
     setSettingsOpen(false);
     newChat();
-    if (user?.id != null || user?.email) {
-      setSavedAccounts(prev => {
-        const next = prev.filter(
-          account =>
-            account.id !== String(user.id) && account.email !== user.email
-        );
-        try {
-          localStorage.setItem(SAVED_ACCOUNTS_KEY, JSON.stringify(next));
-        } catch {}
-        return next;
-      });
-    }
     try {
       localStorage.removeItem("ksemo-user-info");
     } catch {}
@@ -1912,11 +1763,6 @@ export default function Home() {
         onSettings={stableOnSettings}
         onSupport={stableOnSupport}
         onLogout={stableLogout}
-        accounts={savedAccounts}
-        switchingAccountId={switchingAccountId}
-        onSwitchAccount={stableOnSwitchAccount}
-        onAddAccount={stableOnAddAccount}
-        onRemoveAccount={stableOnRemoveAccount}
         user={user}
       />
 
@@ -1955,12 +1801,18 @@ export default function Home() {
                     <DropdownMenuItem
                       disabled={!activeConversationId}
                       onSelect={() => {
-                        if (activeConversationId)
-                          stableOnArchive({ id: activeConversationId });
+                        if (activeConversationId) {
+                          const pinned =
+                            activeQuery.data?.conversation?.isPinned ?? false;
+                          stableOnPin({
+                            id: activeConversationId,
+                            isPinned: pinned,
+                          });
+                        }
                       }}
                     >
-                      <Archive className="mr-2 size-4" />
-                      Archive
+                      <Pin className="mr-2 size-4" />
+                      {activeQuery.data?.conversation?.isPinned ? "Unpin" : "Pin"}
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       disabled={!activeConversationId}
@@ -2051,8 +1903,6 @@ export default function Home() {
                       onDelete={stableDeleteMessage}
                       onViewHistory={stableOnViewHistory}
                       onFeedback={stableOnFeedback}
-                      webSources={webSourcesByMessage[message.id]}
-                      webSearchStatus={webSearchStatus[message.id]}
                     />
                   ))}
                   <div ref={messagesEndRef} />
@@ -2093,8 +1943,6 @@ export default function Home() {
                       initialToolsOpen={isLibraryPreview}
                       menuPlacement="below"
                       showSafetyNote={false}
-                      webSearchEnabled={webSearchEnabled}
-                      onToggleWebSearch={stableOnToggleWebSearch}
                       isCentered={true}
                       onTakeScreenshot={stableCaptureScreenshot}
                     />
@@ -2133,8 +1981,6 @@ export default function Home() {
                 initialLibraryOpen={isLibraryPreview}
                 compactBottomSpacing
                 showSafetyNote
-                webSearchEnabled={webSearchEnabled}
-                onToggleWebSearch={stableOnToggleWebSearch}
                 onTakeScreenshot={stableCaptureScreenshot}
               />
             )}

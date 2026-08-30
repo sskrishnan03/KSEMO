@@ -399,40 +399,49 @@ export async function updateConversationForUser(
 }
 
 export async function getPublicConversationByToken(shareToken: string) {
-  const { data, error } = await supabase.rpc(
-    "get_public_conversation_by_token",
-    {
-      p_share_token: shareToken,
-    }
-  );
+  // Reads the conversation + its messages directly instead of the
+  // get_public_conversation_by_token SQL function: that function's RETURN
+  // TABLE declares `text` columns while the live tables use varchar, so the
+  // RPC always errored with 42804 and every shared-chat link rendered blank.
+  const { data, error } = await supabase
+    .from("conversations")
+    .select(
+      "id, title, conversation_type, created_at, messages(id, role, content, created_at)"
+    )
+    .eq("share_token", shareToken)
+    .eq("is_public", true)
+    .is("deleted_at", null)
+    .order("created_at", { referencedTable: "messages", ascending: true })
+    .limit(1)
+    .maybeSingle();
 
   if (error) {
     if (error.code === "PGRST116") return null;
     handleSupabaseError(error, "getPublicConversationByToken");
   }
 
-  if (!data || data.length === 0) return null;
+  if (!data) return null;
 
-  // Group by conversation
-  const conversation = {
-    id: data[0].conversation_id,
-    title: data[0].title,
-    conversation_type: data[0].conversation_type,
-    created_at: new Date(data[0].created_at),
-  };
-
-  const messages = data
-    .filter((row: any) => row.message_id !== null)
-    .map((row: any) => ({
-      id: row.message_id,
-      conversation_id: row.conversation_id,
-      role: row.message_role,
-      content: row.message_content,
-      created_at: new Date(row.message_created_at),
-      updated_at: new Date(row.message_created_at),
+  const messages = (data.messages ?? [])
+    .filter((m: any) => m.role === "user" || m.role === "assistant")
+    .map((m: any) => ({
+      id: m.id,
+      conversation_id: data.id,
+      role: m.role,
+      content: m.content,
+      created_at: new Date(m.created_at),
+      updated_at: new Date(m.created_at),
     }));
 
-  return { conversation, messages };
+  return {
+    conversation: {
+      id: data.id,
+      title: data.title,
+      conversation_type: data.conversation_type,
+      created_at: new Date(data.created_at),
+    },
+    messages,
+  };
 }
 
 export async function deleteConversationForUser(
@@ -840,13 +849,6 @@ export type MemorySettingsValues = Partial<
   Omit<MemorySettings, "userId" | "createdAt" | "updatedAt">
 >;
 
-export type MemoryInput = Partial<
-  Omit<Memory, "id" | "userId" | "createdAt" | "updatedAt">
-> & {
-  title: string;
-  content: string;
-};
-
 function defaultMemorySettings(userId: number): MemorySettings {
   const now = new Date();
   return {
@@ -912,19 +914,17 @@ export async function listUserMemories(
   opts?: { query?: string; category?: string }
 ): Promise<Memory[]> {
   let query = supabase
-    .from("memories")
+    .from("conversation_memories")
     .select("*")
     .eq("user_id", userId)
-    .order("created_at", { ascending: false });
+    .order("updated_at", { ascending: false });
 
   if (opts?.category) {
     query = query.eq("category", opts.category);
   }
   if (opts?.query && opts.query.trim()) {
     const needle = opts.query.trim().replace(/[%_]/g, "");
-    query = query.or(
-      `title.ilike.%${needle}%,content.ilike.%${needle}%`
-    );
+    query = query.or(`content.ilike.%${needle}%`);
   }
 
   const { data, error } = await query;
@@ -936,92 +936,95 @@ export async function listUserMemories(
   return (data as DbMemory[]).map(dbToMemory);
 }
 
-export async function createUserMemory(
-  userId: number,
-  input: MemoryInput
-): Promise<Memory | undefined> {
-  const dbValues: any = {
-    user_id: userId,
-    title: input.title.trim(),
-    content: input.content.trim(),
-    category: input.category ?? "general",
-    is_sensitive: input.isSensitive ?? false,
-    source: input.source ?? "manual",
-    source_conversation_id: input.sourceConversationId ?? null,
-    consent_status: input.consentStatus ?? "explicit",
+// Persists facts auto-extracted from a conversation. Skips anything already
+// stored for that conversation so re-processing a chat never duplicates rows.
+export type MemoryFactToSave = { content: string; category?: string };
+
+const LIVE_MEMORY_CATEGORIES = new Set([
+  "instruction",
+  "preference",
+  "interest",
+  "goal",
+  "personal_info",
+]);
+
+// The live conversation_memories table enforces a CHECK on category that only
+// allows the categories above. Map KSEMO's app-level categories onto that set
+// so inserts never fail the constraint while durable facts stay retrievable.
+function liveMemoryCategoryFor(category?: string | null): string {
+  if (!category) return "instruction";
+  const mapped: Record<string, string> = {
+    general: "instruction",
+    fact: "instruction",
+    instruction: "instruction",
+    preference: "preference",
+    interest: "interest",
+    interests: "interest",
+    goal: "goal",
+    personal: "personal_info",
+    personal_info: "personal_info",
+    health: "personal_info",
+    religion: "personal_info",
+    politics: "personal_info",
+    financial: "personal_info",
+    relationship: "personal_info",
   };
-
-  const { data, error } = await supabase
-    .from("memories")
-    .insert(dbValues)
-    .select()
-    .single();
-
-  if (error) {
-    handleSupabaseError(error, "createUserMemory");
-  }
-
-  return data ? dbToMemory(data as DbMemory) : undefined;
+  const resolved = mapped[category];
+  if (resolved && LIVE_MEMORY_CATEGORIES.has(resolved)) return resolved;
+  return LIVE_MEMORY_CATEGORIES.has(category) ? category : "instruction";
 }
 
-export async function updateUserMemory(
+export async function saveUserMemoryFacts(
   userId: number,
-  id: string,
-  input: Partial<{
-    title: string;
-    content: string;
-    category: string;
-    isSensitive: boolean;
-  }>
-): Promise<Memory | undefined> {
-  const dbValues: any = {};
-  if (input.title !== undefined) dbValues.title = input.title.trim();
-  if (input.content !== undefined) dbValues.content = input.content.trim();
-  if (input.category !== undefined) dbValues.category = input.category;
-  if (input.isSensitive !== undefined)
-    dbValues.is_sensitive = input.isSensitive;
+  conversationId: string,
+  facts: MemoryFactToSave[]
+): Promise<number> {
+  const byContent = new Map<string, MemoryFactToSave>();
+  for (const fact of facts) {
+    const content = fact.content.trim();
+    if (content.length < 2 || byContent.has(content.toLocaleLowerCase()))
+      continue;
+    byContent.set(content.toLocaleLowerCase(), {
+      content,
+      category: fact.category,
+    });
+  }
+  const normalized = Array.from(byContent.values());
+  if (normalized.length === 0) return 0;
 
-  const { data, error } = await supabase
-    .from("memories")
-    .update(dbValues)
+  const { data: existing, error: existingError } = await supabase
+    .from("conversation_memories")
+    .select("content")
     .eq("user_id", userId)
-    .eq("id", id)
-    .select()
-    .single();
+    .eq("conversation_id", conversationId);
 
-  if (error) {
-    if (error.code === "PGRST116") return undefined;
-    handleSupabaseError(error, "updateUserMemory");
+  if (existingError) {
+    handleSupabaseError(existingError, "saveUserMemoryFacts");
   }
 
-  return data ? dbToMemory(data as DbMemory) : undefined;
-}
+  const known = new Set(
+    (existing ?? []).map(row => row.content.trim().toLocaleLowerCase())
+  );
+  const rows = normalized
+    .filter(fact => !known.has(fact.content.toLocaleLowerCase()))
+    .slice(0, 40)
+    .map(fact => ({
+      user_id: userId,
+      conversation_id: conversationId,
+      content: fact.content,
+      category: liveMemoryCategoryFor(fact.category),
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      last_used_at: new Date().toISOString(),
+    }));
+  if (rows.length === 0) return 0;
 
-export async function deleteUserMemory(
-  userId: number,
-  id: string
-): Promise<boolean> {
   const { error, count } = await supabase
-    .from("memories")
-    .delete({ count: "exact" })
-    .eq("user_id", userId)
-    .eq("id", id);
+    .from("conversation_memories")
+    .insert(rows as any, { count: "exact" });
 
   if (error) {
-    handleSupabaseError(error, "deleteUserMemory");
-  }
-
-  return (count ?? 0) > 0;
-}
-
-export async function deleteAllUserMemories(userId: number): Promise<number> {
-  const { error, count } = await supabase
-    .from("memories")
-    .delete({ count: "exact" })
-    .eq("user_id", userId);
-
-  if (error) {
-    handleSupabaseError(error, "deleteAllUserMemories");
+    handleSupabaseError(error, "saveUserMemoryFacts");
   }
 
   return count ?? 0;

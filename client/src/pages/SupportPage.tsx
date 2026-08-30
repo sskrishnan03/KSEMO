@@ -164,6 +164,7 @@ const PRIVACY_SECTION_TITLES = [
   "What KSEMO stores",
   "How your information is used",
   "Conversations and message history",
+  "Memory",
   "Files and Library storage",
   "Sharing and public links",
   "Authentication and account security",
@@ -733,13 +734,15 @@ function PrivacyContent() {
           KSEMO collects when you create an account or use the service, why that
           information is needed, how it is protected, and the choices and rights
           available to you. It covers the KSEMO web application and every
-          feature inside it: chat conversations, the Library,
-          sharing links, exports, and account settings.
+          feature inside it: chat conversations, the Library, sharing links,
+          exports, and account settings.
         </p>
         <p>
           KSEMO is designed around a simple model. Your workspace is private to
-          your account. Nothing is remembered about you unless you deliberately
-          save it. And deletion
+          your account, and by default nothing you say is remembered between
+          conversations. If you turn on Memory in Settings, KSEMO automatically
+          analyzes your conversations and stores durable facts so future replies
+          can be more personal — you can turn this off at any time. Deletion
           tools are direct and permanent rather than hidden behind support
           requests.
         </p>
@@ -779,6 +782,11 @@ function PrivacyContent() {
               typed text.
             </>,
             <>
+              Memories: when you turn on Memory, durable facts and preferences
+              extracted automatically from your conversations, stored privately
+              in your account and used to personalize future replies.
+            </>,
+            <>
               Library files: documents and images you upload, stored as file
               bytes in private object storage linked to your account.
             </>,
@@ -804,9 +812,8 @@ function PrivacyContent() {
         <PolicyBullets
           items={[
             <>
-              To generate responses: your messages and attached files
-              are sent to the configured server-side AI service to
-              produce answers.
+              To generate responses: your messages and attached files are sent
+              to the configured server-side AI service to produce answers.
             </>,
             <>
               To maintain history: storing conversations lets you reopen,
@@ -814,8 +821,9 @@ function PrivacyContent() {
               time.
             </>,
             <>
-              To personalize replies: saved preferences
-              shape tone, detail, and continuity across chats.
+              To personalize replies: saved preferences shape tone, detail, and
+              continuity, and — when Memory is on — stored facts provide
+              personal context across chats.
             </>,
             <>
               To keep the service safe: authentication data protects your
@@ -878,6 +886,44 @@ function PrivacyContent() {
           public link stops resolving. Deleting content is not reversible, which
           is why destructive actions ask for confirmation first.
         </p>
+      </PolicySection>
+      <PolicySection title="Memory">
+        <p>
+          KSEMO has a single Memory feature that is off by default. When you
+          turn it on in Settings → Memory, KSEMO automatically analyzes your
+          conversations and stores durable, useful facts — for example
+          preferences, projects, and personal context you have shared — so that
+          future replies are consistent and personal.
+        </p>
+        <PolicyBullets
+          items={[
+            <>
+              Nothing is remembered until you enable Memory. It is a single
+              toggle and does not capture anything in the background while off.
+            </>,
+            <>
+              Memories are extracted from the message text you actually send and
+              stored privately in your account, linked to the conversation they
+              came from.
+            </>,
+            <>
+              Memories are used only to personalize the replies KSEMO generates
+              for you. They are not shared with advertising networks and are not
+              used to train third-party models.
+            </>,
+            <>
+              Because captured facts reflect what you say, sensitive personal
+              details can be saved when Memory is on. You control this by what
+              you share and by the Memory toggle itself.
+            </>,
+            <>
+              Turning Memory off stops new captures and stops memories being
+              used in replies; it does not automatically erase already-saved
+              memories. To clear them, contact us from Settings → Feedback or
+              delete your account.
+            </>,
+          ]}
+        />
       </PolicySection>
       <PolicySection title="Files and Library storage">
         <p>
@@ -1016,9 +1062,9 @@ function PrivacyContent() {
       </PolicySection>
       <PolicySection title="Data retention and deletion">
         <p>
-          You control retention. Conversations and files persist only
-          while you keep them, and every category has a direct deletion control
-          in the product.
+          You control retention. Conversations and files persist only while you
+          keep them, and every category has a direct deletion control in the
+          product.
         </p>
         <PolicyBullets
           items={[
@@ -1064,8 +1110,13 @@ function PrivacyContent() {
               chats at once, and Library files — permanently.
             </>,
             <>
-              Restrict: turn off autoplay speech, and avoid
-              attaching files you prefer not to use.
+              Restrict: turn off autoplay speech, and avoid attaching files you
+              prefer not to use.
+            </>,
+            <>
+              Memory: switch the single Settings → Memory toggle on or off.
+              While Memory is off, no new memories are saved and existing ones
+              are not used in replies.
             </>,
             <>
               Withdraw sharing: switch off any public link whenever you choose.
@@ -1192,11 +1243,11 @@ function TermsContent() {
           of KSEMO. If you do not agree, please do not use the service.
         </p>
         <p>
-          These terms apply to every feature: chat, the Library,
-          sharing links, exports, and account settings. Product notices or
-          guidelines presented inside the app supplement these terms. If you use
-          KSEMO on behalf of an organization, you represent that you have
-          authority to bind that organization to this agreement.
+          These terms apply to every feature: chat, the Library, sharing links,
+          exports, and account settings. Product notices or guidelines presented
+          inside the app supplement these terms. If you use KSEMO on behalf of
+          an organization, you represent that you have authority to bind that
+          organization to this agreement.
         </p>
       </PolicySection>
       <PolicySection title="Definitions">
@@ -1208,7 +1259,9 @@ function TermsContent() {
             </>,
             <>
               “Content” means what you submit or upload: messages, Library
-              files, and preferences.
+              files, and preferences, together with related data derived from it
+              — including the memories extracted from your conversations when
+              Memory is enabled.
             </>,
             <>
               “Output” means AI-generated responses produced by the Service from
@@ -1241,9 +1294,7 @@ function TermsContent() {
       <PolicySection title="Using KSEMO">
         <PolicyBullets
           items={[
-            <>
-              KSEMO is an AI assistant for conversation and file analysis.
-            </>,
+            <>KSEMO is an AI assistant for conversation and file analysis.</>,
             <>
               Use the service in compliance with applicable laws and only
               through the official interfaces provided; scraping, undocumented
@@ -1367,7 +1418,8 @@ function TermsContent() {
       </PolicySection>
       <PolicySection title="Your content">
         <p>
-          You retain ownership of everything you submit: messages and files. These terms do not take that away.
+          You retain ownership of everything you submit: messages and files.
+          These terms do not take that away.
         </p>
         <p>
           You grant KSEMO a limited license to store, reproduce, process,

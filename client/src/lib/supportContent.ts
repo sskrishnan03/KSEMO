@@ -10,7 +10,7 @@ export const FAQ_CATEGORIES: FaqCategory[] = [
         id: "gs-1",
         question: "What is KSEMO?",
         answer:
-          "KSEMO is your personal AI assistant for conversations and files. You can ask questions and upload documents.",
+          "KSEMO is your personal AI assistant for conversations and files. You can ask questions, analyze documents and images from your Library, use voice input, and — when you turn on Memory — let KSEMO remember facts about you so replies stay consistent and personal.",
       },
       {
         id: "gs-2",
@@ -47,6 +47,24 @@ export const FAQ_CATEGORIES: FaqCategory[] = [
         question: "What can I ask KSEMO to do?",
         answer:
           "You can ask for explanations, writing help, planning, summaries of uploaded files, brainstorming, analysis, translations, and much more. If a request needs a file, attach it from your Library first.",
+      },
+      {
+        id: "gs-8",
+        question: "Which AI models does KSEMO use?",
+        answer:
+          "KSEMO is powered by Google's Gemini family of models. The model used for a reply is chosen automatically for your request, and you can see or change your preferred model from Settings → Preferences.",
+      },
+      {
+        id: "gs-9",
+        question: "Is there a limit on how many messages I can send?",
+        answer:
+          "KSEMO applies fair-use limits per model to keep capacity fair. If you reach a model's daily allowance, KSEMO automatically switches to a fallback model so you can continue — or you can switch models yourself in Settings.",
+      },
+      {
+        id: "gs-10",
+        question: "What is the KSEMO Assistant in the corner of the FAQ page?",
+        answer:
+          "It is a help-center assistant: it answers questions using this help center's content only. It cannot see your conversations or files. Use the main chat screen for conversations with the AI assistant.",
       },
     ],
   },
@@ -168,6 +186,30 @@ export const FAQ_CATEGORIES: FaqCategory[] = [
         answer:
           "Short network interruptions can interrupt a response. Your message is kept — simply retry from the failed message or send it again. Completed messages are never lost this way.",
       },
+      {
+        id: "cn-12",
+        question: "How do I use voice input?",
+        answer:
+          "Click the microphone next to the message box, speak, then confirm when you are done. KSEMO transcribes your speech and sends it as a regular message. Your transcribed text joins the conversation and is edited and deleted like any other message.",
+      },
+      {
+        id: "cn-13",
+        question: "Are my voice recordings stored?",
+        answer:
+          "Your recording is transcribed into text and then treated as a normal conversation message. The raw audio is used only for that transcription and is not kept as part of the conversation.",
+      },
+      {
+        id: "cn-14",
+        question: "Can I use a screenshot as context in a message?",
+        answer:
+          "Yes. Open the plus menu in the message box and choose “Take screenshot”, then grant screen or window permissions when asked. The screenshot attaches to your message like an image for the current conversation.",
+      },
+      {
+        id: "cn-15",
+        question: "What happens when I edit or restore a message?",
+        answer:
+          "Editing a user message keeps the earlier version recorded in that message's version history, and KSEMO regenerates the response from your edited text. You can open a message's history panel to compare versions and restore an older one.",
+      },
     ],
   },
   {
@@ -184,7 +226,7 @@ export const FAQ_CATEGORIES: FaqCategory[] = [
         id: "lf-2",
         question: "Which file types can I add?",
         answer:
-          "You can add PDFs, text and Markdown files, CSV and JSON data, Word documents, and common image types such as PNG, JPG, and WebP. Each file can be up to 8 MB.",
+          "PDFs, Word documents, Excel spreadsheets, PowerPoint presentations, text and data files (such as TXT, Markdown, CSV, TSV, JSON, XML, YAML, and log files), and common image types such as PNG, JPG, WebP, and GIF. Each file can be up to 25 MB.",
       },
       {
         id: "lf-3",
@@ -212,15 +254,21 @@ export const FAQ_CATEGORIES: FaqCategory[] = [
       },
       {
         id: "lf-7",
-        question: "How do I remove a file from my Library?",
+        question: "How do I delete a file from my Library?",
         answer:
-          "Open Library, hover over the file, and choose Remove. Deleting a Library file also removes it from any messages that referenced it.",
+          "Open Library, hover over the file, and choose Delete, then confirm. Deleting a Library file also removes it from any messages that previously referenced it, and cannot be undone.",
       },
       {
         id: "lf-8",
         question: "Who can see the files in my Library?",
         answer:
           "Only you. Library files are stored privately against your account and are sent to the AI service only at the moment you include them in a conversation.",
+      },
+      {
+        id: "lf-9",
+        question: "How can I tell file types apart when browsing my Library?",
+        answer:
+          "Images show a small thumbnail; every other file type has its own colored icon and label — red for PDF, blue for Word, green for sheets, orange for slides, violet for code and data, and so on.",
       },
     ],
   },
@@ -270,6 +318,12 @@ export const FAQ_CATEGORIES: FaqCategory[] = [
           "Is it safe to share conversations containing personal details?",
         answer:
           "Treat a public link like a printed page: anyone holding it can read it. Remove sensitive details, or keep sharing disabled, when a conversation contains private information.",
+      },
+      {
+        id: "sh-8",
+        question: "Do people need a KSEMO account to view a shared link?",
+        answer:
+          "No. Anyone with the link can read the shared conversation without signing in. The shared view is read-only and shows only that conversation — never your other chats or Library files.",
       },
     ],
   },
@@ -325,6 +379,67 @@ export const FAQ_CATEGORIES: FaqCategory[] = [
         answer:
           "KSEMO is built on privacy-by-design principles: minimal collection, explicit controls, and easy deletion. The Privacy Policy explains how these principles apply to your data in practice.",
       },
+      {
+        id: "pd-9",
+        question: "How do I delete my entire account?",
+        answer:
+          "Open Settings → Account and choose “Delete account”, then confirm. This permanently removes your account and the data tied to it — conversations, files, and memories — and signs you out. This cannot be undone.",
+      },
+    ],
+  },
+  {
+    id: "memory-personalization",
+    label: "Memory & personalization",
+    items: [
+      {
+        id: "mm-1",
+        question: "What is KSEMO Memory?",
+        answer:
+          "Memory lets KSEMO automatically analyze your conversations and remember the facts, preferences, and context that matter, so future replies are consistent and personal. You control it with a single toggle in Settings → Memory.",
+      },
+      {
+        id: "mm-2",
+        question: "Is Memory on by default?",
+        answer:
+          "No. Memory starts off for every account. Nothing is analyzed or remembered until you switch Memory on in Settings → Memory.",
+      },
+      {
+        id: "mm-3",
+        question: "How do I turn Memory on or off?",
+        answer:
+          "Open Settings → Memory and toggle the single Memory switch. On means conversations are analyzed automatically; off means they are not.",
+      },
+      {
+        id: "mm-4",
+        question: "What does KSEMO save as a memory?",
+        answer:
+          "Durable facts you share in conversation — things like “I work as a teacher”, “I prefer email over calls”, “I'm planning a trip to Portugal in spring”, and similar durable details. Transient small talk is not remembered.",
+      },
+      {
+        id: "mm-5",
+        question: "Are sensitive or personal details saved when Memory is on?",
+        answer:
+          "Yes. KSEMO captures the durable facts you actually tell it, which can include personal details such as your job, family, location, or health, once Memory is enabled. Do not share information you would not want saved, or keep Memory off.",
+      },
+      {
+        id: "mm-6",
+        question: "What happens when I turn Memory off?",
+        answer:
+          "KSEMO stops analyzing new conversations and stops using your saved memories in replies. The memories already stored stay in your account while Memory is off, and are used again only if you turn Memory back on. To remove everything, delete your account or contact us from Settings → Feedback.",
+      },
+      {
+        id: "mm-7",
+        question: "Where can I see how many memories are saved?",
+        answer:
+          "Settings → Memory shows the current memory status and how many memories are saved. KSEMO does not currently offer a separate per-fact memory manager, so to review or clear specific facts, contact us from Settings → Feedback.",
+      },
+      {
+        id: "mm-8",
+        question:
+          "Does KSEMO use my memories to train AI models or share them?",
+        answer:
+          "No. Memories stay private in your account. They are used only to personalize the replies KSEMO generates for you, under the same rules as the rest of your content.",
+      },
     ],
   },
   {
@@ -347,7 +462,7 @@ export const FAQ_CATEGORIES: FaqCategory[] = [
         id: "tr-3",
         question: "A file upload failed. What are the limits?",
         answer:
-          "Files must be a supported type and under 8 MB. If you are within the limits, check your connection and try again — very large PDFs may need splitting.",
+          "Files must be a supported type and under 25 MB each. If you are within the limits, check your connection and try again — very large documents may need splitting into smaller parts.",
       },
       {
         id: "tr-4",
@@ -522,6 +637,7 @@ export function answerFromFaq(query: string): AssistantReply {
 }
 
 export const ASSISTANT_SUGGESTIONS = [
+  "How does Memory work?",
   "Which file types can I add?",
   "How do I share a conversation?",
   "How do I delete my data?",

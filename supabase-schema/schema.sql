@@ -133,7 +133,6 @@ CREATE TABLE messages (
     content TEXT NOT NULL,
     model VARCHAR(160),
     status VARCHAR(20) DEFAULT 'sending' CHECK (status IN ('sending', 'streaming', 'completed', 'failed', 'cancelled')),
-    sources JSONB NOT NULL DEFAULT '[]'::jsonb,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -770,6 +769,10 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Get public conversation by share token
+-- The live conversations.title / conversation_type and messages.role are
+-- VARCHAR, so every column is cast to TEXT to match the RETURNS TABLE types
+-- (otherwise Postgres fails with 42804 "structure of query does not match
+-- function result type" and the whole share link errors).
 CREATE OR REPLACE FUNCTION get_public_conversation_by_token(
     p_share_token TEXT
 )
@@ -787,12 +790,12 @@ BEGIN
     RETURN QUERY
     SELECT
         c.id AS conversation_id,
-        c.title,
-        c.conversation_type,
+        c.title::TEXT,
+        c.conversation_type::TEXT,
         c.created_at,
         m.id AS message_id,
-        m.role AS message_role,
-        m.content AS message_content,
+        m.role::TEXT AS message_role,
+        m.content::TEXT AS message_content,
         m.created_at AS message_created_at
     FROM conversations c
     LEFT JOIN messages m ON c.id = m.conversation_id

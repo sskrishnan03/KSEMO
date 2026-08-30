@@ -98,25 +98,4 @@ describe("ChatComposer", () => {
     expect(centeredMarkup).not.toContain("KSEMO can make mistakes");
     expect(conversationMarkup).toContain("KSEMO can make mistakes");
   });
-
-  it("shows a cancellable web search pill only while enabled", () => {
-    const off = renderToStaticMarkup(
-      createElement(ChatComposer, {
-        ...baseProps,
-        webSearchEnabled: false,
-        onToggleWebSearch: () => undefined,
-      })
-    );
-    expect(off).not.toContain('aria-label="Cancel web search"');
-
-    const on = renderToStaticMarkup(
-      createElement(ChatComposer, {
-        ...baseProps,
-        webSearchEnabled: true,
-        onToggleWebSearch: () => undefined,
-      })
-    );
-    expect(on).toContain(">Web search</span>");
-    expect(on).toContain('aria-label="Cancel web search"');
-  });
 });

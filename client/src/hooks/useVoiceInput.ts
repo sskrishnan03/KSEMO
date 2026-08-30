@@ -147,6 +147,10 @@ export function useVoiceInput({
   const stop = useCallback(() => {
     if (state === "recording" && recorderRef.current?.state === "recording") {
       playRecordingStop();
+      // Flip the UI to "transcribing" immediately — onstop only fires after
+      // the MediaRecorder finalizes the blob, which can take several hundred
+      // milliseconds and makes the recording feel like it's stuck.
+      setState("transcribing");
       recorderRef.current.stop();
     }
   }, [state]);

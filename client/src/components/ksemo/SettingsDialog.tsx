@@ -33,6 +33,7 @@ import {
   LogOut,
   MessageSquare,
   Palette,
+  Search,
   ShieldCheck,
   ShieldOff,
   Settings2,
@@ -40,9 +41,10 @@ import {
   Trash2,
   Unlink,
   User,
+  X,
   Zap,
 } from "lucide-react";
-import React, { memo, useEffect, useState } from "react";
+import React, { memo, useEffect, useMemo, useRef, useState } from "react";
 import { MemorySection } from "./MemorySection";
 
 type Preferences =
@@ -66,12 +68,7 @@ type User = {
 };
 
 type SettingsTab =
-  | "account"
-  | "security"
-  | "appearance"
-  | "data"
-  | "memory"
-  | "feedback";
+  "account" | "security" | "appearance" | "data" | "memory" | "feedback";
 
 export const settingsSections: Array<{
   id: string;
@@ -99,6 +96,294 @@ const settingsNavItems: Array<{
   { id: "memory", label: "Memory", icon: Brain },
   { id: "feedback", label: "Feedback", icon: MessageSquare },
 ];
+
+// Power the settings-wide search bar: every entry is searchable text (nav
+// labels plus real content from each section) so phrases like "two factor",
+// "archived chats", or "sensitive topics" all land on the right tab.
+const settingsSearchIndex: Array<{
+  tab: SettingsTab;
+  label: string;
+  hint: string;
+  keywords: string;
+}> = [
+  {
+    tab: "account",
+    label: "Your account",
+    hint: "Account",
+    keywords: "account profile personal information manage",
+  },
+  {
+    tab: "account",
+    label: "Full name",
+    hint: "Account",
+    keywords: "name display name rename profile",
+  },
+  {
+    tab: "account",
+    label: "Email",
+    hint: "Account",
+    keywords: "email address login contact",
+  },
+  {
+    tab: "account",
+    label: "Account created",
+    hint: "Account",
+    keywords: "created date joined member since",
+  },
+  {
+    tab: "account",
+    label: "Delete account",
+    hint: "Account",
+    keywords: "delete remove account permanently data erase",
+  },
+
+  {
+    tab: "security",
+    label: "Password",
+    hint: "Security",
+    keywords: "password change reset current new confirm login secret",
+  },
+  {
+    tab: "security",
+    label: "Two-factor authentication",
+    hint: "Security",
+    keywords: "2fa two factor authentication security",
+  },
+  {
+    tab: "security",
+    label: "Session",
+    hint: "Security",
+    keywords: "session sign in device active expire",
+  },
+  {
+    tab: "security",
+    label: "Login method",
+    hint: "Security",
+    keywords: "login method google email oauth authentication",
+  },
+
+  {
+    tab: "appearance",
+    label: "Theme",
+    hint: "Appearance",
+    keywords: "theme light dark system mode appearance color",
+  },
+
+  {
+    tab: "data",
+    label: "Archived chats",
+    hint: "Data Control",
+    keywords: "archive archived chats hidden manage restore",
+  },
+  {
+    tab: "data",
+    label: "Shared chats",
+    hint: "Data Control",
+    keywords: "shared chats public share link copy stop sharing",
+  },
+  {
+    tab: "data",
+    label: "Download my data",
+    hint: "Data Control",
+    keywords: "export data json download backup",
+  },
+  {
+    tab: "data",
+    label: "Delete all chats",
+    hint: "Data Control",
+    keywords: "delete all chats conversations clear remove",
+  },
+
+  {
+    tab: "memory",
+    label: "Memory on/off",
+    hint: "Memory",
+    keywords: "memory facts save remember personal context toggle",
+  },
+  {
+    tab: "memory",
+    label: "Generate memory from chats",
+    hint: "Memory",
+    keywords: "generate memory ideas conversations chats analyze",
+  },
+  {
+    tab: "memory",
+    label: "Generate memory ideas",
+    hint: "Memory",
+    keywords: "generate ideas chats review approve save",
+  },
+  {
+    tab: "memory",
+    label: "Sensitive topics",
+    hint: "Memory",
+    keywords:
+      "sensitive topics health religion politics financial relationships review",
+  },
+  {
+    tab: "memory",
+    label: "Manage memories",
+    hint: "Memory",
+    keywords: "manage memories edit delete search add view",
+  },
+
+  {
+    tab: "feedback",
+    label: "Feedback",
+    hint: "Feedback",
+    keywords: "feedback bug report feature request improvement general",
+  },
+  {
+    tab: "feedback",
+    label: "Send feedback",
+    hint: "Feedback",
+    keywords: "send feedback submit email report issue",
+  },
+];
+
+function SettingsSearch({
+  onSelect,
+}: {
+  onSelect: (tab: SettingsTab) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const [highlighted, setHighlighted] = useState(0);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const trimmed = query.trim().toLocaleLowerCase();
+  const results = useMemo(() => {
+    if (!trimmed) return [];
+    return settingsSearchIndex
+      .map(entry => ({
+        entry,
+        rank: settingsNavItems.findIndex(item => item.id === entry.tab),
+      }))
+      .filter(({ entry }) =>
+        `${entry.label} ${entry.hint} ${entry.keywords}`
+          .toLocaleLowerCase()
+          .includes(trimmed)
+      )
+      .sort(
+        (a, b) => a.rank - b.rank || a.entry.label.localeCompare(b.entry.label)
+      );
+  }, [trimmed]);
+
+  useEffect(() => {
+    setHighlighted(0);
+  }, [trimmed]);
+
+  // Close when focus leaves the whole component (input or results).
+  useEffect(() => {
+    function onPointerDown(event: MouseEvent) {
+      if (rootRef.current?.contains(event.target as Node)) return;
+      setOpen(false);
+    }
+    document.addEventListener("mousedown", onPointerDown);
+    return () => document.removeEventListener("mousedown", onPointerDown);
+  }, []);
+
+  const select = (tab: SettingsTab) => {
+    setOpen(false);
+    onSelect(tab);
+  };
+
+  const onKeyDown = (event: React.KeyboardEvent) => {
+    if (!open && event.key !== "Escape") return;
+    if (event.key === "Escape") {
+      setOpen(false);
+      inputRef.current?.blur();
+      return;
+    }
+    if (results.length === 0) return;
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setOpen(true);
+      setHighlighted(current => (current + 1) % results.length);
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setOpen(true);
+      setHighlighted(
+        current => (current - 1 + results.length) % results.length
+      );
+    } else if (event.key === "Enter") {
+      event.preventDefault();
+      const result = results[highlighted];
+      if (result) select(result.entry.tab);
+    }
+  };
+
+  return (
+    <div ref={rootRef} className="relative pb-3">
+      <div className="relative">
+        <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+        <input
+          ref={inputRef}
+          value={query}
+          onChange={event => {
+            setQuery(event.target.value);
+            setOpen(true);
+          }}
+          onFocus={() => setOpen(true)}
+          onKeyDown={onKeyDown}
+          placeholder="Search settings…"
+          aria-label="Search settings"
+          className="h-10 w-full rounded-xl border border-border bg-muted/40 pr-9 pl-9 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-primary/40 focus:ring-2 focus:ring-primary/20"
+        />
+        {query && (
+          <button
+            type="button"
+            onClick={() => setQuery("")}
+            aria-label="Clear settings search"
+            className="absolute top-1/2 right-2 flex size-6 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <X className="size-3.5" />
+          </button>
+        )}
+      </div>
+
+      {open && trimmed && (
+        <div className="absolute inset-x-0 top-full z-30 mt-1.5 overflow-hidden rounded-xl border border-border bg-popover shadow-xl">
+          {results.length === 0 ? (
+            <p className="px-3.5 py-3 text-xs text-muted-foreground">
+              No matching settings for “{query.trim()}”.
+            </p>
+          ) : (
+            <ul className="max-h-72 overflow-y-auto p-1.5">
+              {results.map(({ entry }, index) => {
+                const Icon =
+                  settingsNavItems.find(item => item.id === entry.tab)?.icon ??
+                  Settings2;
+                return (
+                  <li key={`${entry.tab}-${entry.label}`}>
+                    <button
+                      type="button"
+                      onMouseEnter={() => setHighlighted(index)}
+                      onClick={() => select(entry.tab)}
+                      className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors ${
+                        index === highlighted ? "bg-muted" : "hover:bg-muted/60"
+                      }`}
+                    >
+                      <Icon className="size-4 shrink-0 text-muted-foreground" />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-[13px] font-medium text-foreground">
+                          {entry.label}
+                        </span>
+                        <span className="block text-[11px] text-muted-foreground">
+                          {entry.hint}
+                        </span>
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export const SettingsDialog = memo(function SettingsDialog({
   open,
@@ -173,6 +458,7 @@ export const SettingsDialog = memo(function SettingsDialog({
                 Settings
               </span>
             </div>
+            <SettingsSearch onSelect={setActiveTab} />
             <nav className="space-y-0.5">
               {settingsNavItems.map(item => {
                 const Icon = item.icon;
@@ -181,7 +467,7 @@ export const SettingsDialog = memo(function SettingsDialog({
                   <button
                     key={item.id}
                     onClick={() => setActiveTab(item.id)}
-                    className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm transition-colors ${
+                    className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm transition-colors outline-none focus-visible:ring-0 focus-visible:outline-none ${
                       active
                         ? "bg-muted font-medium text-foreground"
                         : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
@@ -199,7 +485,7 @@ export const SettingsDialog = memo(function SettingsDialog({
                   onOpenChange(false);
                   onSignOut();
                 }}
-                className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm text-destructive transition-colors hover:bg-destructive/10"
+                className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm text-destructive transition-colors outline-none hover:bg-destructive/10 focus-visible:ring-0 focus-visible:outline-none"
               >
                 <LogOut className="size-4 shrink-0" />
                 Sign out
@@ -215,7 +501,7 @@ export const SettingsDialog = memo(function SettingsDialog({
                 <button
                   key={item.id}
                   onClick={() => setActiveTab(item.id)}
-                  className={`flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs transition-colors ${
+                  className={`flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs transition-colors outline-none focus-visible:ring-0 focus-visible:outline-none ${
                     active
                       ? "bg-muted font-medium text-foreground"
                       : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
@@ -543,8 +829,7 @@ function SecuritySection({ user }: { user: User }) {
                   placeholder="Repeat the new password"
                   autoComplete="new-password"
                   onKeyDown={e => {
-                    if (e.key === "Enter" && canSubmit)
-                      handleSubmitPassword();
+                    if (e.key === "Enter" && canSubmit) handleSubmitPassword();
                   }}
                 />
               </div>
@@ -672,42 +957,96 @@ function MiniKsemoLight() {
     <div className="flex size-full" style={{ background: s.bg }}>
       <div
         className="flex w-[26%] shrink-0 flex-col gap-[3px] px-[4px] py-[5px]"
-        style={{ background: s.sidebar, borderRight: `1px solid ${s.sidebarBorder}` }}
+        style={{
+          background: s.sidebar,
+          borderRight: `1px solid ${s.sidebarBorder}`,
+        }}
       >
         <div className="flex items-center gap-[2px]">
-          <div className="size-[5px] rounded-[1.5px]" style={{ background: s.border }} />
-          <div className="h-[2.5px] w-[55%] rounded-full" style={{ background: s.border }} />
+          <div
+            className="size-[5px] rounded-[1.5px]"
+            style={{ background: s.border }}
+          />
+          <div
+            className="h-[2.5px] w-[55%] rounded-full"
+            style={{ background: s.border }}
+          />
         </div>
         <div className="mt-[3px] flex flex-col gap-[2.5px]">
-          <div className="h-[2.5px] w-[72%] rounded-full" style={{ background: s.border }} />
-          <div className="h-[2.5px] w-[60%] rounded-full" style={{ background: s.border }} />
-          <div className="h-[2.5px] w-[66%] rounded-full" style={{ background: s.border }} />
+          <div
+            className="h-[2.5px] w-[72%] rounded-full"
+            style={{ background: s.border }}
+          />
+          <div
+            className="h-[2.5px] w-[60%] rounded-full"
+            style={{ background: s.border }}
+          />
+          <div
+            className="h-[2.5px] w-[66%] rounded-full"
+            style={{ background: s.border }}
+          />
         </div>
         <div className="mt-auto flex items-center gap-[2px]">
-          <div className="size-[5px] rounded-full" style={{ background: s.border }} />
-          <div className="h-[2.5px] w-[50%] rounded-full" style={{ background: s.border }} />
+          <div
+            className="size-[5px] rounded-full"
+            style={{ background: s.border }}
+          />
+          <div
+            className="h-[2.5px] w-[50%] rounded-full"
+            style={{ background: s.border }}
+          />
         </div>
       </div>
       <div className="flex min-w-0 flex-1 flex-col">
-        <div className="flex items-center gap-[3px] px-[5px] py-[4px]" style={{ borderBottom: `1px solid ${s.border}` }}>
-          <div className="h-[2.5px] w-[35%] rounded-full" style={{ background: s.textSec }} />
+        <div
+          className="flex items-center gap-[3px] px-[5px] py-[4px]"
+          style={{ borderBottom: `1px solid ${s.border}` }}
+        >
+          <div
+            className="h-[2.5px] w-[35%] rounded-full"
+            style={{ background: s.textSec }}
+          />
         </div>
         <div className="flex min-h-0 flex-1 flex-col justify-end gap-[3px] px-[5px] pb-[4px] pt-[3px]">
           <div className="flex justify-end">
-            <div className="max-w-[65%] rounded-[3px] px-[4px] py-[2px]" style={{ background: s.userBubble }}>
-              <div className="h-[2px] w-[40px] rounded-full" style={{ background: s.textSec }} />
+            <div
+              className="max-w-[65%] rounded-[3px] px-[4px] py-[2px]"
+              style={{ background: s.userBubble }}
+            >
+              <div
+                className="h-[2px] w-[40px] rounded-full"
+                style={{ background: s.textSec }}
+              />
             </div>
           </div>
           <div className="flex justify-start">
-            <div className="max-w-[70%] rounded-[3px] px-[4px] py-[2px]" style={{ background: s.assistantBg, border: `1px solid ${s.border}` }}>
-              <div className="h-[2px] w-[50px] rounded-full" style={{ background: s.border }} />
-              <div className="mt-[1px] h-[2px] w-[32px] rounded-full" style={{ background: s.border }} />
+            <div
+              className="max-w-[70%] rounded-[3px] px-[4px] py-[2px]"
+              style={{
+                background: s.assistantBg,
+                border: `1px solid ${s.border}`,
+              }}
+            >
+              <div
+                className="h-[2px] w-[50px] rounded-full"
+                style={{ background: s.border }}
+              />
+              <div
+                className="mt-[1px] h-[2px] w-[32px] rounded-full"
+                style={{ background: s.border }}
+              />
             </div>
           </div>
         </div>
         <div className="flex items-center gap-[2px] px-[5px] pb-[4px]">
-          <div className="h-[5px] flex-1 rounded-[2px]" style={{ background: s.inputBg, border: `1px solid ${s.border}` }} />
-          <div className="size-[5px] rounded-[1.5px]" style={{ background: s.text }} />
+          <div
+            className="h-[5px] flex-1 rounded-[2px]"
+            style={{ background: s.inputBg, border: `1px solid ${s.border}` }}
+          />
+          <div
+            className="size-[5px] rounded-[1.5px]"
+            style={{ background: s.text }}
+          />
         </div>
       </div>
     </div>
@@ -731,42 +1070,99 @@ function MiniKsemoDark() {
     <div className="flex size-full" style={{ background: s.bg }}>
       <div
         className="flex w-[26%] shrink-0 flex-col gap-[3px] px-[4px] py-[5px]"
-        style={{ background: s.sidebar, borderRight: `1px solid ${s.sidebarBorder}` }}
+        style={{
+          background: s.sidebar,
+          borderRight: `1px solid ${s.sidebarBorder}`,
+        }}
       >
         <div className="flex items-center gap-[2px]">
-          <div className="size-[5px] rounded-[1.5px]" style={{ background: s.border }} />
-          <div className="h-[2.5px] w-[55%] rounded-full" style={{ background: s.border }} />
+          <div
+            className="size-[5px] rounded-[1.5px]"
+            style={{ background: s.border }}
+          />
+          <div
+            className="h-[2.5px] w-[55%] rounded-full"
+            style={{ background: s.border }}
+          />
         </div>
         <div className="mt-[3px] flex flex-col gap-[2.5px]">
-          <div className="h-[2.5px] w-[72%] rounded-full" style={{ background: s.border }} />
-          <div className="h-[2.5px] w-[60%] rounded-full" style={{ background: s.border }} />
-          <div className="h-[2.5px] w-[66%] rounded-full" style={{ background: s.border }} />
+          <div
+            className="h-[2.5px] w-[72%] rounded-full"
+            style={{ background: s.border }}
+          />
+          <div
+            className="h-[2.5px] w-[60%] rounded-full"
+            style={{ background: s.border }}
+          />
+          <div
+            className="h-[2.5px] w-[66%] rounded-full"
+            style={{ background: s.border }}
+          />
         </div>
         <div className="mt-auto flex items-center gap-[2px]">
-          <div className="size-[5px] rounded-full" style={{ background: s.border }} />
-          <div className="h-[2.5px] w-[50%] rounded-full" style={{ background: s.border }} />
+          <div
+            className="size-[5px] rounded-full"
+            style={{ background: s.border }}
+          />
+          <div
+            className="h-[2.5px] w-[50%] rounded-full"
+            style={{ background: s.border }}
+          />
         </div>
       </div>
       <div className="flex min-w-0 flex-1 flex-col">
-        <div className="flex items-center gap-[3px] px-[5px] py-[4px]" style={{ borderBottom: `1px solid ${s.border}` }}>
-          <div className="h-[2.5px] w-[35%] rounded-full" style={{ background: s.textSec }} />
+        <div
+          className="flex items-center gap-[3px] px-[5px] py-[4px]"
+          style={{ borderBottom: `1px solid ${s.border}` }}
+        >
+          <div
+            className="h-[2.5px] w-[35%] rounded-full"
+            style={{ background: s.textSec }}
+          />
         </div>
         <div className="flex min-h-0 flex-1 flex-col justify-end gap-[3px] px-[5px] pb-[4px] pt-[3px]">
           <div className="flex justify-end">
-            <div className="max-w-[65%] rounded-[3px] px-[4px] py-[2px]" style={{ background: s.userBubble, border: `1px solid ${s.border}` }}>
-              <div className="h-[2px] w-[40px] rounded-full" style={{ background: s.textSec }} />
+            <div
+              className="max-w-[65%] rounded-[3px] px-[4px] py-[2px]"
+              style={{
+                background: s.userBubble,
+                border: `1px solid ${s.border}`,
+              }}
+            >
+              <div
+                className="h-[2px] w-[40px] rounded-full"
+                style={{ background: s.textSec }}
+              />
             </div>
           </div>
           <div className="flex justify-start">
-            <div className="max-w-[70%] rounded-[3px] px-[4px] py-[2px]" style={{ background: s.assistantBg, border: `1px solid ${s.border}` }}>
-              <div className="h-[2px] w-[50px] rounded-full" style={{ background: s.border }} />
-              <div className="mt-[1px] h-[2px] w-[32px] rounded-full" style={{ background: s.border }} />
+            <div
+              className="max-w-[70%] rounded-[3px] px-[4px] py-[2px]"
+              style={{
+                background: s.assistantBg,
+                border: `1px solid ${s.border}`,
+              }}
+            >
+              <div
+                className="h-[2px] w-[50px] rounded-full"
+                style={{ background: s.border }}
+              />
+              <div
+                className="mt-[1px] h-[2px] w-[32px] rounded-full"
+                style={{ background: s.border }}
+              />
             </div>
           </div>
         </div>
         <div className="flex items-center gap-[2px] px-[5px] pb-[4px]">
-          <div className="h-[5px] flex-1 rounded-[2px]" style={{ background: s.inputBg, border: `1px solid ${s.border}` }} />
-          <div className="size-[5px] rounded-[1.5px]" style={{ background: s.text }} />
+          <div
+            className="h-[5px] flex-1 rounded-[2px]"
+            style={{ background: s.inputBg, border: `1px solid ${s.border}` }}
+          />
+          <div
+            className="size-[5px] rounded-[1.5px]"
+            style={{ background: s.text }}
+          />
         </div>
       </div>
     </div>
@@ -802,16 +1198,34 @@ function SystemPreviewThumb() {
       <div className="flex h-full flex-1 flex-col" style={{ background: c.bg }}>
         <div
           className="flex w-[26%] shrink-0 flex-col gap-[2px] px-[3px] py-[4px]"
-          style={{ background: c.sidebar, borderRight: `1px solid ${c.sidebarBorder}` }}
+          style={{
+            background: c.sidebar,
+            borderRight: `1px solid ${c.sidebarBorder}`,
+          }}
         >
           <div className="flex items-center gap-[2px]">
-            <div className="size-[4px] rounded-[1px]" style={{ background: c.border }} />
-            <div className="h-[2px] w-[50%] rounded-full" style={{ background: c.border }} />
+            <div
+              className="size-[4px] rounded-[1px]"
+              style={{ background: c.border }}
+            />
+            <div
+              className="h-[2px] w-[50%] rounded-full"
+              style={{ background: c.border }}
+            />
           </div>
           <div className="mt-[2px] flex flex-col gap-[2px]">
-            <div className="h-[2px] w-[65%] rounded-full" style={{ background: c.border }} />
-            <div className="h-[2px] w-[55%] rounded-full" style={{ background: c.sidebarBorder }} />
-            <div className="h-[2px] w-[60%] rounded-full" style={{ background: c.border }} />
+            <div
+              className="h-[2px] w-[65%] rounded-full"
+              style={{ background: c.border }}
+            />
+            <div
+              className="h-[2px] w-[55%] rounded-full"
+              style={{ background: c.sidebarBorder }}
+            />
+            <div
+              className="h-[2px] w-[60%] rounded-full"
+              style={{ background: c.border }}
+            />
           </div>
         </div>
         <div className="flex min-w-0 flex-1 flex-col">
@@ -819,23 +1233,38 @@ function SystemPreviewThumb() {
             className="flex items-center px-[3px] py-[2px]"
             style={{ borderBottom: `1px solid ${c.border}` }}
           >
-            <div className="h-[1.5px] w-[30%] rounded-full" style={{ background: c.textSec }} />
+            <div
+              className="h-[1.5px] w-[30%] rounded-full"
+              style={{ background: c.textSec }}
+            />
           </div>
           <div className="flex min-h-0 flex-1 flex-col justify-end gap-[2px] px-[3px] pb-[3px] pt-[2px]">
             <div className="flex justify-end">
               <div
                 className="max-w-[70%] rounded-[2px] px-[3px] py-[1.5px]"
-                style={{ background: c.userBubble, border: `1px solid ${c.border}` }}
+                style={{
+                  background: c.userBubble,
+                  border: `1px solid ${c.border}`,
+                }}
               >
-                <div className="h-[1.5px] w-[28px] rounded-full" style={{ background: c.textSec }} />
+                <div
+                  className="h-[1.5px] w-[28px] rounded-full"
+                  style={{ background: c.textSec }}
+                />
               </div>
             </div>
             <div className="flex justify-start">
               <div
                 className="max-w-[70%] rounded-[2px] px-[3px] py-[1.5px]"
-                style={{ background: c.assistantBg, border: `1px solid ${c.border}` }}
+                style={{
+                  background: c.assistantBg,
+                  border: `1px solid ${c.border}`,
+                }}
               >
-                <div className="h-[1.5px] w-[32px] rounded-full" style={{ background: c.border }} />
+                <div
+                  className="h-[1.5px] w-[32px] rounded-full"
+                  style={{ background: c.border }}
+                />
               </div>
             </div>
           </div>
@@ -844,7 +1273,10 @@ function SystemPreviewThumb() {
               className="h-[3.5px] flex-1 rounded-[1.5px]"
               style={{ background: c.inputBg, border: `1px solid ${c.border}` }}
             />
-            <div className="size-[3.5px] rounded-[1px]" style={{ background: c.text }} />
+            <div
+              className="size-[3.5px] rounded-[1px]"
+              style={{ background: c.text }}
+            />
           </div>
         </div>
       </div>
@@ -1296,9 +1728,7 @@ function ManagedChatsDialog({
                             <ArchiveRestore className="size-4" />
                           </Button>
                         </TooltipTrigger>
-                        <TooltipContent side="bottom">
-                          Unarchive
-                        </TooltipContent>
+                        <TooltipContent side="bottom">Unarchive</TooltipContent>
                       </Tooltip>
                       <Tooltip>
                         <TooltipTrigger asChild>
@@ -1315,9 +1745,7 @@ function ManagedChatsDialog({
                             <Trash2 className="size-4" />
                           </Button>
                         </TooltipTrigger>
-                        <TooltipContent side="bottom">
-                          Delete
-                        </TooltipContent>
+                        <TooltipContent side="bottom">Delete</TooltipContent>
                       </Tooltip>
                     </div>
                   </li>
@@ -1410,9 +1838,7 @@ function SharedChatsDialog({
   };
 
   const busy =
-    unpublishMutation.isPending ||
-    deleteMutation.isPending ||
-    copyPending;
+    unpublishMutation.isPending || deleteMutation.isPending || copyPending;
 
   return (
     <>
@@ -1499,9 +1925,7 @@ function SharedChatsDialog({
                             <Trash2 className="size-4" />
                           </Button>
                         </TooltipTrigger>
-                        <TooltipContent side="bottom">
-                          Delete
-                        </TooltipContent>
+                        <TooltipContent side="bottom">Delete</TooltipContent>
                       </Tooltip>
                     </div>
                   </li>

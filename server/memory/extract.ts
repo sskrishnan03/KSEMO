@@ -2,10 +2,10 @@ import { MEMORY_CANDIDATES_MAX, type MemoryCategoryId } from "@shared/memory";
 
 // Rule-based extraction of memory candidates from a user's chats.
 //
-// Important: extraction is ONLY ever run when the user explicitly triggers the
-// "Generate from chats" flow and picks the conversations to analyze. Nothing is
-// saved automatically — every candidate is returned for review, and only an
-// explicit user approval persists anything to the database.
+// Extraction runs after each completed conversation turn while Memory is
+// enabled: durable facts are captured, stored privately, and later used to
+// personalize replies (see autoMemorize.ts and retrieval.ts). Every extracted
+// fact is non-destructive and capped per run.
 
 export type MemoryCandidate = {
   title: string;
@@ -88,7 +88,10 @@ const SPECIFIC_RULES: LinkRule[] = [
     category: "preference",
     sensitive: false,
     markers: [
-      new RegExp(`\\bI\\s+(?:${TRAILING_ADVERBS})*(?:love|like|enjoy|prefer|hate|dislike)\\b`, "i"),
+      new RegExp(
+        `\\bI\\s+(?:${TRAILING_ADVERBS})*(?:love|like|enjoy|prefer|hate|dislike)\\b`,
+        "i"
+      ),
       /\bI(?:\s*'m|\s+am)\s+(?:really|quite|very|not)\s+into\b/i,
       /\b(?:my|our)\s+favo(u)?rite\b/i,
       /\bI\s+don'?t\s+(?:like|care\s+for)\b/i,
@@ -124,8 +127,9 @@ const GENERAL_RULES: RegExp[] = [
 ];
 
 // Used to veto a generic capture that actually contains sensitive information.
-const SENSITIVE_MARKERS: RegExp[] = SPECIFIC_RULES.filter(rule => rule.sensitive)
-  .flatMap(rule => rule.markers);
+const SENSITIVE_MARKERS: RegExp[] = SPECIFIC_RULES.filter(
+  rule => rule.sensitive
+).flatMap(rule => rule.markers);
 
 function sentence(text: string): string {
   return text.replace(/\s+/g, " ").trim();
@@ -133,9 +137,7 @@ function sentence(text: string): string {
 
 function splitSentences(text: string): string[] {
   const parts = text.split(/\n+|(?<=[.!?])\s+/);
-  return parts
-    .map(part => sentence(part))
-    .filter(part => part.length > 0);
+  return parts.map(part => sentence(part)).filter(part => part.length > 0);
 }
 
 function titleFor(sentenceText: string): string {
