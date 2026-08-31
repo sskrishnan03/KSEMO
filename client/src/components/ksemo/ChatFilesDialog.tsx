@@ -77,7 +77,7 @@ export const ChatFilesDialog = memo(function ChatFilesDialog({
           <button
             type="button"
             onClick={() => onOpenChange(false)}
-            className="flex size-7 shrink-0 items-center justify-center rounded-lg text-muted-foreground outline-none transition-colors hover:bg-[#0A0A0A] hover:text-foreground focus-visible:ring-0"
+            className="flex size-7 shrink-0 items-center justify-center rounded-lg text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-0"
             aria-label="Close files panel"
           >
             <X className="size-4" />
@@ -107,7 +107,7 @@ export const ChatFilesDialog = memo(function ChatFilesDialog({
                       href={file.url}
                       target="_blank"
                       rel="noreferrer"
-                      className="flex items-center gap-3 rounded-xl px-2.5 py-2 transition-colors hover:bg-[#0A0A0A]"
+                      className="flex items-center gap-3 rounded-xl px-2.5 py-2 transition-colors hover:bg-accent"
                     >
                       {image ? (
                         <span className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border">

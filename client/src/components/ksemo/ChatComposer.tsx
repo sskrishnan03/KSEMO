@@ -20,6 +20,7 @@ import {
   Check,
   FileUp,
   Library,
+  Loader2,
   Mic,
   MonitorUp,
   Plus,
@@ -37,6 +38,14 @@ import React, {
 
 export const getLibrarySubmenuClass = (isCentered: boolean) =>
   `absolute left-1/2 -translate-x-1/2 z-50 max-h-[calc(100dvh-${isCentered ? "12rem" : "6rem"})] w-full max-w-3xl rounded-xl border border-border bg-popover p-0 text-popover-foreground shadow-xl`;
+
+const CHATBOX_PLACEHOLDERS = [
+  "Ask KSEMO anything you need...",
+  "Drag & drop images or any files here...",
+  "Summarize a document or web page for me...",
+  "Write code, analyze spreadsheets, translate text...",
+  "Search your Library and ask questions about it...",
+];
 
 export const ChatComposer = memo(function ChatComposer({
   onSend,
@@ -117,6 +126,9 @@ export const ChatComposer = memo(function ChatComposer({
   const [libraryOpen, setLibraryOpen] = useState(initialLibraryOpen);
   const [toolsOpen, setToolsOpen] = useState(initialToolsOpen);
   const [libraryQuery, setLibraryQuery] = useState("");
+  const [placeholderIndex, setPlaceholderIndex] = useState(0);
+  const [isDragActive, setIsDragActive] = useState(false);
+  const dragCounterRef = useRef(0);
   const displayedLibraryFiles = useMemo(
     () => filterLibraryItems(libraryFiles, libraryQuery),
     [libraryFiles, libraryQuery]
@@ -128,15 +140,23 @@ export const ChatComposer = memo(function ChatComposer({
       : []);
 
   useEffect(() => {
+    const interval = window.setInterval(
+      () => setPlaceholderIndex(index => (index + 1) % CHATBOX_PLACEHOLDERS.length),
+      4500
+    );
+    return () => window.clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
     const textarea = textareaRef.current;
     if (!textarea) return;
     const frame = requestAnimationFrame(() => {
       // Reset to auto first to allow shrinking
       textarea.style.height = "auto";
       // Then set to actual scrollHeight with max constraint
-      const height = Math.min(textarea.scrollHeight, 128);
-      // Ensure minimum height of 40px for consistent layout
-      const finalHeight = Math.max(height, 40);
+      const height = Math.min(textarea.scrollHeight, 160);
+      // Ensure minimum height of 44px for a comfortable compact layout
+      const finalHeight = Math.max(height, 44);
       textarea.style.height = `${finalHeight}px`;
     });
     return () => cancelAnimationFrame(frame);
@@ -176,14 +196,60 @@ export const ChatComposer = memo(function ChatComposer({
     for (const file of files) onAttachment?.(file);
   }
 
+  function hasFiles(event: React.DragEvent<HTMLDivElement>) {
+    return Array.from(event.dataTransfer?.types ?? []).includes("Files");
+  }
+
+  function handleDragEnter(event: React.DragEvent<HTMLDivElement>) {
+    if (!hasFiles(event)) return;
+    event.preventDefault();
+    dragCounterRef.current += 1;
+    setIsDragActive(true);
+  }
+
+  function handleDragOver(event: React.DragEvent<HTMLDivElement>) {
+    if (!hasFiles(event)) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+  }
+
+  function handleDragLeave(event: React.DragEvent<HTMLDivElement>) {
+    if (!hasFiles(event)) return;
+    dragCounterRef.current -= 1;
+    if (dragCounterRef.current <= 0) {
+      dragCounterRef.current = 0;
+      setIsDragActive(false);
+    }
+  }
+
+  function handleDrop(event: React.DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    dragCounterRef.current = 0;
+    setIsDragActive(false);
+    const files = Array.from(event.dataTransfer?.files ?? []);
+    event.dataTransfer.clearData?.();
+    for (const file of files) onAttachment?.(file);
+  }
+
   return (
     <div
       className={cn(
-        "mx-auto w-full max-w-3xl px-4 pt-3 sm:px-6",
-        compactBottomSpacing ? "pb-2 sm:pb-3" : "pb-5 sm:pb-7"
+        "mx-auto w-full max-w-3xl px-4 pt-3",
+        compactBottomSpacing ? "pb-3" : "pb-6"
       )}
+      onDragEnter={handleDragEnter}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
     >
-      <div className="relative rounded-[1.35rem] border border-[#242424] bg-[#0B0B0B] p-2 shadow-[0_8px_32px_rgba(0,0,0,0.08)] transition-shadow focus-within:shadow-[0_12px_40px_rgba(0,0,0,0.12)]">
+      <div className="relative rounded-2xl border border-border bg-card p-2 shadow-sm transition-shadow focus-within:shadow-md">
+        {isDragActive && (
+          <div className="pointer-events-none absolute inset-0 z-50 flex items-center justify-center rounded-2xl border-2 border-dashed border-primary/60 bg-card/90 backdrop-blur-sm">
+            <p className="text-sm font-medium text-foreground">
+              Drop to attach files
+            </p>
+          </div>
+        )}
         {libraryOpen && (
           <div
             ref={libraryPanelRef}
@@ -225,7 +291,7 @@ export const ChatComposer = memo(function ChatComposer({
           className="sr-only"
         />
         {visibleAttachmentNotices.length > 0 && (
-          <div className="mx-1 mb-1 flex items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="mx-1 mb-2 flex items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {visibleAttachmentNotices.map(item => {
               const isImage =
                 (item.url || item.mimeType) &&
@@ -235,7 +301,7 @@ export const ChatComposer = memo(function ChatComposer({
               return isImage && item.url ? (
                 <div
                   key={item.fileId}
-                  className="group relative size-10 shrink-0 overflow-hidden rounded-lg border border-border shadow-sm"
+                  className="group relative size-16 shrink-0 overflow-hidden rounded-xl border border-border shadow-sm"
                 >
                   <img
                     src={item.url}
@@ -245,28 +311,28 @@ export const ChatComposer = memo(function ChatComposer({
                   {onClearAttachment && (
                     <button
                       onClick={() => onClearAttachment(item.fileId)}
-                      className="absolute right-0.5 top-0.5 flex size-4 items-center justify-center rounded-full border border-border bg-background/80 text-foreground opacity-0 shadow-md backdrop-blur outline-none transition-opacity hover:bg-[#0A0A0A] focus-visible:ring-0 group-hover:opacity-100"
+                      className="absolute right-1 top-1 flex size-5 items-center justify-center rounded-full border border-border bg-card/90 text-foreground opacity-0 shadow-md backdrop-blur outline-none transition-opacity hover:bg-muted focus-visible:ring-0 group-hover:opacity-100"
                       aria-label="Remove screenshot"
                     >
-                      <X className="size-2.5" />
+                      <X className="size-3" />
                     </button>
                   )}
                 </div>
               ) : (
                 <div
                   key={item.fileId}
-                  className="group flex h-10 shrink-0 items-center gap-2 rounded-lg border border-border bg-transparent py-1.5 px-2 shadow-sm transition-colors hover:bg-[#0A0A0A]"
+                  className="group flex h-16 shrink-0 items-center gap-3 rounded-xl border border-border bg-muted py-2 pl-2 pr-3 shadow-sm transition-colors hover:bg-accent"
                 >
                   <span
-                    className={`flex size-6 shrink-0 items-center justify-center rounded-lg ${kind.colorClass}`}
+                    className={`flex size-10 shrink-0 items-center justify-center rounded-lg ${kind.colorClass}`}
                   >
-                    <kind.icon className="size-3" />
+                    <kind.icon className="size-5" />
                   </span>
                   <span className="flex min-w-0 flex-col">
-                    <span className="max-w-[120px] truncate text-[10px] font-semibold text-foreground">
+                    <span className="max-w-[150px] truncate text-[13px] font-semibold text-foreground">
                       {item.name}
                     </span>
-                    <span className="text-[9px] font-medium uppercase tracking-wide text-muted-foreground">
+                    <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
                       {kind.label}
                       {item.linked ? " · linked" : " · library"}
                     </span>
@@ -274,10 +340,10 @@ export const ChatComposer = memo(function ChatComposer({
                   {onClearAttachment && (
                     <button
                       onClick={() => onClearAttachment(item.fileId)}
-                      className="ml-1 flex size-4 shrink-0 items-center justify-center rounded-full text-muted-foreground opacity-0 outline-none transition-opacity hover:bg-[#0A0A0A] hover:text-foreground focus-visible:ring-0 group-hover:opacity-100"
+                      className="ml-1.5 flex size-6 shrink-0 items-center justify-center rounded-full text-muted-foreground opacity-0 outline-none transition-all hover:bg-accent hover:text-foreground focus-visible:ring-0 group-hover:opacity-100"
                       aria-label="Remove screenshot"
                     >
-                      <X className="size-2.5" />
+                      <X className="size-3.5" />
                     </button>
                   )}
                 </div>
@@ -285,46 +351,118 @@ export const ChatComposer = memo(function ChatComposer({
             })}
           </div>
         )}
-        <div className="flex items-end gap-2 bg-transparent">
-          <Textarea
-            ref={textareaRef}
-            value={value}
-            onChange={event => onValueChange(event.target.value)}
-            onPaste={handlePaste}
-            onKeyDown={event => {
-              if (event.key === "Enter" && !event.shiftKey) {
-                event.preventDefault();
-                submit();
-              }
-            }}
-            disabled={isGenerating || isRecording || isTranscribing}
-            placeholder={
-              isRecording
-                ? "Listening…"
-                : isTranscribing
-                  ? "Transcribing your recording…"
-                  : "Ask KSEMO anything…"
-            }
-            className="min-h-10 max-h-32 resize-none border-0 !bg-transparent px-2 py-2 text-[14px] leading-5 shadow-none focus-visible:ring-0 focus-visible:ring-0 placeholder:text-muted-foreground dark:!bg-transparent flex-1"
-            aria-label="Message KSEMO"
-          />
-          <div className="flex items-center gap-1 bg-transparent">
-            {isRecording ? (
-              <div className="flex items-center gap-1">
-                <div className="flex h-7 items-center gap-1.5 rounded-full border border-border bg-transparent px-2">
-                  <span
-                    className="flex items-center gap-0.5 px-0.5"
-                    aria-label={`Recording ${recordingSeconds} seconds`}
+        
+        {/* Main Composer Content */}
+        <div className="flex flex-col">
+          {/* Text Input Area */}
+          <div className="relative flex flex-1">
+            <Textarea
+              ref={textareaRef}
+              value={value}
+              onChange={event => onValueChange(event.target.value)}
+              onPaste={handlePaste}
+              onKeyDown={event => {
+                if (event.key === "Enter" && !event.shiftKey) {
+                  event.preventDefault();
+                  submit();
+                }
+              }}
+              disabled={isGenerating || isRecording || isTranscribing}
+              className="min-h-11 max-h-32 resize-none border-0 !bg-transparent pl-2.5 pr-1 py-1 text-[15px] leading-6 md:text-[15px] shadow-none focus-visible:ring-0 focus-visible:ring-0 dark:!bg-transparent flex-1"
+              aria-label="Message KSEMO"
+            />
+            {value.length === 0 &&
+              (isTranscribing ? (
+                <span className="pointer-events-none absolute left-2.5 top-1 flex items-center gap-2 text-[15px] leading-6 text-muted-foreground">
+                  <Loader2 className="size-3.5 shrink-0 animate-spin" />
+                  Converting speech to text…
+                </span>
+              ) : (
+                <span
+                  key={placeholderIndex}
+                  className="pointer-events-none absolute left-2.5 top-1 text-[15px] leading-6 text-muted-foreground animate-[ksemo-placeholder-rise_800ms_ease-out]"
+                  aria-hidden="true"
+                >
+                  {CHATBOX_PLACEHOLDERS[placeholderIndex]}
+                </span>
+              ))}
+          </div>
+
+          {/* Bottom Control Row */}
+          <div className="flex items-center justify-between pt-1">
+            {/* Left Side Controls */}
+            <div className="flex items-center gap-1.5">
+              {/* Plus Button */}
+              <DropdownMenu
+                open={toolsOpen && !libraryOpen}
+                onOpenChange={setToolsOpen}
+              >
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-9 rounded-full bg-transparent text-foreground hover:bg-accent hover:text-foreground transition-colors"
+                        aria-label="Open composer tools"
+                      >
+                        <Plus className="size-5" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    Add a file or browse Library
+                  </TooltipContent>
+                </Tooltip>
+                <DropdownMenuContent
+                  align="start"
+                  side={menuPlacement === "below" ? "bottom" : "top"}
+                  sideOffset={10}
+                  collisionPadding={12}
+                  className="w-56 rounded-xl"
+                >
+                  <DropdownMenuItem onClick={() => fileInputRef.current?.click()}>
+                    <FileUp className="mr-2 size-4" /> Upload files
+                  </DropdownMenuItem>
+                  {onTakeScreenshot && (
+                    <DropdownMenuItem
+                      onSelect={() => {
+                        setToolsOpen(false);
+                        onTakeScreenshot();
+                      }}
+                    >
+                      <MonitorUp className="mr-2 size-4" />
+                      Take Screenshot
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      setLibraryOpen(true);
+                      setToolsOpen(false);
+                    }}
                   >
+                    <Library className="mr-2 size-4" />
+                    Browse Library
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+
+            {/* Right Side Controls */}
+            <div className="flex items-center gap-1.5">
+              {/* Recording / Transcribing / Mic — opens in place of the mic when clicked */}
+              {isRecording ? (
+                <div className="flex items-center gap-2 overflow-hidden rounded-full border border-border bg-muted px-3 py-1.5 shadow-sm">
+                  <div className="flex items-end gap-0.5 overflow-hidden">
                     {[4, 8, 12, 7, 15, 9, 5, 11].map((height, index) => (
                       <span
                         key={index}
-                        className="w-px animate-pulse rounded-full bg-muted-foreground"
+                        className="w-1 animate-pulse rounded-full bg-muted-foreground/80"
                         style={{ height, animationDelay: `${index * 70}ms` }}
                       />
                     ))}
-                  </span>
-                  <span className="text-[10px] font-medium tabular-nums text-muted-foreground">
+                  </div>
+                  <span className="text-[12px] font-medium tabular-nums text-foreground">
                     {String(Math.floor(recordingSeconds / 60)).padStart(2, "0")}:
                     {String(recordingSeconds % 60).padStart(2, "0")}
                   </span>
@@ -334,7 +472,7 @@ export const ChatComposer = memo(function ChatComposer({
                         variant="ghost"
                         size="icon"
                         onClick={onCancelRecording}
-                        className="size-6 rounded-full outline-none focus-visible:ring-0 focus-visible:border-transparent"
+                        className="size-6 rounded-full text-foreground/80 hover:bg-accent hover:text-foreground transition-colors"
                         aria-label="Cancel recording"
                       >
                         <X className="size-3" />
@@ -349,7 +487,7 @@ export const ChatComposer = memo(function ChatComposer({
                       <Button
                         size="icon"
                         onClick={onVoice}
-                        className="size-6 rounded-full bg-foreground text-background hover:bg-[#0A0A0A]"
+                        className="size-6 rounded-full bg-foreground text-background hover:bg-foreground/90 transition-colors"
                         aria-label="Finish recording"
                       >
                         <Check className="size-3" />
@@ -360,124 +498,83 @@ export const ChatComposer = memo(function ChatComposer({
                     </TooltipContent>
                   </Tooltip>
                 </div>
-              </div>
-            ) : (
-              <>
-                <DropdownMenu
-                  open={toolsOpen && !libraryOpen}
-                  onOpenChange={setToolsOpen}
-                >
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="size-8 rounded-lg text-muted-foreground hover:bg-[#0A0A0A] hover:text-foreground"
-                          aria-label="Open composer tools"
-                        >
-                          <Plus className="size-3.5" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom">
-                      Add a file or browse Library
-                    </TooltipContent>
-                  </DropdownMenu>
-                  <DropdownMenuContent
-                    align="start"
-                    side={menuPlacement === "bottom" ? "bottom" : "top"}
-                    sideOffset={10}
-                    collisionPadding={12}
-                    className="w-56 rounded-xl"
-                  >
-                    <DropdownMenuItem
-                      onClick={() => fileInputRef.current?.click()}
+              ) : isTranscribing ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      disabled
+                      className="size-9 rounded-full bg-transparent text-muted-foreground transition-colors"
+                      aria-label="Converting speech to text"
                     >
-                      <FileUp className="mr-2 size-4" /> Upload files
-                    </DropdownMenuItem>
-                    {onTakeScreenshot && (
-                      <DropdownMenuItem
-                        onSelect={() => {
-                          setToolsOpen(false);
-                          onTakeScreenshot();
-                        }}
-                      >
-                        <MonitorUp className="mr-2 size-4" />
-                        Take Screenshot
-                      </DropdownMenuItem>
-                    )}
-                    <DropdownMenuItem
-                      onSelect={() => {
-                        setLibraryOpen(true);
-                        setToolsOpen(false);
-                      }}
+                      <Loader2 className="size-4.5 animate-spin" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    Converting speech to text…
+                  </TooltipContent>
+                </Tooltip>
+              ) : (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={onVoice}
+                      disabled={isTranscribing}
+                      className="size-9 rounded-full bg-transparent text-foreground hover:bg-accent hover:text-foreground transition-colors"
+                      aria-label="Use voice input"
                     >
-                      <Library className="mr-2 size-4" />
-                      Browse Library
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-                {!isGenerating && (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={onVoice}
-                        disabled={isTranscribing}
-                        className="size-8 rounded-lg text-muted-foreground hover:bg-[#0A0A0A] hover:text-foreground"
-                        aria-label="Use voice input"
-                      >
-                        <Mic className="size-3.5" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom">
-                      Record a voice message
-                    </TooltipContent>
-                  </Tooltip>
-                )}
-              </>
-            )}
-            {isGenerating ? (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    onClick={onCancel}
-                    size="icon"
-                    className="size-8 rounded-lg bg-foreground text-background hover:bg-[#0A0A0A]"
-                    aria-label="Stop generating"
-                  >
-                    <Square className="size-3 fill-current" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom">Stop generating</TooltipContent>
-              </Tooltip>
-            ) : (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    onClick={submit}
-                    disabled={
-                      (!value.trim() && !visibleAttachmentNotices.length) ||
-                      isRecording ||
-                      isTranscribing
-                    }
-                    size="icon"
-                    className="size-8 rounded-lg bg-foreground text-background hover:bg-[#0A0A0A] disabled:bg-muted disabled:text-muted-foreground"
-                    aria-label="Send message"
-                  >
-                    <ArrowUp className="size-[16px]" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom">Send message</TooltipContent>
-              </Tooltip>
-            )}
+                      <Mic className="size-4.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    Record a voice message
+                  </TooltipContent>
+                </Tooltip>
+              )}
+              {/* Send/Stop Button */}
+              {isGenerating ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      onClick={onCancel}
+                      size="icon"
+                      className="size-9 rounded-full bg-foreground text-background hover:bg-foreground/90 transition-colors"
+                      aria-label="Stop generating"
+                    >
+                      <Square className="size-4 fill-current" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">Stop generating</TooltipContent>
+                </Tooltip>
+              ) : (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      onClick={submit}
+                      disabled={
+                        (!value.trim() && !visibleAttachmentNotices.length) ||
+                        isRecording ||
+                        isTranscribing
+                      }
+                      size="icon"
+                      className="size-9 rounded-full bg-foreground text-background hover:bg-foreground/90 disabled:bg-muted disabled:text-muted-foreground transition-colors"
+                      aria-label="Send message"
+                    >
+                      <ArrowUp className="size-4.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">Send message</TooltipContent>
+                </Tooltip>
+              )}
+            </div>
           </div>
         </div>
       </div>
       {showSafetyNote && (
-        <p className="mt-2 text-center text-[11px] text-muted-foreground">
+        <p className="mt-3 text-center text-[12px] text-muted-foreground">
           KSEMO can make mistakes. Verify important details.
         </p>
       )}
@@ -562,7 +659,7 @@ export function LibraryPickerContent({
         {selectedFiles.size > 0 && (
           <Button
             onClick={handleConfirm}
-            className="h-8 rounded-xl bg-foreground text-background hover:bg-[#0A0A0A] text-sm px-4"
+            className="h-8 rounded-xl bg-foreground text-background hover:bg-foreground/90 text-sm px-4"
             size="sm"
           >
             Add to chat
@@ -590,8 +687,8 @@ export function LibraryPickerContent({
                   className={cn(
                     "flex w-full items-center gap-2 rounded-lg p-2 text-left transition-colors",
                     isSelected
-                      ? "bg-muted/50 hover:bg-[#0A0A0A]"
-                      : "hover:bg-[#0A0A0A]"
+                      ? "bg-muted/50 hover:bg-accent"
+                      : "hover:bg-accent"
                   )}
                 >
                   {isImage && file.url ? (

@@ -1988,7 +1988,7 @@ export default function Home() {
                 libraryFiles={libraryFilesQuery.data}
                 onLibraryFile={stableAttachLibraryFiles}
                 initialLibraryOpen={isLibraryPreview}
-                menuPlacement="below"
+                menuPlacement="above"
                 compactBottomSpacing
                 showSafetyNote
                 onTakeScreenshot={stableCaptureScreenshot}

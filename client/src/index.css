@@ -39,63 +39,63 @@
 
 :root {
   --radius: 0.85rem;
-  --background: oklch(0.985 0.002 80);
-  --foreground: oklch(0.21 0.008 80);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.21 0.008 80);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.21 0.008 80);
-  --primary: oklch(0.22 0.008 80);
-  --primary-foreground: oklch(0.98 0.002 80);
-  --secondary: oklch(0.955 0.003 80);
-  --secondary-foreground: oklch(0.32 0.01 80);
-  --muted: oklch(0.945 0.003 80);
-  --muted-foreground: oklch(0.52 0.01 80);
-  --accent: oklch(0.945 0.003 80);
-  --accent-foreground: oklch(0.21 0.008 80);
-  --destructive: oklch(0.56 0.19 25);
-  --destructive-foreground: oklch(0.98 0 0);
-  --border: oklch(0.89 0.004 80);
-  --input: oklch(0.89 0.004 80);
-  --ring: oklch(0.45 0.02 80);
-  --sidebar: oklch(0.975 0.002 80);
-  --sidebar-foreground: oklch(0.21 0.008 80);
-  --sidebar-primary: oklch(0.22 0.008 80);
-  --sidebar-primary-foreground: oklch(0.98 0.002 80);
-  --sidebar-accent: oklch(0.94 0.003 80);
-  --sidebar-accent-foreground: oklch(0.21 0.008 80);
-  --sidebar-border: oklch(0.89 0.004 80);
-  --sidebar-ring: oklch(0.45 0.02 80);
+  --background: #F8F8FF;
+  --foreground: #1A1A1A;
+  --card: #FFFFFF;
+  --card-foreground: #1A1A1A;
+  --popover: #FFFFFF;
+  --popover-foreground: #1A1A1A;
+  --primary: #1A1A1A;
+  --primary-foreground: #F8F8FF;
+  --secondary: #E9E9F0;
+  --secondary-foreground: #1A1A1A;
+  --muted: #EDEDF4;
+  --muted-foreground: #6B6B74;
+  --accent: #E9E9F0;
+  --accent-foreground: #1A1A1A;
+  --destructive: #C23B2E;
+  --destructive-foreground: #FFFFFF;
+  --border: rgba(0, 0, 0, 0.12);
+  --input: rgba(0, 0, 0, 0.14);
+  --ring: #4A4A55;
+  --sidebar: #D3D3D3;
+  --sidebar-foreground: #1A1A1A;
+  --sidebar-primary: #1A1A1A;
+  --sidebar-primary-foreground: #F8F8FF;
+  --sidebar-accent: #C6C6C6;
+  --sidebar-accent-foreground: #1A1A1A;
+  --sidebar-border: rgba(0, 0, 0, 0.14);
+  --sidebar-ring: #9A9AA4;
 }
 
 .dark {
-  --background: #050505;
-  --foreground: oklch(0.93 0.004 80);
-  --card: oklch(0.19 0.004 80);
-  --card-foreground: oklch(0.93 0.004 80);
-  --popover: oklch(0.21 0.004 80);
-  --popover-foreground: oklch(0.93 0.004 80);
-  --primary: oklch(0.95 0.003 80);
-  --primary-foreground: oklch(0.18 0.006 80);
-  --secondary: oklch(0.235 0.004 80);
-  --secondary-foreground: oklch(0.76 0.004 80);
-  --muted: #0A0A0A;
-  --muted-foreground: oklch(0.67 0.006 80);
-  --accent: oklch(0.25 0.004 80);
-  --accent-foreground: oklch(0.95 0.003 80);
-  --destructive: oklch(0.69 0.17 25);
-  --destructive-foreground: oklch(0.16 0 0);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 14%);
-  --ring: oklch(0.73 0.01 80);
+  --background: #0A0A0A;
+  --foreground: #EDEDED;
+  --card: #141414;
+  --card-foreground: #EDEDED;
+  --popover: #151515;
+  --popover-foreground: #EDEDED;
+  --primary: #EDEDED;
+  --primary-foreground: #0A0A0A;
+  --secondary: #141414;
+  --secondary-foreground: #BFBFBF;
+  --muted: #141414;
+  --muted-foreground: #A6A6A6;
+  --accent: #171717;
+  --accent-foreground: #EDEDED;
+  --destructive: #E4645A;
+  --destructive-foreground: #0A0A0A;
+  --border: #262626;
+  --input: rgba(255, 255, 255, 0.14);
+  --ring: #B3B3B3;
   --sidebar: #000000;
-  --sidebar-foreground: oklch(0.93 0.004 80);
-  --sidebar-primary: oklch(0.95 0.003 80);
-  --sidebar-primary-foreground: oklch(0.18 0.006 80);
-  --sidebar-accent: #0A0A0A;
-  --sidebar-accent-foreground: oklch(0.95 0.003 80);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.73 0.01 80);
+  --sidebar-foreground: #EDEDED;
+  --sidebar-primary: #EDEDED;
+  --sidebar-primary-foreground: #0A0A0A;
+  --sidebar-accent: #131313;
+  --sidebar-accent-foreground: #EDEDED;
+  --sidebar-border: #202020;
+  --sidebar-ring: #B3B3B3;
 }
 
 @layer base {
@@ -310,14 +310,14 @@ html.ksemo-reduce-motion [data-state] .ksemo-orb-morph-b {
 }
 
 .voice-chat-bg {
-  background: #000000;
+  background: var(--background);
 }
 
 .voice-chat-vignette {
   background: radial-gradient(
     ellipse at center,
     transparent 40%,
-    rgba(0, 0, 0, 0.6) 100%
+    color-mix(in oklab, var(--foreground) 24%, transparent) 100%
   );
 }
 
@@ -357,4 +357,18 @@ html.ksemo-reduce-motion [data-state] .ksemo-orb-morph-b {
 
 html.ksemo-reduce-motion .loader {
   animation: none;
+}
+
+@keyframes ksemo-placeholder-rise {
+  0% {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  60% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

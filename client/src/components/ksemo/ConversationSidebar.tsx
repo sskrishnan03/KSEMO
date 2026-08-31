@@ -131,7 +131,7 @@ export const ConversationSidebar = memo(function ConversationSidebar({
         onClick={action}
         variant="ghost"
         className={cn(
-          "group relative h-9 rounded-lg text-foreground/90 transition-[color,background-color,transform] duration-150 hover:bg-[#0A0A0A] hover:text-foreground active:scale-[0.97]",
+          "group relative h-9 rounded-lg text-foreground/90 transition-[color,background-color,transform] duration-150 hover:bg-sidebar-accent hover:text-foreground active:scale-[0.97]",
           compact ? "w-10 px-0" : "w-full justify-start gap-2 px-2"
         )}
       >
@@ -162,7 +162,7 @@ export const ConversationSidebar = memo(function ConversationSidebar({
   const accountButton = (
     <button
       className={cn(
-        "group relative flex w-full items-center rounded-xl py-2 text-left transition-colors hover:bg-[#0A0A0A] focus-visible:ring-0 focus-visible:outline-none",
+        "group relative flex w-full items-center rounded-xl py-2 text-left transition-colors hover:bg-sidebar-accent focus-visible:ring-0 focus-visible:outline-none",
         compact ? "justify-center" : "gap-2.5 px-2"
       )}
       aria-label="Open profile menu"
@@ -190,7 +190,7 @@ export const ConversationSidebar = memo(function ConversationSidebar({
       <aside
         ref={asideRef}
         className={cn(
-          "fixed inset-y-0 left-0 z-50 flex flex-col border-r border-border bg-[oklch(0.975_0.002_80)] px-3 py-3 transition-[width,transform] duration-200 dark:bg-[#000000] lg:static lg:translate-x-0",
+          "fixed inset-y-0 left-0 z-50 flex flex-col border-r border-border bg-sidebar px-3 py-3 transition-[width,transform] duration-200 lg:static lg:translate-x-0",
           compact ? "w-16" : "w-[16.5rem]",
           open ? "translate-x-0" : "-translate-x-full"
         )}
@@ -216,7 +216,7 @@ export const ConversationSidebar = memo(function ConversationSidebar({
                     variant="ghost"
                     size="icon"
                     onClick={onToggleCollapsed}
-                    className="absolute inset-0 size-8 rounded-xl opacity-0 transition-all duration-150 group-hover/brand:scale-100 group-hover/brand:opacity-100 group-focus-within/brand:scale-100 group-focus-within/brand:opacity-100 hover:bg-[#0A0A0A] focus-visible:ring-2 focus-visible:ring-ring active:scale-95"
+                    className="absolute inset-0 size-8 rounded-xl opacity-0 transition-all duration-150 group-hover/brand:scale-100 group-hover/brand:opacity-100 group-focus-within/brand:scale-100 group-focus-within/brand:opacity-100 hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-ring active:scale-95"
                     aria-label="Expand sidebar"
                   >
                     <ChevronsRight className="size-4" />
@@ -239,7 +239,7 @@ export const ConversationSidebar = memo(function ConversationSidebar({
                   variant="ghost"
                   size="icon"
                   onClick={onToggleCollapsed}
-                  className="hidden size-8 rounded-lg transition-transform duration-150 hover:bg-[#0A0A0A] active:scale-95 lg:inline-flex"
+                  className="hidden size-8 rounded-lg transition-transform duration-150 hover:bg-sidebar-accent active:scale-95 lg:inline-flex"
                   aria-label="Collapse sidebar"
                 >
                   <ChevronsLeft className="size-4" />
@@ -255,7 +255,7 @@ export const ConversationSidebar = memo(function ConversationSidebar({
                   variant="ghost"
                   size="icon"
                   onClick={onClose}
-                  className="size-8 rounded-lg text-muted-foreground outline-none hover:bg-[#0A0A0A] hover:text-foreground focus-visible:ring-0 focus-visible:border-transparent lg:hidden"
+                  className="size-8 rounded-lg text-muted-foreground outline-none hover:bg-sidebar-accent hover:text-foreground focus-visible:ring-0 focus-visible:border-transparent lg:hidden"
                   aria-label="Close navigation"
                 >
                   <PanelLeftClose className="size-4" />
@@ -453,8 +453,8 @@ const ConversationGroup = memo(function ConversationGroup({
               className={cn(
                 "group flex items-center gap-1 rounded-lg",
                 activeConversationId === conversation.id
-                  ? "bg-[#0A0A0A]"
-                  : "hover:bg-[#0A0A0A]"
+                  ? "bg-sidebar-accent"
+                  : "hover:bg-sidebar-accent"
               )}
             >
               <ConversationTitleButton

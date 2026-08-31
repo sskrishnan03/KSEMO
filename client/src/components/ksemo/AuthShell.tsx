@@ -39,7 +39,7 @@ export function GoogleButton({
       onClick={onClick}
       variant="outline"
       disabled={disabled}
-      className="h-10 w-full rounded-lg border-border bg-background text-sm font-medium hover:bg-[#0A0A0A]"
+      className="h-10 w-full rounded-lg border-border bg-background text-sm font-medium hover:bg-accent"
     >
       <span className="inline-flex items-center gap-2">
         <GoogleIcon />

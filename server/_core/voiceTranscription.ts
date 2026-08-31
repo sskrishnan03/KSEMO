@@ -8,15 +8,16 @@ const GEMINI_BASE_URL =
   "https://generativelanguage.googleapis.com/v1beta";
 // Ordered by transcription speed as a best effort; each fallback is only used
 // when the previous model is busy or unavailable on the configured API key.
+// NOTE: gemini-2.0-flash returns 404 ("no longer available") and has been
+// removed — it only wasted the request budget before the working models ran.
 const TRANSCRIBE_MODELS = [
-  "gemini-2.0-flash",
   "gemini-3.7-flash",
   "gemini-3.6-flash",
 ];
 
 // Hard cap on total transcription time so the UI never hangs on an unresponsive
 // model; the remaining budget is shared across model fallbacks.
-const TRANSCRIPTION_DEADLINE_MS = 30_000;
+const TRANSCRIPTION_DEADLINE_MS = 45_000;
 
 export type TranscribeOptions = {
   audio: Buffer;
@@ -156,7 +157,10 @@ export async function transcribeAudio(
             : error instanceof Error
               ? error.message
               : "Transcription request failed";
-        break;
+        // Move on to the next model instead of aborting — a slow or stalled
+        // request on one model must not prevent the fallbacks from trying.
+        if (Date.now() >= deadline) break;
+        continue;
       }
       if (response.ok) break;
       const errorText = await response.text().catch(() => "");
@@ -173,8 +177,11 @@ export async function transcribeAudio(
     }
 
     if (!response || !response.ok) {
+      const rateLimited = /429|quota|RESOURCE_EXHAUSTED/i.test(lastError);
       return {
-        error: "Transcription service request failed",
+        error: rateLimited
+          ? "Voice transcription is temporarily rate-limited. Please wait a moment and try again."
+          : "Transcription service request failed",
         code: "TRANSCRIPTION_FAILED",
         details: lastError,
       };

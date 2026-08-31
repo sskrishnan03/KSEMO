@@ -166,7 +166,7 @@ function CopyCodeButton({ code }: { code: string }) {
             "size-7 rounded-md transition-colors focus-visible:ring-1",
             copied
               ? "text-foreground"
-              : "text-muted-foreground hover:bg-[#0A0A0A] hover:text-foreground"
+              : "text-muted-foreground hover:bg-accent hover:text-foreground"
           )}
           onClick={copy}
           disabled={!code}
@@ -215,7 +215,7 @@ function DownloadCodeButton({
           type="button"
           variant="ghost"
           size="icon"
-          className="size-7 rounded-md text-muted-foreground hover:bg-[#0A0A0A] hover:text-foreground focus-visible:ring-1"
+          className="size-7 rounded-md text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:ring-1"
           onClick={download}
           disabled={!code}
           aria-label="Download code"
@@ -324,7 +324,7 @@ export function KsemoCodeBlock({
   );
   return (
     <div
-      className="my-4 w-full overflow-hidden rounded-xl border border-border/70 bg-[oklch(0.975_0.002_80)] dark:bg-[oklch(0.17_0.003_80)]"
+      className="my-4 w-full overflow-hidden rounded-xl border border-border/70 bg-muted"
       data-language={id || "text"}
       style={blockStyle}
       aria-label={`${codeBlockLanguageLabel(rawLanguage)} code block`}

@@ -308,7 +308,7 @@ function SettingsSearch({
             type="button"
             onClick={() => setQuery("")}
             aria-label="Clear settings search"
-            className="absolute top-1/2 right-2 flex size-6 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-[#0A0A0A] hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+            className="absolute top-1/2 right-2 flex size-6 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
           >
             <X className="size-3.5" />
           </button>
@@ -334,7 +334,7 @@ function SettingsSearch({
                       onMouseEnter={() => setHighlighted(index)}
                       onClick={() => select(entry.tab)}
                       className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors ${
-                        index === highlighted ? "bg-[#0A0A0A]" : "hover:bg-[#0A0A0A]"
+                        index === highlighted ? "bg-accent" : "hover:bg-accent"
                       }`}
                     >
                       <Icon className="size-4 shrink-0 text-muted-foreground" />
@@ -424,7 +424,7 @@ export const SettingsDialog = memo(function SettingsDialog({
         </DialogHeader>
 
         <div className="flex min-h-0 flex-1 flex-col md:flex-row">
-          <aside className="hidden md:flex w-56 shrink-0 flex-col border-r border-border bg-[oklch(0.975_0.002_80)] px-3 py-3 dark:bg-[#000000]">
+          <aside className="hidden md:flex w-56 shrink-0 flex-col border-r border-border bg-sidebar px-3 py-3">
             <div className="mb-3 flex items-center gap-2 px-2 pb-2">
               <Settings2 className="size-4 text-muted-foreground" />
               <span className="text-sm font-semibold tracking-[-0.02em]">
@@ -442,8 +442,8 @@ export const SettingsDialog = memo(function SettingsDialog({
                     onClick={() => setActiveTab(item.id)}
                     className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm transition-colors outline-none focus-visible:ring-0 focus-visible:outline-none ${
                       active
-                        ? "bg-[#0A0A0A] font-medium text-foreground"
-                        : "text-muted-foreground hover:bg-[#0A0A0A] hover:text-foreground"
+                        ? "bg-accent font-medium text-foreground"
+                        : "text-muted-foreground hover:bg-accent hover:text-foreground"
                     }`}
                   >
                     <Icon className="size-4 shrink-0" />
@@ -458,7 +458,7 @@ export const SettingsDialog = memo(function SettingsDialog({
                   onOpenChange(false);
                   onSignOut();
                 }}
-                className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm text-destructive transition-colors outline-none hover:bg-[#0A0A0A] focus-visible:ring-0 focus-visible:outline-none"
+                className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm text-destructive transition-colors outline-none hover:bg-accent focus-visible:ring-0 focus-visible:outline-none"
               >
                 <LogOut className="size-4 shrink-0" />
                 Sign out
@@ -466,7 +466,7 @@ export const SettingsDialog = memo(function SettingsDialog({
             </div>
           </aside>
 
-          <nav className="flex md:hidden overflow-x-auto border-b border-border bg-[oklch(0.975_0.002_80)] px-2 py-1.5 dark:bg-[#000000]">
+          <nav className="flex md:hidden overflow-x-auto border-b border-border bg-sidebar px-2 py-1.5">
             {settingsNavItems.map(item => {
               const Icon = item.icon;
               const active = activeTab === item.id;
@@ -476,8 +476,8 @@ export const SettingsDialog = memo(function SettingsDialog({
                   onClick={() => setActiveTab(item.id)}
                   className={`flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs transition-colors outline-none focus-visible:ring-0 focus-visible:outline-none ${
                     active
-                      ? "bg-[#0A0A0A] font-medium text-foreground"
-                      : "text-muted-foreground hover:bg-[#0A0A0A] hover:text-foreground"
+                      ? "bg-accent font-medium text-foreground"
+                      : "text-muted-foreground hover:bg-accent hover:text-foreground"
                   }`}
                 >
                   <Icon className="size-3.5 shrink-0" />
@@ -671,7 +671,7 @@ function AccountSection({
           type="button"
           disabled={deleteBusy}
           onClick={onDeleteAccount}
-          className="shrink-0 inline-flex items-center rounded-lg bg-destructive px-3 py-1.5 text-[11px] font-semibold text-white transition-opacity hover:opacity-90 disabled:pointer-events-none disabled:opacity-60"
+          className="shrink-0 inline-flex items-center rounded-lg bg-destructive px-3 py-1.5 text-[11px] font-semibold text-destructive-foreground transition-opacity hover:opacity-90 disabled:pointer-events-none disabled:opacity-60"
         >
           {deleteBusy ? "Deleting…" : "Delete Account"}
         </button>
@@ -915,15 +915,15 @@ const THUMB_H = 72;
 
 function MiniKsemoLight() {
   const s = {
-    bg: "#FFFFFF",
-    sidebar: "#F9FAFB",
-    sidebarBorder: "#E5E7EB",
-    surface: "#F3F4F6",
-    text: "#111111",
-    textSec: "#6B7280",
-    border: "#E5E7EB",
-    inputBg: "#F3F4F6",
-    userBubble: "#F3F4F6",
+    bg: "#F8F8FF",
+    sidebar: "#D3D3D3",
+    sidebarBorder: "#C2C2C2",
+    surface: "#E9E9F0",
+    text: "#1A1A1A",
+    textSec: "#6B6B74",
+    border: "#C2C2C2",
+    inputBg: "#E9E9F0",
+    userBubble: "#E9E9F0",
     assistantBg: "#FFFFFF",
   } as const;
   return (
@@ -1028,16 +1028,16 @@ function MiniKsemoLight() {
 
 function MiniKsemoDark() {
   const s = {
-    bg: "#0A0A0A",
-    sidebar: "#111111",
-    sidebarBorder: "#222222",
-    surface: "#1A1A1A",
-    text: "#FFFFFF",
-    textSec: "#888888",
-    border: "#222222",
-    inputBg: "#141414",
-    userBubble: "#1A1A1A",
-    assistantBg: "#111111",
+    bg: "#1A1A1A",
+    sidebar: "#0A0A0A",
+    sidebarBorder: "#262626",
+    surface: "#232323",
+    text: "#EDEDED",
+    textSec: "#A6A6A6",
+    border: "#262626",
+    inputBg: "#222222",
+    userBubble: "#232323",
+    assistantBg: "#232323",
   } as const;
   return (
     <div className="flex size-full" style={{ background: s.bg }}>
@@ -1144,26 +1144,26 @@ function MiniKsemoDark() {
 
 function SystemPreviewThumb() {
   const light = {
-    bg: "#FFFFFF",
-    sidebar: "#F9FAFB",
-    sidebarBorder: "#E5E7EB",
-    border: "#E5E7EB",
-    textSec: "#6B7280",
-    inputBg: "#F3F4F6",
-    userBubble: "#F3F4F6",
+    bg: "#F8F8FF",
+    sidebar: "#D3D3D3",
+    sidebarBorder: "#C2C2C2",
+    border: "#C2C2C2",
+    textSec: "#6B6B74",
+    inputBg: "#E9E9F0",
+    userBubble: "#E9E9F0",
     assistantBg: "#FFFFFF",
-    text: "#111111",
+    text: "#1A1A1A",
   } as const;
   const dark = {
-    bg: "#0A0A0A",
-    sidebar: "#111111",
-    sidebarBorder: "#222222",
-    border: "#222222",
-    textSec: "#888888",
-    inputBg: "#141414",
-    userBubble: "#1A1A1A",
-    assistantBg: "#111111",
-    text: "#FFFFFF",
+    bg: "#1A1A1A",
+    sidebar: "#0A0A0A",
+    sidebarBorder: "#262626",
+    border: "#262626",
+    textSec: "#A6A6A6",
+    inputBg: "#222222",
+    userBubble: "#232323",
+    assistantBg: "#232323",
+    text: "#EDEDED",
   } as const;
 
   function Half({ c }: { c: Record<string, string> }) {
@@ -1259,7 +1259,7 @@ function SystemPreviewThumb() {
   return (
     <div className="flex size-full overflow-hidden rounded-lg">
       <Half c={light} />
-      <div style={{ width: 1, background: "#D1D5DB" }} />
+      <div style={{ width: 1, background: "var(--border)" }} />
       <Half c={dark} />
     </div>
   );
@@ -1466,7 +1466,7 @@ function DataSection({
         <button
           type="button"
           onClick={onDeleteAll}
-          className="shrink-0 rounded-lg bg-destructive px-3 py-1.5 text-[11px] font-semibold text-white transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          className="shrink-0 rounded-lg bg-destructive px-3 py-1.5 text-[11px] font-semibold text-destructive-foreground transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         >
           Delete all
         </button>
@@ -1545,7 +1545,7 @@ function FeedbackSection() {
                     className={`flex items-center gap-2 rounded-xl border p-2.5 text-left text-sm transition-colors ${
                       active
                         ? "border-primary bg-primary/5 font-medium text-foreground"
-                        : "border-border text-muted-foreground hover:bg-[#0A0A0A] hover:text-foreground"
+                        : "border-border text-muted-foreground hover:bg-accent hover:text-foreground"
                     }`}
                   >
                     <Icon className="size-4 shrink-0" />
@@ -1584,7 +1584,7 @@ function FeedbackSection() {
               size="sm"
               onClick={handleSubmit}
               disabled={!feedbackText.trim() || !category || sendFeedback.isPending}
-              className="rounded-lg bg-foreground text-background hover:bg-[#0A0A0A]"
+              className="rounded-lg bg-foreground text-background hover:bg-foreground/90"
             >
               {sendFeedback.isPending ? "Sending…" : "Send feedback"}
             </Button>
@@ -1671,7 +1671,7 @@ function ManagedChatsDialog({
               <ul className="space-y-1.5">
                 {conversations.map(c => (
                   <li key={c.id}>
-                    <div className="group flex items-center gap-2 rounded-xl border border-border px-3 py-2 transition-colors hover:bg-[#0A0A0A]">
+                    <div className="group flex items-center gap-2 rounded-xl border border-border px-3 py-2 transition-colors hover:bg-accent">
                       <button
                         onClick={() => openChat(c.id)}
                         className="min-w-0 flex-1 rounded-lg py-0.5 text-left focus-visible:ring-0 focus-visible:outline-none"
@@ -1689,7 +1689,7 @@ function ManagedChatsDialog({
                             variant="ghost"
                             size="icon"
                             aria-label="Unarchive chat"
-                            className="size-8 shrink-0 rounded-lg text-muted-foreground hover:bg-[#0A0A0A] hover:text-foreground"
+                            className="size-8 shrink-0 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground"
                             disabled={restorePending}
                             onClick={() => restoreChat(c.id)}
                           >
@@ -1704,7 +1704,7 @@ function ManagedChatsDialog({
                             variant="ghost"
                             size="icon"
                             aria-label="Delete chat"
-                            className="size-8 shrink-0 rounded-lg text-muted-foreground hover:bg-[#0A0A0A] hover:text-destructive"
+                            className="size-8 shrink-0 rounded-lg text-muted-foreground hover:bg-accent hover:text-destructive"
                             disabled={deleteMutation.isPending}
                             onClick={() =>
                               setDeleteTarget({ id: c.id, title: c.title })
@@ -1834,7 +1834,7 @@ function SharedChatsDialog({
               <ul className="space-y-1.5">
                 {conversations.map(c => (
                   <li key={c.id}>
-                    <div className="flex items-center gap-2 rounded-xl border border-border px-3 py-2 transition-colors hover:bg-[#0A0A0A]">
+                    <div className="flex items-center gap-2 rounded-xl border border-border px-3 py-2 transition-colors hover:bg-accent">
                       <button
                         onClick={() => openChat(c.id)}
                         className="min-w-0 flex-1 rounded-lg py-0.5 text-left focus-visible:ring-0 focus-visible:outline-none"
@@ -1862,7 +1862,7 @@ function SharedChatsDialog({
                             variant="ghost"
                             size="icon"
                             aria-label="Stop sharing"
-                            className="size-8 shrink-0 rounded-lg text-muted-foreground hover:bg-[#0A0A0A] hover:text-foreground"
+                            className="size-8 shrink-0 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground"
                             disabled={busy}
                             onClick={() =>
                               unpublishMutation.mutate({
@@ -1884,7 +1884,7 @@ function SharedChatsDialog({
                             variant="ghost"
                             size="icon"
                             aria-label="Delete chat"
-                            className="size-8 shrink-0 rounded-lg text-muted-foreground hover:bg-[#0A0A0A] hover:text-destructive"
+                            className="size-8 shrink-0 rounded-lg text-muted-foreground hover:bg-accent hover:text-destructive"
                             disabled={busy}
                             onClick={() =>
                               setDeleteTarget({ id: c.id, title: c.title })
