@@ -37,7 +37,10 @@ import {
   ChatFilesDialog,
   type ChatFile,
 } from "../components/ksemo/ChatFilesDialog";
-import { FileCreationCard } from "../components/ksemo/FileCreationCard";
+import {
+  FileCreationCard,
+  type FileCreationStage,
+} from "../components/ksemo/FileCreationCard";
 import AuthStage from "./AuthStage";
 import { ConversationSidebar } from "../components/ksemo/ConversationSidebar";
 import { MessageContent, type KsemoMessage } from "../components/ksemo/MessageContent";
@@ -328,6 +331,29 @@ export default function Home() {
   const isGenerating = Boolean(activeStream);
   const generatingMessageId = activeStream?.assistantMessageId ?? null;
 
+  // -------------------------------------------------------------------
+  // MODE SEPARATION: Normal Chat vs File Creation
+  // -------------------------------------------------------------------
+  // activeMode is a derived state — never set directly. It reflects whether
+  // the user currently has a file type armed via the Create File UI.
+  //   "chat" = Normal Chat Mode   (documentFormat is null)
+  //   "file" = File Creation Mode  (documentFormat is non-null)
+  const activeMode: "chat" | "file" = documentFormat ? "file" : "chat";
+  // isFileGenerating: true only when in File Creation Mode AND the current
+  // stream is actively producing file-generation progress for the viewed
+  // conversation. This is completely separate from isGenerating (which is
+  // true for both chat and file streams).
+  const isFileGenerating = Boolean(
+    documentFormat &&
+      fileGeneration &&
+      fileGeneration.status === "processing" &&
+      activeStream &&
+      fileGeneration.messageId === generatingMessageId
+  );
+  // isChatGenerating: true only when a stream is active but we are NOT in
+  // file generation — i.e. the normal typing/streaming UI should appear.
+  const isChatGenerating = isGenerating && !isFileGenerating;
+
   const conversationQuery = trpc.conversation.list.useQuery(
     { scope: "active" },
     {
@@ -485,6 +511,9 @@ export default function Home() {
       content: message.content,
       status: message.status,
       attachments: message.attachments,
+      fileGeneration: (message as Record<string, unknown>).fileGeneration as
+        | { stage: string; format: string; status: "processing" | "created" | "error" }
+        | undefined,
     }));
     setChatMessages(current => {
       if (!current.length) return serverMessages;
@@ -799,6 +828,9 @@ export default function Home() {
     }) as KsemoMessage[];
     setChatMessages(drafts);
     setFileGeneration(null);
+    // The selected format is intentionally NOT cleared here: it persists in the
+    // chat input so the user can create multiple files in a row. It only clears
+    // when the user presses Cancel on the format chip (onDocumentFormatChange(null)).
     if (selectedAttachments.length) setAttachmentNotices([]);
     const controller = new AbortController();
     const turnSequence = ++generationSequenceRef.current;
@@ -935,22 +967,87 @@ export default function Home() {
               str(data.message) || "KSEMO could not complete this response.";
           } else if (eventName === "file.progress") {
             lastProgressAt = Date.now();
+            const progressStage = str(data.stage) || "analyzing";
+            setFileGeneration(current => {
+              const progressFormat = str(data.format ?? "") || current?.format || "";
+              return {
+                messageId: str(data.messageId),
+                stage: progressStage,
+                format: progressFormat,
+                status: "processing",
+                createdAt: current?.createdAt ?? Date.now(),
+              };
+            });
+            if (isViewingThisStream()) {
+              const progMsgId = str(data.messageId);
+              const resolvedFormat = str(data.format ?? "");
+              setChatMessages(current =>
+                current.map(message =>
+                  message.id === progMsgId
+                    ? {
+                        ...message,
+                        fileGeneration: {
+                          stage: progressStage,
+                          format: resolvedFormat,
+                          status: "processing" as const,
+                        },
+                      }
+                    : message
+                )
+              );
+            }
+          } else if (eventName === "file.error") {
+            lastProgressAt = Date.now();
             setFileGeneration(current => ({
               messageId: str(data.messageId),
-              stage: str(data.stage) || "detecting",
-              format: str(data.format ?? "") || current?.format || "",
-              status: "processing",
+              stage: "error",
+              format: current?.format || "",
+              status: "error",
               createdAt: current?.createdAt ?? Date.now(),
             }));
+            if (isViewingThisStream()) {
+              const errorMsgId = str(data.messageId);
+              setChatMessages(current =>
+                current.map(message =>
+                  message.id === errorMsgId
+                    ? {
+                        ...message,
+                        fileGeneration: {
+                          stage: "error",
+                          format: fileGeneration?.format || "",
+                          status: "error" as const,
+                        },
+                      }
+                    : message
+                )
+              );
+            }
           } else if (eventName === "file.created") {
             lastProgressAt = Date.now();
             setFileGeneration(current => ({
               messageId: str(data.messageId),
-              stage: "created",
+              stage: "completed",
               format: current?.format || "",
               status: "created",
               createdAt: current?.createdAt ?? Date.now(),
             }));
+            if (isViewingThisStream()) {
+              const createdMsgId = str(data.messageId);
+              setChatMessages(current =>
+                current.map(message =>
+                  message.id === createdMsgId
+                    ? {
+                        ...message,
+                        fileGeneration: {
+                          stage: "completed",
+                          format: fileGeneration?.format || "",
+                          status: "created" as const,
+                        },
+                      }
+                    : message
+                )
+              );
+            }
             utils.workspace.files.list.invalidate();
             const fileData = data.file as
               | {
@@ -1957,28 +2054,40 @@ export default function Home() {
                   {visibleMessages.map(message => {
                     return (
                       <>
-                <div className="mb-2">
-                  {fileGeneration && fileGeneration.messageId === message.id && (
-                    <FileCreationCard
-                      stage={
-                        fileGeneration.status === "created"
-                          ? "completed"
-                          : fileGeneration.status === "error"
-                            ? "error"
-                            : fileGeneration.stage === "generating"
-                              ? "generating"
-                              : "understanding"
-                      }
-                      format={
-                        (fileGeneration.format as DocFormat) || "pdf"
-                      }
-                      filename={message.attachments?.[0]?.filename}
-                      fileUrl={message.attachments?.[0]?.url}
-                      fileMimeType={message.attachments?.[0]?.mimeType}
-                      fileSizeBytes={message.attachments?.[0]?.sizeBytes}
-                    />
-                  )}
-                </div>
+                  {(() => {
+                    const activeFileGen =
+                      fileGeneration && fileGeneration.messageId === message.id
+                        ? fileGeneration
+                        : message.fileGeneration
+                          ? {
+                              messageId: message.id,
+                              stage: message.fileGeneration.stage,
+                              format: message.fileGeneration.format,
+                              status: message.fileGeneration.status,
+                              createdAt: 0,
+                            }
+                          : null;
+                    return activeFileGen ? (
+                      <div className="mb-2">
+                        <FileCreationCard
+                          stage={
+                            activeFileGen.status === "created"
+                              ? "completed"
+                              : activeFileGen.status === "error"
+                                ? "error"
+                                : (activeFileGen.stage as FileCreationStage)
+                          }
+                          format={
+                            (activeFileGen.format as DocFormat) || undefined
+                          }
+                          filename={message.attachments?.[0]?.filename}
+                          fileUrl={message.attachments?.[0]?.url}
+                          fileMimeType={message.attachments?.[0]?.mimeType}
+                          fileSizeBytes={message.attachments?.[0]?.sizeBytes}
+                        />
+                      </div>
+                    ) : null;
+                  })()}
                       <MessageContent
                         key={message.id}
                         message={message}
@@ -1991,6 +2100,7 @@ export default function Home() {
                         isCurrentGeneration={
                           isGenerating && generatingMessageId === message.id
                         }
+                        hideTypingIndicator={isFileGenerating}
                         onEdit={stableEditMessage}
                         onRegenerate={stableRegenerateMessage}
                         onRetry={stableRegenerateMessage}

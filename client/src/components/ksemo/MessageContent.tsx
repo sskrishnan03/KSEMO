@@ -48,6 +48,11 @@ type KsemoMessage = {
     url: string;
     sizeBytes?: number;
   }>;
+  fileGeneration?: {
+    stage: string;
+    format: string;
+    status: "processing" | "created" | "error";
+  };
 };
 
 // Stable Streamdown component map so the internal `marked.Lexer` cache is not
@@ -79,6 +84,7 @@ export const MessageContent = memo(function MessageContent({
   isSpeaking,
   speechState,
   isCurrentGeneration = false,
+  hideTypingIndicator = false,
   onEdit,
   onRegenerate,
   onRetry,
@@ -95,6 +101,7 @@ export const MessageContent = memo(function MessageContent({
   isSpeaking: boolean;
   speechState: "idle" | "playing" | "paused";
   isCurrentGeneration?: boolean;
+  hideTypingIndicator?: boolean;
   onEdit?: (message: KsemoMessage) => void;
   onRegenerate?: (message: KsemoMessage) => void;
   onRetry?: (message: KsemoMessage) => void;
@@ -265,7 +272,9 @@ export const MessageContent = memo(function MessageContent({
                 {message.content}
               </Streamdown>
             </div>
-          ) : message.status === "streaming" && isCurrentGeneration ? (
+          ) : message.status === "streaming" &&
+            isCurrentGeneration &&
+            !hideTypingIndicator ? (
             <div
               className="flex h-7 items-center gap-1.5"
               aria-label="KSEMO is responding"

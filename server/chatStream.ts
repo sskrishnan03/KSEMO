@@ -17,7 +17,6 @@ import { resolveStoragePath } from "./storage";
 import fs from "fs";
 import { buildUserMemoryContext } from "./memory/retrieval";
 import { memorizeConversation } from "./memory/autoMemorize";
-import { looksLikeFileRequest } from "./docgen/detect";
 import { planDocument } from "./docgen/plan";
 import {
   buildDocumentSpec,
@@ -484,12 +483,20 @@ export function registerChatStream(app: Express) {
 
         // ------------------------------------------------------------------
         // AI File Creation & Document Generation
-        // ------------------------------------------------------------------
-        // When the user asks (in natural language) to create a file, we detect
-        // the request, ask the model for structured content, build a real
-        // downloadable file, store it securely, and attach it to this assistant
-        // message. The chat reply becomes a short summary over the file card.
+        // --------------------------------------------------------------
+        // File creation is an explicit, separate mode. It activates ONLY
+        // when the user has selected a file type through the Create File UI
+        // (which sends `documentFormat`). Auto-detection from natural language
+        // is intentionally disabled: typing "create a PDF" alone must NOT
+        // create a file. The selected format is the single source of truth
+        // that drives the whole pipeline.
+        //
+        // When File Creation Mode is active (forcedFormat is set) and the
+        // generation fails, the server does NOT fall back to normal chat.
+        // The file.error event is emitted and the assistant message is
+        // settled as failed. The two modes must never bleed into each other.
         let deliveredFile: GeneratedFileResult | null = null;
+        let fileModeFailed = false;
         const isRegenerationTurn = Boolean(body.regenerateAssistantMessageId);
         const forcedFormat =
           body.documentFormat &&
@@ -498,20 +505,17 @@ export function registerChatStream(app: Express) {
           )
             ? (body.documentFormat as GeneratedFileResult["format"])
             : null;
-        if (
-          !isRegenerationTurn &&
-          (looksLikeFileRequest(content ?? "") || forcedFormat)
-        ) {
+        if (!isRegenerationTurn && forcedFormat) {
           try {
             writeEvent(res, "file.progress", {
               messageId: assistantMessageId,
-              stage: "detecting",
+              stage: "analyzing",
+              format: forcedFormat,
             });
+
             const plannerHistory: Message[] = filteredAssistantContext
               .filter(msg => msg.role === "user" || msg.role === "assistant")
               .slice(-8);
-            // Drop a trailing duplicate of the current user message so the
-            // planner treats the passed content as the latest instruction.
             const last = plannerHistory[plannerHistory.length - 1];
             if (
               last &&
@@ -521,18 +525,42 @@ export function registerChatStream(app: Express) {
             ) {
               plannerHistory.pop();
             }
+
+            writeEvent(res, "file.progress", {
+              messageId: assistantMessageId,
+              stage: "researching",
+              format: forcedFormat,
+            });
+
             const plan = await planDocument(
               content ?? "",
               plannerHistory,
               forcedFormat
             );
+
             if (plan.kind === "file") {
+              const planFormat = plan.format;
+
               writeEvent(res, "file.progress", {
                 messageId: assistantMessageId,
-                stage: "generating",
-                format: plan.format,
+                stage: "planning",
+                format: planFormat,
               });
+
               const spec = buildDocumentSpec(plan);
+
+              writeEvent(res, "file.progress", {
+                messageId: assistantMessageId,
+                stage: "content_generated",
+                format: planFormat,
+              });
+
+              writeEvent(res, "file.progress", {
+                messageId: assistantMessageId,
+                stage: "formatting",
+                format: planFormat,
+              });
+
               deliveredFile = await generateAndDeliverFile({
                 userId: user.id,
                 assistantMessageId,
@@ -540,11 +568,18 @@ export function registerChatStream(app: Express) {
                 spec,
                 summary: plan.summary,
               });
+
+              writeEvent(res, "file.progress", {
+                messageId: assistantMessageId,
+                stage: "validating",
+                format: planFormat,
+              });
+
               writeEvent(res, "file.created", {
                 messageId: assistantMessageId,
                 file: deliveredFile,
               });
-              // Stream the short summary as the visible assistant reply.
+
               responseText = deliveredFile.summary;
               for (let i = 0; i < responseText.length; i += 64) {
                 writeEvent(res, "assistant.delta", {
@@ -552,17 +587,38 @@ export function registerChatStream(app: Express) {
                   delta: responseText.slice(i, i + 64),
                 });
               }
+            } else {
+              // The planner decided this message does not need a file even
+              // though a format was forced. Treat this as a file-mode failure
+              // rather than silently dropping into normal chat — the two
+              // modes must remain strictly separated.
+              fileModeFailed = true;
+              writeEvent(res, "file.error", {
+                messageId: assistantMessageId,
+                message: "KSEMO could not create a file for this request. Please try a different request.",
+              });
             }
           } catch (error) {
             console.warn(
-              "[ChatStream] file generation failed; falling back to text",
+              "[ChatStream] file generation failed",
               error
             );
-            deliveredFile = null;
+            fileModeFailed = true;
+            writeEvent(res, "file.error", {
+              messageId: assistantMessageId,
+              message: "File generation could not be completed.",
+            });
           }
         }
 
-        if (!deliveredFile) {
+        // ------------------------------------------------------------------
+        // Normal Chat — only runs when NOT in file creation mode.
+        // If forcedFormat was set (file mode) and the file was delivered,
+        // we skip this block entirely. If forcedFormat was set and file
+        // creation failed (fileModeFailed), we also skip — the error event
+        // has already been emitted and the message will be settled below.
+        // ------------------------------------------------------------------
+        if (!deliveredFile && !fileModeFailed && !forcedFormat) {
           try {
             responseText = await runGeneration(
               preferences?.selectedModel ?? undefined,
@@ -581,6 +637,7 @@ export function registerChatStream(app: Express) {
 
         if (
           !deliveredFile &&
+          !fileModeFailed &&
           generationError &&
           !controller.signal.aborted &&
           !responseText &&
@@ -608,7 +665,16 @@ export function registerChatStream(app: Express) {
         }
 
         const timedOut = deadline.signal.aborted && !controller.signal.aborted;
-        if ((generationError || timedOut) && !controller.signal.aborted) {
+        if (fileModeFailed && !controller.signal.aborted) {
+          // File Creation Mode was active but generation failed. Settle the
+          // message as failed — do NOT fall back to normal chat. The two
+          // modes must remain strictly separated.
+          await updateMessage(assistantMessageId, {
+            content: responseText || "",
+            status: "failed",
+          });
+          terminalStatusWritten = true;
+        } else if ((generationError || timedOut) && !controller.signal.aborted) {
           await updateMessage(assistantMessageId, {
             content: responseText,
             status: "failed",
