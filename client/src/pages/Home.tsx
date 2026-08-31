@@ -37,6 +37,7 @@ import {
   ChatFilesDialog,
   type ChatFile,
 } from "../components/ksemo/ChatFilesDialog";
+import { FileCreationCard } from "../components/ksemo/FileCreationCard";
 import AuthStage from "./AuthStage";
 import { ConversationSidebar } from "../components/ksemo/ConversationSidebar";
 import { MessageContent, type KsemoMessage } from "../components/ksemo/MessageContent";
@@ -220,6 +221,8 @@ export default function Home() {
     messageId: string;
     stage: string;
     format: string;
+    status: "processing" | "created" | "error";
+    createdAt: number;
   } | null>(null);
   const [documentFormat, setDocumentFormat] = useState<DocFormat | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -932,14 +935,22 @@ export default function Home() {
               str(data.message) || "KSEMO could not complete this response.";
           } else if (eventName === "file.progress") {
             lastProgressAt = Date.now();
-            setFileGeneration({
+            setFileGeneration(current => ({
               messageId: str(data.messageId),
               stage: str(data.stage) || "detecting",
-              format: str(data.format ?? ""),
-            });
+              format: str(data.format ?? "") || current?.format || "",
+              status: "processing",
+              createdAt: current?.createdAt ?? Date.now(),
+            }));
           } else if (eventName === "file.created") {
             lastProgressAt = Date.now();
-            setFileGeneration(null);
+            setFileGeneration(current => ({
+              messageId: str(data.messageId),
+              stage: "created",
+              format: current?.format || "",
+              status: "created",
+              createdAt: current?.createdAt ?? Date.now(),
+            }));
             utils.workspace.files.list.invalidate();
             const fileData = data.file as
               | {
@@ -1946,14 +1957,28 @@ export default function Home() {
                   {visibleMessages.map(message => {
                     return (
                       <>
-                      {fileGeneration && fileGeneration.messageId === message.id && (
-                        <div className="mb-1.5 flex items-center gap-2 text-xs text-muted-foreground">
-                          <span className="size-3 animate-spin rounded-full border-[1.5px] border-muted-foreground/30 border-t-muted-foreground" />
-                          {fileGeneration.stage === "generating"
-                            ? `Creating ${fileGeneration.format.toUpperCase()} file…`
-                            : "Preparing your file…"}
-                        </div>
-                      )}
+                <div className="mb-2">
+                  {fileGeneration && fileGeneration.messageId === message.id && (
+                    <FileCreationCard
+                      stage={
+                        fileGeneration.status === "created"
+                          ? "completed"
+                          : fileGeneration.status === "error"
+                            ? "error"
+                            : fileGeneration.stage === "generating"
+                              ? "generating"
+                              : "understanding"
+                      }
+                      format={
+                        (fileGeneration.format as DocFormat) || "pdf"
+                      }
+                      filename={message.attachments?.[0]?.filename}
+                      fileUrl={message.attachments?.[0]?.url}
+                      fileMimeType={message.attachments?.[0]?.mimeType}
+                      fileSizeBytes={message.attachments?.[0]?.sizeBytes}
+                    />
+                  )}
+                </div>
                       <MessageContent
                         key={message.id}
                         message={message}

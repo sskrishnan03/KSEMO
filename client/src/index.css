@@ -372,3 +372,19 @@ html.ksemo-reduce-motion .loader {
     transform: translateY(0);
   }
 }
+
+@keyframes ksemo-card-enter {
+  0% {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-\[ksemo-card-enter_300ms_ease-out\] {
+    animation: none;
+  }
+}
