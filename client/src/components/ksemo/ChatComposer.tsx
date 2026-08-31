@@ -5,6 +5,9 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
@@ -16,8 +19,14 @@ import {
 import { filterLibraryItems } from "@/lib/ksemoInteraction";
 import { getFileKind, IMAGE_EXT } from "@/lib/fileKinds";
 import {
+  DOC_FORMAT_OPTIONS,
+  getDocFormatOption,
+  type DocFormat,
+} from "@/lib/docFormats";
+import {
   ArrowUp,
   Check,
+  FilePlus2,
   FileUp,
   Library,
   Loader2,
@@ -71,6 +80,8 @@ export const ChatComposer = memo(function ChatComposer({
   showSafetyNote = true,
   isCentered = false,
   onTakeScreenshot,
+  documentFormat,
+  onDocumentFormatChange,
 }: {
   onSend: (content: string) => void;
   onCancel: () => void;
@@ -119,6 +130,8 @@ export const ChatComposer = memo(function ChatComposer({
   showSafetyNote?: boolean;
   isCentered?: boolean;
   onTakeScreenshot?: () => void;
+  documentFormat?: DocFormat | null;
+  onDocumentFormatChange?: (format: DocFormat | null) => void;
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -379,11 +392,13 @@ export const ChatComposer = memo(function ChatComposer({
             />
             {value.length === 0 && (
               <span
-                key={placeholderIndex}
+                key={documentFormat ?? placeholderIndex}
                 className="pointer-events-none absolute left-2.5 top-1 text-[15px] leading-6 text-muted-foreground animate-[ksemo-placeholder-rise_800ms_ease-out]"
                 aria-hidden="true"
               >
-                {CHATBOX_PLACEHOLDERS[placeholderIndex]}
+                {documentFormat
+                  ? `Describe what you want in your ${getDocFormatOption(documentFormat).label}…`
+                  : CHATBOX_PLACEHOLDERS[placeholderIndex]}
               </span>
             )}
           </div>
@@ -444,8 +459,70 @@ export const ChatComposer = memo(function ChatComposer({
                     <Library className="mr-2 size-4" />
                     Browse Library
                   </DropdownMenuItem>
+                  <DropdownMenuSub>
+                    <DropdownMenuSubTrigger>
+                      <FilePlus2 className="mr-2 size-4" />
+                      Create file
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent
+                      sideOffset={6}
+                      alignOffset={-56}
+                      className="w-48 max-h-[11rem] overflow-y-auto pt-1.5 pb-2 px-1"
+                    >
+                      {DOC_FORMAT_OPTIONS.map(option => {
+                        const Icon = option.icon;
+                        const active = documentFormat === option.format;
+                        return (
+                          <DropdownMenuItem
+                            key={option.format}
+                            onSelect={() =>
+                              onDocumentFormatChange?.(option.format)
+                            }
+                          >
+                            <Icon
+                              className={`mr-2 size-4 shrink-0 ${option.iconColor}`}
+                            />
+                            <span className="flex-1">{option.label}</span>
+                            {active && (
+                              <Check className="size-4 text-foreground" />
+                            )}
+                          </DropdownMenuItem>
+                        );
+                      })}
+                    </DropdownMenuSubContent>
+                  </DropdownMenuSub>
                 </DropdownMenuContent>
               </DropdownMenu>
+              {/* Armed document format indicator (after the + button) */}
+              {documentFormat && (
+                <span className="flex items-center gap-1.5 rounded-full border border-border bg-muted py-1 pl-1.5 pr-1 text-xs font-medium text-foreground">
+                  {(() => {
+                    const option = getDocFormatOption(documentFormat);
+                    const Icon = option.icon;
+                    return (
+                      <>
+                        <Icon className={`size-4 shrink-0 ${option.iconColor}`} />
+                        <span className="whitespace-nowrap">
+                          Create {option.label}
+                        </span>
+                      </>
+                    );
+                  })()}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        onClick={() => onDocumentFormatChange?.(null)}
+                        className="flex size-5 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                        aria-label="Cancel document format"
+                      >
+                        <X className="size-3" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">Cancel</TooltipContent>
+                  </Tooltip>
+                </span>
+              )}
             </div>
 
             {/* Right Side Controls */}

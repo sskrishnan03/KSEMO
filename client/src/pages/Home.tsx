@@ -58,6 +58,7 @@ import {
 import { createPublicConversationUrl } from "../lib/ksemoInteraction";
 import { saveEditedUserMessageAndRegenerate } from "../lib/editRegeneration";
 import { buildStreamingDrafts } from "../lib/streamingDrafts";
+import { type DocFormat } from "../lib/docFormats";
 import { restoreUserMessageVersionAndRegenerate } from "../lib/historyRestoration";
 
 type StreamConversation = {
@@ -215,6 +216,12 @@ export default function Home() {
   const [attachmentNotices, setAttachmentNotices] = useState<
     SelectedAttachment[]
   >([]);
+  const [fileGeneration, setFileGeneration] = useState<{
+    messageId: string;
+    stage: string;
+    format: string;
+  } | null>(null);
+  const [documentFormat, setDocumentFormat] = useState<DocFormat | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(
     null
@@ -788,6 +795,7 @@ export default function Home() {
       now: draftNow,
     }) as KsemoMessage[];
     setChatMessages(drafts);
+    setFileGeneration(null);
     if (selectedAttachments.length) setAttachmentNotices([]);
     const controller = new AbortController();
     const turnSequence = ++generationSequenceRef.current;
@@ -839,6 +847,7 @@ export default function Home() {
           attachmentFileIds: selectedAttachments.length
             ? selectedAttachments.map(file => file.fileId)
             : undefined,
+          documentFormat: documentFormat ?? undefined,
         }),
       });
       if (!response.ok || !response.body) {
@@ -921,6 +930,49 @@ export default function Home() {
             lastProgressAt = Date.now();
             errorMessage =
               str(data.message) || "KSEMO could not complete this response.";
+          } else if (eventName === "file.progress") {
+            lastProgressAt = Date.now();
+            setFileGeneration({
+              messageId: str(data.messageId),
+              stage: str(data.stage) || "detecting",
+              format: str(data.format ?? ""),
+            });
+          } else if (eventName === "file.created") {
+            lastProgressAt = Date.now();
+            setFileGeneration(null);
+            const fileData = data.file as
+              | {
+                  fileId?: string;
+                  filename?: string;
+                  mimeType?: string;
+                  url?: string;
+                  sizeBytes?: number;
+                }
+              | undefined;
+            const assistantId = str(data.messageId);
+            if (fileData?.fileId && isViewingThisStream()) {
+              setChatMessages(current =>
+                current.map(message =>
+                  message.id === assistantId
+                    ? {
+                        ...message,
+                        attachments: [
+                          ...(message.attachments ?? []).filter(
+                            a => a.id !== fileData.fileId
+                          ),
+                          {
+                            id: fileData.fileId!,
+                            filename: fileData.filename ?? "",
+                            mimeType: fileData.mimeType,
+                            url: fileData.url ?? "",
+                            sizeBytes: fileData.sizeBytes,
+                          },
+                        ],
+                      }
+                    : message
+                )
+              );
+            }
           }
         }
       };
@@ -1892,6 +1944,15 @@ export default function Home() {
                 >
                   {visibleMessages.map(message => {
                     return (
+                      <>
+                      {fileGeneration && fileGeneration.messageId === message.id && (
+                        <div className="mb-1.5 flex items-center gap-2 text-xs text-muted-foreground">
+                          <span className="size-3 animate-spin rounded-full border-[1.5px] border-muted-foreground/30 border-t-muted-foreground" />
+                          {fileGeneration.stage === "generating"
+                            ? `Creating ${fileGeneration.format.toUpperCase()} file…`
+                            : "Preparing your file…"}
+                        </div>
+                      )}
                       <MessageContent
                         key={message.id}
                         message={message}
@@ -1912,6 +1973,7 @@ export default function Home() {
                         onViewHistory={stableOnViewHistory}
                         onFeedback={stableOnFeedback}
                       />
+                      </>
                     );
                   })}
                   <div ref={messagesEndRef} />
@@ -1933,6 +1995,8 @@ export default function Home() {
                       recordingSeconds={voice.seconds}
                       value={composerValue}
                       onValueChange={setComposerValue}
+                      documentFormat={documentFormat}
+                      onDocumentFormatChange={setDocumentFormat}
                       onAttachment={stableAttachFromComposer}
                       attachmentNotices={
                         isAttachmentPreview
@@ -1972,6 +2036,8 @@ export default function Home() {
                 recordingSeconds={voice.seconds}
                 value={composerValue}
                 onValueChange={setComposerValue}
+                documentFormat={documentFormat}
+                onDocumentFormatChange={setDocumentFormat}
                 onAttachment={stableAttachFromComposer}
                 attachmentNotices={
                   isAttachmentPreview

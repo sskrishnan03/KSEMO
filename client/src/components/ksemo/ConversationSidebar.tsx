@@ -552,7 +552,7 @@ const ConversationActionsMenu = memo(function ConversationActionsMenu({
             Export
           </DropdownMenuSubTrigger>
           <DropdownMenuSubContent
-            sideOffset={8}
+            sideOffset={6}
             collisionPadding={12}
             className="w-44 rounded-xl"
           >

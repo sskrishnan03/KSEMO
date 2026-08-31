@@ -8,6 +8,7 @@ export type StreamDraftMessage = {
     filename: string;
     mimeType?: string;
     url: string;
+    sizeBytes?: number;
   }>;
 };
 

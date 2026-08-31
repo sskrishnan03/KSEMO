@@ -398,6 +398,7 @@ export const messageRouter = router({
           message: "Message not found",
         });
       return setMessageFeedbackForUser({
+        id: crypto.randomUUID(),
         messageId: input.messageId,
         userId: ctx.user.id,
         value: input.value,

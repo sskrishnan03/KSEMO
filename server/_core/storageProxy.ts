@@ -12,9 +12,12 @@ const MIME_TYPES: Record<string, string> = {
   ".pdf": "application/pdf",
   ".txt": "text/plain; charset=utf-8",
   ".md": "text/markdown; charset=utf-8",
-  ".csv": "text/csv; charset=utf-8",
-  ".json": "application/json",
-  ".mp4": "video/mp4",
+    ".csv": "text/csv; charset=utf-8",
+    ".json": "application/json",
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    ".mp4": "video/mp4",
   ".zip": "application/zip",
 };
 

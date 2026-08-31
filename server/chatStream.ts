@@ -17,6 +17,13 @@ import { resolveStoragePath } from "./storage";
 import fs from "fs";
 import { buildUserMemoryContext } from "./memory/retrieval";
 import { memorizeConversation } from "./memory/autoMemorize";
+import { looksLikeFileRequest } from "./docgen/detect";
+import { planDocument } from "./docgen/plan";
+import {
+  buildDocumentSpec,
+  generateAndDeliverFile,
+  type GeneratedFileResult,
+} from "./docgen/service";
 
 const BASE_SYSTEM_INSTRUCTION =
   "You are KSEMO, a thoughtful and reliable AI assistant. Be clear, accurate, respectful, and practical. Use Markdown when it improves readability. Never claim to have completed work you cannot verify. You can perform math, logic, code analysis, and general reasoning directly — do not refuse calculation or analysis questions. When asked about the current time or date, state that you do not have access to a real-time clock but you can help with time-zone conversions, date math, and scheduling if the user provides a reference time or zone.";
@@ -161,6 +168,7 @@ export function registerChatStream(app: Express) {
       content?: string;
       regenerateAssistantMessageId?: string;
       attachmentFileIds?: string[];
+      documentFormat?: string;
     };
     let content = body.content?.trim();
     const hasAttachments = (body.attachmentFileIds?.length ?? 0) > 0;
@@ -474,22 +482,105 @@ export function registerChatStream(app: Express) {
           ...filteredAssistantContext,
         ];
 
-        try {
-          responseText = await runGeneration(
-            preferences?.selectedModel ?? undefined,
-            chatMessages,
-            generationSignal,
-            delta =>
-              writeEvent(res, "assistant.delta", {
+        // ------------------------------------------------------------------
+        // AI File Creation & Document Generation
+        // ------------------------------------------------------------------
+        // When the user asks (in natural language) to create a file, we detect
+        // the request, ask the model for structured content, build a real
+        // downloadable file, store it securely, and attach it to this assistant
+        // message. The chat reply becomes a short summary over the file card.
+        let deliveredFile: GeneratedFileResult | null = null;
+        const isRegenerationTurn = Boolean(body.regenerateAssistantMessageId);
+        const forcedFormat =
+          body.documentFormat &&
+          ["pdf", "docx", "xlsx", "pptx", "csv", "txt", "md"].includes(
+            body.documentFormat
+          )
+            ? (body.documentFormat as GeneratedFileResult["format"])
+            : null;
+        if (
+          !isRegenerationTurn &&
+          (looksLikeFileRequest(content ?? "") || forcedFormat)
+        ) {
+          try {
+            writeEvent(res, "file.progress", {
+              messageId: assistantMessageId,
+              stage: "detecting",
+            });
+            const plannerHistory: Message[] = filteredAssistantContext
+              .filter(msg => msg.role === "user" || msg.role === "assistant")
+              .slice(-8);
+            // Drop a trailing duplicate of the current user message so the
+            // planner treats the passed content as the latest instruction.
+            const last = plannerHistory[plannerHistory.length - 1];
+            if (
+              last &&
+              last.role === "user" &&
+              typeof last.content === "string" &&
+              last.content === content
+            ) {
+              plannerHistory.pop();
+            }
+            const plan = await planDocument(
+              content ?? "",
+              plannerHistory,
+              forcedFormat
+            );
+            if (plan.kind === "file") {
+              writeEvent(res, "file.progress", {
                 messageId: assistantMessageId,
-                delta,
-              })
-          );
-        } catch (error) {
-          generationError = error;
+                stage: "generating",
+                format: plan.format,
+              });
+              const spec = buildDocumentSpec(plan);
+              deliveredFile = await generateAndDeliverFile({
+                userId: user.id,
+                assistantMessageId,
+                conversationId: conversation.id,
+                spec,
+                summary: plan.summary,
+              });
+              writeEvent(res, "file.created", {
+                messageId: assistantMessageId,
+                file: deliveredFile,
+              });
+              // Stream the short summary as the visible assistant reply.
+              responseText = deliveredFile.summary;
+              for (let i = 0; i < responseText.length; i += 64) {
+                writeEvent(res, "assistant.delta", {
+                  messageId: assistantMessageId,
+                  delta: responseText.slice(i, i + 64),
+                });
+              }
+            }
+          } catch (error) {
+            console.warn(
+              "[ChatStream] file generation failed; falling back to text",
+              error
+            );
+            deliveredFile = null;
+          }
+        }
+
+        if (!deliveredFile) {
+          try {
+            responseText = await runGeneration(
+              preferences?.selectedModel ?? undefined,
+              chatMessages,
+              generationSignal,
+              delta =>
+                writeEvent(res, "assistant.delta", {
+                  messageId: assistantMessageId,
+                  delta,
+                })
+            );
+          } catch (error) {
+            generationError = error;
+          }
         }
 
         if (
+          !deliveredFile &&
           generationError &&
           !controller.signal.aborted &&
           !responseText &&
