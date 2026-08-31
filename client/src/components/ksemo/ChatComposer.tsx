@@ -196,40 +196,48 @@ export const ChatComposer = memo(function ChatComposer({
     for (const file of files) onAttachment?.(file);
   }
 
-  function hasFiles(event: React.DragEvent<HTMLDivElement>) {
-    return Array.from(event.dataTransfer?.types ?? []).includes("Files");
-  }
-
-  function handleDragEnter(event: React.DragEvent<HTMLDivElement>) {
-    if (!hasFiles(event)) return;
-    event.preventDefault();
-    dragCounterRef.current += 1;
-    setIsDragActive(true);
-  }
-
-  function handleDragOver(event: React.DragEvent<HTMLDivElement>) {
-    if (!hasFiles(event)) return;
-    event.preventDefault();
-    event.dataTransfer.dropEffect = "copy";
-  }
-
-  function handleDragLeave(event: React.DragEvent<HTMLDivElement>) {
-    if (!hasFiles(event)) return;
-    dragCounterRef.current -= 1;
-    if (dragCounterRef.current <= 0) {
+  useEffect(() => {
+    const dragHasFiles = (e: DragEvent) =>
+      Array.from(e.dataTransfer?.types ?? []).includes("Files");
+    const onDragEnter = (e: DragEvent) => {
+      if (!dragHasFiles(e)) return;
+      e.preventDefault();
+      dragCounterRef.current += 1;
+      setIsDragActive(true);
+    };
+    const onDragOver = (e: DragEvent) => {
+      if (!dragHasFiles(e)) return;
+      e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+    };
+    const onDragLeave = (e: DragEvent) => {
+      if (!dragHasFiles(e)) return;
+      dragCounterRef.current -= 1;
+      if (dragCounterRef.current <= 0) {
+        dragCounterRef.current = 0;
+        setIsDragActive(false);
+      }
+    };
+    const onDrop = (e: DragEvent) => {
+      if (!dragHasFiles(e)) return;
+      e.preventDefault();
       dragCounterRef.current = 0;
       setIsDragActive(false);
-    }
-  }
-
-  function handleDrop(event: React.DragEvent<HTMLDivElement>) {
-    event.preventDefault();
-    dragCounterRef.current = 0;
-    setIsDragActive(false);
-    const files = Array.from(event.dataTransfer?.files ?? []);
-    event.dataTransfer.clearData?.();
-    for (const file of files) onAttachment?.(file);
-  }
+      const files = Array.from(e.dataTransfer?.files ?? []);
+      e.dataTransfer?.clearData?.();
+      for (const file of files) onAttachment?.(file);
+    };
+    document.addEventListener("dragenter", onDragEnter);
+    document.addEventListener("dragover", onDragOver);
+    document.addEventListener("dragleave", onDragLeave);
+    document.addEventListener("drop", onDrop);
+    return () => {
+      document.removeEventListener("dragenter", onDragEnter);
+      document.removeEventListener("dragover", onDragOver);
+      document.removeEventListener("dragleave", onDragLeave);
+      document.removeEventListener("drop", onDrop);
+    };
+  }, [onAttachment]);
 
   return (
     <div
@@ -237,17 +245,15 @@ export const ChatComposer = memo(function ChatComposer({
         "mx-auto w-full max-w-3xl px-4 pt-3",
         compactBottomSpacing ? "pb-3" : "pb-6"
       )}
-      onDragEnter={handleDragEnter}
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
     >
       <div className="relative rounded-2xl border border-border bg-card p-2 shadow-sm transition-shadow focus-within:shadow-md">
         {isDragActive && (
-          <div className="pointer-events-none absolute inset-0 z-50 flex items-center justify-center rounded-2xl border-2 border-dashed border-primary/60 bg-card/90 backdrop-blur-sm">
-            <p className="text-sm font-medium text-foreground">
-              Drop to attach files
-            </p>
+          <div className="pointer-events-none fixed inset-0 z-[100] flex items-center justify-center bg-card/80 backdrop-blur-sm">
+            <div className="rounded-2xl border-2 border-dashed border-primary/60 bg-card px-10 py-8 shadow-xl">
+              <p className="text-sm font-medium text-foreground">
+                Drop to attach files or images
+              </p>
+            </div>
           </div>
         )}
         {libraryOpen && (
@@ -371,21 +377,15 @@ export const ChatComposer = memo(function ChatComposer({
               className="min-h-11 max-h-32 resize-none border-0 !bg-transparent pl-2.5 pr-1 py-1 text-[15px] leading-6 md:text-[15px] shadow-none focus-visible:ring-0 focus-visible:ring-0 dark:!bg-transparent flex-1"
               aria-label="Message KSEMO"
             />
-            {value.length === 0 &&
-              (isTranscribing ? (
-                <span className="pointer-events-none absolute left-2.5 top-1 flex items-center gap-2 text-[15px] leading-6 text-muted-foreground">
-                  <Loader2 className="size-3.5 shrink-0 animate-spin" />
-                  Converting speech to text…
-                </span>
-              ) : (
-                <span
-                  key={placeholderIndex}
-                  className="pointer-events-none absolute left-2.5 top-1 text-[15px] leading-6 text-muted-foreground animate-[ksemo-placeholder-rise_800ms_ease-out]"
-                  aria-hidden="true"
-                >
-                  {CHATBOX_PLACEHOLDERS[placeholderIndex]}
-                </span>
-              ))}
+            {value.length === 0 && (
+              <span
+                key={placeholderIndex}
+                className="pointer-events-none absolute left-2.5 top-1 text-[15px] leading-6 text-muted-foreground animate-[ksemo-placeholder-rise_800ms_ease-out]"
+                aria-hidden="true"
+              >
+                {CHATBOX_PLACEHOLDERS[placeholderIndex]}
+              </span>
+            )}
           </div>
 
           {/* Bottom Control Row */}

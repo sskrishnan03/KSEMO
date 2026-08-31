@@ -388,7 +388,7 @@ export const ConversationSidebar = memo(function ConversationSidebar({
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 onClick={onLogout}
-                className="text-destructive focus:text-destructive focus-visible:ring-0 focus-visible:outline-none"
+                variant="destructive"
               >
                 <LogOut className="mr-2 size-4" /> Sign out
               </DropdownMenuItem>
@@ -569,7 +569,7 @@ const ConversationActionsMenu = memo(function ConversationActionsMenu({
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onClick={() => onDelete(conversation)}
-          className="text-destructive focus:text-destructive"
+          variant="destructive"
         >
           <Trash2 className="mr-2 size-3.5" />
           Delete

@@ -1852,7 +1852,7 @@ export default function Home() {
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
                       disabled={!activeConversationId}
-                      className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+                      variant="destructive"
                       onSelect={() => {
                         if (activeConversationId)
                           stableOnDelete({

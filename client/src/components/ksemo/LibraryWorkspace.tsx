@@ -441,7 +441,7 @@ export function LibraryWorkspace({
               <Button
                 size="sm"
                 variant="outline"
-                className="rounded-lg hover:text-destructive"
+                className="rounded-lg hover:bg-destructive/10 hover:text-destructive"
                 onClick={() => setDeleteTarget(selectedFiles)}
               >
                 <Trash2 className="mr-1.5 size-3.5" />

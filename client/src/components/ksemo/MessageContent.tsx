@@ -15,6 +15,8 @@ import { cn } from "@/lib/utils";
 import { getFileKind } from "@/lib/fileKinds";
 import {
   Check,
+  ChevronLeft,
+  ChevronRight,
   Copy,
   Ellipsis,
   History,
@@ -25,9 +27,10 @@ import {
   ThumbsUp,
   Trash2,
   Volume2,
+  X,
 } from "lucide-react";
 import { ShareIcon } from "./icons";
-import React, { memo, useState } from "react";
+import React, { memo, useEffect, useState } from "react";
 import { Streamdown } from "streamdown";
 import { KsemoMarkdownCode } from "./code-block";
 
@@ -83,7 +86,24 @@ export const MessageContent = memo(function MessageContent({
   onViewHistory?: (message: KsemoMessage) => void;
 }) {
   const [copied, setCopied] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const isUser = message.role === "user";
+  const images = (message.attachments ?? []).filter(f =>
+    f.mimeType?.startsWith("image/")
+  );
+
+  useEffect(() => {
+    if (lightboxIndex === null) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setLightboxIndex(null);
+      else if (e.key === "ArrowRight")
+        setLightboxIndex(i => (i! + 1) % images.length);
+      else if (e.key === "ArrowLeft")
+        setLightboxIndex(i => (i! - 1 + images.length) % images.length);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [lightboxIndex, images.length]);
 
   async function copyMessage() {
     await navigator.clipboard.writeText(message.content);
@@ -113,9 +133,10 @@ export const MessageContent = memo(function MessageContent({
   );
 
   return (
-    <article
-      className={cn("group flex", isUser ? "justify-end" : "justify-start")}
-    >
+    <>
+      <article
+        className={cn("group flex", isUser ? "justify-end" : "justify-start")}
+      >
       <div
         className={cn(
           "min-w-0",
@@ -125,50 +146,75 @@ export const MessageContent = memo(function MessageContent({
         )}
       >
         {isUser && message.attachments?.length ? (
-          <div className="mb-2 flex max-w-full flex-wrap justify-end gap-2">
-            {message.attachments.map(file => {
-              const kind = getFileKind(file.filename, file.mimeType);
-              return file.mimeType?.startsWith("image/") ? (
-                <button
-                  key={file.id}
-                  type="button"
-                  onClick={() => window.open(file.url, "_blank")}
-                  className="group overflow-hidden rounded-xl border border-border bg-muted/50 text-left shadow-sm transition-opacity hover:opacity-90"
-                  aria-label={`View ${file.filename}`}
-                >
-                  <img
-                    src={file.url}
-                    alt={file.filename}
-                    className="block max-h-40 max-w-64 rounded-xl object-cover"
-                  />
-                </button>
-              ) : (
-                <a
-                  key={file.id}
-                  href={file.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="overflow-hidden rounded-xl border border-border bg-muted/50 text-left shadow-sm"
-                >
-                  <span className="flex min-w-44 items-center gap-2 p-2.5">
-                    <span
-                      className={`flex size-8 shrink-0 items-center justify-center rounded-lg ${kind.colorClass}`}
-                    >
-                      <kind.icon className="size-4" />
-                    </span>
-                    <span className="min-w-0">
-                      <span className="block truncate text-xs font-medium">
-                        {file.filename}
-                      </span>
-                      <span className="mt-0.5 block text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                        {kind.label}
-                      </span>
-                    </span>
-                  </span>
-                </a>
-              );
-            })}
-          </div>
+          (() => {
+            const documents = message.attachments.filter(
+              f => !f.mimeType?.startsWith("image/")
+            );
+            const extra = images.length - 4;
+            return (
+              <div className="mb-2 flex max-w-full flex-col items-end gap-2">
+                {images.length > 0 && (
+                  <div className="grid w-full max-w-[15rem] grid-cols-2 gap-1.5">
+                    {images.slice(0, 4).map((file, i) => {
+                      const isLastShown = i === 3;
+                      return (
+                        <button
+                          key={file.id}
+                          type="button"
+                          onClick={() => setLightboxIndex(i)}
+                          className="group relative aspect-square overflow-hidden rounded-lg border border-border bg-muted/50"
+                          aria-label={`View ${file.filename}`}
+                        >
+                          <img
+                            src={file.url}
+                            alt={file.filename}
+                            className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
+                          />
+                          {isLastShown && extra > 0 && (
+                            <span className="absolute inset-0 flex items-center justify-center bg-black/55 text-base font-semibold text-white">
+                              +{extra}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                {documents.length > 0 && (
+                  <div className="flex max-w-full flex-wrap justify-end gap-2">
+                    {documents.map(file => {
+                      const kind = getFileKind(file.filename, file.mimeType);
+                      return (
+                        <a
+                          key={file.id}
+                          href={file.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="overflow-hidden rounded-xl border border-border bg-muted/50 text-left shadow-sm"
+                        >
+                          <span className="flex min-w-44 items-center gap-2 p-2.5">
+                            <span
+                              className={`flex size-8 shrink-0 items-center justify-center rounded-lg ${kind.colorClass}`}
+                            >
+                              <kind.icon className="size-4" />
+                            </span>
+                            <span className="min-w-0">
+                              <span className="block truncate text-xs font-medium">
+                                {file.filename}
+                              </span>
+                              <span className="mt-0.5 block text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                                {kind.label}
+                              </span>
+                            </span>
+                          </span>
+                        </a>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })()
         ) : null}
         <div
           className={cn(
@@ -279,9 +325,65 @@ export const MessageContent = memo(function MessageContent({
         )}
       </div>
     </article>
+
+      {lightboxIndex !== null && images.length > 0 && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90"
+          onClick={() => setLightboxIndex(null)}
+        >
+          <button
+            type="button"
+            onClick={() => setLightboxIndex(null)}
+            aria-label="Close"
+            className="absolute top-4 right-4 z-10 rounded-full bg-white/10 p-2 text-white transition-colors hover:bg-white/25"
+          >
+            <X className="size-5" />
+          </button>
+
+          {images.length > 1 && (
+            <>
+              <button
+                type="button"
+                onClick={e => {
+                  e.stopPropagation();
+                  setLightboxIndex(
+                    (lightboxIndex - 1 + images.length) % images.length
+                  );
+                }}
+                aria-label="Previous image"
+                className="absolute top-1/2 left-3 z-10 -translate-y-1/2 rounded-full bg-white/10 p-2.5 text-white transition-colors hover:bg-white/25"
+              >
+                <ChevronLeft className="size-5" />
+              </button>
+              <button
+                type="button"
+                onClick={e => {
+                  e.stopPropagation();
+                  setLightboxIndex((lightboxIndex + 1) % images.length);
+                }}
+                aria-label="Next image"
+                className="absolute top-1/2 right-3 z-10 -translate-y-1/2 rounded-full bg-white/10 p-2.5 text-white transition-colors hover:bg-white/25"
+              >
+                <ChevronRight className="size-5" />
+              </button>
+            </>
+          )}
+
+          <img
+            src={images[lightboxIndex].url}
+            alt={images[lightboxIndex].filename}
+            onClick={e => e.stopPropagation()}
+            className="max-h-[85vh] max-w-[90vw] rounded-lg object-contain shadow-2xl"
+          />
+
+          <span className="absolute bottom-4 left-1/2 -translate-x-1/2 text-sm font-medium text-white/90">
+            {lightboxIndex + 1} / {images.length}
+          </span>
+        </div>
+      )}
+      </>
   );
 });
-
 function MessageOverflow({
   message,
   onReadAloud,
@@ -337,7 +439,7 @@ function MessageOverflow({
         {onDelete && (
           <DropdownMenuItem
             onClick={() => onDelete(message)}
-            className="text-destructive focus:text-destructive"
+            variant="destructive"
           >
             <Trash2 className="mr-2 size-3.5" />
             Delete message

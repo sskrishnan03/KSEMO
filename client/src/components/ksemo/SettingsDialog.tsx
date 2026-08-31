@@ -458,7 +458,7 @@ export const SettingsDialog = memo(function SettingsDialog({
                   onOpenChange(false);
                   onSignOut();
                 }}
-                className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm text-destructive transition-colors outline-none hover:bg-accent focus-visible:ring-0 focus-visible:outline-none"
+                className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm text-destructive transition-colors outline-none hover:bg-destructive/10 focus-visible:ring-0 focus-visible:outline-none"
               >
                 <LogOut className="size-4 shrink-0" />
                 Sign out
@@ -1704,7 +1704,7 @@ function ManagedChatsDialog({
                             variant="ghost"
                             size="icon"
                             aria-label="Delete chat"
-                            className="size-8 shrink-0 rounded-lg text-muted-foreground hover:bg-accent hover:text-destructive"
+                            className="size-8 shrink-0 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                             disabled={deleteMutation.isPending}
                             onClick={() =>
                               setDeleteTarget({ id: c.id, title: c.title })
@@ -1884,7 +1884,7 @@ function SharedChatsDialog({
                             variant="ghost"
                             size="icon"
                             aria-label="Delete chat"
-                            className="size-8 shrink-0 rounded-lg text-muted-foreground hover:bg-accent hover:text-destructive"
+                            className="size-8 shrink-0 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                             disabled={busy}
                             onClick={() =>
                               setDeleteTarget({ id: c.id, title: c.title })
