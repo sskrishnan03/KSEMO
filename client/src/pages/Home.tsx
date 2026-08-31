@@ -940,6 +940,7 @@ export default function Home() {
           } else if (eventName === "file.created") {
             lastProgressAt = Date.now();
             setFileGeneration(null);
+            utils.workspace.files.list.invalidate();
             const fileData = data.file as
               | {
                   fileId?: string;

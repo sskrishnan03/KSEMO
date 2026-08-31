@@ -284,47 +284,84 @@ export const MessageContent = memo(function MessageContent({
               const isImage = file.mimeType?.startsWith("image/");
               if (isImage) {
                 return (
-                  <button
+                  <div
                     key={file.id}
-                    type="button"
-                    onClick={() => setPreviewFile(file)}
-                    className="max-w-[15rem] overflow-hidden rounded-xl border border-border bg-muted/50 shadow-sm"
-                    aria-label={`View ${file.filename}`}
+                    className="group/card w-fit max-w-[15rem] overflow-hidden rounded-xl border border-border bg-muted/50 shadow-sm"
                   >
-                    <img
-                      src={file.url}
-                      alt={file.filename}
-                      className="aspect-video w-full object-cover"
-                    />
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => setPreviewFile(file)}
+                      className="block w-full"
+                      aria-label={`View ${file.filename}`}
+                    >
+                      <img
+                        src={file.url}
+                        alt={file.filename}
+                        className="aspect-video w-full object-cover"
+                      />
+                    </button>
+                    <div className="flex items-center justify-end border-t border-border bg-background/40 px-1 py-0.5">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <a
+                            href={file.url}
+                            download
+                            aria-label={`Download ${file.filename}`}
+                            className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                          >
+                            <Download className="size-3.5" />
+                          </a>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom">Download image</TooltipContent>
+                      </Tooltip>
+                    </div>
+                  </div>
                 );
               }
               return (
-                <button
+                <div
                   key={file.id}
-                  type="button"
-                  onClick={() => setPreviewFile(file)}
-                  className="group/card flex w-full max-w-md items-center gap-2.5 overflow-hidden rounded-xl border border-border bg-muted/50 p-2.5 text-left shadow-sm transition-colors hover:border-primary/30 hover:bg-accent"
-                  aria-label={`Preview ${file.filename}`}
+                  className="group/card flex h-14 w-72 max-w-full items-center gap-1 rounded-xl border border-border bg-muted/50 p-2 pr-1 shadow-sm transition-colors hover:border-primary/30 hover:bg-accent"
                 >
-                  <span
-                    className={`flex size-9 shrink-0 items-center justify-center rounded-lg ${kind.colorClass}`}
+                  <button
+                    type="button"
+                    onClick={() => setPreviewFile(file)}
+                    className="flex min-w-0 flex-1 items-center gap-2.5 overflow-hidden rounded-lg text-left"
+                    aria-label={`Preview ${file.filename}`}
                   >
-                    <kind.icon className="size-4" />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-xs font-medium text-foreground">
-                      {file.filename}
+                    <span
+                      className={`flex size-9 shrink-0 items-center justify-center rounded-lg ${kind.colorClass}`}
+                    >
+                      <kind.icon className="size-4" />
                     </span>
-                    <span className="mt-0.5 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                      <span>{kind.label}</span>
-                      {size ? <span className="opacity-80">· {size}</span> : null}
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-xs font-medium leading-snug text-foreground">
+                        {file.filename}
+                      </span>
+                      <span className="mt-0.5 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                        <span>{kind.label}</span>
+                        {size ? (
+                          <span className="opacity-80">· {size}</span>
+                        ) : null}
+                      </span>
                     </span>
-                  </span>
-                  <span className="shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover/card:opacity-100">
-                    <Download className="size-3.5" />
-                  </span>
-                </button>
+                  </button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <a
+                        href={file.url}
+                        download
+                        aria-label={`Download ${file.filename}`}
+                        className="flex size-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                      >
+                        <Download className="size-4" />
+                      </a>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">
+                      Download {kind.label}
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
               );
             })}
           </div>

@@ -77,10 +77,7 @@ export const conversationRouter = router({
         messages: await Promise.all(
           items.map(async message => ({
             ...message,
-            attachments:
-              message.role === "user"
-                ? await listMessageFilesForUser(message.id, ctx.user.id)
-                : [],
+            attachments: await listMessageFilesForUser(message.id, ctx.user.id),
           }))
         ),
       };
