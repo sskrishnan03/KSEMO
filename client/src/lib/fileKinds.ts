@@ -27,7 +27,7 @@ export function getFileKind(name: string, mimeType?: string): FileKind {
   }
   if (
     /(spreadsheetml\.sheet$|excel$|officedocument\.spreadsheetml)/.test(mime) ||
-    /\.(xlsx|xls|csv|tsv)$/i.test(name)
+    /\.(xlsx|xls|tsv)$/i.test(name)
   ) {
     return {
       label: "Sheet",
@@ -64,7 +64,7 @@ export function getFileKind(name: string, mimeType?: string): FileKind {
   }
   if (
     /text\//.test(mime) ||
-    /\.(txt|md|markdown|json|log|xml|yml|yaml)$/i.test(name)
+    /\.(txt|json|log|xml|yml|yaml)$/i.test(name)
   ) {
     return { label: "Text", icon: FileText, colorClass: "bg-slate-500/10 text-slate-500" };
   }

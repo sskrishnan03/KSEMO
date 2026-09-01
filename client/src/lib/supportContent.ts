@@ -226,7 +226,7 @@ export const FAQ_CATEGORIES: FaqCategory[] = [
         id: "lf-2",
         question: "Which file types can I add?",
         answer:
-          "PDFs, Word documents, Excel spreadsheets, PowerPoint presentations, text and data files (such as TXT, Markdown, CSV, TSV, JSON, XML, YAML, and log files), and common image types such as PNG, JPG, WebP, and GIF. Each file can be up to 25 MB.",
+          "PDFs, Word documents, Excel spreadsheets, PowerPoint presentations, and plain text files (such as TXT, JSON, XML, YAML, and log files). Each file can be up to 25 MB.",
       },
       {
         id: "lf-3",

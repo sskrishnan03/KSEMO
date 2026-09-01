@@ -82,8 +82,6 @@ async function ensureLiteSchema(): Promise<boolean> {
 const allowedMimeTypes = new Set([
   "application/pdf",
   "text/plain",
-  "text/markdown",
-  "text/csv",
   "application/json",
   "image/png",
   "image/jpeg",
@@ -100,9 +98,6 @@ const allowedMimeTypes = new Set([
 const allowedExtensions = new Set([
   "pdf",
   "txt",
-  "md",
-  "markdown",
-  "csv",
   "tsv",
   "json",
   "log",

@@ -148,7 +148,7 @@ export const WorkspacePanel = memo(function WorkspacePanel({
                 onChange={uploadFile}
                 type="file"
                 className="sr-only"
-                accept=".pdf,.txt,.md,.markdown,.csv,.tsv,.json,.log,.xml,.yml,.yaml,.png,.jpg,.jpeg,.webp,.gif,.docx,.xlsx,.xls,.pptx"
+                accept=".pdf,.txt,.tsv,.json,.log,.xml,.yml,.yaml,.png,.jpg,.jpeg,.webp,.gif,.docx,.xlsx,.xls,.pptx"
               />
               <Button
                 onClick={() => fileInputRef.current?.click()}

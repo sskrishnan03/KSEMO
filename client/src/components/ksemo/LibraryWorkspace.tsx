@@ -289,7 +289,7 @@ export function LibraryWorkspace({
       <input
         ref={fileInputRef}
         type="file"
-        accept=".pdf,.txt,.md,.markdown,.csv,.tsv,.json,.log,.xml,.yml,.yaml,.png,.jpg,.jpeg,.webp,.gif,.docx,.xlsx,.xls,.pptx"
+        accept=".pdf,.txt,.tsv,.json,.log,.xml,.yml,.yaml,.png,.jpg,.jpeg,.webp,.gif,.docx,.xlsx,.xls,.pptx"
         multiple
         className="sr-only"
         onChange={uploadFile}

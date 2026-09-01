@@ -717,7 +717,6 @@ export async function generateDocument(spec: DocumentSpec): Promise<{
     xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
     txt: "text/plain",
-    md: "text/markdown",
   };
   let buffer: Buffer;
   switch (spec.format) {
@@ -735,9 +734,6 @@ export async function generateDocument(spec: DocumentSpec): Promise<{
       break;
     case "txt":
       buffer = generateTxt(spec);
-      break;
-    case "md":
-      buffer = generateMarkdown(spec);
       break;
     default:
       throw new Error(`Unsupported document format: ${(spec as never as { format: string }).format}`);

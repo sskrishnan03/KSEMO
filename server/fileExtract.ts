@@ -8,9 +8,6 @@ export const MAX_EXTRACT_CHARS = 200_000;
 
 const TEXT_EXTENSIONS = new Set([
   "txt",
-  "md",
-  "markdown",
-  "csv",
   "tsv",
   "json",
   "log",
@@ -127,7 +124,6 @@ export async function extractFileText(
     } else if (
       ext === "xlsx" ||
       ext === "xls" ||
-      ext === "csv" ||
       ext === "tsv"
     ) {
       text = await extractSheet(buffer);

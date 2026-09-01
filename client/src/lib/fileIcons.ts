@@ -16,8 +16,6 @@ const EXT_VISUALS: Record<string, FileVisual> = {
   docx: { Icon: FileText, className: "text-blue-500" },
   xls: { Icon: FileSpreadsheet, className: "text-emerald-600" },
   xlsx: { Icon: FileSpreadsheet, className: "text-emerald-600" },
-  csv: { Icon: FileSpreadsheet, className: "text-emerald-600" },
-  tsv: { Icon: FileSpreadsheet, className: "text-emerald-600" },
   ppt: { Icon: FileText, className: "text-amber-500" },
   pptx: { Icon: FileText, className: "text-amber-500" },
   json: { Icon: FileCode2, className: "text-violet-500" },
@@ -25,8 +23,6 @@ const EXT_VISUALS: Record<string, FileVisual> = {
   yml: { Icon: FileCode2, className: "text-violet-500" },
   yaml: { Icon: FileCode2, className: "text-violet-500" },
   txt: { Icon: FileText, className: "text-muted-foreground" },
-  md: { Icon: FileText, className: "text-muted-foreground" },
-  markdown: { Icon: FileText, className: "text-muted-foreground" },
   log: { Icon: FileText, className: "text-muted-foreground" },
 };
 
@@ -40,9 +36,6 @@ export function extensionOfFilename(filename: string): string {
 const SUPPORTED_EXTENSIONS = new Set([
   "pdf",
   "txt",
-  "md",
-  "markdown",
-  "csv",
   "tsv",
   "json",
   "log",
@@ -73,9 +66,6 @@ export function guessMimeType(filename: string) {
   const map: Record<string, string> = {
     pdf: "application/pdf",
     txt: "text/plain",
-    md: "text/markdown",
-    markdown: "text/markdown",
-    csv: "text/csv",
     tsv: "text/tab-separated-values",
     json: "application/json",
     xml: "application/xml",

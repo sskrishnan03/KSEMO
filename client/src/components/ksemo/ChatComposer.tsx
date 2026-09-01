@@ -314,7 +314,7 @@ export const ChatComposer = memo(function ChatComposer({
           type="file"
           multiple
           onChange={selectFile}
-          accept="image/*,.pdf,.txt,.md,.csv,.json,.docx,.xlsx,.pptx,.zip,.webp,.gif"
+          accept="image/*,.pdf,.txt,.json,.docx,.xlsx,.pptx,.zip,.webp,.gif"
           className="sr-only"
         />
         {visibleAttachmentNotices.length > 0 && (
