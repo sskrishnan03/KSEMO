@@ -619,28 +619,8 @@ export function generatePdf(spec: DocumentSpec): Buffer {
 }
 
 // ---------------------------------------------------------------------------
-// CSV / TXT / MD
+// TXT
 // ---------------------------------------------------------------------------
-
-function escapeCsv(value: string): string {
-  const needsQuote = /[",\n\r]/.test(value);
-  return needsQuote ? `"${value.replace(/"/g, '""')}"` : value;
-}
-
-export function generateCsv(spec: DocumentSpec): Buffer {
-  const rows = spec.blocks
-    ?.filter(b => b.type === "table")
-    .flatMap(b => (b.type === "table" ? [b.headers ?? [], ...b.rows] : [])) ?? [];
-  const header = spec.blocks
-    ?.filter(b => b.type === "table" && b.headers?.length)
-    .map(b => (b.type === "table" ? b.headers : []))
-    .find(Boolean);
-  const data = rows.filter((row, index) =>
-    header ? index > 0 || !row.every((c, i) => c === (header as string[])[i]) : true
-  );
-  const lines = (header ? [header, ...data] : rows).map(row => row.map(escapeCsv).join(","));
-  return Buffer.from(`\uFEFF${lines.join("\r\n")}`, "utf8");
-}
 
 export function generateTxt(spec: DocumentSpec): Buffer {
   const lines: string[] = [spec.title || "Document", ""];
@@ -677,31 +657,40 @@ export function generateTxt(spec: DocumentSpec): Buffer {
   return Buffer.from(lines.join("\n"), "utf8");
 }
 
+// ---------------------------------------------------------------------------
+// MARKDOWN (.md)
+// ---------------------------------------------------------------------------
+
 export function generateMarkdown(spec: DocumentSpec): Buffer {
-  const lines: string[] = [`# ${spec.title || "Document"}`, ""];
+  const lines: string[] = [`# ${spec.title || "Document"}`, "", "---", ""];
   for (const block of spec.blocks ?? []) {
     switch (block.type) {
-      case "heading":
-        lines.push(`${"#".repeat(block.level)} ${block.text}`, "");
+      case "heading": {
+        const prefix = "#".repeat(Math.min(6, Math.max(1, block.level || 2)));
+        lines.push(`${prefix} ${block.text}`, "");
         break;
+      }
       case "paragraph":
         lines.push(block.text, "");
         break;
       case "bulletList":
-        block.items.forEach(item => lines.push(`- ${item}`));
+        block.items.forEach(item => (item.trim().startsWith("-") || item.trim().startsWith("*") ? lines.push(item) : lines.push(`- ${item}`)));
         lines.push("");
         break;
       case "numberedList":
         block.items.forEach((item, i) => lines.push(`${i + 1}. ${item}`));
         lines.push("");
         break;
-      case "table": {
-        lines.push(`| ${(block.headers ?? []).join(" | ")} |`);
-        lines.push(`| ${(block.headers ?? []).map(() => "---").join(" | ")} |`);
-        block.rows.forEach(row => lines.push(`| ${row.join(" | ")} |`));
-        lines.push("");
+      case "table":
+        if ((block.headers ?? []).length) {
+          lines.push(`| ${block.headers!.join(" | ")} |`);
+          lines.push(`| ${block.headers!.map(() => "---").join(" | ")} |`);
+          block.rows.forEach(row =>
+            lines.push(`| ${row.map(c => c.replace(/\|/g, "\\|")).join(" | ")} |`)
+          );
+          lines.push("");
+        }
         break;
-      }
       case "pageBreak":
         lines.push("---", "");
         break;
@@ -727,7 +716,6 @@ export async function generateDocument(spec: DocumentSpec): Promise<{
     docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-    csv: "text/csv",
     txt: "text/plain",
     md: "text/markdown",
   };
@@ -744,9 +732,6 @@ export async function generateDocument(spec: DocumentSpec): Promise<{
       break;
     case "pdf":
       buffer = generatePdf(spec);
-      break;
-    case "csv":
-      buffer = generateCsv(spec);
       break;
     case "txt":
       buffer = generateTxt(spec);

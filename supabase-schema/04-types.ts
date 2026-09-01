@@ -249,6 +249,32 @@ export type InsertTaskActivity = Partial<
   summary: string;
 };
 
+export type ResearchSession = {
+  id: string;
+  userId: number;
+  conversationId: string | null;
+  messageId: string | null;
+  researchMode: "web_search" | "deep_research";
+  query: string;
+  status: "running" | "completed" | "failed" | "cancelled";
+  sourcesCount: number;
+  sourcesData: unknown;
+  errorMessage: string | null;
+  startedAt: Date;
+  completedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type InsertResearchSession = Partial<
+  Omit<ResearchSession, "id" | "createdAt" | "updatedAt">
+> & {
+  id: string;
+  userId: number;
+  researchMode: "web_search" | "deep_research";
+  query: string;
+};
+
 // Database row types (snake_case as stored in Supabase)
 export type DbUser = {
   id: number;

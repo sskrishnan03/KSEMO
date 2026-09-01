@@ -6,6 +6,7 @@ import { authCredentialsRouterProcedures } from "./routers/authCredentials";
 import {
   conversationRouter,
   feedbackRouter,
+  fileGenerationRouter,
   messageRouter,
   preferenceRouter,
   voiceRouter,
@@ -33,6 +34,7 @@ export const appRouter = router({
   preferences: preferenceRouter,
   memory: memoryRouter,
   voice: voiceRouter,
+  fileGeneration: fileGenerationRouter,
   workspace: workspaceRouter,
 });
 

@@ -5,6 +5,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuSub,
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
@@ -19,14 +20,13 @@ import {
 import { filterLibraryItems } from "@/lib/ksemoInteraction";
 import { getFileKind, IMAGE_EXT } from "@/lib/fileKinds";
 import {
-  DOC_FORMAT_OPTIONS,
-  getDocFormatOption,
-  type DocFormat,
-} from "@/lib/docFormats";
+  CAPABILITY_SECTIONS,
+  getCapabilityOption,
+  type CapabilityMode,
+} from "@/lib/capabilities";
 import {
   ArrowUp,
   Check,
-  FilePlus2,
   FileUp,
   Library,
   Loader2,
@@ -34,7 +34,9 @@ import {
   MonitorUp,
   Plus,
   Square,
+  Sparkles,
   X,
+  FileText,
 } from "lucide-react";
 import React, {
   memo,
@@ -44,6 +46,10 @@ import React, {
   useState,
   type ChangeEvent,
 } from "react";
+import { SourceList } from "./SourceList";
+import { FileResultCard } from "./FileResultCard";
+import { ResearchProgress } from "./ResearchProgress";
+import { parseContentWithSources } from "@shared/research";
 
 export const getLibrarySubmenuClass = (isCentered: boolean) =>
   `absolute left-1/2 -translate-x-1/2 z-50 max-h-[calc(100dvh-${isCentered ? "12rem" : "6rem"})] w-full max-w-3xl rounded-xl border border-border bg-popover p-0 text-popover-foreground shadow-xl`;
@@ -55,6 +61,8 @@ const CHATBOX_PLACEHOLDERS = [
   "Write code, analyze spreadsheets, translate text...",
   "Search your Library and ask questions about it...",
 ];
+
+const MENU_TITLE = "Create, Search & Research";
 
 export const ChatComposer = memo(function ChatComposer({
   onSend,
@@ -80,8 +88,8 @@ export const ChatComposer = memo(function ChatComposer({
   showSafetyNote = true,
   isCentered = false,
   onTakeScreenshot,
-  documentFormat,
-  onDocumentFormatChange,
+  activeMode,
+  onModeChange,
 }: {
   onSend: (content: string) => void;
   onCancel: () => void;
@@ -130,8 +138,8 @@ export const ChatComposer = memo(function ChatComposer({
   showSafetyNote?: boolean;
   isCentered?: boolean;
   onTakeScreenshot?: () => void;
-  documentFormat?: DocFormat | null;
-  onDocumentFormatChange?: (format: DocFormat | null) => void;
+  activeMode?: CapabilityMode;
+  onModeChange?: (mode: CapabilityMode | null) => void;
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -392,12 +400,12 @@ export const ChatComposer = memo(function ChatComposer({
             />
             {value.length === 0 && (
               <span
-                key={documentFormat ?? placeholderIndex}
+                key={activeMode ?? placeholderIndex}
                 className="pointer-events-none absolute left-2.5 top-1 text-[15px] leading-6 text-muted-foreground animate-[ksemo-placeholder-rise_800ms_ease-out]"
                 aria-hidden="true"
               >
-                {documentFormat
-                  ? `Describe what you want in your ${getDocFormatOption(documentFormat).label}…`
+                {activeMode && activeMode !== "chat"
+                  ? getCapabilityOption(activeMode).placeholder
                   : CHATBOX_PLACEHOLDERS[placeholderIndex]}
               </span>
             )}
@@ -434,7 +442,7 @@ export const ChatComposer = memo(function ChatComposer({
                   side={menuPlacement === "below" ? "bottom" : "top"}
                   sideOffset={10}
                   collisionPadding={12}
-                  className="w-56 rounded-xl"
+                  className="ksemo-thin-scroll w-56 rounded-xl max-h-[16rem] overflow-y-auto"
                 >
                   <DropdownMenuItem onClick={() => fileInputRef.current?.click()}>
                     <FileUp className="mr-2 size-4" /> Upload files
@@ -459,32 +467,73 @@ export const ChatComposer = memo(function ChatComposer({
                     <Library className="mr-2 size-4" />
                     Browse Library
                   </DropdownMenuItem>
-                  <DropdownMenuSub>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuSub openDelay={0} closeDelay={0}>
                     <DropdownMenuSubTrigger>
-                      <FilePlus2 className="mr-2 size-4" />
-                      Create file
+                      <FileText className="mr-2 size-4" />
+                      Create Files
                     </DropdownMenuSubTrigger>
                     <DropdownMenuSubContent
                       sideOffset={6}
                       alignOffset={-56}
-                      className="w-48 max-h-[11rem] overflow-y-auto pt-1.5 pb-2 px-1"
+                      className="w-48 max-h-[14rem] overflow-y-auto"
+                      style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
                     >
-                      {DOC_FORMAT_OPTIONS.map(option => {
+                      {CAPABILITY_SECTIONS.find(s => s.id === "create")?.options.map(option => {
                         const Icon = option.icon;
-                        const active = documentFormat === option.format;
+                        const isActive = activeMode === option.mode;
                         return (
                           <DropdownMenuItem
-                            key={option.format}
-                            onSelect={() =>
-                              onDocumentFormatChange?.(option.format)
-                            }
+                            key={option.mode}
+                            onSelect={() => {
+                              if (isActive) {
+                                onModeChange?.(null);
+                              } else {
+                                onModeChange?.(option.mode);
+                              }
+                              setToolsOpen(false);
+                            }}
                           >
-                            <Icon
-                              className={`mr-2 size-4 shrink-0 ${option.iconColor}`}
-                            />
-                            <span className="flex-1">{option.label}</span>
-                            {active && (
-                              <Check className="size-4 text-foreground" />
+                            <Icon className={`mr-2 size-4 ${option.iconColor}`} />
+                            {option.title}
+                            {isActive && (
+                              <Check className="ml-auto size-4 text-foreground" />
+                            )}
+                          </DropdownMenuItem>
+                        );
+                      })}
+                    </DropdownMenuSubContent>
+                  </DropdownMenuSub>
+                  <DropdownMenuSub openDelay={0} closeDelay={0}>
+                    <DropdownMenuSubTrigger>
+                      <Sparkles className="mr-2 size-4" />
+                      Search & Research
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent
+                      sideOffset={6}
+                      alignOffset={-56}
+                      className="w-48 max-h-[14rem] overflow-y-auto"
+                      style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                    >
+                      {CAPABILITY_SECTIONS.find(s => s.id === "research")?.options.map(option => {
+                        const Icon = option.icon;
+                        const isActive = activeMode === option.mode;
+                        return (
+                          <DropdownMenuItem
+                            key={option.mode}
+                            onSelect={() => {
+                              if (isActive) {
+                                onModeChange?.(null);
+                              } else {
+                                onModeChange?.(option.mode);
+                              }
+                              setToolsOpen(false);
+                            }}
+                          >
+                            <Icon className={`mr-2 size-4 ${option.iconColor}`} />
+                            {option.title}
+                            {isActive && (
+                              <Check className="ml-auto size-4 text-foreground" />
                             )}
                           </DropdownMenuItem>
                         );
@@ -493,17 +542,17 @@ export const ChatComposer = memo(function ChatComposer({
                   </DropdownMenuSub>
                 </DropdownMenuContent>
               </DropdownMenu>
-              {/* Armed document format indicator (after the + button) */}
-              {documentFormat && (
+              {/* Active mode indicator (after the + button) */}
+              {activeMode && activeMode !== "chat" && (
                 <span className="flex items-center gap-1.5 rounded-full border border-border bg-muted py-1 pl-1.5 pr-1 text-xs font-medium text-foreground">
                   {(() => {
-                    const option = getDocFormatOption(documentFormat);
+                    const option = getCapabilityOption(activeMode);
                     const Icon = option.icon;
                     return (
                       <>
                         <Icon className={`size-4 shrink-0 ${option.iconColor}`} />
                         <span className="whitespace-nowrap">
-                          Create {option.label}
+                          {option.chipLabel}
                         </span>
                       </>
                     );
@@ -512,9 +561,9 @@ export const ChatComposer = memo(function ChatComposer({
                     <TooltipTrigger asChild>
                       <button
                         type="button"
-                        onClick={() => onDocumentFormatChange?.(null)}
+                        onClick={() => onModeChange?.(null)}
                         className="flex size-5 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                        aria-label="Cancel document format"
+                        aria-label="Cancel active mode"
                       >
                         <X className="size-3" />
                       </button>

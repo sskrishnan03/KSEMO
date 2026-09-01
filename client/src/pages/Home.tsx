@@ -62,7 +62,7 @@ import {
 import { createPublicConversationUrl } from "../lib/ksemoInteraction";
 import { saveEditedUserMessageAndRegenerate } from "../lib/editRegeneration";
 import { buildStreamingDrafts } from "../lib/streamingDrafts";
-import { type DocFormat } from "../lib/docFormats";
+import { type CapabilityMode } from "@shared/research";
 import { restoreUserMessageVersionAndRegenerate } from "../lib/historyRestoration";
 
 type StreamConversation = {
@@ -227,7 +227,7 @@ export default function Home() {
     status: "processing" | "created" | "error";
     createdAt: number;
   } | null>(null);
-  const [documentFormat, setDocumentFormat] = useState<DocFormat | null>(null);
+  const [activeMode, setActiveMode] = useState<CapabilityMode>("chat");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(
     null
@@ -336,15 +336,15 @@ export default function Home() {
   // -------------------------------------------------------------------
   // activeMode is a derived state — never set directly. It reflects whether
   // the user currently has a file type armed via the Create File UI.
-  //   "chat" = Normal Chat Mode   (documentFormat is null)
-  //   "file" = File Creation Mode  (documentFormat is non-null)
-  const activeMode: "chat" | "file" = documentFormat ? "file" : "chat";
+  // "chat" = Normal Chat Mode (activeMode is "chat")
+  // File creation modes (activeMode is one of the file format modes)
+  // Research modes (activeMode is "web_search" or "deep_research")
   // isFileGenerating: true only when in File Creation Mode AND the current
   // stream is actively producing file-generation progress for the viewed
   // conversation. This is completely separate from isGenerating (which is
   // true for both chat and file streams).
   const isFileGenerating = Boolean(
-    documentFormat &&
+    activeMode !== "chat" &&
       fileGeneration &&
       fileGeneration.status === "processing" &&
       activeStream &&
@@ -882,7 +882,7 @@ export default function Home() {
           attachmentFileIds: selectedAttachments.length
             ? selectedAttachments.map(file => file.fileId)
             : undefined,
-          documentFormat: documentFormat ?? undefined,
+          activeMode: activeMode ?? undefined,
         }),
       });
       if (!response.ok || !response.body) {
@@ -1210,6 +1210,7 @@ export default function Home() {
   function stopGeneration() {
     // Stop only the stream for the currently-viewed conversation; any other
     // conversations generating in the background are left untouched.
+    // This cancels file generation, web search, and deep research operations.
     const target = activeConversationId;
     for (const stream of streamsRef.current) {
       if (stream.active && stream.conversationId === target) {
@@ -1221,6 +1222,9 @@ export default function Home() {
         );
       }
     }
+    
+    // Clear active mode when stopping generation
+    setActiveMode("chat");
   }
 
   function newChat() {
@@ -2041,7 +2045,7 @@ export default function Home() {
               ref={messagesContainerRef}
               onScroll={handleMessagesScroll}
               className={cn(
-                "min-h-0 flex-1",
+                "ksemo-thin-scroll min-h-0 flex-1",
                 visibleMessages.length ? "overflow-y-auto" : "overflow-hidden"
               )}
               aria-label="Conversation"
@@ -2131,8 +2135,8 @@ export default function Home() {
                       recordingSeconds={voice.seconds}
                       value={composerValue}
                       onValueChange={setComposerValue}
-                      documentFormat={documentFormat}
-                      onDocumentFormatChange={setDocumentFormat}
+                      activeMode={activeMode}
+                      onModeChange={setActiveMode}
                       onAttachment={stableAttachFromComposer}
                       attachmentNotices={
                         isAttachmentPreview
@@ -2172,8 +2176,8 @@ export default function Home() {
                 recordingSeconds={voice.seconds}
                 value={composerValue}
                 onValueChange={setComposerValue}
-                documentFormat={documentFormat}
-                onDocumentFormatChange={setDocumentFormat}
+                activeMode={activeMode}
+                onModeChange={setActiveMode}
                 onAttachment={stableAttachFromComposer}
                 attachmentNotices={
                   isAttachmentPreview

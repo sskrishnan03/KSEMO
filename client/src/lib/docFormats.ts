@@ -1,7 +1,11 @@
 import type { ComponentType } from "react";
-import { FileText, FileSpreadsheet, Presentation } from "lucide-react";
+import {
+  FileSpreadsheet,
+  FileText,
+  Presentation,
+} from "lucide-react";
 
-export type DocFormat = "pdf" | "docx" | "xlsx" | "pptx" | "csv" | "txt" | "md";
+export type DocFormat = "pdf" | "docx" | "xlsx" | "pptx" | "txt";
 
 export type DocFormatOption = {
   format: DocFormat;
@@ -46,28 +50,12 @@ export const DOC_FORMAT_OPTIONS: DocFormatOption[] = [
     iconColor: "text-orange-500",
   },
   {
-    format: "csv",
-    label: "CSV",
-    hint: "Plain table data",
-    icon: FileSpreadsheet,
-    colorClass: "bg-teal-500/10 text-teal-500",
-    iconColor: "text-teal-600",
-  },
-  {
     format: "txt",
     label: "Text",
     hint: "Plain text notes",
     icon: FileText,
     colorClass: "bg-slate-500/10 text-slate-500",
     iconColor: "text-slate-500",
-  },
-  {
-    format: "md",
-    label: "Markdown",
-    hint: "Markdown-formatted file",
-    icon: FileText,
-    colorClass: "bg-indigo-500/10 text-indigo-500",
-    iconColor: "text-indigo-500",
   },
 ];
 

@@ -4,3 +4,4 @@
  */
 
 export * from "./_core/errors";
+export * from "./research";

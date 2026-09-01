@@ -72,9 +72,7 @@ const FORMAT_LABELS: Record<string, string> = {
   docx: "Word Document",
   xlsx: "Excel Spreadsheet",
   pptx: "PowerPoint Presentation",
-  csv: "CSV File",
   txt: "Text File",
-  md: "Markdown File",
 };
 
 type FileCreationCardProps = {

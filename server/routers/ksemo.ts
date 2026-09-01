@@ -26,6 +26,7 @@ import {
 import { listLLMModels } from "../_core/llm";
 import { transcribeAudio } from "../_core/voiceTranscription";
 import { isMailerConfigured, sendFeedbackEmail } from "../_core/mailer";
+import { generateFile, type FileFormat } from "../fileGeneration";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 
 const conversationId = z.string().min(8).max(36);
@@ -410,6 +411,39 @@ const supportedAudioTypes = new Set([
   "audio/wav",
   "audio/mp4",
 ]);
+
+export const fileGenerationRouter = router({
+  generate: protectedProcedure
+    .input(
+      z.object({
+        format: z.enum(["pdf", "docx", "xlsx", "pptx", "txt", "md"]),
+        content: z.string().min(1),
+        title: z.string().optional(),
+        description: z.string().optional(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      try {
+        const result = await generateFile({
+          format: input.format as FileFormat,
+          content: input.content,
+          title: input.title,
+          description: input.description,
+        });
+        
+        return {
+          success: true,
+          file: result,
+        };
+      } catch (error) {
+        console.error("File generation error:", error);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to generate file",
+        });
+      }
+    }),
+});
 
 export const voiceRouter = router({
   transcribe: protectedProcedure

@@ -35,6 +35,10 @@ import { ShareIcon } from "./icons";
 import React, { memo, useEffect, useState } from "react";
 import { Streamdown } from "streamdown";
 import { KsemoMarkdownCode } from "./code-block";
+import { SourceList } from "./SourceList";
+import { FileResultCard } from "./FileResultCard";
+import { ResearchProgress } from "./ResearchProgress";
+import { parseContentWithSources } from "@shared/research";
 
 type KsemoMessage = {
   id: string;
@@ -52,6 +56,11 @@ type KsemoMessage = {
     stage: string;
     format: string;
     status: "processing" | "created" | "error";
+    errorMessage?: string;
+  };
+  researchProgress?: {
+    stage: "understanding" | "planning" | "searching" | "retrieving" | "analyzing" | "comparing" | "writing" | "completed" | "error";
+    mode: "web_search" | "deep_research";
     errorMessage?: string;
   };
 };
@@ -121,6 +130,9 @@ export const MessageContent = memo(function MessageContent({
   const previewKind = previewFile
     ? getFileKind(previewFile.filename, previewFile.mimeType)
     : null;
+
+  // Parse sources from message content for research results
+  const { answer: cleanContent, sources } = parseContentWithSources(message.content);
 
   useEffect(() => {
     if (lightboxIndex === null) return;
@@ -265,12 +277,12 @@ export const MessageContent = memo(function MessageContent({
         >
           {isUser ? (
             <p className="whitespace-pre-wrap">{message.content}</p>
-          ) : message.content ? (
+          ) : cleanContent ? (
             <div className="ksemo-markdown prose prose-neutral max-w-none text-[15px] leading-6 dark:prose-invert">
               <Streamdown
                 components={KSEMO_MARKDOWN_COMPONENTS}
               >
-                {message.content}
+                {cleanContent}
               </Streamdown>
             </div>
           ) : message.status === "streaming" &&
@@ -286,6 +298,69 @@ export const MessageContent = memo(function MessageContent({
             </div>
           ) : null}
         </div>
+        
+        {/* Sources section for web search and deep research */}
+        {!isUser && sources.length > 0 && (
+          <SourceList
+            sources={sources}
+            onSourceClick={(source) => {
+              window.open(source.url, '_blank', 'noopener,noreferrer');
+            }}
+          />
+        )}
+        
+        {/* File generation result card */}
+        {!isUser && message.fileGeneration && message.fileGeneration.status === "created" && message.attachments?.length === 1 && (
+          <div className="mt-3">
+            <FileResultCard
+              file={{
+                filename: message.attachments[0].filename,
+                mimeType: message.attachments[0].mimeType || "application/octet-stream",
+                size: message.attachments[0].sizeBytes || 0,
+                downloadUrl: message.attachments[0].url,
+                status: "completed",
+              }}
+              onDownload={() => {
+                const link = document.createElement('a');
+                link.href = message.attachments![0].url;
+                link.download = message.attachments![0].filename;
+                link.click();
+              }}
+            />
+          </div>
+        )}
+        
+        {/* File generation error state */}
+        {!isUser && message.fileGeneration && message.fileGeneration.status === "error" && (
+          <div className="mt-3 p-3 rounded-lg border border-red-200 bg-red-50 dark:border-red-900/30 dark:bg-red-950/20">
+            <p className="text-sm text-red-800 dark:text-red-200">
+              {message.fileGeneration.errorMessage || "Failed to generate file. Please try again."}
+            </p>
+          </div>
+        )}
+        
+        {/* Research progress indicator */}
+        {!isUser && message.researchProgress && message.researchProgress.stage !== "completed" && message.researchProgress.stage !== "error" && (
+          <div className="mt-3">
+            <ResearchProgress
+              currentStage={message.researchProgress.stage}
+              mode={message.researchProgress.mode}
+            />
+          </div>
+        )}
+        
+        {/* Research error state */}
+        {!isUser && message.researchProgress && message.researchProgress.stage === "error" && (
+          <div className="mt-3 p-3 rounded-lg border border-red-200 bg-red-50 dark:border-red-900/30 dark:bg-red-950/20">
+            <p className="text-sm text-red-800 dark:text-red-200">
+              {message.researchProgress.errorMessage || 
+                (message.researchProgress.mode === "web_search" 
+                  ? "Web search failed. Please try again." 
+                  : "Deep research failed. Please try again.")}
+            </p>
+          </div>
+        )}
+        
         {!isUser && message.attachments?.length ? (
           <div className="mt-2 flex max-w-full flex-col items-start gap-2">
             {message.attachments.map(file => {

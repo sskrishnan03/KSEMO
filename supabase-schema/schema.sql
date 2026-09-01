@@ -289,6 +289,34 @@ CREATE INDEX idx_task_activities_status ON task_activities(status);
 CREATE INDEX idx_task_activities_created_at ON task_activities(created_at);
 
 -- ============================================
+-- RESEARCH SESSIONS TABLE
+-- ============================================
+-- Tracks web search and deep research operations for analytics and debugging
+CREATE TABLE research_sessions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    conversation_id UUID REFERENCES conversations(id) ON DELETE CASCADE,
+    message_id UUID REFERENCES messages(id) ON DELETE CASCADE,
+    research_mode VARCHAR(20) NOT NULL CHECK (research_mode IN ('web_search', 'deep_research')),
+    query TEXT NOT NULL,
+    status VARCHAR(20) DEFAULT 'running' CHECK (status IN ('running', 'completed', 'failed', 'cancelled')),
+    sources_count INTEGER DEFAULT 0,
+    sources_data JSONB,
+    error_message TEXT,
+    started_at TIMESTAMPTZ DEFAULT NOW(),
+    completed_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_research_sessions_user_id ON research_sessions(user_id);
+CREATE INDEX idx_research_sessions_conversation_id ON research_sessions(conversation_id);
+CREATE INDEX idx_research_sessions_message_id ON research_sessions(message_id);
+CREATE INDEX idx_research_sessions_research_mode ON research_sessions(research_mode);
+CREATE INDEX idx_research_sessions_status ON research_sessions(status);
+CREATE INDEX idx_research_sessions_created_at ON research_sessions(created_at);
+
+-- ============================================
 -- UPDATED_AT TRIGGER FUNCTION
 -- ============================================
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -322,6 +350,8 @@ CREATE TRIGGER update_files_updated_at BEFORE UPDATE ON files
 CREATE TRIGGER update_tasks_updated_at BEFORE UPDATE ON tasks
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_task_activities_updated_at BEFORE UPDATE ON task_activities
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_research_sessions_updated_at BEFORE UPDATE ON research_sessions
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- ============================================
@@ -376,6 +406,7 @@ ALTER TABLE files ENABLE ROW LEVEL SECURITY;
 ALTER TABLE attachments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE task_activities ENABLE ROW LEVEL SECURITY;
+ALTER TABLE research_sessions ENABLE ROW LEVEL SECURITY;
 
 -- ============================================
 -- USERS TABLE POLICIES
@@ -659,6 +690,22 @@ CREATE POLICY "Users can insert own task activities"
 
 CREATE POLICY "Users can update own task activities"
     ON task_activities FOR UPDATE
+    USING (user_id = get_current_user_id())
+    WITH CHECK (user_id = get_current_user_id());
+
+-- ============================================
+-- RESEARCH SESSIONS POLICIES
+-- ============================================
+CREATE POLICY "Users can view own research sessions"
+    ON research_sessions FOR SELECT
+    USING (user_id = get_current_user_id());
+
+CREATE POLICY "Users can insert own research sessions"
+    ON research_sessions FOR INSERT
+    WITH CHECK (user_id = get_current_user_id());
+
+CREATE POLICY "Users can update own research sessions"
+    ON research_sessions FOR UPDATE
     USING (user_id = get_current_user_id())
     WITH CHECK (user_id = get_current_user_id());
 

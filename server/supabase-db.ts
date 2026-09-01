@@ -17,6 +17,8 @@ import {
   Memory,
   MemorySettings,
   InsertMemory,
+  ResearchSession,
+  InsertResearchSession,
   dbToUser,
   dbToConversation,
   dbToMessage,
@@ -53,6 +55,8 @@ export type {
   Memory,
   MemorySettings,
   InsertMemory,
+  ResearchSession,
+  InsertResearchSession,
 };
 
 // Export the supabase client for direct access when needed
@@ -1130,6 +1134,75 @@ export async function attachFileToMessageForUser(input: {
   }
 
   return { messageId: input.messageId, fileId: input.fileId };
+}
+
+// ============================================
+// RESEARCH SESSION FUNCTIONS
+// ============================================
+
+export async function createResearchSession(
+  input: InsertResearchSession
+): Promise<ResearchSession> {
+  const { data, error } = await supabase
+    .from("research_sessions")
+    .insert({
+      id: input.id,
+      user_id: input.userId,
+      conversation_id: input.conversationId,
+      message_id: input.messageId,
+      research_mode: input.researchMode,
+      query: input.query,
+      status: "running",
+      sources_count: 0,
+      started_at: new Date().toISOString(),
+    })
+    .select()
+    .single();
+
+  if (error) {
+    handleSupabaseError(error, "createResearchSession");
+  }
+
+  return data as ResearchSession;
+}
+
+export async function updateResearchSession(
+  sessionId: string,
+  values: Partial<ResearchSession>
+): Promise<void> {
+  const { error } = await supabase
+    .from("research_sessions")
+    .update({
+      status: values.status,
+      sources_count: values.sourcesCount,
+      sources_data: values.sourcesData,
+      error_message: values.errorMessage,
+      completed_at: values.completedAt?.toISOString(),
+    })
+    .eq("id", sessionId);
+
+  if (error) {
+    handleSupabaseError(error, "updateResearchSession");
+  }
+}
+
+export async function getResearchSessionForUser(
+  sessionId: string,
+  userId: number
+): Promise<ResearchSession | undefined> {
+  const { data, error } = await supabase
+    .from("research_sessions")
+    .select("*")
+    .eq("id", sessionId)
+    .eq("user_id", userId)
+    .single();
+
+  if (error) {
+    if (error.code === "PGRST116") return undefined;
+    handleSupabaseError(error, "getResearchSessionForUser");
+  }
+
+  return data as ResearchSession;
 }
 
 // ============================================

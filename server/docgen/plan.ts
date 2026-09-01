@@ -10,7 +10,7 @@ import type { DocFormat } from "./spec";
 export type DocumentPlan =
   | {
       kind: "file";
-      format: "pdf" | "docx" | "xlsx" | "pptx" | "csv" | "txt" | "md";
+      format: "pdf" | "docx" | "xlsx" | "pptx" | "txt" | "md";
       filename: string;
       title: string;
       summary: string;
@@ -25,26 +25,25 @@ export type DocumentPlan =
 const FORMAT_INSTRUCTIONS = `
 You are part of a document-generation assistant. Decide whether the user's latest
 message is asking to CREATE a file (report, resume, invoice, letter, essay,
-budget, spreadsheet, presentation, notes, table, CSV, plain text, markdown, etc.).
+budget, spreadsheet, presentation, notes, table, plain text, etc.).
 
 Available output formats and their codes:
 - pdf  -> a styled PDF document
 - docx -> an editable Microsoft Word document
 - xlsx -> an Excel spreadsheet (use the "sheets" structure)
 - pptx -> a PowerPoint presentation (use the "slides" structure)
-- csv  -> a comma-separated values file (use a table)
 - txt  -> a plain text file
-- md   -> a Markdown file
+- md   -> a Markdown document (headings, lists, tables, code blocks, links)
 
 Return a JSON object (no markdown fences). Schema:
 {
   "createFile": true|false,
-  "format": "pdf"|"docx"|"xlsx"|"pptx"|"csv"|"txt"|"md",
+  "format": "pdf"|"docx"|"xlsx"|"pptx"|"txt"|"md",
   "filename": "a url-safe base name WITHOUT extension, e.g. Project_Report",
   "title": "document title",
   "summary": "a short, friendly sentence telling the user what you created and its format",
   "content": {
-     "blocks": [ ... ]   // for pdf/docx/txt/md: an array of content blocks
+     "blocks": [ ... ]   // for pdf/docx/txt: an array of content blocks
      // OR
      "sheets": [ ... ]   // for xlsx
      // OR
@@ -162,7 +161,7 @@ function normalizeFormat(value: unknown): DocFormat | null {
     .trim()
     .toLowerCase()
     .replace(/^\./, "");
-  const valid: DocFormat[] = ["pdf", "docx", "xlsx", "pptx", "csv", "txt", "md"];
+  const valid: DocFormat[] = ["pdf", "docx", "xlsx", "pptx", "txt", "md"];
   return valid.includes(v as DocFormat) ? (v as DocFormat) : null;
 }
 

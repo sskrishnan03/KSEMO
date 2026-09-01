@@ -1,14 +1,13 @@
 // The DocumentSpec is the structured, format-independent representation of a
 // generated document. The AI produces a DocumentSpec (or the deterministic
 // builder constructs one from a request), and the generators translate it into
-// a real .docx / .xlsx / .pptx / .pdf / .csv / .txt / .md file.
+// a real .docx / .xlsx / .pptx / .pdf / .txt file.
 
 export type DocFormat =
   | "pdf"
   | "docx"
   | "xlsx"
   | "pptx"
-  | "csv"
   | "txt"
   | "md";
 
@@ -86,7 +85,7 @@ export type DocumentSpec = {
   format: DocFormat;
   filename: string;
   title: string;
-  // For docx/pdf/txt/md: a linear list of content blocks.
+  // For docx/pdf/txt: a linear list of content blocks.
   blocks?: DocBlock[];
   // For xlsx: one or more sheets.
   sheets?: SheetDefinition[];
@@ -101,7 +100,6 @@ export const DOC_FORMATS: DocFormat[] = [
   "docx",
   "xlsx",
   "pptx",
-  "csv",
   "txt",
   "md",
 ];
@@ -111,9 +109,8 @@ export const FORMAT_LABELS: Record<DocFormat, string> = {
   docx: "Word document",
   xlsx: "Excel spreadsheet",
   pptx: "PowerPoint presentation",
-  csv: "CSV file",
   txt: "Text file",
-  md: "Markdown file",
+  md: "Markdown document",
 };
 
 export const FORMAT_EXTENSIONS: Record<DocFormat, string> = {
@@ -121,7 +118,6 @@ export const FORMAT_EXTENSIONS: Record<DocFormat, string> = {
   docx: "docx",
   xlsx: "xlsx",
   pptx: "pptx",
-  csv: "csv",
   txt: "txt",
   md: "md",
 };
@@ -131,7 +127,6 @@ export const FORMAT_MIME: Record<DocFormat, string> = {
   docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-  csv: "text/csv",
   txt: "text/plain",
   md: "text/markdown",
 };
@@ -141,9 +136,8 @@ export const DEFAULT_SUMMARY: Record<DocFormat, string> = {
   docx: "I created the requested Word document.",
   xlsx: "I created the requested Excel spreadsheet.",
   pptx: "I created the requested PowerPoint presentation.",
-  csv: "I created the requested CSV file.",
   txt: "I created the requested text file.",
-  md: "I created the requested Markdown file.",
+  md: "I created the requested Markdown document.",
 };
 
 export function sanitizeFilename(format: DocFormat, requested?: string): string {

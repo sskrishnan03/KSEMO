@@ -82,6 +82,7 @@ export function likelyFormatHint(message: string): string | null {
     [/xlsx|\bexcel\b|spreadsheet|budget|student marks|marksheet|grade/, "xlsx"],
     [/pptx|\bpowerpoint\b|\bppt\b|presentation|slides/, "pptx"],
     [/docx|\bword\b|\bdoc\b/, "docx"],
+    [/\.md\b|\bmarkdown\b/, "md"],
     [/\btxt\b|text file/, "txt"],
     [/pdf/, "pdf"],
   ];
