@@ -52,6 +52,7 @@ type KsemoMessage = {
     stage: string;
     format: string;
     status: "processing" | "created" | "error";
+    errorMessage?: string;
   };
 };
 

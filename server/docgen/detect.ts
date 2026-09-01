@@ -28,7 +28,6 @@ const FILE_FORMAT_HINTS = [
   "xlsx",
   "xls",
   "spreadsheet",
-  "csv",
   "powerpoint",
   "pptx",
   "ppt",
@@ -36,8 +35,6 @@ const FILE_FORMAT_HINTS = [
   "slides",
   "text file",
   "txt",
-  "markdown",
-  "md file",
   "resume",
   "cv",
   "invoice",
@@ -68,7 +65,7 @@ export function looksLikeFileRequest(message: string): boolean {
     lower.includes(`${word} the `)
   );
   // "convert X into PDF", "make this into a PDF", "give me this as a PDF"
-  const conversion = /(convert|make|turn|give|export|format|send).*(into|to|as a)?\s*(pdf|word|docx|excel|xlsx|spreadsheet|csv|powerpoint|pptx|presentation|markdown|text)/i.test(
+  const conversion = /(convert|make|turn|give|export|format|send).*(into|to|as a)?\s*(pdf|word|docx|excel|xlsx|spreadsheet|powerpoint|pptx|presentation|text)/i.test(
     lower
   );
   // "attach / file" phrasing
@@ -85,8 +82,6 @@ export function likelyFormatHint(message: string): string | null {
     [/xlsx|\bexcel\b|spreadsheet|budget|student marks|marksheet|grade/, "xlsx"],
     [/pptx|\bpowerpoint\b|\bppt\b|presentation|slides/, "pptx"],
     [/docx|\bword\b|\bdoc\b/, "docx"],
-    [/\bcsv\b/, "csv"],
-    [/\bmd\b|markdown/, "md"],
     [/\btxt\b|text file/, "txt"],
     [/pdf/, "pdf"],
   ];
