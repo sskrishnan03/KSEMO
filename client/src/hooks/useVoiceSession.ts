@@ -139,6 +139,8 @@ export function useVoiceSession(options: {
   const subtitleTimerRef = useRef<number | null>(null);
   const enqueuedLenRef = useRef(0);
   const boundarySeenRef = useRef(false);
+  const keepaliveRef = useRef<number | null>(null);
+  const lastAdvanceRef = useRef(0);
   const interimRef = useRef("");
   const lastVoiceEventRef = useRef(0);
   const watchdogRef = useRef<number | null>(null);
@@ -227,8 +229,25 @@ export function useVoiceSession(options: {
     subtitleCharRef.current = 0;
     enqueuedLenRef.current = 0;
     boundarySeenRef.current = false;
+    lastAdvanceRef.current = 0;
     setSubtitle("");
   }, [stopSubtitleTimer]);
+
+  const startKeepalive = useCallback(() => {
+    if (keepaliveRef.current !== null) return;
+    keepaliveRef.current = window.setInterval(() => {
+      if ("speechSynthesis" in window && speakPendingRef.current > 0) {
+        window.speechSynthesis.resume();
+      }
+    }, 10_000);
+  }, []);
+
+  const stopKeepalive = useCallback(() => {
+    if (keepaliveRef.current !== null) {
+      window.clearInterval(keepaliveRef.current);
+      keepaliveRef.current = null;
+    }
+  }, []);
 
   const stopWatchdog = useCallback(() => {
     if (watchdogRef.current !== null) {
@@ -407,6 +426,7 @@ export function useVoiceSession(options: {
     text.replace(/\s+/g, " ").trimStart();
 
   const revealSubtitleTo = useCallback((globalIndex: number) => {
+    lastAdvanceRef.current = Date.now();
     const full = fullReplyRef.current;
     let end = Math.min(
       full.length,
@@ -419,44 +439,49 @@ export function useVoiceSession(options: {
   }, []);
 
   const startSubtitleFallback = useCallback(() => {
-    if (subtitleTimerRef.current !== null || boundarySeenRef.current) return;
+    if (subtitleTimerRef.current !== null) return;
     const rate = Math.min(1.6, Math.max(0.7, speechRate));
-    const msPerChar = 62 / rate;
+    const msPerWord = Math.round(380 / rate);
     subtitleTimerRef.current = window.setInterval(() => {
+      if (
+        boundarySeenRef.current &&
+        Date.now() - lastAdvanceRef.current < msPerWord * 2
+      )
+        return;
       const full = fullReplyRef.current;
       const target = Math.min(full.length, enqueuedLenRef.current);
       if (subtitleCharRef.current >= target) return;
-      let next =
-        subtitleCharRef.current + Math.max(2, Math.round(80 / msPerChar));
-      if (next > target) next = target;
-      else {
-        while (next < target && !/\s/.test(full[next])) next += 1;
-        if (next < target) next += 1;
-      }
+      let next = subtitleCharRef.current;
+      while (next < target && /\s/.test(full[next])) next += 1;
+      while (next < target && !/\s/.test(full[next])) next += 1;
+      if (next <= subtitleCharRef.current) return;
       subtitleCharRef.current = next;
       setSubtitle(normalizeSubtitle(full.slice(0, next)));
-    }, 80);
+    }, msPerWord);
   }, [speechRate]);
 
   const resolveDrain = useCallback(() => {
     if (speakPendingRef.current <= 0 && !streamOpenRef.current) {
+      stopKeepalive();
       clearSubtitles();
       drainResolverRef.current?.();
     }
-  }, [clearSubtitles]);
+  }, [clearSubtitles, stopKeepalive]);
 
   const interruptSpeaking = useCallback(() => {
     if ("speechSynthesis" in window) window.speechSynthesis.cancel();
     speakPendingRef.current = 0;
+    stopKeepalive();
     clearSubtitles();
     abortRef.current?.abort();
     resolveDrain();
-  }, [clearSubtitles, resolveDrain]);
+  }, [clearSubtitles, resolveDrain, stopKeepalive]);
 
   function hardStopInternal() {
     wantListeningRef.current = false;
     stopRecognition();
     if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+    stopKeepalive();
     speakPendingRef.current = 0;
     abortRef.current?.abort();
     streamOpenRef.current = false;
@@ -507,6 +532,7 @@ export function useVoiceSession(options: {
     utterance.onstart = () => {
       lastSpeakStartRef.current = Date.now();
       if (stateRef.current !== "speaking") setState("speaking");
+      startKeepalive();
       startSubtitleFallback();
     };
     utterance.onboundary = event => {
@@ -527,45 +553,63 @@ export function useVoiceSession(options: {
 
   function flushSpokenChunks(force: boolean) {
     const full = fullReplyRef.current;
+    const MAX_CHUNK = 250;
     while (enqueuedLenRef.current < full.length) {
       const segment = full.slice(enqueuedLenRef.current);
       let cut = -1;
-      for (let index = 0; index < segment.length; index += 1) {
-        const char = segment[index];
-        if (char === "\n") {
-          cut = index + 1;
-          break;
-        }
-        if (
-          char === "." ||
-          char === "!" ||
-          char === "?" ||
-          char === "…" ||
-          char === "。" ||
-          char === "！" ||
-          char === "？"
+
+      if (segment.length < MAX_CHUNK && !force) break;
+
+      const nlIndex = segment.indexOf("\n");
+      if (nlIndex !== -1 && nlIndex < MAX_CHUNK) {
+        cut = nlIndex + 1;
+      }
+
+      if (cut === -1) {
+        let lastSentenceCut = -1;
+        for (
+          let index = 0;
+          index < Math.min(segment.length, MAX_CHUNK);
+          index += 1
         ) {
-          let end = index + 1;
-          while (end < segment.length && ")\"']".includes(segment[end]))
-            end += 1;
-          if (end >= segment.length || /\s/.test(segment[end])) {
-            cut = end;
-            break;
+          const char = segment[index];
+          if (
+            char === "." ||
+            char === "!" ||
+            char === "?" ||
+            char === "…" ||
+            char === "。" ||
+            char === "！" ||
+            char === "？"
+          ) {
+            let end = index + 1;
+            while (end < segment.length && ")\"']".includes(segment[end])) end += 1;
+            if (end >= segment.length || /\s/.test(segment[end])) {
+              lastSentenceCut = end;
+            }
           }
         }
+        if (lastSentenceCut > 0) cut = lastSentenceCut;
       }
-      if (cut === -1 && segment.length > 90) {
-        for (let index = segment.length - 1; index > 30; index -= 1) {
+
+      if (cut === -1 && segment.length > MAX_CHUNK) {
+        for (
+          let index = Math.min(segment.length, MAX_CHUNK + 20);
+          index > 30;
+          index -= 1
+        ) {
           if (/\s/.test(segment[index])) {
             cut = index + 1;
             break;
           }
         }
       }
+
       if (cut === -1) {
         if (!force) break;
         cut = segment.length;
       }
+
       const chunk = segment.slice(0, cut);
       if (chunk.trim()) enqueueSentence(chunk, enqueuedLenRef.current);
       enqueuedLenRef.current += cut;
