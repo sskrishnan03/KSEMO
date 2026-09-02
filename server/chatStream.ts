@@ -72,10 +72,14 @@ const MAX_INLINE_IMAGE_BYTES = 18 * 1024 * 1024;
 // while still allowing a generous number of images and files per message.
 const MAX_ATTACHMENTS_PER_MESSAGE = 12;
 
-function createTitle(content: string) {
+// Use the user's first message directly as the conversation title. Never adds
+// an ellipsis — long titles are handled by the sidebar's edge blur and tooltip.
+// Hard cap matches the conversations.title VARCHAR(120) column.
+function createTitle(content: string): string {
   const cleaned = content.replace(/\s+/g, " ").trim();
-  if (cleaned.length <= 56) return cleaned || "New conversation";
-  return `${cleaned.slice(0, 53).trimEnd()}…`;
+  if (!cleaned) return "New conversation";
+  if (cleaned.length <= 120) return cleaned;
+  return cleaned.slice(0, 120);
 }
 
 // Separate free-tier quota bucket; used when the selected model's daily limit is hit.

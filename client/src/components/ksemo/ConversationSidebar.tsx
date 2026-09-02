@@ -451,7 +451,7 @@ const ConversationGroup = memo(function ConversationGroup({
             <div
               key={conversation.id}
               className={cn(
-                "group flex items-center gap-1 rounded-lg",
+                "group flex items-center rounded-lg",
                 activeConversationId === conversation.id
                   ? "bg-sidebar-accent"
                   : "hover:bg-sidebar-accent"
@@ -511,9 +511,12 @@ const ConversationActionsMenu = memo(function ConversationActionsMenu({
           variant="ghost"
           size="icon"
           className={cn(
-            "mr-1 size-7 rounded-md opacity-0 transition-opacity",
-            "group-hover:opacity-100 group-focus-within:opacity-100 focus:opacity-100",
-            open && "opacity-100"
+            "mr-0.5 size-7 shrink-0 rounded-md text-muted-foreground opacity-0",
+            "transition-[opacity,background-color,color] duration-150",
+            "group-hover:opacity-100 group-hover:text-foreground",
+            "group-focus-within:opacity-100 focus:opacity-100 focus-visible:ring-0",
+            "hover:bg-accent hover:text-foreground",
+            "data-[state=open]:bg-accent data-[state=open]:opacity-100"
           )}
           aria-label={`Actions for ${conversation.title}`}
         >
@@ -590,10 +593,21 @@ const ConversationTitleButton = memo(function ConversationTitleButton({
     <button
       onClick={() => onSelect(conversation.id)}
       aria-label={conversation.title}
-      className="flex min-w-0 flex-1 items-center gap-2 truncate px-2.5 py-2 text-left text-[13px] leading-5"
+      className="flex min-w-0 flex-1 items-center gap-2 self-stretch py-2 pl-1.5 pr-0 text-left text-[13px] leading-5"
     >
-      <MessageCircle className="size-[18px] shrink-0 stroke-[2.4] text-foreground/85 transition-colors group-hover:text-foreground" />
-      <span className="min-w-0 truncate">{conversation.title}</span>
+      <MessageCircle className="size-[18px] shrink-0 stroke-[2.4] text-foreground/95 transition-colors group-hover:text-foreground" />
+      {/* Off hover the title runs all the way to the three-dot button.
+          On hover the last ~3-4 characters blur out at the exact spot where the
+          three-dot button appears — the dots cover the faded tail. */}
+      <span
+        className={cn(
+          "min-w-0 flex-1 overflow-hidden whitespace-nowrap",
+          "group-hover:[-webkit-mask-image:linear-gradient(to_right,black_calc(100%_-_24px),transparent_100%)]",
+          "group-hover:[mask-image:linear-gradient(to_right,black_calc(100%_-_24px),transparent_100%)]"
+        )}
+      >
+        {conversation.title}
+      </span>
     </button>
   );
 });

@@ -28,7 +28,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { ShareIcon } from "../components/ksemo/icons";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { memo } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
@@ -2119,7 +2119,7 @@ export default function Home() {
                 >
                   {visibleMessages.map(message => {
                     return (
-                      <>
+                      <Fragment key={message.id}>
                   {(() => {
                     const activeFileGen =
                       fileGeneration && fileGeneration.messageId === message.id
@@ -2175,7 +2175,7 @@ export default function Home() {
                         onViewHistory={stableOnViewHistory}
                         onFeedback={stableOnFeedback}
                       />
-                      </>
+                      </Fragment>
                     );
                   })}
                   <div ref={messagesEndRef} />

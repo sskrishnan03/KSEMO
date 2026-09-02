@@ -341,7 +341,7 @@ export const ChatComposer = memo(function ChatComposer({
           className="sr-only"
         />
         {visibleAttachmentNotices.length > 0 && (
-          <div className="mx-1 mb-2 flex items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="mx-1 mb-0.5 flex items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {visibleAttachmentNotices.map(item => {
               const isImage =
                 (item.url || item.mimeType) &&
@@ -401,7 +401,18 @@ export const ChatComposer = memo(function ChatComposer({
             })}
           </div>
         )}
-        
+        {visibleAttachmentNotices.length > 0 && (
+          <div
+            aria-hidden="true"
+            className="pointer-events-none mx-1 h-2 select-none"
+            style={{
+              background:
+                "linear-gradient(to bottom, rgba(0,0,0,0), rgba(0,0,0,0.18), rgba(0,0,0,0))",
+              backgroundBlendMode: "multiply",
+            }}
+          />
+        )}
+
         {/* Main Composer Content */}
         <div className="flex flex-col">
           {/* Text Input Area */}
