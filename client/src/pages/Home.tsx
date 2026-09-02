@@ -1959,7 +1959,6 @@ export default function Home() {
       initialLibraryOpen={isLibraryPreview}
       menuPlacement="above"
       compactBottomSpacing
-      showSafetyNote
       onTakeScreenshot={stableCaptureScreenshot}
       hideVoiceInput={options.hideVoiceInput}
     />
@@ -2219,7 +2218,6 @@ export default function Home() {
                       initialLibraryOpen={isLibraryPreview}
                       initialToolsOpen={isLibraryPreview}
                       menuPlacement="below"
-                      showSafetyNote={false}
                       isCentered={true}
                       onTakeScreenshot={stableCaptureScreenshot}
                     />

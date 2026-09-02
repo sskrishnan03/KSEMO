@@ -85,17 +85,10 @@ describe("ChatComposer", () => {
     expect(librarySubmenuClass).toContain("max-h-[calc(100dvh-6rem)]");
   });
 
-  it("hides the safety note for the centered fresh-chat composer while retaining it by default below a conversation", () => {
+  it("does not render the stale safety/disclaimer note in any composer variant", () => {
     const centeredMarkup = renderToStaticMarkup(
-      createElement(ChatComposer, {
-        ...baseProps,
-        showSafetyNote: false,
-      })
-    );
-    const conversationMarkup = renderToStaticMarkup(
       createElement(ChatComposer, { ...baseProps })
     );
     expect(centeredMarkup).not.toContain("KSEMO can make mistakes");
-    expect(conversationMarkup).toContain("KSEMO can make mistakes");
   });
 });

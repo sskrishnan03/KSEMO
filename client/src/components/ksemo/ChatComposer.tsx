@@ -33,7 +33,9 @@ import {
   FileUp,
   Library,
   Loader2,
+  Maximize2,
   Mic,
+  Minimize2,
   MonitorUp,
   Plus,
   Sparkles,
@@ -63,6 +65,10 @@ const CHAT_PLACEHOLDER = "Ask KSEMO anything you need...";
 const VOICE_PLACEHOLDER =
   "Ask me out loud or type your question here...";
 
+const COMPACT_INPUT_MAX_HEIGHT = 112;
+const EXPANDED_INPUT_MAX_HEIGHT = 320;
+const MIN_INPUT_HEIGHT = 40;
+
 const MENU_TITLE = "Create, Search & Research";
 
 export const ChatComposer = memo(function ChatComposer({
@@ -87,7 +93,6 @@ export const ChatComposer = memo(function ChatComposer({
   initialToolsOpen = false,
   menuPlacement = "above",
   compactBottomSpacing = false,
-  showSafetyNote = true,
   isCentered = false,
   onTakeScreenshot,
   activeMode,
@@ -146,7 +151,6 @@ export const ChatComposer = memo(function ChatComposer({
   initialToolsOpen?: boolean;
   menuPlacement?: "above" | "below";
   compactBottomSpacing?: boolean;
-  showSafetyNote?: boolean;
   isCentered?: boolean;
   onTakeScreenshot?: () => void;
   activeMode?: CapabilityMode;
@@ -167,6 +171,8 @@ export const ChatComposer = memo(function ChatComposer({
   const [toolsOpen, setToolsOpen] = useState(initialToolsOpen);
   const [libraryQuery, setLibraryQuery] = useState("");
   const [isDragActive, setIsDragActive] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const [canExpand, setCanExpand] = useState(false);
   const dragCounterRef = useRef(0);
   const displayedLibraryFiles = useMemo(
     () => filterLibraryItems(libraryFiles, libraryQuery),
@@ -184,14 +190,23 @@ export const ChatComposer = memo(function ChatComposer({
     const frame = requestAnimationFrame(() => {
       // Reset to auto first to allow shrinking
       textarea.style.height = "auto";
-      // Then set to actual scrollHeight with max constraint
-      const height = Math.min(textarea.scrollHeight, 104);
-      // Ensure minimum height of 40px for a comfortable compact layout
-      const finalHeight = Math.max(height, 40);
-      textarea.style.height = `${finalHeight}px`;
+      // Then size to actual scrollHeight, capped by the current mode
+      const cap = expanded
+        ? EXPANDED_INPUT_MAX_HEIGHT
+        : COMPACT_INPUT_MAX_HEIGHT;
+      const height = Math.max(
+        Math.min(textarea.scrollHeight, cap),
+        MIN_INPUT_HEIGHT
+      );
+      textarea.style.height = `${height}px`;
+      setCanExpand(textarea.scrollHeight > COMPACT_INPUT_MAX_HEIGHT);
     });
     return () => cancelAnimationFrame(frame);
-  }, [value]);
+  }, [value, expanded]);
+
+  useEffect(() => {
+    if (expanded && !canExpand) setExpanded(false);
+  }, [expanded, canExpand]);
 
   useEffect(() => {
     if (!libraryOpen) return;
@@ -274,7 +289,7 @@ export const ChatComposer = memo(function ChatComposer({
     <div
       className={cn(
         "mx-auto w-full max-w-3xl px-4 pt-2",
-        compactBottomSpacing ? "pb-2" : "pb-4"
+        compactBottomSpacing ? "pb-5" : "pb-4"
       )}
     >
       <div className="relative rounded-2xl border border-border bg-card p-1.5 shadow-sm transition-shadow focus-within:shadow-md">
@@ -405,9 +420,29 @@ export const ChatComposer = memo(function ChatComposer({
                 }
               }}
               disabled={isGenerating || isRecording || isTranscribing}
-              className="min-h-10 max-h-28 resize-none border-0 !bg-transparent pl-2.5 pr-1 py-1 text-[15px] leading-6 md:text-[15px] shadow-none focus-visible:ring-0 focus-visible:ring-0 dark:!bg-transparent flex-1"
+              className={cn(
+                "min-h-10 resize-none border-0 !bg-transparent pl-2.5 py-1 text-[15px] leading-6 md:text-[15px] shadow-none focus-visible:ring-0 dark:!bg-transparent flex-1 ![field-sizing:manual]",
+                expanded ? "max-h-80" : "max-h-28",
+                canExpand ? "pr-8" : "pr-1"
+              )}
               aria-label="Message KSEMO"
             />
+            {canExpand && (
+              <button
+                type="button"
+                tabIndex={-1}
+                onClick={() => setExpanded(current => !current)}
+                className="absolute right-1.5 top-1.5 z-10 flex size-6 items-center justify-center rounded-full text-muted-foreground/60 transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-0 focus-visible:outline-none"
+                aria-label={expanded ? "Collapse input" : "Expand input"}
+                aria-pressed={expanded}
+              >
+                {expanded ? (
+                  <Minimize2 className="size-3.5" />
+                ) : (
+                  <Maximize2 className="size-3.5" />
+                )}
+              </button>
+            )}
             {value.length === 0 && (
               <span
                 key={
@@ -444,7 +479,7 @@ export const ChatComposer = memo(function ChatComposer({
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="size-9 rounded-full bg-transparent text-foreground hover:bg-accent hover:text-foreground transition-colors"
+                        className="size-10 rounded-full bg-transparent text-foreground hover:bg-accent hover:text-foreground transition-colors"
                         aria-label="Open composer tools"
                       >
                         <Plus className="size-5" />
@@ -458,7 +493,7 @@ export const ChatComposer = memo(function ChatComposer({
 <DropdownMenuContent
                   align="start"
                   side={menuPlacement === "below" ? "bottom" : "top"}
-                  sideOffset={13}
+sideOffset={8}
                   collisionPadding={12}
                   className="ksemo-thin-scroll w-56 rounded-xl max-h-[16rem] overflow-y-auto"
                 >
@@ -666,7 +701,7 @@ export const ChatComposer = memo(function ChatComposer({
                       variant="ghost"
                       size="icon"
                       disabled
-                      className="size-9 rounded-full bg-transparent text-muted-foreground transition-colors"
+                      className="size-10 rounded-full bg-transparent text-muted-foreground transition-colors"
                       aria-label="Converting speech to text"
                     >
                       <Loader2 className="size-4.5 animate-spin" />
@@ -684,7 +719,7 @@ export const ChatComposer = memo(function ChatComposer({
                       size="icon"
                       onClick={onVoice}
                       disabled={isTranscribing}
-                      className="size-9 rounded-full bg-transparent text-foreground hover:bg-accent hover:text-foreground transition-colors"
+                      className="size-10 rounded-full bg-transparent text-foreground hover:bg-accent hover:text-foreground transition-colors"
                       aria-label="Use voice input"
                     >
                       <Mic className="size-4.5" />
@@ -704,7 +739,7 @@ export const ChatComposer = memo(function ChatComposer({
                     <Button
                       onClick={onCancel}
                       size="icon"
-                      className="size-9 rounded-full bg-foreground text-background hover:bg-foreground/90 transition-colors"
+                      className="size-10 rounded-full bg-foreground text-background hover:bg-foreground/90 transition-colors"
                       aria-label="Stop generating"
                     >
                       <Square className="size-4 fill-current" />
@@ -719,7 +754,7 @@ export const ChatComposer = memo(function ChatComposer({
                       onClick={onVoiceChat}
                       disabled={isRecording || isTranscribing}
                       size="icon"
-                      className="size-[45px] rounded-full bg-muted text-foreground hover:bg-[#3A3A3A] transition-colors"
+                      className="size-10 rounded-full bg-muted text-foreground hover:bg-[#3A3A3A] transition-colors"
                       aria-label="Start voice chat"
                     >
                       <span className="flex items-center justify-center gap-[3px]">
@@ -745,7 +780,7 @@ export const ChatComposer = memo(function ChatComposer({
                       onClick={submit}
                       disabled={isRecording || isTranscribing}
                       size="icon"
-                      className="size-9 rounded-full bg-foreground text-background hover:bg-foreground/90 disabled:bg-muted disabled:text-muted-foreground transition-colors"
+                      className="size-10 rounded-full bg-foreground text-background hover:bg-foreground/90 disabled:bg-muted disabled:text-muted-foreground transition-colors"
                       aria-label="Send message"
                     >
                       <ArrowUp className="size-4.5" />
@@ -760,11 +795,6 @@ export const ChatComposer = memo(function ChatComposer({
           </div>
         </div>
       </div>
-      {showSafetyNote && (
-        <p className="mt-3 text-center text-[12px] text-muted-foreground">
-          KSEMO can make mistakes. Verify important details.
-        </p>
-      )}
     </div>
   );
 });
