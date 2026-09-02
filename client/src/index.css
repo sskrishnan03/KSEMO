@@ -376,6 +376,19 @@ html.ksemo-reduce-motion [data-state] .ksemo-orb-morph-b {
 html.ksemo-reduce-motion .loader {
   animation: none;
 }
+html.ksemo-reduce-motion .ksemo-voice-bar {
+  animation: none !important;
+  height: 10px !important;
+}
+
+@keyframes ksemo-voice-bar {
+  0%, 100% {
+    height: 4px;
+  }
+  50% {
+    height: 16px;
+  }
+}
 
 @keyframes ksemo-placeholder-rise {
   0% {

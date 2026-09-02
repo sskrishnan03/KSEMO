@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   createConversationForUser,
   createMessage,
+  createVoiceSession,
   deleteAllConversationsForUser,
   deleteConversationForUser,
   deleteMessageForUser,
@@ -21,6 +22,7 @@ import {
   searchConversationTitles,
   setMessageFeedbackForUser,
   updateConversationForUser,
+  updateVoiceSessionForUser,
   upsertUserPreferences,
 } from "../supabase-db";
 import { listLLMModels } from "../_core/llm";
@@ -28,6 +30,7 @@ import { transcribeAudio } from "../_core/voiceTranscription";
 import { isMailerConfigured, sendFeedbackEmail } from "../_core/mailer";
 import { generateFile, type FileFormat } from "../fileGeneration";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
+import { typeAfterVoiceSession } from "../conversationTypes";
 
 const conversationId = z.string().min(8).max(36);
 const preferenceInput = z.object({
@@ -62,12 +65,19 @@ export const conversationRouter = router({
     .query(({ ctx, input }) =>
       listConversationsForUser(ctx.user.id, input?.scope ?? "active")
     ),
-  create: protectedProcedure.mutation(({ ctx }) =>
-    createConversationForUser({
-      id: crypto.randomUUID(),
-      userId: ctx.user.id,
-    })
-  ),
+  create: protectedProcedure
+    .input(
+      z.object({
+        conversationType: z.enum(["text", "voice", "mixed"]).default("text"),
+      })
+    )
+    .mutation(({ ctx, input }) =>
+      createConversationForUser({
+        id: crypto.randomUUID(),
+        userId: ctx.user.id,
+        conversationType: input.conversationType,
+      })
+    ),
   get: protectedProcedure
     .input(z.object({ id: conversationId }))
     .query(async ({ ctx, input }) => {
@@ -446,6 +456,61 @@ export const fileGenerationRouter = router({
 });
 
 export const voiceRouter = router({
+  sessionStart: protectedProcedure
+    .input(z.object({ conversationId: conversationId.optional() }))
+    .mutation(async ({ ctx, input }) => {
+      let conversation = input.conversationId
+        ? await requireConversation(input.conversationId, ctx.user.id)
+        : await createConversationForUser({
+            id: crypto.randomUUID(),
+            userId: ctx.user.id,
+            conversationType: "voice",
+          });
+      if (!conversation)
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Unable to create a voice session.",
+        });
+      const nextType = typeAfterVoiceSession(conversation.conversationType);
+      if (nextType !== conversation.conversationType) {
+        const updated = await updateConversationForUser(
+          conversation.id,
+          ctx.user.id,
+          { conversationType: nextType }
+        );
+        if (updated) conversation = updated;
+      }
+      if (!conversation)
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Unable to update the conversation voice mode.",
+        });
+      const session = await createVoiceSession({
+        id: crypto.randomUUID(),
+        userId: ctx.user.id,
+        conversationId: conversation.id,
+      });
+      return { session, conversation };
+    }),
+  sessionStatus: protectedProcedure
+    .input(
+      z.object({
+        id: z.string().min(8).max(36),
+        status: z.enum([
+          "connecting",
+          "listening",
+          "speaking",
+          "processing",
+          "interrupted",
+          "ended",
+          "error",
+        ]),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      await updateVoiceSessionForUser(input.id, ctx.user.id, input.status);
+      return { success: true } as const;
+    }),
   transcribe: protectedProcedure
     .input(
       z.object({

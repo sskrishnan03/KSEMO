@@ -22,21 +22,25 @@ import { getFileKind, IMAGE_EXT } from "@/lib/fileKinds";
 import {
   CAPABILITY_SECTIONS,
   getCapabilityOption,
-  type CapabilityMode,
 } from "@/lib/capabilities";
+import { type CapabilityMode } from "@shared/research";
 import {
   ArrowUp,
+  AudioLines,
   Check,
+  ChevronDown,
+  FileText,
   FileUp,
   Library,
   Loader2,
   Mic,
   MonitorUp,
   Plus,
-  Square,
   Sparkles,
+  Square,
+  Volume2,
+  VolumeX,
   X,
-  FileText,
 } from "lucide-react";
 import React, {
   memo,
@@ -54,13 +58,10 @@ import { parseContentWithSources } from "@shared/research";
 export const getLibrarySubmenuClass = (isCentered: boolean) =>
   `absolute left-1/2 -translate-x-1/2 z-50 max-h-[calc(100dvh-${isCentered ? "12rem" : "6rem"})] w-full max-w-3xl rounded-xl border border-border bg-popover p-0 text-popover-foreground shadow-xl`;
 
-const CHATBOX_PLACEHOLDERS = [
-  "Ask KSEMO anything you need...",
-  "Drag & drop images or any files here...",
-  "Summarize a document or web page for me...",
-  "Write code, analyze spreadsheets, translate text...",
-  "Search your Library and ask questions about it...",
-];
+const CHAT_PLACEHOLDER = "Ask KSEMO anything you need...";
+
+const VOICE_PLACEHOLDER =
+  "Ask me out loud or type your question here...";
 
 const MENU_TITLE = "Create, Search & Research";
 
@@ -68,6 +69,7 @@ export const ChatComposer = memo(function ChatComposer({
   onSend,
   onCancel,
   onVoice,
+  onVoiceChat,
   onCancelRecording,
   isGenerating,
   isRecording,
@@ -90,10 +92,19 @@ export const ChatComposer = memo(function ChatComposer({
   onTakeScreenshot,
   activeMode,
   onModeChange,
+  hideVoiceInput = false,
+  voiceChatActive = false,
+  voiceChatMuted = false,
+  onVoiceChatMicToggle,
+  onVoiceChatEnd,
+  voices,
+  selectedVoiceName,
+  onVoiceChatVoiceSelect,
 }: {
   onSend: (content: string) => void;
   onCancel: () => void;
   onVoice: () => void;
+  onVoiceChat?: () => void;
   onCancelRecording: () => void;
   isGenerating: boolean;
   isRecording: boolean;
@@ -140,6 +151,14 @@ export const ChatComposer = memo(function ChatComposer({
   onTakeScreenshot?: () => void;
   activeMode?: CapabilityMode;
   onModeChange?: (mode: CapabilityMode | null) => void;
+  hideVoiceInput?: boolean;
+  voiceChatActive?: boolean;
+  voiceChatMuted?: boolean;
+  onVoiceChatMicToggle?: () => void;
+  onVoiceChatEnd?: () => void;
+  voices?: Array<{ name: string; lang: string; default: boolean }>;
+  selectedVoiceName?: string | null;
+  onVoiceChatVoiceSelect?: (name: string) => void;
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -147,7 +166,6 @@ export const ChatComposer = memo(function ChatComposer({
   const [libraryOpen, setLibraryOpen] = useState(initialLibraryOpen);
   const [toolsOpen, setToolsOpen] = useState(initialToolsOpen);
   const [libraryQuery, setLibraryQuery] = useState("");
-  const [placeholderIndex, setPlaceholderIndex] = useState(0);
   const [isDragActive, setIsDragActive] = useState(false);
   const dragCounterRef = useRef(0);
   const displayedLibraryFiles = useMemo(
@@ -159,14 +177,6 @@ export const ChatComposer = memo(function ChatComposer({
     (attachmentNotice
       ? [{ fileId: attachmentNotice.name, ...attachmentNotice }]
       : []);
-
-  useEffect(() => {
-    const interval = window.setInterval(
-      () => setPlaceholderIndex(index => (index + 1) % CHATBOX_PLACEHOLDERS.length),
-      4500
-    );
-    return () => window.clearInterval(interval);
-  }, []);
 
   useEffect(() => {
     const textarea = textareaRef.current;
@@ -400,13 +410,21 @@ export const ChatComposer = memo(function ChatComposer({
             />
             {value.length === 0 && (
               <span
-                key={activeMode ?? placeholderIndex}
+                key={
+                  voiceChatActive
+                    ? "voice"
+                    : activeMode && activeMode !== "chat"
+                      ? activeMode
+                      : "chat"
+                }
                 className="pointer-events-none absolute left-2.5 top-1 text-[15px] leading-6 text-muted-foreground animate-[ksemo-placeholder-rise_800ms_ease-out]"
                 aria-hidden="true"
               >
-                {activeMode && activeMode !== "chat"
-                  ? getCapabilityOption(activeMode).placeholder
-                  : CHATBOX_PLACEHOLDERS[placeholderIndex]}
+                {voiceChatActive
+                  ? VOICE_PLACEHOLDER
+                  : activeMode && activeMode !== "chat"
+                    ? getCapabilityOption(activeMode).placeholder
+                    : CHAT_PLACEHOLDER}
               </span>
             )}
           </div>
@@ -440,7 +458,7 @@ export const ChatComposer = memo(function ChatComposer({
                 <DropdownMenuContent
                   align="start"
                   side={menuPlacement === "below" ? "bottom" : "top"}
-                  sideOffset={10}
+sideOffset={12}
                   collisionPadding={12}
                   className="ksemo-thin-scroll w-56 rounded-xl max-h-[16rem] overflow-y-auto"
                 >
@@ -467,79 +485,83 @@ export const ChatComposer = memo(function ChatComposer({
                     <Library className="mr-2 size-4" />
                     Browse Library
                   </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuSub openDelay={0} closeDelay={0}>
-                    <DropdownMenuSubTrigger>
-                      <FileText className="mr-2 size-4" />
-                      Create Files
-                    </DropdownMenuSubTrigger>
-                    <DropdownMenuSubContent
-                      sideOffset={6}
-                      alignOffset={-56}
-                      className="w-48 max-h-[14rem] overflow-y-auto"
-                      style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-                    >
-                      {CAPABILITY_SECTIONS.find(s => s.id === "create")?.options.map(option => {
-                        const Icon = option.icon;
-                        const isActive = activeMode === option.mode;
-                        return (
-                          <DropdownMenuItem
-                            key={option.mode}
-                            onSelect={() => {
-                              if (isActive) {
-                                onModeChange?.(null);
-                              } else {
-                                onModeChange?.(option.mode);
-                              }
-                              setToolsOpen(false);
-                            }}
-                          >
-                            <Icon className={`mr-2 size-4 ${option.iconColor}`} />
-                            {option.title}
-                            {isActive && (
-                              <Check className="ml-auto size-4 text-foreground" />
-                            )}
-                          </DropdownMenuItem>
-                        );
-                      })}
-                    </DropdownMenuSubContent>
-                  </DropdownMenuSub>
-                  <DropdownMenuSub openDelay={0} closeDelay={0}>
-                    <DropdownMenuSubTrigger>
-                      <Sparkles className="mr-2 size-4" />
-                      Search & Research
-                    </DropdownMenuSubTrigger>
-                    <DropdownMenuSubContent
-                      sideOffset={6}
-                      alignOffset={-56}
-                      className="w-48 max-h-[14rem] overflow-y-auto"
-                      style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-                    >
-                      {CAPABILITY_SECTIONS.find(s => s.id === "research")?.options.map(option => {
-                        const Icon = option.icon;
-                        const isActive = activeMode === option.mode;
-                        return (
-                          <DropdownMenuItem
-                            key={option.mode}
-                            onSelect={() => {
-                              if (isActive) {
-                                onModeChange?.(null);
-                              } else {
-                                onModeChange?.(option.mode);
-                              }
-                              setToolsOpen(false);
-                            }}
-                          >
-                            <Icon className={`mr-2 size-4 ${option.iconColor}`} />
-                            {option.title}
-                            {isActive && (
-                              <Check className="ml-auto size-4 text-foreground" />
-                            )}
-                          </DropdownMenuItem>
-                        );
-                      })}
-                    </DropdownMenuSubContent>
-                  </DropdownMenuSub>
+                  {!voiceChatActive && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuSub>
+                        <DropdownMenuSubTrigger>
+                          <FileText className="mr-2 size-4" />
+                          Create Files
+                        </DropdownMenuSubTrigger>
+                        <DropdownMenuSubContent
+                          sideOffset={6}
+                          alignOffset={-56}
+                          className="w-48 max-h-[14rem] overflow-y-auto"
+                          style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+                        >
+                          {CAPABILITY_SECTIONS.find(s => s.id === "create")?.options.map(option => {
+                            const Icon = option.icon;
+                            const isActive = activeMode === option.mode;
+                            return (
+                              <DropdownMenuItem
+                                key={option.mode}
+                                onSelect={() => {
+                                  if (isActive) {
+                                    onModeChange?.(null);
+                                  } else {
+                                    onModeChange?.(option.mode);
+                                  }
+                                  setToolsOpen(false);
+                                }}
+                              >
+                                <Icon className={`mr-2 size-4 ${option.iconColor}`} />
+                                {option.title}
+                                {isActive && (
+                                  <Check className="ml-auto size-4 text-foreground" />
+                                )}
+                              </DropdownMenuItem>
+                            );
+                          })}
+                        </DropdownMenuSubContent>
+                      </DropdownMenuSub>
+                      <DropdownMenuSub>
+                        <DropdownMenuSubTrigger>
+                          <Sparkles className="mr-2 size-4" />
+                          Search & Research
+                        </DropdownMenuSubTrigger>
+                        <DropdownMenuSubContent
+                          sideOffset={6}
+                          alignOffset={-56}
+                          className="w-48 max-h-[14rem] overflow-y-auto"
+                          style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+                        >
+                          {CAPABILITY_SECTIONS.find(s => s.id === "research")?.options.map(option => {
+                            const Icon = option.icon;
+                            const isActive = activeMode === option.mode;
+                            return (
+                              <DropdownMenuItem
+                                key={option.mode}
+                                onSelect={() => {
+                                  if (isActive) {
+                                    onModeChange?.(null);
+                                  } else {
+                                    onModeChange?.(option.mode);
+                                  }
+                                  setToolsOpen(false);
+                                }}
+                              >
+                                <Icon className={`mr-2 size-4 ${option.iconColor}`} />
+                                {option.title}
+                                {isActive && (
+                                  <Check className="ml-auto size-4 text-foreground" />
+                                )}
+                              </DropdownMenuItem>
+                            );
+                          })}
+                        </DropdownMenuSubContent>
+                      </DropdownMenuSub>
+                    </>
+                  )}
                 </DropdownMenuContent>
               </DropdownMenu>
               {/* Active mode indicator (after the + button) */}
@@ -576,8 +598,21 @@ export const ChatComposer = memo(function ChatComposer({
 
             {/* Right Side Controls */}
             <div className="flex items-center gap-1.5">
+              {voiceChatActive ? (
+                <VoiceChatInlineControls
+                  muted={voiceChatMuted ?? false}
+                  onMicToggle={onVoiceChatMicToggle ?? (() => undefined)}
+                  onEnd={onVoiceChatEnd ?? (() => undefined)}
+                  voices={voices}
+                  selectedVoiceName={selectedVoiceName}
+                  onVoiceSelect={onVoiceChatVoiceSelect}
+                />
+              ) : (
+                <>
               {/* Recording / Transcribing / Mic — opens in place of the mic when clicked */}
-              {isRecording ? (
+              {!hideVoiceInput && (
+                <>
+                  {isRecording ? (
                 <div className="flex items-center gap-2 overflow-hidden rounded-full border border-border bg-muted px-3 py-1.5 shadow-sm">
                   <div className="flex items-end gap-0.5 overflow-hidden">
                     {[4, 8, 12, 7, 15, 9, 5, 11].map((height, index) => (
@@ -659,8 +694,10 @@ export const ChatComposer = memo(function ChatComposer({
                     Record a voice message
                   </TooltipContent>
                 </Tooltip>
+                )}
+                </>
               )}
-              {/* Send/Stop Button */}
+              {/* Send / Voice / Stop Button */}
               {isGenerating ? (
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -675,16 +712,38 @@ export const ChatComposer = memo(function ChatComposer({
                   </TooltipTrigger>
                   <TooltipContent side="bottom">Stop generating</TooltipContent>
                 </Tooltip>
+              ) : !value.trim() && !visibleAttachmentNotices.length ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      onClick={onVoiceChat}
+                      disabled={isRecording || isTranscribing}
+                      size="icon"
+                      className="size-[45px] rounded-full bg-muted text-foreground hover:bg-accent transition-colors"
+                      aria-label="Start voice chat"
+                    >
+                      <span className="flex items-center justify-center gap-[3px]">
+                        {[0, 1, 2, 3].map(i => (
+                          <span
+                            key={i}
+                            className="ksemo-voice-bar w-[3px] rounded-full bg-foreground/70"
+                            style={{
+                              height: 4,
+                              animation: `ksemo-voice-bar 1s ease-in-out ${i * 0.15}s infinite`,
+                            }}
+                          />
+                        ))}
+                      </span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">Start voice chat</TooltipContent>
+                </Tooltip>
               ) : (
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
                       onClick={submit}
-                      disabled={
-                        (!value.trim() && !visibleAttachmentNotices.length) ||
-                        isRecording ||
-                        isTranscribing
-                      }
+                      disabled={isRecording || isTranscribing}
                       size="icon"
                       className="size-9 rounded-full bg-foreground text-background hover:bg-foreground/90 disabled:bg-muted disabled:text-muted-foreground transition-colors"
                       aria-label="Send message"
@@ -694,6 +753,8 @@ export const ChatComposer = memo(function ChatComposer({
                   </TooltipTrigger>
                   <TooltipContent side="bottom">Send message</TooltipContent>
                 </Tooltip>
+              )}
+                </>
               )}
             </div>
           </div>
@@ -707,6 +768,119 @@ export const ChatComposer = memo(function ChatComposer({
     </div>
   );
 });
+
+function VoiceChatInlineControls({
+  muted,
+  onMicToggle,
+  onEnd,
+  voices,
+  selectedVoiceName,
+  onVoiceSelect,
+}: {
+  muted: boolean;
+  onMicToggle: () => void;
+  onEnd: () => void;
+  voices?: Array<{ name: string; lang: string; default: boolean }>;
+  selectedVoiceName?: string | null;
+  onVoiceSelect?: (name: string) => void;
+}) {
+  const [voiceMenuOpen, setVoiceMenuOpen] = useState(false);
+  const englishVoices = voices?.filter(voice =>
+    voice.lang.toLowerCase().startsWith("en")
+  );
+  const displayVoices =
+    englishVoices && englishVoices.length > 0 ? englishVoices : voices ?? [];
+
+  return (
+    <div className="flex items-center gap-1.5" role="group" aria-label="Voice chat controls">
+      <DropdownMenu open={voiceMenuOpen} onOpenChange={setVoiceMenuOpen}>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            className="h-10 gap-1.5 rounded-full px-3.5 text-foreground transition-colors hover:bg-accent hover:text-foreground"
+            aria-label="Choose KSEMO's voice"
+          >
+            <AudioLines className="size-4" />
+            <span className="text-sm font-medium leading-none">Voice</span>
+            <ChevronDown
+              className={cn(
+                "size-4 text-muted-foreground transition-transform duration-200",
+                voiceMenuOpen ? "rotate-180" : ""
+              )}
+            />
+          </Button>
+        </DropdownMenuTrigger>
+<DropdownMenuContent
+            align="end"
+            side="top"
+            sideOffset={10}
+            collisionPadding={12}
+            className="ksemo-thin-scroll w-60 max-h-72 overflow-y-auto"
+          >
+            {displayVoices.length > 0 ? (
+            displayVoices.map(voice => (
+              <DropdownMenuItem
+                key={voice.name}
+                onSelect={() => {
+                  onVoiceSelect?.(voice.name);
+                  setVoiceMenuOpen(false);
+                }}
+              >
+                <span className="min-w-0 flex-1 truncate">{voice.name}</span>
+                <span className="shrink-0 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                  {voice.lang}
+                </span>
+                {selectedVoiceName === voice.name && (
+                  <Check className="ml-2 size-4 shrink-0 text-foreground" />
+                )}
+              </DropdownMenuItem>
+            ))
+          ) : (
+            <p className="px-3 py-2 text-xs text-muted-foreground">
+              No voices available on this device.
+            </p>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onMicToggle}
+            aria-pressed={!muted}
+            className="size-10 rounded-full bg-transparent text-foreground transition-colors hover:bg-accent hover:text-foreground"
+            aria-label={muted ? "Unmute microphone" : "Mute microphone"}
+          >
+            {muted ? (
+              <VolumeX className="size-5" />
+            ) : (
+              <Volume2 className="size-5" />
+            )}
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="bottom">
+          {muted ? "Unmute microphone" : "Mute microphone"}
+        </TooltipContent>
+      </Tooltip>
+
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            onClick={onEnd}
+            size="icon"
+            className="size-10 rounded-full bg-foreground text-background hover:bg-foreground/90 transition-colors"
+            aria-label="End voice chat"
+          >
+            <Square className="size-4 fill-current" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="bottom">End voice chat</TooltipContent>
+      </Tooltip>
+    </div>
+  );
+}
 
 export function LibraryPickerContent({
   files,

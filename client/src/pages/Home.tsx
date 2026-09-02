@@ -54,6 +54,7 @@ import { useVoiceInput } from "../hooks/useVoiceInput";
 import { usePersistFn } from "../hooks/usePersistFn";
 import { WorkspacePanel } from "../components/ksemo/WorkspacePanel";
 import { LibraryWorkspace } from "../components/ksemo/LibraryWorkspace";
+import { VoiceChat } from "../components/voice/VoiceChat";
 import { SearchDialog } from "../components/ksemo/SearchWorkspace";
 import {
   createConversationPdfFile,
@@ -240,6 +241,7 @@ export default function Home() {
   );
   const [searchOpen, setSearchOpen] = useState(false);
   const [chatFilesOpen, setChatFilesOpen] = useState(false);
+  const [voiceChatOpen, setVoiceChatOpen] = useState(false);
   const activePrimaryWorkspace = primaryWorkspace ?? inlineWorkspaceSection;
   const [shareTarget, setShareTarget] = useState<{
     id: string;
@@ -381,6 +383,11 @@ export default function Home() {
       setSettingsOpen(false);
     },
     onError: () => toast.error("Settings could not be saved."),
+  });
+  const voicePreferencesMutation = trpc.preferences.update.useMutation({
+    onSuccess: () => {
+      utils.preferences.get.invalidate();
+    },
   });
 
   // Keep a ref mirror of the viewed conversation so streaming callbacks can
@@ -1747,6 +1754,17 @@ export default function Home() {
     voice.state === "recording" ? voice.stop : voice.start
   );
   const stableVoiceCancel = usePersistFn(voice.cancel);
+  const stableOpenVoiceChat = usePersistFn(() => setVoiceChatOpen(true));
+  const stableCloseVoiceChat = usePersistFn(() => {
+    setVoiceChatOpen(false);
+    if (activeConversationId) {
+      // Spoken turns stream straight to the server, so the open chat must
+      // re-seed from the database for the exchange to read as a normal chat.
+      seededConversationIdRef.current = null;
+      void utils.conversation.get.refetch({ id: activeConversationId });
+    }
+    utils.conversation.list.invalidate();
+  });
   const stableOnViewHistory = usePersistFn(
     (userMessage: KsemoMessage) => setHistoryMessage(userMessage)
   );
@@ -1904,6 +1922,51 @@ export default function Home() {
 
   const greeting = useMemo(timeGreeting, []);
 
+  const stableVoiceSpeechRate = usePersistFn((rate: number) => {
+    voicePreferencesMutation.mutate({ speechRate: rate });
+  });
+
+  const renderComposer = (options: { hideVoiceInput?: boolean } = {}) => (
+    <ChatComposer
+      onSend={stableComposerSend}
+      onCancel={stableStopGeneration}
+      onVoice={stableVoiceAction}
+      onVoiceChat={stableOpenVoiceChat}
+      onCancelRecording={stableVoiceCancel}
+      isGenerating={isGenerating}
+      isRecording={voice.state === "recording"}
+      isTranscribing={voice.state === "transcribing"}
+      recordingSeconds={voice.seconds}
+      value={composerValue}
+      onValueChange={setComposerValue}
+      activeMode={activeMode}
+      onModeChange={setActiveMode}
+      onAttachment={stableAttachFromComposer}
+      attachmentNotices={
+        isAttachmentPreview
+          ? [
+              {
+                fileId: "preview-file",
+                name: "project-brief.pdf",
+                linked: true,
+              },
+            ]
+          : attachmentNotices
+      }
+      onClearAttachment={stableOnClearAttachment}
+      libraryFiles={libraryFilesQuery.data}
+      onLibraryFile={stableAttachLibraryFiles}
+      initialLibraryOpen={isLibraryPreview}
+      menuPlacement="above"
+      compactBottomSpacing
+      showSafetyNote
+      onTakeScreenshot={stableCaptureScreenshot}
+      hideVoiceInput={options.hideVoiceInput}
+    />
+  );
+  const composerElement = renderComposer();
+  const voiceComposerElement = renderComposer({ hideVoiceInput: true });
+
   if (loading)
     return (
       <Loading fullScreen />
@@ -2045,7 +2108,7 @@ export default function Home() {
               ref={messagesContainerRef}
               onScroll={handleMessagesScroll}
               className={cn(
-                "ksemo-thin-scroll min-h-0 flex-1",
+                "min-h-0 flex-1",
                 visibleMessages.length ? "overflow-y-auto" : "overflow-hidden"
               )}
               aria-label="Conversation"
@@ -2128,6 +2191,7 @@ export default function Home() {
                       onSend={stableComposerSend}
                       onCancel={stableStopGeneration}
                       onVoice={stableVoiceAction}
+                      onVoiceChat={stableOpenVoiceChat}
                       onCancelRecording={stableVoiceCancel}
                       isGenerating={isGenerating}
                       isRecording={voice.state === "recording"}
@@ -2164,40 +2228,15 @@ export default function Home() {
               )}
             </section>
 
-            {visibleMessages.length > 0 && (
-              <ChatComposer
-                onSend={stableComposerSend}
-                onCancel={stableStopGeneration}
-                onVoice={stableVoiceAction}
-                onCancelRecording={stableVoiceCancel}
-                isGenerating={isGenerating}
-                isRecording={voice.state === "recording"}
-                isTranscribing={voice.state === "transcribing"}
-                recordingSeconds={voice.seconds}
-                value={composerValue}
-                onValueChange={setComposerValue}
-                activeMode={activeMode}
-                onModeChange={setActiveMode}
-                onAttachment={stableAttachFromComposer}
-                attachmentNotices={
-                  isAttachmentPreview
-                    ? [
-                        {
-                          fileId: "preview-file",
-                          name: "project-brief.pdf",
-                          linked: true,
-                        },
-                      ]
-                    : attachmentNotices
-                }
-                onClearAttachment={stableOnClearAttachment}
-                libraryFiles={libraryFilesQuery.data}
-                onLibraryFile={stableAttachLibraryFiles}
-                initialLibraryOpen={isLibraryPreview}
-                menuPlacement="above"
-                compactBottomSpacing
-                showSafetyNote
-                onTakeScreenshot={stableCaptureScreenshot}
+            {visibleMessages.length > 0 && composerElement}
+            {voiceChatOpen && (
+              <VoiceChat
+                conversationId={activeConversationId}
+                onConversation={stableSelectConversation}
+                onExit={stableCloseVoiceChat}
+                speechRatePreference={preferencesQuery.data?.speechRate ?? 100}
+                onSpeechRateChange={stableVoiceSpeechRate}
+                composer={voiceComposerElement}
               />
             )}
           </>

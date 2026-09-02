@@ -19,6 +19,7 @@ import {
   InsertMemory,
   ResearchSession,
   InsertResearchSession,
+  VoiceSession,
   dbToUser,
   dbToConversation,
   dbToMessage,
@@ -52,11 +53,12 @@ export type {
   Attachment,
   Task,
   TaskActivity,
-  Memory,
+Memory,
   MemorySettings,
   InsertMemory,
   ResearchSession,
   InsertResearchSession,
+  VoiceSession,
 };
 
 // Export the supabase client for direct access when needed
@@ -339,7 +341,7 @@ export async function createConversationForUser(input: {
   id: string;
   userId: number;
   title?: string;
-  conversationType?: "text";
+  conversationType?: "text" | "voice" | "mixed";
 }): Promise<Conversation> {
   const { data, error } = await supabase
     .from("conversations")
@@ -1036,6 +1038,52 @@ export async function saveUserMemoryFacts(
   }
 
   return count ?? 0;
+}
+
+// ============================================
+// VOICE SESSION FUNCTIONS
+// ============================================
+
+export async function createVoiceSession(input: {
+  id: string;
+  userId: number;
+  conversationId: string;
+}): Promise<VoiceSession> {
+  const { data, error } = await supabase.from("voice_sessions").insert({
+    id: input.id,
+    user_id: input.userId,
+    conversation_id: input.conversationId,
+    status: "connecting",
+  }).select().single();
+
+  if (error) {
+    handleSupabaseError(error, "createVoiceSession");
+  }
+
+  return {
+    id: data.id,
+    userId: data.user_id,
+    conversationId: data.conversation_id,
+    status: data.status,
+    createdAt: new Date(data.created_at),
+    updatedAt: new Date(data.updated_at),
+  };
+}
+
+export async function updateVoiceSessionForUser(
+  id: string,
+  userId: number,
+  status: VoiceSession["status"]
+): Promise<void> {
+  const { error } = await supabase
+    .from("voice_sessions")
+    .update({ status })
+    .eq("id", id)
+    .eq("user_id", userId);
+
+  if (error) {
+    handleSupabaseError(error, "updateVoiceSessionForUser");
+  }
 }
 
 // ============================================

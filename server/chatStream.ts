@@ -37,6 +37,9 @@ const BASE_SYSTEM_INSTRUCTION =
 // Per-file cap on extracted document text injected into the model context.
 const FILE_TEXT_PER_FILE_CHARS = 12_000;
 
+const VOICE_STYLE_INSTRUCTION =
+  "Your reply will be spoken aloud in a live voice conversation. Answer exactly and completely, with the same full detail you would give in a written reply — but in plain natural spoken language. No markdown formatting, no bullet or numbered lists, no tables, no headings, no filler, and do not repeat the question back.";
+
 // The Gemini/OpenAI-compatible provider cannot resolve localhost or relative
 // storage URLs, so images are read from disk and sent inline as base64 data
 // URIs instead of remote image_urls that the model could never fetch.
@@ -500,6 +503,7 @@ export function registerChatStream(app: Express) {
           `The current date and time is: ${currentTimeString}. Use this to answer questions about time, dates, and scheduling. You may be asked about mathematical equations, code analysis, general reasoning, and anything else — always attempt to answer helpfully.`,
           personaInstruction,
           preferences?.customInstructions?.trim(),
+          body.mode === "voice" ? VOICE_STYLE_INSTRUCTION : null,
           memoryContext,
         ]
           .filter(Boolean)

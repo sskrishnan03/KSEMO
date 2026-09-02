@@ -102,7 +102,7 @@ export type Conversation = {
   userId: number;
   projectId: string | null;
   title: string;
-  conversationType: "text";
+  conversationType: "text" | "voice" | "mixed";
   isPinned: boolean;
   isArchived: boolean;
   isPublic: boolean;
@@ -275,6 +275,22 @@ export type InsertResearchSession = Partial<
   query: string;
 };
 
+export type VoiceSession = {
+  id: string;
+  userId: number;
+  conversationId: string;
+  status:
+    | "connecting"
+    | "listening"
+    | "speaking"
+    | "processing"
+    | "interrupted"
+    | "ended"
+    | "error";
+  createdAt: Date;
+  updatedAt: Date;
+};
+
 // Database row types (snake_case as stored in Supabase)
 export type DbUser = {
   id: number;
@@ -296,7 +312,7 @@ export type DbConversation = {
   user_id: number;
   project_id: string | null;
   title: string;
-  conversation_type: "text";
+  conversation_type: "text" | "voice" | "mixed";
   is_pinned: boolean;
   is_archived: boolean;
   is_public: boolean;

@@ -91,7 +91,7 @@ CREATE TABLE conversations (
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     project_id UUID REFERENCES projects(id) ON DELETE SET NULL,
     title VARCHAR(120) NOT NULL DEFAULT 'New conversation',
-    conversation_type VARCHAR(20) DEFAULT 'text' CHECK (conversation_type IN ('text')),
+    conversation_type VARCHAR(20) DEFAULT 'text' CHECK (conversation_type IN ('text', 'voice', 'mixed')),
     is_pinned BOOLEAN DEFAULT FALSE,
     is_archived BOOLEAN DEFAULT FALSE,
     is_public BOOLEAN DEFAULT FALSE,
@@ -107,6 +107,22 @@ CREATE INDEX idx_conversations_share_token ON conversations(share_token);
 CREATE INDEX idx_conversations_is_archived ON conversations(is_archived);
 CREATE INDEX idx_conversations_deleted_at ON conversations(deleted_at);
 CREATE INDEX idx_conversations_is_pinned ON conversations(is_pinned);
+
+-- ============================================
+-- VOICE SESSIONS TABLE
+-- ============================================
+CREATE TABLE voice_sessions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    conversation_id UUID NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+    status VARCHAR(20) DEFAULT 'connecting' CHECK (status IN ('connecting', 'listening', 'speaking', 'processing', 'interrupted', 'ended', 'error')),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_voice_sessions_user_id ON voice_sessions(user_id);
+CREATE INDEX idx_voice_sessions_conversation_id ON voice_sessions(conversation_id);
+CREATE INDEX idx_voice_sessions_status ON voice_sessions(status);
 
 -- ============================================
 -- MEMORIES TABLE
@@ -341,6 +357,8 @@ CREATE TRIGGER update_projects_updated_at BEFORE UPDATE ON projects
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_conversations_updated_at BEFORE UPDATE ON conversations
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_voice_sessions_updated_at BEFORE UPDATE ON voice_sessions
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_messages_updated_at BEFORE UPDATE ON messages
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_message_feedback_updated_at BEFORE UPDATE ON message_feedback
@@ -407,6 +425,7 @@ ALTER TABLE attachments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE task_activities ENABLE ROW LEVEL SECURITY;
 ALTER TABLE research_sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE voice_sessions ENABLE ROW LEVEL SECURITY;
 
 -- ============================================
 -- USERS TABLE POLICIES
@@ -706,6 +725,22 @@ CREATE POLICY "Users can insert own research sessions"
 
 CREATE POLICY "Users can update own research sessions"
     ON research_sessions FOR UPDATE
+    USING (user_id = get_current_user_id())
+    WITH CHECK (user_id = get_current_user_id());
+
+-- ============================================
+-- VOICE SESSIONS POLICIES
+-- ============================================
+CREATE POLICY "Users can view own voice sessions"
+    ON voice_sessions FOR SELECT
+    USING (user_id = get_current_user_id());
+
+CREATE POLICY "Users can insert own voice sessions"
+    ON voice_sessions FOR INSERT
+    WITH CHECK (user_id = get_current_user_id());
+
+CREATE POLICY "Users can update own voice sessions"
+    ON voice_sessions FOR UPDATE
     USING (user_id = get_current_user_id())
     WITH CHECK (user_id = get_current_user_id());
 
