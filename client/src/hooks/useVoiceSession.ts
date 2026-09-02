@@ -25,6 +25,7 @@ type SpeechRecognitionLike = {
   start: () => void;
   stop: () => void;
   abort: () => void;
+  onstart: (() => void) | null;
   onresult: ((event: SpeechRecognitionEventLike) => void) | null;
   onerror: ((event: SpeechRecognitionErrorEventLike) => void) | null;
   onend: (() => void) | null;
@@ -49,6 +50,17 @@ function chooseRecorderType() {
     "audio/mp4",
   ];
   return candidates.find(type => MediaRecorder.isTypeSupported(type)) ?? null;
+}
+
+function isMobileDevice(): boolean {
+  if (typeof navigator === "undefined" || typeof window === "undefined")
+    return false;
+  const ua = navigator.userAgent;
+  return (
+    /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua) ||
+    (("ontouchstart" in window || navigator.maxTouchPoints > 0) &&
+      (window.screen?.width ?? 1024) <= 768)
+  );
 }
 
 async function toBase64(blob: Blob) {
@@ -130,6 +142,7 @@ export function useVoiceSession(options: {
   const interimRef = useRef("");
   const lastVoiceEventRef = useRef(0);
   const watchdogRef = useRef<number | null>(null);
+  const mobileRestartCountRef = useRef(0);
 
   const continuousSupported =
     typeof window !== "undefined" && getRecognitionCtor() !== null;
@@ -262,7 +275,8 @@ export function useVoiceSession(options: {
     if (
       unmountedRef.current ||
       !wantListeningRef.current ||
-      recognitionRef.current
+      recognitionRef.current ||
+      recognitionActiveRef.current
     )
       return;
     const Ctor = getRecognitionCtor();
@@ -295,6 +309,7 @@ export function useVoiceSession(options: {
         return;
       }
       if (finalText.trim()) {
+        if (isMobileDevice()) mobileRestartCountRef.current = 0;
         setInterim("");
         interimRef.current = "";
         scheduleTurn(finalText.trim());
@@ -306,6 +321,8 @@ export function useVoiceSession(options: {
     recognition.onerror = event => {
       if (event.error === "no-speech" || event.error === "aborted") return;
       recognitionActiveRef.current = false;
+      if (process.env.NODE_ENV !== "production")
+        console.log("[Voice] Recognition error:", event.error);
       if (
         event.error === "not-allowed" ||
         event.error === "service-not-allowed"
@@ -313,6 +330,13 @@ export function useVoiceSession(options: {
         hardStopInternal();
         setError(
           "Microphone access is blocked. Allow microphone access for KSEMO in your browser settings, then try again."
+        );
+      } else if (event.error === "audio-capture") {
+        hardStopInternal();
+        setError(
+          isMobileDevice()
+            ? "The microphone is unavailable. Close other apps using the microphone and try again."
+            : "Could not access the microphone. Check that it is connected and not in use by another app."
         );
       } else if (event.error === "network") {
         setError(
@@ -324,12 +348,31 @@ export function useVoiceSession(options: {
     };
     recognition.onend = () => {
       recognitionActiveRef.current = false;
+      if (process.env.NODE_ENV !== "production")
+        console.log(
+          "[Voice] Recognition ended, wantListening:",
+          wantListeningRef.current
+        );
       if (
         wantListeningRef.current &&
         !turnActiveRef.current &&
         !unmountedRef.current &&
         stateRef.current === "listening"
       ) {
+        if (isMobileDevice()) {
+          mobileRestartCountRef.current += 1;
+          if (mobileRestartCountRef.current > 8) {
+            if (process.env.NODE_ENV !== "production")
+              console.log("[Voice] Too many recognition restarts, stopping");
+            wantListeningRef.current = false;
+            setState("idle");
+            setError(
+              "Voice recognition stopped unexpectedly. Tap the microphone to try again."
+            );
+            return;
+          }
+        }
+        const restartDelay = isMobileDevice() ? 500 : 250;
         window.setTimeout(() => {
           if (
             wantListeningRef.current &&
@@ -344,8 +387,12 @@ export function useVoiceSession(options: {
               /* restart race is harmless */
             }
           }
-        }, 250);
+        }, restartDelay);
       }
+    };
+    recognition.onstart = () => {
+      if (process.env.NODE_ENV !== "production")
+        console.log("[Voice] Recognition started");
     };
     recognitionRef.current = recognition;
     try {
@@ -679,6 +726,21 @@ export function useVoiceSession(options: {
   const startListening = useCallback(async () => {
     if (stateRef.current !== "idle" || unmountedRef.current) return;
     setError(null);
+    if (isMobileDevice() && getRecognitionCtor()) {
+      if (process.env.NODE_ENV !== "production")
+        console.log(
+          "[Voice] Mobile path: SpeechRecognition only (no getUserMedia)"
+        );
+      wantListeningRef.current = true;
+      lastVoiceEventRef.current = Date.now();
+      setState("listening");
+      setInterim("");
+      interimRef.current = "";
+      mobileRestartCountRef.current = 0;
+      startWatchdog();
+      startRecognitionInternal();
+      return;
+    }
     if (!navigator.mediaDevices?.getUserMedia) {
       setError(
         "Voice input is not supported in this browser. Use a current desktop or mobile browser with microphone support."
@@ -941,6 +1003,25 @@ export function useVoiceSession(options: {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (!isMobileDevice()) return;
+    const handleVisibility = () => {
+      if (document.hidden && stateRef.current !== "idle") {
+        if (process.env.NODE_ENV !== "production")
+          console.log("[Voice] Page hidden, cleaning up voice session");
+        wantListeningRef.current = false;
+        stopRecognition();
+        stopWatchdog();
+        setInterim("");
+        interimRef.current = "";
+        setState("idle");
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () =>
+      document.removeEventListener("visibilitychange", handleVisibility);
+  }, [stopRecognition, stopWatchdog]);
 
   function sendText(text: string) {
     const trimmed = text.trim();
