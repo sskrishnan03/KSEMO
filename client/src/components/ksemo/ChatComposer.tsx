@@ -719,7 +719,7 @@ sideOffset={12}
                       onClick={onVoiceChat}
                       disabled={isRecording || isTranscribing}
                       size="icon"
-                      className="size-[45px] rounded-full bg-muted text-foreground hover:bg-accent transition-colors"
+                      className="size-[45px] rounded-full bg-muted text-foreground hover:bg-[#3A3A3A] transition-colors"
                       aria-label="Start voice chat"
                     >
                       <span className="flex items-center justify-center gap-[3px]">
