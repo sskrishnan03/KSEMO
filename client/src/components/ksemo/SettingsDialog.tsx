@@ -1028,16 +1028,16 @@ function MiniKsemoLight() {
 
 function MiniKsemoDark() {
   const s = {
-    bg: "#1A1A1A",
-    sidebar: "#0A0A0A",
-    sidebarBorder: "#262626",
-    surface: "#232323",
+    bg: "#1C1C1C",
+    sidebar: "#181818",
+    sidebarBorder: "#2A2A2A",
+    surface: "#222222",
     text: "#EDEDED",
     textSec: "#A6A6A6",
-    border: "#262626",
-    inputBg: "#222222",
-    userBubble: "#232323",
-    assistantBg: "#232323",
+    border: "#2E2E2E",
+    inputBg: "#282828",
+    userBubble: "#252525",
+    assistantBg: "#252525",
   } as const;
   return (
     <div className="flex size-full" style={{ background: s.bg }}>
@@ -1155,14 +1155,14 @@ function SystemPreviewThumb() {
     text: "#1A1A1A",
   } as const;
   const dark = {
-    bg: "#1A1A1A",
-    sidebar: "#0A0A0A",
-    sidebarBorder: "#262626",
-    border: "#262626",
+    bg: "#1C1C1C",
+    sidebar: "#181818",
+    sidebarBorder: "#2A2A2A",
+    border: "#2E2E2E",
     textSec: "#A6A6A6",
-    inputBg: "#222222",
-    userBubble: "#232323",
-    assistantBg: "#232323",
+    inputBg: "#282828",
+    userBubble: "#252525",
+    assistantBg: "#252525",
     text: "#EDEDED",
   } as const;
 

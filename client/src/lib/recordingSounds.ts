@@ -68,3 +68,19 @@ export function playRecordingStop() {
 export function playRecordingCancel() {
   chime([[392, 0]], 0.16);
 }
+
+export function playVoiceChatStart() {
+  chime([
+    [523, 0],
+    [659, 1],
+    [784, 2],
+  ], 0.1);
+}
+
+export function playVoiceChatStop() {
+  chime([
+    [784, 0],
+    [659, 1],
+    [523, 2],
+  ], 0.1);
+}

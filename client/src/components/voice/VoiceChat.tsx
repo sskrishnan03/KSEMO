@@ -1,5 +1,6 @@
 import { useVoiceSession } from "@/hooks/useVoiceSession";
 import { cn } from "@/lib/utils";
+import { playVoiceChatStart, playVoiceChatStop } from "@/lib/recordingSounds";
 import React, {
   useCallback,
   useEffect,
@@ -49,12 +50,14 @@ export function VoiceChat({
   useEffect(() => {
     if (autoStartedRef.current) return;
     autoStartedRef.current = true;
+    playVoiceChatStart();
     if (voice.continuousSupported) void voice.startListening();
     else void voice.startPushToTalk();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const requestExit = useCallback(() => {
+    playVoiceChatStop();
     voice.exitAndCleanup();
     onExit();
   }, [onExit, voice]);

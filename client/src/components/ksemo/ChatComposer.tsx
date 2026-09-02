@@ -29,14 +29,12 @@ import {
   AudioLines,
   Check,
   ChevronDown,
-  FileText,
-  FileUp,
+  Camera,
+  FilePlus2,
   Library,
   Loader2,
-  Maximize2,
   Mic,
-  Minimize2,
-  MonitorUp,
+  Paperclip,
   Plus,
   Sparkles,
   Square,
@@ -292,7 +290,7 @@ export const ChatComposer = memo(function ChatComposer({
         compactBottomSpacing ? "pb-5" : "pb-4"
       )}
     >
-      <div className="relative rounded-2xl border border-border bg-card p-1.5 shadow-sm transition-shadow focus-within:shadow-md">
+      <div className="relative rounded-2xl p-1.5 shadow-sm transition-shadow focus-within:shadow-md" style={{ backgroundColor: "#20201F", border: "1px solid #353534" }}>
         {isDragActive && (
           <div className="pointer-events-none fixed inset-0 z-[100] flex items-center justify-center bg-card/80 backdrop-blur-sm">
             <div className="rounded-2xl border-2 border-dashed border-primary/60 bg-card px-10 py-8 shadow-xl">
@@ -423,25 +421,33 @@ export const ChatComposer = memo(function ChatComposer({
               className={cn(
                 "min-h-10 resize-none border-0 !bg-transparent pl-2.5 py-1 text-[15px] leading-6 md:text-[15px] shadow-none focus-visible:ring-0 dark:!bg-transparent flex-1 ![field-sizing:manual]",
                 expanded ? "max-h-80" : "max-h-28",
-                canExpand ? "pr-8" : "pr-1"
+                canExpand ? "pr-10" : "pr-1"
               )}
               aria-label="Message KSEMO"
             />
             {canExpand && (
-              <button
-                type="button"
-                tabIndex={-1}
-                onClick={() => setExpanded(current => !current)}
-                className="absolute right-1.5 top-1.5 z-10 flex size-6 items-center justify-center rounded-full text-muted-foreground/60 transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-0 focus-visible:outline-none"
-                aria-label={expanded ? "Collapse input" : "Expand input"}
-                aria-pressed={expanded}
-              >
-                {expanded ? (
-                  <Minimize2 className="size-3.5" />
-                ) : (
-                  <Maximize2 className="size-3.5" />
-                )}
-              </button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    tabIndex={-1}
+                    onClick={() => setExpanded(current => !current)}
+                    className="absolute right-1.5 top-1.5 z-10 flex size-8 items-center justify-center rounded-full bg-transparent text-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-0 focus-visible:outline-none"
+                    aria-label={expanded ? "Collapse input" : "Expand input"}
+                    aria-pressed={expanded}
+                  >
+                    <ChevronDown
+                      className={cn(
+                        "size-5 transition-transform duration-200",
+                        expanded ? "rotate-180" : ""
+                      )}
+                    />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  {expanded ? "Collapse input" : "Expand input"}
+                </TooltipContent>
+              </Tooltip>
             )}
             {value.length === 0 && (
               <span
@@ -498,7 +504,7 @@ sideOffset={8}
                   className="ksemo-thin-scroll w-56 rounded-xl max-h-[16rem] overflow-y-auto"
                 >
                   <DropdownMenuItem onClick={() => fileInputRef.current?.click()}>
-                    <FileUp className="mr-2 size-4" /> Upload files
+                    <Paperclip className="mr-2 size-4" /> Upload files
                   </DropdownMenuItem>
                   {onTakeScreenshot && (
                     <DropdownMenuItem
@@ -507,7 +513,7 @@ sideOffset={8}
                         onTakeScreenshot();
                       }}
                     >
-                      <MonitorUp className="mr-2 size-4" />
+                      <Camera className="mr-2 size-4" />
                       Take Screenshot
                     </DropdownMenuItem>
                   )}
@@ -525,7 +531,7 @@ sideOffset={8}
                       <DropdownMenuSeparator />
                       <DropdownMenuSub>
                         <DropdownMenuSubTrigger>
-                          <FileText className="mr-2 size-4" />
+                          <FilePlus2 className="mr-2 size-4" />
                           Create Files
                         </DropdownMenuSubTrigger>
                         <DropdownMenuSubContent
@@ -754,7 +760,7 @@ sideOffset={8}
                       onClick={onVoiceChat}
                       disabled={isRecording || isTranscribing}
                       size="icon"
-                      className="size-10 rounded-full bg-muted text-foreground hover:bg-[#3A3A3A] transition-colors"
+                      className="size-10 rounded-full bg-muted text-foreground hover:bg-[#333333] transition-colors"
                       aria-label="Start voice chat"
                     >
                       <span className="flex items-center justify-center gap-[3px]">
