@@ -2116,7 +2116,7 @@ export default function Home() {
               {visibleMessages.length ? (
                 <div
                   ref={messagesBodyRef}
-                  className="mx-auto max-w-3xl space-y-7 px-4 pb-4 pt-6 sm:px-6 sm:pb-5 sm:pt-8"
+                  className="mx-auto max-w-3xl space-y-5 px-4 pb-3 pt-4 sm:px-6 sm:pb-4 sm:pt-5"
                 >
                   {visibleMessages.map(message => {
                     return (
@@ -2366,7 +2366,7 @@ const EmptyState = memo(function EmptyState({
   composer: React.ReactNode;
 }) {
   return (
-    <div className="mx-auto flex h-full w-full max-w-3xl flex-col justify-center px-5 pb-6">
+    <div className="mx-auto flex h-full w-full max-w-3xl flex-col justify-center px-5 pb-4">
       <div className="mb-4 text-center sm:mb-5">
         <p className="whitespace-nowrap text-[17px] font-bold tracking-[-0.04em] text-foreground sm:text-xl sm:tracking-[-0.025em]">
           {greeting}

@@ -185,9 +185,9 @@ export const ChatComposer = memo(function ChatComposer({
       // Reset to auto first to allow shrinking
       textarea.style.height = "auto";
       // Then set to actual scrollHeight with max constraint
-      const height = Math.min(textarea.scrollHeight, 160);
-      // Ensure minimum height of 44px for a comfortable compact layout
-      const finalHeight = Math.max(height, 44);
+      const height = Math.min(textarea.scrollHeight, 104);
+      // Ensure minimum height of 40px for a comfortable compact layout
+      const finalHeight = Math.max(height, 40);
       textarea.style.height = `${finalHeight}px`;
     });
     return () => cancelAnimationFrame(frame);
@@ -273,11 +273,11 @@ export const ChatComposer = memo(function ChatComposer({
   return (
     <div
       className={cn(
-        "mx-auto w-full max-w-3xl px-4 pt-3",
-        compactBottomSpacing ? "pb-3" : "pb-6"
+        "mx-auto w-full max-w-3xl px-4 pt-2",
+        compactBottomSpacing ? "pb-2" : "pb-4"
       )}
     >
-      <div className="relative rounded-2xl border border-border bg-card p-2 shadow-sm transition-shadow focus-within:shadow-md">
+      <div className="relative rounded-2xl border border-border bg-card p-1.5 shadow-sm transition-shadow focus-within:shadow-md">
         {isDragActive && (
           <div className="pointer-events-none fixed inset-0 z-[100] flex items-center justify-center bg-card/80 backdrop-blur-sm">
             <div className="rounded-2xl border-2 border-dashed border-primary/60 bg-card px-10 py-8 shadow-xl">
@@ -405,7 +405,7 @@ export const ChatComposer = memo(function ChatComposer({
                 }
               }}
               disabled={isGenerating || isRecording || isTranscribing}
-              className="min-h-11 max-h-32 resize-none border-0 !bg-transparent pl-2.5 pr-1 py-1 text-[15px] leading-6 md:text-[15px] shadow-none focus-visible:ring-0 focus-visible:ring-0 dark:!bg-transparent flex-1"
+              className="min-h-10 max-h-28 resize-none border-0 !bg-transparent pl-2.5 pr-1 py-1 text-[15px] leading-6 md:text-[15px] shadow-none focus-visible:ring-0 focus-visible:ring-0 dark:!bg-transparent flex-1"
               aria-label="Message KSEMO"
             />
             {value.length === 0 && (
@@ -455,10 +455,10 @@ export const ChatComposer = memo(function ChatComposer({
                     Add a file or browse Library
                   </TooltipContent>
                 </Tooltip>
-                <DropdownMenuContent
+<DropdownMenuContent
                   align="start"
                   side={menuPlacement === "below" ? "bottom" : "top"}
-sideOffset={12}
+                  sideOffset={13}
                   collisionPadding={12}
                   className="ksemo-thin-scroll w-56 rounded-xl max-h-[16rem] overflow-y-auto"
                 >
