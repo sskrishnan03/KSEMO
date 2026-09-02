@@ -747,7 +747,7 @@ sideOffset={8}
                   </TooltipTrigger>
                   <TooltipContent side="bottom">Stop generating</TooltipContent>
                 </Tooltip>
-              ) : !value.trim() && !visibleAttachmentNotices.length ? (
+              ) : !value.trim() && !visibleAttachmentNotices.length && !isRecording && !isTranscribing ? (
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
@@ -773,7 +773,7 @@ sideOffset={8}
                   </TooltipTrigger>
                   <TooltipContent side="bottom">Start voice chat</TooltipContent>
                 </Tooltip>
-              ) : (
+              ) : !isRecording && !isTranscribing ? (
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
@@ -788,7 +788,7 @@ sideOffset={8}
                   </TooltipTrigger>
                   <TooltipContent side="bottom">Send message</TooltipContent>
                 </Tooltip>
-              )}
+              ) : null}
                 </>
               )}
             </div>
