@@ -2026,13 +2026,13 @@ export default function Home() {
             </Button>
 
             {visibleMessages.length > 0 && (
-              <div className="absolute right-4 top-4 z-10">
+              <div className="absolute right-2 top-2 z-10">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="size-9 rounded-xl"
+                      className="size-9 rounded-lg"
                       aria-label="Chat actions"
                     >
                       <MoreHorizontal className="size-4" />
