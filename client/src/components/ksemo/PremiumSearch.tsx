@@ -9,6 +9,7 @@ import {
   Pin,
 } from "lucide-react";
 import { memo, useEffect, useMemo, useState } from "react";
+import { formatDistanceToNow, format, isToday, isYesterday, isThisWeek, isThisYear } from "date-fns";
 
 type SearchResult = {
   conversationId: string;
@@ -16,12 +17,51 @@ type SearchResult = {
   isPinned: boolean;
   snippet?: string;
   role?: string;
+  createdAt?: Date;
 };
 
 function snippetFromContent(content: string, maxLen = 80): string {
   const clean = content.replace(/\s+/g, " ").trim();
   if (clean.length <= maxLen) return clean;
   return clean.slice(0, maxLen) + "…";
+}
+
+function formatRelativeDate(date: Date): string {
+  if (isToday(date)) {
+    return 'Today';
+  }
+  if (isYesterday(date)) {
+    return 'Yesterday';
+  }
+  if (isThisYear(date)) {
+    return format(date, 'MMM d');
+  }
+  return format(date, 'MMM d, yyyy');
+}
+
+function groupConversationsByDate(conversations: SearchResult[]): Record<string, SearchResult[]> {
+  const groups: Record<string, SearchResult[]> = {
+    today: [],
+    yesterday: [],
+    older: [],
+  };
+
+  conversations.forEach(conv => {
+    if (!conv.createdAt) {
+      groups.older.push(conv);
+      return;
+    }
+    
+    if (isToday(conv.createdAt)) {
+      groups.today.push(conv);
+    } else if (isYesterday(conv.createdAt)) {
+      groups.yesterday.push(conv);
+    } else {
+      groups.older.push(conv);
+    }
+  });
+
+  return groups;
 }
 
 export function SearchWorkspace({
@@ -52,6 +92,11 @@ export function SearchWorkspace({
       { enabled: debouncedQuery.trim().length >= 1 }
     );
 
+  const { data: allConversations, isLoading: isLoadingAll } = trpc.conversation.getAllConversations.useQuery(
+    undefined,
+    { enabled: true }
+  );
+
   const titleMatches = useMemo(() => {
     if (!trimmed) return [];
     return conversations.filter(c => c.title.toLowerCase().includes(trimmed));
@@ -73,6 +118,7 @@ export function SearchWorkspace({
         isPinned: false,
         snippet: snippetFromContent(msg.content),
         role: msg.role,
+        createdAt: msg.createdAt,
       });
     }
 
@@ -86,7 +132,21 @@ export function SearchWorkspace({
       isPinned: c.isPinned,
     }));
 
-    const combined = [...titleResults, ...messageMatches];
+    // Add message previews for title matches from server data
+    const titleResultsWithPreviews = titleResults.map(result => {
+      const serverChat = serverData?.chats.find(c => c.conversationId === result.conversationId);
+      if (serverChat?.messagePreview) {
+        return {
+          ...result,
+          snippet: snippetFromContent(serverChat.messagePreview.content),
+          role: serverChat.messagePreview.role,
+          createdAt: serverChat.createdAt,
+        };
+      }
+      return result;
+    });
+
+    const combined = [...titleResultsWithPreviews, ...messageMatches];
     
     // Sort pinned items first
     return combined.sort((a, b) => {
@@ -94,7 +154,20 @@ export function SearchWorkspace({
       if (!a.isPinned && b.isPinned) return 1;
       return 0;
     });
-  }, [titleMatches, messageMatches]);
+  }, [titleMatches, messageMatches, serverData]);
+
+  // Use all conversations with previews when no search query
+  const allResults = useMemo(() => {
+    if (!allConversations) return [];
+    return allConversations.map(conv => ({
+      conversationId: conv.conversationId,
+      title: conv.conversationTitle,
+      isPinned: conv.isPinned,
+      snippet: conv.messagePreview ? snippetFromContent(conv.messagePreview.content) : undefined,
+      role: conv.messagePreview?.role,
+      createdAt: conv.createdAt,
+    }));
+  }, [allConversations]);
 
   const handleSelect = (id: string) => {
     onSelectConversation(id);
@@ -141,12 +214,6 @@ export function SearchWorkspace({
           </div>
         </section>
 
-        <div className="mt-4">
-          <p className="text-xs text-muted-foreground">
-            {results.length} {results.length === 1 ? "result" : "results"} shown
-          </p>
-        </div>
-
         <div className="mt-5 pb-10">
           {trimmed ? (
             searchLoading && titleMatches.length === 0 ? (
@@ -176,6 +243,11 @@ export function SearchWorkspace({
                         </p>
                       )}
                     </div>
+                    {result.createdAt && (
+                      <span className="shrink-0 text-xs text-muted-foreground">
+                        {formatRelativeDate(result.createdAt)}
+                      </span>
+                    )}
                   </button>
                 ))}
               </div>
@@ -194,23 +266,128 @@ export function SearchWorkspace({
               </div>
             )
           ) : (
-            <div className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card">
-              {conversations.length > 0 ? (
-                conversations.map((conversation) => (
-                  <button
-                    key={conversation.id}
-                    onClick={() => handleSelect(conversation.id)}
-                    className="flex w-full items-center gap-4 px-5 py-4 text-left transition-colors hover:bg-accent"
-                  >
-                    <MessageCircle className="size-5 shrink-0 text-foreground/70" />
-                    <span className="min-w-0 flex-1 truncate text-base font-medium">
-                      {conversation.title}
-                    </span>
-                    {conversation.isPinned && (
-                      <Pin className="size-3.5 shrink-0 text-primary" />
-                    )}
-                  </button>
-                ))
+            <div className="space-y-6">
+              {isLoadingAll ? (
+                <Loading className="min-h-64" />
+              ) : allResults.length > 0 ? (
+                (() => {
+                  const grouped = groupConversationsByDate(allResults);
+                  return (
+                    <>
+                      {grouped.today.length > 0 && (
+                        <div>
+                          <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Today</h3>
+                          <div className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card">
+                            {grouped.today.map((result) => (
+                              <button
+                                key={result.conversationId}
+                                onClick={() => handleSelect(result.conversationId)}
+                                className="flex w-full items-center gap-4 px-5 py-4 text-left transition-colors hover:bg-accent"
+                              >
+                                <MessageCircle className="size-5 shrink-0 text-foreground/70" />
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="truncate text-base font-medium">
+                                      {result.title}
+                                    </span>
+                                    {result.isPinned && (
+                                      <Pin className="size-3.5 shrink-0 text-primary" />
+                                    )}
+                                  </div>
+                                  {result.snippet && (
+                                    <p className="mt-1 line-clamp-1 text-sm text-muted-foreground">
+                                      {result.role === "user" ? "You: " : ""}
+                                      {result.snippet}
+                                    </p>
+                                  )}
+                                </div>
+                                {result.createdAt && (
+                                  <span className="shrink-0 text-xs text-muted-foreground">
+                                    {formatRelativeDate(result.createdAt)}
+                                  </span>
+                                )}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {grouped.yesterday.length > 0 && (
+                        <div>
+                          <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Yesterday</h3>
+                          <div className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card">
+                            {grouped.yesterday.map((result) => (
+                              <button
+                                key={result.conversationId}
+                                onClick={() => handleSelect(result.conversationId)}
+                                className="flex w-full items-center gap-4 px-5 py-4 text-left transition-colors hover:bg-accent"
+                              >
+                                <MessageCircle className="size-5 shrink-0 text-foreground/70" />
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="truncate text-base font-medium">
+                                      {result.title}
+                                    </span>
+                                    {result.isPinned && (
+                                      <Pin className="size-3.5 shrink-0 text-primary" />
+                                    )}
+                                  </div>
+                                  {result.snippet && (
+                                    <p className="mt-1 line-clamp-1 text-sm text-muted-foreground">
+                                      {result.role === "user" ? "You: " : ""}
+                                      {result.snippet}
+                                    </p>
+                                  )}
+                                </div>
+                                {result.createdAt && (
+                                  <span className="shrink-0 text-xs text-muted-foreground">
+                                    {formatRelativeDate(result.createdAt)}
+                                  </span>
+                                )}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {grouped.older.length > 0 && (
+                        <div>
+                          <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Older</h3>
+                          <div className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card">
+                            {grouped.older.map((result) => (
+                              <button
+                                key={result.conversationId}
+                                onClick={() => handleSelect(result.conversationId)}
+                                className="flex w-full items-center gap-4 px-5 py-4 text-left transition-colors hover:bg-accent"
+                              >
+                                <MessageCircle className="size-5 shrink-0 text-foreground/70" />
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="truncate text-base font-medium">
+                                      {result.title}
+                                    </span>
+                                    {result.isPinned && (
+                                      <Pin className="size-3.5 shrink-0 text-primary" />
+                                    )}
+                                  </div>
+                                  {result.snippet && (
+                                    <p className="mt-1 line-clamp-1 text-sm text-muted-foreground">
+                                      {result.role === "user" ? "You: " : ""}
+                                      {result.snippet}
+                                    </p>
+                                  )}
+                                </div>
+                                {result.createdAt && (
+                                  <span className="shrink-0 text-xs text-muted-foreground">
+                                    {formatRelativeDate(result.createdAt)}
+                                  </span>
+                                )}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()
               ) : (
                 <div className="grid min-h-72 place-items-center rounded-2xl border border-dashed border-border bg-muted/20 p-7 text-center">
                   <div>

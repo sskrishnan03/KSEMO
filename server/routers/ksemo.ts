@@ -236,14 +236,52 @@ export const conversationRouter = router({
         searchConversationMessages(ctx.user.id, input.query),
         searchConversationTitles(ctx.user.id, input.query),
       ]);
+
+      // Get latest message preview for title matches
+      const titleMatchesWithPreviews = await Promise.all(
+        titleMatches.map(async (conversation: any) => {
+          const messages = await listMessagesForConversation(conversation.id);
+          const latestMessage = messages.length > 0 ? messages[messages.length - 1] : null;
+          return {
+            conversationId: conversation.id,
+            conversationTitle: conversation.title,
+            createdAt: conversation.updatedAt,
+            messagePreview: latestMessage ? {
+              content: latestMessage.content,
+              role: latestMessage.role,
+            } : null,
+          };
+        })
+      );
+
       return {
-        chats: titleMatches.map((conversation: any) => ({
-          conversationId: conversation.id,
-          conversationTitle: conversation.title,
-          createdAt: conversation.updatedAt,
-        })),
+        chats: titleMatchesWithPreviews,
         messages: messageMatches.slice(0, 30),
       };
+    }),
+  getAllConversations: protectedProcedure
+    .query(async ({ ctx }) => {
+      const conversations = await listConversationsForUser(ctx.user.id, "active");
+      
+      // Get latest message preview for all conversations
+      const conversationsWithPreviews = await Promise.all(
+        conversations.map(async (conversation) => {
+          const messages = await listMessagesForConversation(conversation.id);
+          const latestMessage = messages.length > 0 ? messages[messages.length - 1] : null;
+          return {
+            conversationId: conversation.id,
+            conversationTitle: conversation.title,
+            createdAt: conversation.updatedAt,
+            isPinned: conversation.isPinned,
+            messagePreview: latestMessage ? {
+              content: latestMessage.content,
+              role: latestMessage.role,
+            } : null,
+          };
+        })
+      );
+
+      return conversationsWithPreviews;
     }),
 });
 
