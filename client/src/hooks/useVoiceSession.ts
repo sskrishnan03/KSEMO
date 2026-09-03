@@ -77,8 +77,8 @@ async function toBase64(blob: Blob) {
 
 const TURN_SILENCE_MS = 300;
 const INTERIM_COMMIT_MS = 800;
-const BARGE_IN_LEVEL = 0.14;
-const BARGE_IN_HOLD_MS = 380;
+const BARGE_IN_LEVEL = 0.35;
+const BARGE_IN_HOLD_MS = 800;
 
 export function useVoiceSession(options: {
   conversationId: string | null;
@@ -238,8 +238,10 @@ export function useVoiceSession(options: {
     keepaliveRef.current = window.setInterval(() => {
       if ("speechSynthesis" in window && speakPendingRef.current > 0) {
         window.speechSynthesis.resume();
+        window.speechSynthesis.pause();
+        window.speechSynthesis.resume();
       }
-    }, 10_000);
+    }, 8_000);
   }, []);
 
   const stopKeepalive = useCallback(() => {
@@ -498,11 +500,11 @@ export function useVoiceSession(options: {
     setState("idle");
   }
 
-  function scheduleTurn(text: string) {
+  function scheduleTurn(text: string, attachments?: Array<{fileId: string, name: string, mimeType?: string, url?: string}>) {
     if (turnTimerRef.current) window.clearTimeout(turnTimerRef.current);
     turnTimerRef.current = window.setTimeout(() => {
       turnTimerRef.current = null;
-      void handleTurn(text);
+      void handleTurn(text, attachments);
     }, TURN_SILENCE_MS);
   }
 
@@ -526,7 +528,9 @@ export function useVoiceSession(options: {
     if (!sentence) return;
     const lead = rawSentence.length - rawSentence.trimStart().length;
     const utterance = new SpeechSynthesisUtterance(sentence);
-    utterance.rate = Math.min(1.8, Math.max(0.6, speechRate));
+    utterance.rate = Math.min(1.6, Math.max(0.7, speechRate));
+    utterance.pitch = 1.0;
+    utterance.volume = 1.0;
     if (voiceRef.current) utterance.voice = voiceRef.current;
     speakPendingRef.current += 1;
     utterance.onstart = () => {
@@ -547,13 +551,16 @@ export function useVoiceSession(options: {
       resolveDrain();
     };
     utterance.onend = settle;
-    utterance.onerror = settle;
+    utterance.onerror = (event) => {
+      console.error('[Voice] Speech synthesis error:', event.error);
+      settle();
+    };
     window.speechSynthesis.speak(utterance);
   }
 
   function flushSpokenChunks(force: boolean) {
     const full = fullReplyRef.current;
-    const MAX_CHUNK = 250;
+    const MAX_CHUNK = 350;
     while (enqueuedLenRef.current < full.length) {
       const segment = full.slice(enqueuedLenRef.current);
       let cut = -1;
@@ -624,7 +631,7 @@ export function useVoiceSession(options: {
     drainResolverRef.current = null;
   }
 
-  async function handleTurn(userText: string) {
+  async function handleTurn(userText: string, attachments?: Array<{fileId: string, name: string, mimeType?: string, url?: string}>) {
     if (turnActiveRef.current || unmountedRef.current || !userText.trim())
       return;
     turnActiveRef.current = true;
@@ -655,6 +662,27 @@ export function useVoiceSession(options: {
 
     try {
       const activeConversationId = await ensureConversation();
+      const requestBody: Record<string, unknown> = {
+        conversationId: activeConversationId,
+        content: userText,
+        mode: "voice",
+      };
+      
+      // Add attachments if provided
+      if (attachments && attachments.length > 0) {
+        console.log('[VoiceSession] Sending attachments:', attachments);
+        requestBody.attachments = attachments.map(file => ({
+          id: file.fileId,
+          filename: file.name,
+          mimeType: file.mimeType,
+          url: file.url,
+        }));
+      } else {
+        console.log('[VoiceSession] No attachments to send');
+      }
+      
+      console.log('[VoiceSession] Request body:', JSON.stringify(requestBody, null, 2));
+      
       const response = await fetch("/api/chat/stream", {
         method: "POST",
         credentials: "include",
@@ -663,11 +691,7 @@ export function useVoiceSession(options: {
           "content-type": "application/json",
           accept: "text/event-stream",
         },
-        body: JSON.stringify({
-          conversationId: activeConversationId,
-          content: userText,
-          mode: "voice",
-        }),
+        body: JSON.stringify(requestBody),
       });
       lastActivityAt = Date.now();
       if (!response.ok || !response.body)
@@ -830,7 +854,7 @@ export function useVoiceSession(options: {
         }
         if (
           stateRef.current === "speaking" &&
-          Date.now() - lastSpeakStartRef.current > 900
+          Date.now() - lastSpeakStartRef.current > 1500
         ) {
           if (smoothed > BARGE_IN_LEVEL) {
             bargeInHoldRef.current += 16;
@@ -1067,15 +1091,15 @@ export function useVoiceSession(options: {
       document.removeEventListener("visibilitychange", handleVisibility);
   }, [stopRecognition, stopWatchdog]);
 
-  function sendText(text: string) {
+  function sendText(text: string, attachments?: Array<{fileId: string, name: string, mimeType?: string, url?: string}>) {
     const trimmed = text.trim();
     if (unmountedRef.current || !trimmed) return;
     if (turnActiveRef.current) {
       interruptSpeaking();
-      scheduleTurn(trimmed);
+      scheduleTurn(trimmed, attachments);
       return;
     }
-    void handleTurn(trimmed);
+    void handleTurn(trimmed, attachments);
   }
 
   return {

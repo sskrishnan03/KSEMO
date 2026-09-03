@@ -23,6 +23,22 @@ function fitCaptionTail(text: string): string {
   return tail.length > 0 ? tail : text.slice(-MAX_CAPTION_CHARS);
 }
 
+// Smoothly update caption to avoid jumping backwards
+function getSmoothCaption(fullText: string, previousText: string): string {
+  if (fullText.length <= MAX_CAPTION_CHARS) return fullText;
+  
+  // If the new text is just an extension of previous text, show the end
+  if (fullText.startsWith(previousText) && previousText.length > 0) {
+    const tailLength = MAX_CAPTION_CHARS;
+    const start = Math.max(0, fullText.length - tailLength);
+    while (start > 0 && !/\s/.test(fullText[start - 1])) start -= 1;
+    return fullText.slice(start).trimStart();
+  }
+  
+  // Otherwise use the normal tail function
+  return fitCaptionTail(fullText);
+}
+
 export function VoiceChat({
   conversationId,
   onConversation,
@@ -46,6 +62,7 @@ export function VoiceChat({
   });
   const autoStartedRef = useRef(false);
   const [micOff, setMicOff] = useState(false);
+  const [previousSubtitle, setPreviousSubtitle] = useState("");
 
   useEffect(() => {
     if (autoStartedRef.current) return;
@@ -55,6 +72,15 @@ export function VoiceChat({
     else void voice.startPushToTalk();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Track subtitle changes for smooth transitions
+  useEffect(() => {
+    if (voice.state === "speaking" && voice.subtitle) {
+      setPreviousSubtitle(voice.subtitle);
+    } else if (voice.state !== "speaking") {
+      setPreviousSubtitle("");
+    }
+  }, [voice.state, voice.subtitle]);
 
   const requestExit = useCallback(() => {
     playVoiceChatStop();
@@ -84,19 +110,52 @@ export function VoiceChat({
     : mutedHint
       ? "Microphone muted — tap the microphone to unmute and talk."
       : voice.state === "speaking"
-        ? fitCaptionTail(voice.subtitle)
+        ? getSmoothCaption(voice.subtitle, previousSubtitle)
         : "";
 
   const composerWithVoiceControls = useMemo(() => {
     if (!composer) return null;
     if (!React.isValidElement<Record<string, unknown>>(composer)) return composer;
+    
+    const composerProps = composer.props as Record<string, unknown>;
+    const originalOnSend = composerProps.onSend as ((content: string) => void) | undefined;
+    
     return React.cloneElement(composer, {
       voiceChatActive: true,
       voiceChatMuted: micOff,
       onVoiceChatMicToggle: handleMicToggle,
       onVoiceChatEnd: requestExit,
       onSend: (content: string) => {
-        if (content.trim()) voice.sendText(content);
+        if (content.trim()) {
+          // Handle attachments in voice chat
+          const attachmentNotices = composerProps.attachmentNotices as Array<{fileId: string, name: string, mimeType?: string, url?: string}> | undefined;
+          const attachmentNotice = composerProps.attachmentNotice as {fileId: string, name: string, mimeType?: string, url?: string} | undefined;
+          
+          // Collect all attachments
+          let attachments: Array<{fileId: string, name: string, mimeType?: string, url?: string}> = [];
+          
+          if (attachmentNotices && attachmentNotices.length > 0) {
+            attachments = [...attachmentNotices];
+            console.log('[VoiceChat] Sending with attachmentNotices:', attachments);
+          } else if (attachmentNotice) {
+            attachments = [attachmentNotice];
+            console.log('[VoiceChat] Sending with attachmentNotice:', attachments);
+          } else {
+            console.log('[VoiceChat] No attachments found');
+          }
+          
+          // Send via voice chat with attachments
+          if (attachments.length > 0) {
+            // Clear attachments after sending
+            if (composerProps.onClearAttachment) {
+              (composerProps.onClearAttachment as () => void)();
+            }
+            voice.sendText(content, attachments);
+          } else {
+            // If no attachments, use voice chat send
+            voice.sendText(content);
+          }
+        }
       },
       voices: voice.voices.map(availableVoice => ({
         name: availableVoice.name,
@@ -108,6 +167,7 @@ export function VoiceChat({
     } as Record<string, unknown>);
   }, [
     composer,
+    composer?.props,
     micOff,
     handleMicToggle,
     requestExit,
