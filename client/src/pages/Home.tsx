@@ -55,7 +55,7 @@ import { usePersistFn } from "../hooks/usePersistFn";
 import { WorkspacePanel } from "../components/ksemo/WorkspacePanel";
 import { LibraryWorkspace } from "../components/ksemo/LibraryWorkspace";
 import { VoiceChat } from "../components/voice/VoiceChat";
-import { SearchDialog } from "../components/ksemo/SearchWorkspace";
+import { SearchWorkspace } from "../components/ksemo/PremiumSearch";
 import {
   createConversationPdfFile,
   createConversationWordFile,
@@ -236,10 +236,9 @@ export default function Home() {
   const [speechState, setSpeechState] = useState<"idle" | "playing" | "paused">(
     "idle"
   );
-  const [primaryWorkspace, setPrimaryWorkspace] = useState<"library" | null>(
+  const [primaryWorkspace, setPrimaryWorkspace] = useState<"library" | "search" | null>(
     null
   );
-  const [searchOpen, setSearchOpen] = useState(false);
   const [chatFilesOpen, setChatFilesOpen] = useState(false);
   const [voiceChatOpen, setVoiceChatOpen] = useState(false);
   const activePrimaryWorkspace = primaryWorkspace ?? inlineWorkspaceSection;
@@ -1835,7 +1834,7 @@ export default function Home() {
       })
   );
   const stableOnSearch = usePersistFn(() => {
-    setSearchOpen(true);
+    setPrimaryWorkspace("search");
     setSidebarOpen(false);
   });
   const stableOnWorkspace = usePersistFn((_section: "files") => {
@@ -1848,7 +1847,6 @@ export default function Home() {
   );
   const stableOnSearchSelect = usePersistFn((id: string) => {
     selectConversation(id);
-    setSearchOpen(false);
   });
   const stableOnOpenArchivedConversation = usePersistFn(
     (conversationId: string) => {
@@ -2008,6 +2006,12 @@ export default function Home() {
           <LibraryWorkspace
             onBackToChat={() => setPrimaryWorkspace(null)}
             onChatWithFiles={startChatWithLibraryFiles}
+          />
+        ) : activePrimaryWorkspace === "search" ? (
+          <SearchWorkspace
+            onBackToChat={() => setPrimaryWorkspace(null)}
+            conversations={conversationQuery.data ?? []}
+            onSelectConversation={stableOnSearchSelect}
           />
         ) : (
           <>
@@ -2243,13 +2247,6 @@ export default function Home() {
           </>
         )}
       </main>
-
-      <SearchDialog
-        open={searchOpen}
-        onOpenChange={setSearchOpen}
-        conversations={conversationQuery.data ?? []}
-        onSelectConversation={stableOnSearchSelect}
-      />
 
       <SettingsDialog
         open={settingsOpen || isSettingsPreview}
