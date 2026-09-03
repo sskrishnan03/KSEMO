@@ -157,7 +157,7 @@ export const SearchDialog = memo(function SearchDialog({
                         {result.title}
                       </span>
                       {result.snippet && (
-                        <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-muted-foreground">
+                        <p className="mt-1 truncate text-xs leading-relaxed text-muted-foreground">
                           {result.role === "user" ? "You: " : ""}
                           {result.snippet}
                         </p>

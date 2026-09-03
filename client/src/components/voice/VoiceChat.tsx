@@ -17,9 +17,9 @@ const MAX_CAPTION_CHARS = 160;
 // growing taller (the "coming and closing" effect).
 function fitCaptionTail(text: string): string {
   if (text.length <= MAX_CAPTION_CHARS) return text;
-  let start = text.length - MAX_CAPTION_CHARS;
-  while (start < text.length && !/\s/.test(text[start])) start += 1;
-  const tail = text.slice(start).trimStart();
+  let startIndex = text.length - MAX_CAPTION_CHARS;
+  while (startIndex < text.length && !/\s/.test(text[startIndex])) startIndex += 1;
+  const tail = text.slice(startIndex).trimStart();
   return tail.length > 0 ? tail : text.slice(-MAX_CAPTION_CHARS);
 }
 
@@ -30,9 +30,9 @@ function getSmoothCaption(fullText: string, previousText: string): string {
   // If the new text is just an extension of previous text, show the end
   if (fullText.startsWith(previousText) && previousText.length > 0) {
     const tailLength = MAX_CAPTION_CHARS;
-    const start = Math.max(0, fullText.length - tailLength);
-    while (start > 0 && !/\s/.test(fullText[start - 1])) start -= 1;
-    return fullText.slice(start).trimStart();
+    let smoothStart = Math.max(0, fullText.length - tailLength);
+    while (smoothStart > 0 && !/\s/.test(fullText[smoothStart - 1])) smoothStart -= 1;
+    return fullText.slice(smoothStart).trimStart();
   }
   
   // Otherwise use the normal tail function

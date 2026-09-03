@@ -7,7 +7,6 @@ import {
   MessageCircle,
   Search,
   Pin,
-  ArrowLeft,
 } from "lucide-react";
 import { memo, useEffect, useMemo, useState } from "react";
 
@@ -124,7 +123,6 @@ export function SearchWorkspace({
               className="rounded-xl"
               onClick={onBackToChat}
             >
-              <ArrowLeft className="mr-2 size-4" />
               Back to chat
             </Button>
           </div>
