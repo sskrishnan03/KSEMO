@@ -203,9 +203,9 @@ export const MessageContent = memo(function MessageContent({
             );
             const extra = images.length - 4;
             return (
-              <div className="mb-2 flex max-w-full flex-col items-end gap-2">
+              <div className="mb-2 flex max-w-full flex-wrap items-end gap-2">
                 {images.length > 0 && (
-                  <div className="grid w-full max-w-[15rem] grid-cols-2 gap-1.5">
+                  <div className="flex flex-wrap gap-1.5">
                     {images.slice(0, 4).map((file, i) => {
                       const isLastShown = i === 3;
                       return (
@@ -213,7 +213,7 @@ export const MessageContent = memo(function MessageContent({
                           key={file.id}
                           type="button"
                           onClick={() => setLightboxIndex(i)}
-                          className="group relative aspect-square overflow-hidden rounded-lg border border-border bg-muted/50"
+                          className="group relative size-16 shrink-0 overflow-hidden rounded-lg border border-border bg-muted/50"
                           aria-label={`View ${file.filename}`}
                         >
                           <img

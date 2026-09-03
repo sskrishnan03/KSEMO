@@ -401,17 +401,7 @@ export const ChatComposer = memo(function ChatComposer({
             })}
           </div>
         )}
-        {visibleAttachmentNotices.length > 0 && (
-          <div
-            aria-hidden="true"
-            className="pointer-events-none mx-1 h-2 select-none"
-            style={{
-              background:
-                "linear-gradient(to bottom, rgba(0,0,0,0), rgba(0,0,0,0.18), rgba(0,0,0,0))",
-              backgroundBlendMode: "multiply",
-            }}
-          />
-        )}
+
 
         {/* Main Composer Content */}
         <div className="flex flex-col">
