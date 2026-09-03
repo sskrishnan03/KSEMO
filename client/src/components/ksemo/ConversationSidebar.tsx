@@ -451,7 +451,7 @@ const ConversationGroup = memo(function ConversationGroup({
             <div
               key={conversation.id}
               className={cn(
-                "group flex items-center rounded-lg",
+                "group flex items-center rounded-lg pr-1",
                 activeConversationId === conversation.id
                   ? "bg-sidebar-accent"
                   : "hover:bg-sidebar-accent"
@@ -511,7 +511,7 @@ const ConversationActionsMenu = memo(function ConversationActionsMenu({
           variant="ghost"
           size="icon"
           className={cn(
-            "size-7 shrink-0 rounded-md text-muted-foreground opacity-0",
+            "size-7 shrink-0 rounded-md text-muted-foreground opacity-0 ml-0.5",
             "transition-[opacity,background-color,color] duration-150",
             "group-hover:opacity-100 group-hover:text-foreground",
             "group-focus-within:opacity-100 focus:opacity-100 focus-visible:ring-0",
@@ -625,7 +625,7 @@ const ConversationTitleButton = memo(function ConversationTitleButton({
     <button
       onClick={() => onSelect(conversation.id)}
       aria-label={conversation.title}
-      className="flex min-w-0 flex-1 items-center gap-2 self-stretch py-2 pl-1.5 pr-0 text-left text-[13px] leading-5"
+      className="flex min-w-0 flex-1 items-center gap-2 self-stretch py-2 pl-1.5 pr-1 text-left text-[13px] leading-5"
     >
       <MessageCircle className="size-[18px] shrink-0 stroke-[2.4] text-foreground/95 transition-colors group-hover:text-foreground" />
       <Tooltip open={showTooltip}>
