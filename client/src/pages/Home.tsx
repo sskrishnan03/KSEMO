@@ -968,6 +968,9 @@ export default function Home() {
             }
           } else if (eventName === "assistant.completed") {
             lastProgressAt = Date.now();
+          } else if (eventName === "conversation.titleUpdated") {
+            // Invalidate the conversation list to refresh the sidebar with the new title
+            utils.conversation.list.invalidate();
           } else if (eventName === "assistant.error") {
             lastProgressAt = Date.now();
             errorMessage =

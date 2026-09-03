@@ -72,14 +72,133 @@ const MAX_INLINE_IMAGE_BYTES = 18 * 1024 * 1024;
 // while still allowing a generous number of images and files per message.
 const MAX_ATTACHMENTS_PER_MESSAGE = 12;
 
-// Use the user's first message directly as the conversation title. Never adds
-// an ellipsis — long titles are handled by the sidebar's edge blur and tooltip.
+// Generate an intelligent conversation title by analyzing the user's first message
+// and the first assistant response to create a concise, meaningful topic label.
 // Hard cap matches the conversations.title VARCHAR(120) column.
-function createTitle(content: string): string {
+function createTitle(userContent: string, assistantContent?: string): string {
+  const cleanedUser = userContent.replace(/\s+/g, " ").trim();
+  if (!cleanedUser) return "New conversation";
+
+  // If the user message is already short and meaningful (under 50 chars), use it directly
+  if (cleanedUser.length <= 50) {
+    return cleanedUser.slice(0, 120);
+  }
+
+  // Extract the core topic/question from the user message
+  let topic = extractTopic(cleanedUser);
+
+  // If we have assistant response, use it to refine the topic
+  if (assistantContent && topic.length > 30) {
+    const assistantTopic = extractTopic(assistantContent);
+    if (assistantTopic.length < topic.length) {
+      topic = assistantTopic;
+    }
+  }
+
+  // If topic is still too long, create a more concise version
+  if (topic.length > 60) {
+    topic = createConciseTitle(topic);
+  }
+
+  // Final safety cap
+  return topic.slice(0, 120) || cleanedUser.slice(0, 60);
+}
+
+// Quick title generation for initial conversation creation (before assistant response)
+// This provides a reasonable fallback title that can be refined later
+function createInitialTitle(content: string): string {
   const cleaned = content.replace(/\s+/g, " ").trim();
   if (!cleaned) return "New conversation";
-  if (cleaned.length <= 120) return cleaned;
-  return cleaned.slice(0, 120);
+  
+  // For initial creation, use a simpler approach
+  if (cleaned.length <= 60) {
+    return cleaned.slice(0, 120);
+  }
+  
+  // Take first meaningful sentence or phrase
+  const sentences = cleaned.split(/[.!?]/).filter(s => s.trim().length > 0);
+  const firstSentence = sentences[0]?.trim() || cleaned;
+  
+  // If still long, take first few words
+  if (firstSentence.length > 60) {
+    const words = firstSentence.split(/\s+/);
+    return words.slice(0, 8).join(" ").slice(0, 120);
+  }
+  
+  return firstSentence.slice(0, 120);
+}
+
+// Extract the main topic or question from a message
+function extractTopic(content: string): string {
+  // Remove common filler phrases
+  const fillerPatterns = [
+    /^(I need help with|I need|I want|I'm looking for|Can you help me|Please help me|I'm trying to|I am trying to|I would like to|I'd like to|Help me with|I need to|I have a question about|I have questions about)/i,
+    /^(So I want|I want to know|I want to understand|I want to learn|I want to figure out)/i,
+    /^(What is the best|What are the best|Who is the best|Which is the best)/i,
+    /^(How do I|How can I|How to|How should I|How would I)/i,
+    /^(Tell me about|Explain|Describe|Discuss|Talk about)/i,
+    /^(I'm building|I am building|I'm working on|I am working on|I'm creating|I am creating)/i,
+  ];
+
+  let cleaned = content;
+  for (const pattern of fillerPatterns) {
+    cleaned = cleaned.replace(pattern, "");
+  }
+
+  // Take the first meaningful sentence or phrase
+  const sentences = cleaned.split(/[.!?]/).filter(s => s.trim().length > 0);
+  if (sentences.length > 0) {
+    cleaned = sentences[0].trim();
+  }
+
+  // Remove trailing filler words
+  cleaned = cleaned.replace(/\s+(and|or|but|because|so|however|therefore|meanwhile|anyway|basically|essentially|just|simply|actually|really|very|quite|rather|somewhat|pretty|fairly)$/i, "");
+
+  // If still long, take first few meaningful words
+  if (cleaned.length > 60) {
+    const words = cleaned.split(/\s+/);
+    const meaningfulWords = words.filter(word => 
+      word.length > 2 && 
+      !/^(and|or|but|the|a|an|in|on|at|to|for|of|with|by|from|as|is|are|was|were|be|been|being|have|has|had|do|does|did|will|would|could|should|may|might|must|can|this|that|these|those|it|its|they|them|their|there|here|when|where|why|how|what|which|who|whom|whose)$/i.test(word)
+    );
+    
+    if (meaningfulWords.length >= 3) {
+      cleaned = meaningfulWords.slice(0, 5).join(" ");
+    } else {
+      cleaned = words.slice(0, 8).join(" ");
+    }
+  }
+
+  return cleaned.trim() || content.slice(0, 60);
+}
+
+// Create a very concise title from a longer topic
+function createConciseTitle(topic: string): string {
+  const words = topic.split(/\s+/);
+  
+  // Look for key patterns
+  const questionWords = words.filter(w => /^(what|how|why|when|where|who|which|can|could|should|would|will|do|does|did|is|are|was|were)$/i.test(w));
+  const actionWords = words.filter(w => /^(fix|create|build|implement|add|remove|improve|update|change|make|get|find|help|use|set|configure|setup|install|deploy|run|start|stop|test|debug|solve|resolve|handle|manage|optimize|refactor|migrate|convert|transform|generate|parse|process|analyze|validate|verify|check|monitor|track|log|save|load|store|retrieve|fetch|send|receive|connect|disconnect|authenticate|authorize|login|logout|register|signup|sign)$/i.test(w));
+  const subjectWords = words.filter(w => 
+    w.length > 3 && 
+    !/^(and|or|but|the|a|an|in|on|at|to|for|of|with|by|from|as|is|are|was|were|be|been|being|have|has|had|do|does|did|will|would|could|should|may|might|must|can|this|that|these|those|it|its|they|them|their|there|here|when|where|why|how|what|which|who|whom|whose)$/i.test(w) &&
+    !questionWords.includes(w) &&
+    !actionWords.includes(w)
+  );
+
+  // Try to build a concise title: action + subject or question + subject
+  let concise = "";
+  if (actionWords.length > 0 && subjectWords.length > 0) {
+    concise = `${actionWords[0]} ${subjectWords.slice(0, 2).join(" ")}`;
+  } else if (questionWords.length > 0 && subjectWords.length > 0) {
+    concise = `${questionWords[0]} ${subjectWords.slice(0, 2).join(" ")}`;
+  } else if (subjectWords.length > 0) {
+    concise = subjectWords.slice(0, 3).join(" ");
+  } else {
+    concise = words.slice(0, 4).join(" ");
+  }
+
+  return concise.trim() || topic.slice(0, 40);
 }
 
 // Separate free-tier quota bucket; used when the selected model's daily limit is hit.
@@ -245,14 +364,14 @@ export function registerChatStream(app: Express) {
         conversation = await createConversationForUser({
           id: crypto.randomUUID(),
           userId: user.id,
-          title: createTitle(content),
+          title: createInitialTitle(content),
         });
       }
 
       if (!conversation) throw new Error("Conversation creation failed");
       if (conversation.title === "New conversation" && content) {
         await updateConversationForUser(conversation.id, user.id, {
-          title: createTitle(content),
+          title: createInitialTitle(content),
         });
       }
 
@@ -373,7 +492,7 @@ export function registerChatStream(app: Express) {
         conversationId: conversation.id,
         title:
           conversation.title === "New conversation"
-            ? createTitle(content ?? "New conversation")
+            ? createInitialTitle(content ?? "New conversation")
             : conversation.title,
         userMessageId,
         assistantMessageId,
@@ -965,6 +1084,29 @@ export function registerChatStream(app: Express) {
               model: QUOTA_FALLBACK_MODEL,
             });
           }
+          
+          // Generate intelligent title after first assistant response
+          // Only do this for new conversations (not regenerations)
+          if (!body.regenerateAssistantMessageId && content) {
+            const messages = await listMessagesForConversation(conversation.id);
+            const userMessages = messages.filter(m => m.role === "user");
+            const assistantMessages = messages.filter(m => m.role === "assistant");
+            
+            // Only update title if this is the first assistant response
+            if (assistantMessages.length === 1 && userMessages.length > 0) {
+              const intelligentTitle = createTitle(content, responseText);
+              if (intelligentTitle !== conversation.title) {
+                await updateConversationForUser(conversation.id, user.id, {
+                  title: intelligentTitle,
+                });
+                writeEvent(res, "conversation.titleUpdated", {
+                  conversationId: conversation.id,
+                  title: intelligentTitle,
+                });
+              }
+            }
+          }
+          
           void memorizeConversation(user.id, conversation.id);
         } else if (fileModeFailed && !userCancelled) {
           // File Creation Mode was active but generation failed. Settle the

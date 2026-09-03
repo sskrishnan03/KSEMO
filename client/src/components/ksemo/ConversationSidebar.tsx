@@ -511,7 +511,7 @@ const ConversationActionsMenu = memo(function ConversationActionsMenu({
           variant="ghost"
           size="icon"
           className={cn(
-            "mr-0.5 size-7 shrink-0 rounded-md text-muted-foreground opacity-0",
+            "size-7 shrink-0 rounded-md text-muted-foreground opacity-0",
             "transition-[opacity,background-color,color] duration-150",
             "group-hover:opacity-100 group-hover:text-foreground",
             "group-focus-within:opacity-100 focus:opacity-100 focus-visible:ring-0",
@@ -589,6 +589,38 @@ const ConversationTitleButton = memo(function ConversationTitleButton({
   conversation: Conversation;
   onSelect: (id: string) => void;
 }) {
+  const titleRef = useRef<HTMLSpanElement>(null);
+  const [isOverflowing, setIsOverflowing] = useState(false);
+  const [showTooltip, setShowTooltip] = useState(false);
+
+  // Detect overflow using ResizeObserver and scrollWidth comparison
+  React.useEffect(() => {
+    const checkOverflow = () => {
+      if (titleRef.current) {
+        setIsOverflowing(titleRef.current.scrollWidth > titleRef.current.clientWidth);
+      }
+    };
+
+    checkOverflow();
+
+    const resizeObserver = new ResizeObserver(checkOverflow);
+    if (titleRef.current) {
+      resizeObserver.observe(titleRef.current);
+    }
+
+    return () => resizeObserver.disconnect();
+  }, [conversation.title]);
+
+  const handleMouseEnter = () => {
+    if (isOverflowing) {
+      setShowTooltip(true);
+    }
+  };
+
+  const handleMouseLeave = () => {
+    setShowTooltip(false);
+  };
+
   return (
     <button
       onClick={() => onSelect(conversation.id)}
@@ -596,18 +628,37 @@ const ConversationTitleButton = memo(function ConversationTitleButton({
       className="flex min-w-0 flex-1 items-center gap-2 self-stretch py-2 pl-1.5 pr-0 text-left text-[13px] leading-5"
     >
       <MessageCircle className="size-[18px] shrink-0 stroke-[2.4] text-foreground/95 transition-colors group-hover:text-foreground" />
-      {/* Off hover the title runs all the way to the three-dot button.
-          On hover the last ~3-4 characters blur out at the exact spot where the
-          three-dot button appears — the dots cover the faded tail. */}
-      <span
-        className={cn(
-          "min-w-0 flex-1 overflow-hidden whitespace-nowrap",
-          "group-hover:[-webkit-mask-image:linear-gradient(to_right,black_calc(100%_-_24px),transparent_100%)]",
-          "group-hover:[mask-image:linear-gradient(to_right,black_calc(100%_-_24px),transparent_100%)]"
+      <Tooltip open={showTooltip}>
+        <TooltipTrigger asChild>
+          <span
+            ref={titleRef}
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={handleMouseLeave}
+            className={cn(
+              "min-w-0 flex-1 overflow-hidden whitespace-nowrap cursor-pointer",
+              // Only apply fade effect when title is actually overflowing
+              // Subtle fade over final 2-3 characters (approximately 16-20px)
+              isOverflowing && [
+                "[-webkit-mask-image:linear-gradient(to_right,black_calc(100%_-_18px),transparent_100%)]",
+                "[mask-image:linear-gradient(to_right,black_calc(100%_-_18px),transparent_100%)]"
+              ]
+            )}
+          >
+            {conversation.title}
+          </span>
+        </TooltipTrigger>
+        {/* Only show tooltip when title is truncated */}
+        {isOverflowing && (
+          <TooltipContent 
+            side="right" 
+            sideOffset={35} 
+            collisionPadding={40}
+            className="min-w-[80px] max-w-[150px] break-words whitespace-pre-wrap leading-tight px-2.5 py-1.5"
+          >
+            {conversation.title}
+          </TooltipContent>
         )}
-      >
-        {conversation.title}
-      </span>
+      </Tooltip>
     </button>
   );
 });
