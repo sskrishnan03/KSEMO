@@ -191,7 +191,7 @@ export const ConversationSidebar = memo(function ConversationSidebar({
         ref={asideRef}
         className={cn(
           "fixed inset-y-0 left-0 z-50 flex flex-col border-r border-border bg-sidebar px-3 py-3 transition-[width,transform] duration-200 lg:static lg:translate-x-0",
-          compact ? "w-16" : "w-[16.5rem]",
+          compact ? "w-16" : "w-[17.25rem]",
           open ? "translate-x-0" : "-translate-x-full"
         )}
       >
@@ -459,14 +459,14 @@ const ConversationGroup = memo(function ConversationGroup({
                 onMouseEnter={() => setHoveredId(conversation.id)}
                 onMouseLeave={() => setHoveredId(null)}
                 className={cn(
-                  "group flex items-center rounded-lg pr-1",
+                  "group flex items-center rounded-lg pr-0",
                   (isRowActive || isHovered || isMenuOpen) && "bg-sidebar-accent"
                 )}
               >
                 <ConversationTitleButton
                   conversation={conversation}
                   onSelect={onSelect}
-                  isRowHovered={isHovered}
+                  isRowHovered={isHovered || isMenuOpen}
                 />
                 <ConversationActionsMenu
                   conversation={conversation}
@@ -526,7 +526,7 @@ const ConversationActionsMenu = memo(function ConversationActionsMenu({
           variant="ghost"
           size="icon"
           className={cn(
-            "size-7 shrink-0 rounded-md text-muted-foreground opacity-0 ml-0.5",
+            "size-7 shrink-0 rounded-md text-muted-foreground opacity-0 ml-0",
             "transition-[opacity,background-color,color] duration-150",
             "group-hover:opacity-100 group-hover:text-foreground",
             "hover:bg-accent hover:text-foreground",
@@ -640,9 +640,9 @@ const ConversationTitleButton = memo(function ConversationTitleButton({
     <button
       onClick={() => onSelect(conversation.id)}
       aria-label={conversation.title}
-      className="flex min-w-0 flex-1 items-center gap-2 self-stretch py-2 pl-1.5 pr-1 text-left text-[13px] leading-5"
+      className="flex min-w-0 flex-1 items-center gap-2 self-stretch py-2 pl-1 pr-0 text-left text-[13px] leading-5"
     >
-      <MessageCircle className="size-[18px] shrink-0 stroke-[2.4] text-foreground/95 transition-colors group-hover:text-foreground" />
+      <MessageCircle className="size-[20px] shrink-0 stroke-[2.4] text-white transition-colors group-hover:text-white" />
       <Tooltip open={showTooltip}>
         <TooltipTrigger asChild>
           <span
@@ -652,8 +652,8 @@ const ConversationTitleButton = memo(function ConversationTitleButton({
             className={cn(
               "min-w-0 flex-1 overflow-hidden whitespace-nowrap cursor-pointer transition-[mask-image] duration-150",
               isRowHovered && isOverflowing && [
-                "[-webkit-mask-image:linear-gradient(to_right,black_calc(100%_-_18px),transparent_100%)]",
-                "[mask-image:linear-gradient(to_right,black_calc(100%_-_18px),transparent_100%)]"
+                "[-webkit-mask-image:linear-gradient(to_right,black_calc(100%_-_30px),transparent_100%)]",
+                "[mask-image:linear-gradient(to_right,black_calc(100%_-_30px),transparent_100%)]"
               ]
             )}
           >
