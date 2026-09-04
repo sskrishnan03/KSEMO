@@ -428,6 +428,8 @@ const ConversationGroup = memo(function ConversationGroup({
   emptyText?: string;
 }) {
   const [expanded, setExpanded] = useState(true);
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   return (
     <section className="mb-5">
       <button
@@ -447,32 +449,42 @@ const ConversationGroup = memo(function ConversationGroup({
       </button>
       {expanded && (
         <div className="mt-0.5 space-y-0.5">
-          {conversations.map(conversation => (
-            <div
-              key={conversation.id}
-              className={cn(
-                "group flex items-center rounded-lg pr-1",
-                activeConversationId === conversation.id
-                  ? "bg-sidebar-accent"
-                  : "hover:bg-sidebar-accent"
-              )}
-            >
-              <ConversationTitleButton
-                conversation={conversation}
-                onSelect={onSelect}
-              />
-              <ConversationActionsMenu
-                conversation={conversation}
-                onRename={onRename}
-                onPin={onPin}
-                onDuplicate={onDuplicate}
-                onArchive={onArchive}
-                onShare={onShare}
-                onExport={onExport}
-                onDelete={onDelete}
-              />
-            </div>
-          ))}
+          {conversations.map(conversation => {
+            const isRowActive = activeConversationId === conversation.id;
+            const isHovered = hoveredId === conversation.id;
+            const isMenuOpen = openMenuId === conversation.id;
+            return (
+              <div
+                key={conversation.id}
+                onMouseEnter={() => setHoveredId(conversation.id)}
+                onMouseLeave={() => setHoveredId(null)}
+                className={cn(
+                  "group flex items-center rounded-lg pr-1",
+                  (isRowActive || isHovered || isMenuOpen) && "bg-sidebar-accent"
+                )}
+              >
+                <ConversationTitleButton
+                  conversation={conversation}
+                  onSelect={onSelect}
+                  isRowHovered={isHovered}
+                />
+                <ConversationActionsMenu
+                  conversation={conversation}
+                  isMenuOpen={isMenuOpen}
+                  onMenuOpenChange={open =>
+                    setOpenMenuId(open ? conversation.id : null)
+                  }
+                  onRename={onRename}
+                  onPin={onPin}
+                  onDuplicate={onDuplicate}
+                  onArchive={onArchive}
+                  onShare={onShare}
+                  onExport={onExport}
+                  onDelete={onDelete}
+                />
+              </div>
+            );
+          })}
           {!conversations.length && emptyText && (
             <p className="px-2 py-2 text-xs leading-5 text-muted-foreground">
               {emptyText}
@@ -486,6 +498,8 @@ const ConversationGroup = memo(function ConversationGroup({
 
 const ConversationActionsMenu = memo(function ConversationActionsMenu({
   conversation,
+  isMenuOpen,
+  onMenuOpenChange,
   onRename,
   onPin,
   onDuplicate,
@@ -495,6 +509,8 @@ const ConversationActionsMenu = memo(function ConversationActionsMenu({
   onDelete,
 }: {
   conversation: Conversation;
+  isMenuOpen: boolean;
+  onMenuOpenChange: (open: boolean) => void;
   onRename: (conversation: Conversation) => void;
   onPin: (conversation: Conversation) => void;
   onDuplicate: (conversation: Conversation) => void;
@@ -503,9 +519,8 @@ const ConversationActionsMenu = memo(function ConversationActionsMenu({
   onExport: (conversation: Conversation, format: "pdf" | "word") => void;
   onDelete: (conversation: Conversation) => void;
 }) {
-  const [open, setOpen] = useState(false);
   return (
-    <DropdownMenu open={open} onOpenChange={setOpen}>
+    <DropdownMenu open={isMenuOpen} onOpenChange={onMenuOpenChange}>
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
@@ -514,7 +529,6 @@ const ConversationActionsMenu = memo(function ConversationActionsMenu({
             "size-7 shrink-0 rounded-md text-muted-foreground opacity-0 ml-0.5",
             "transition-[opacity,background-color,color] duration-150",
             "group-hover:opacity-100 group-hover:text-foreground",
-            "group-focus-within:opacity-100 focus:opacity-100 focus-visible:ring-0",
             "hover:bg-accent hover:text-foreground",
             "data-[state=open]:bg-accent data-[state=open]:opacity-100"
           )}
@@ -585,15 +599,16 @@ const ConversationActionsMenu = memo(function ConversationActionsMenu({
 const ConversationTitleButton = memo(function ConversationTitleButton({
   conversation,
   onSelect,
+  isRowHovered,
 }: {
   conversation: Conversation;
   onSelect: (id: string) => void;
+  isRowHovered: boolean;
 }) {
   const titleRef = useRef<HTMLSpanElement>(null);
   const [isOverflowing, setIsOverflowing] = useState(false);
   const [showTooltip, setShowTooltip] = useState(false);
 
-  // Detect overflow using ResizeObserver and scrollWidth comparison
   React.useEffect(() => {
     const checkOverflow = () => {
       if (titleRef.current) {
@@ -635,10 +650,8 @@ const ConversationTitleButton = memo(function ConversationTitleButton({
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
             className={cn(
-              "min-w-0 flex-1 overflow-hidden whitespace-nowrap cursor-pointer",
-              // Only apply fade effect when title is actually overflowing
-              // Subtle fade over final 2-3 characters (approximately 16-20px)
-              isOverflowing && [
+              "min-w-0 flex-1 overflow-hidden whitespace-nowrap cursor-pointer transition-[mask-image] duration-150",
+              isRowHovered && isOverflowing && [
                 "[-webkit-mask-image:linear-gradient(to_right,black_calc(100%_-_18px),transparent_100%)]",
                 "[mask-image:linear-gradient(to_right,black_calc(100%_-_18px),transparent_100%)]"
               ]
@@ -647,7 +660,6 @@ const ConversationTitleButton = memo(function ConversationTitleButton({
             {conversation.title}
           </span>
         </TooltipTrigger>
-        {/* Only show tooltip when title is truncated */}
         {isOverflowing && (
           <TooltipContent 
             side="right" 

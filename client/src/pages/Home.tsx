@@ -401,6 +401,21 @@ export default function Home() {
     } catch {}
   }, [sidebarCollapsed]);
 
+  // When the browser closes, clear the stored conversation ID so the next
+  // session always opens with a fresh new chat. The conversation history is
+  // still accessible from the sidebar.
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (user?.id) {
+        try {
+          localStorage.removeItem(activeConversationStorageKey(user.id));
+        } catch {}
+      }
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [user?.id]);
+
   // When the session ends, forget the previous session's chat state so nothing
   // leaks into the next one.
   useEffect(() => {
