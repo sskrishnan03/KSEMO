@@ -526,7 +526,7 @@ const ConversationActionsMenu = memo(function ConversationActionsMenu({
           variant="ghost"
           size="icon"
           className={cn(
-            "size-7 shrink-0 rounded-md text-muted-foreground opacity-0 ml-0",
+            "size-7 shrink-0 rounded-md text-muted-foreground opacity-0 ml-0 mr-1.5",
             "transition-[opacity,background-color,color] duration-150",
             "group-hover:opacity-100 group-hover:text-foreground",
             "hover:bg-accent hover:text-foreground",
@@ -606,28 +606,58 @@ const ConversationTitleButton = memo(function ConversationTitleButton({
   isRowHovered: boolean;
 }) {
   const titleRef = useRef<HTMLSpanElement>(null);
+  const fullTitle = conversation.title;
+  const [displayTitle, setDisplayTitle] = useState(fullTitle);
+  const [wasTruncated, setWasTruncated] = useState(false);
   const [isOverflowing, setIsOverflowing] = useState(false);
   const [showTooltip, setShowTooltip] = useState(false);
 
+  // Word-safe truncation: the title is shortened to COMPLETE words that fit the
+  // available width, with "…" appended. A word is never visually cut in half.
   React.useEffect(() => {
-    const checkOverflow = () => {
-      if (titleRef.current) {
-        setIsOverflowing(titleRef.current.scrollWidth > titleRef.current.clientWidth);
+    const el = titleRef.current;
+    if (!el) return;
+
+    const compute = () => {
+      const words = fullTitle.trim().split(/\s+/).filter(Boolean);
+      if (!words.length) {
+        setDisplayTitle("");
+        setWasTruncated(false);
+        setIsOverflowing(false);
+        return;
       }
+
+      el.textContent = fullTitle;
+      const available = el.clientWidth;
+
+      let truncated = fullTitle;
+      let overflowed = false;
+      if (el.scrollWidth > available) {
+        overflowed = true;
+        let n = words.length;
+        while (n > 1 && el.scrollWidth > available) {
+          n -= 1;
+          truncated = words.slice(0, n).join(" ");
+          el.textContent = truncated;
+        }
+      }
+
+      el.textContent = truncated;
+      setDisplayTitle(words.length === 1 && overflowed ? "…" : overflowed ? truncated + "…" : truncated);
+      setWasTruncated(overflowed);
+      setIsOverflowing(el.scrollWidth > el.clientWidth);
     };
 
-    checkOverflow();
+    compute();
 
-    const resizeObserver = new ResizeObserver(checkOverflow);
-    if (titleRef.current) {
-      resizeObserver.observe(titleRef.current);
-    }
+    const resizeObserver = new ResizeObserver(compute);
+    resizeObserver.observe(el);
 
     return () => resizeObserver.disconnect();
-  }, [conversation.title]);
+  }, [fullTitle]);
 
   const handleMouseEnter = () => {
-    if (isOverflowing) {
+    if (wasTruncated) {
       setShowTooltip(true);
     }
   };
@@ -651,23 +681,23 @@ const ConversationTitleButton = memo(function ConversationTitleButton({
             onMouseLeave={handleMouseLeave}
             className={cn(
               "min-w-0 flex-1 overflow-hidden whitespace-nowrap cursor-pointer transition-[mask-image] duration-150",
-              isRowHovered && isOverflowing && [
-                "[-webkit-mask-image:linear-gradient(to_right,black_calc(100%_-_30px),transparent_100%)]",
-                "[mask-image:linear-gradient(to_right,black_calc(100%_-_30px),transparent_100%)]"
+              isRowHovered && wasTruncated && [
+                "[-webkit-mask-image:linear-gradient(to_right,black_calc(100%_-_36px),transparent_100%)]",
+                "[mask-image:linear-gradient(to_right,black_calc(100%_-_36px),transparent_100%)]"
               ]
             )}
           >
-            {conversation.title}
+            {displayTitle}
           </span>
         </TooltipTrigger>
-        {isOverflowing && (
+        {wasTruncated && (
           <TooltipContent 
             side="right" 
             sideOffset={35} 
             collisionPadding={40}
             className="min-w-[80px] max-w-[150px] break-words whitespace-pre-wrap leading-tight px-2.5 py-1.5"
           >
-            {conversation.title}
+            {fullTitle}
           </TooltipContent>
         )}
       </Tooltip>
