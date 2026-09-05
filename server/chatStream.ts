@@ -25,11 +25,12 @@ import {
   generateAndDeliverFile,
   type GeneratedFileResult,
 } from "./docgen/service";
-import type { CapabilityMode } from "@shared/research";
+import type { CapabilityMode, Source } from "@shared/research";
 import { embedSourcesInContent, parseContentWithSources } from "@shared/research";
 import { searchWeb } from "./search/webSearch";
 import { streamWebAnswer } from "./search/searchAnswer";
 import { runDeepResearch } from "./search/deepResearch";
+import { normalizeCitedSources } from "./search/sources";
 
 const BASE_SYSTEM_INSTRUCTION =
   "You are KSEMO, a thoughtful and reliable AI assistant. Be clear, accurate, respectful, and practical. Use Markdown when it improves readability. Never claim to have completed work you cannot verify. You can perform math, logic, code analysis, and general reasoning directly — do not refuse calculation or analysis questions. When asked about the current time or date, state that you do not have access to a real-time clock but you can help with time-zone conversions, date math, and scheduling if the user provides a reference time or zone.";
@@ -325,6 +326,8 @@ export function registerChatStream(app: Express) {
       documentFormat?: string;
       /** The active capability mode. See shared/research.ts. */
       mode?: string;
+      /** Backward-compatible alias sent by older clients (`activeMode`). */
+      activeMode?: string;
     };
     let content = body.content?.trim();
     const hasAttachments = (body.attachmentFileIds?.length ?? 0) > 0;
@@ -660,7 +663,7 @@ export function registerChatStream(app: Express) {
         // file format / web search / deep research). `mode` is the source of
         // truth; `documentFormat` is kept for backward compatibility.
         const requestedMode = resolveCapabilityMode(
-          body.mode ?? body.documentFormat ?? "chat"
+          body.mode ?? body.activeMode ?? body.documentFormat ?? "chat"
         );
         const FILE_FORMATS = new Set<string>([
           "pdf",
@@ -798,7 +801,7 @@ export function registerChatStream(app: Express) {
         // when the corresponding mode is active and never bleed into Normal
         // Chat or File Creation.
         // ------------------------------------------------------------------
-        if (!isRegenerationTurn && isResearchTurn && activeResearchMode) {
+        if (isResearchTurn && activeResearchMode) {
           // Create research session for tracking
           let researchSessionId: string | null = null;
           try {
@@ -815,7 +818,7 @@ export function registerChatStream(app: Express) {
             console.warn("[ChatStream] Failed to create research session", error);
           }
 
-          try {
+          researchBlock: {
             if (activeResearchMode === "web_search") {
               writeEvent(res, "research.stage", {
                 messageId: assistantMessageId,
@@ -825,7 +828,37 @@ export function registerChatStream(app: Express) {
 
               // Real live search. On failure we report a real outage rather
               // than pretending a search happened.
-              const sources = await searchWeb(content ?? "");
+              let sources: Source[];
+              try {
+                sources = await searchWeb(content ?? "");
+              } catch (searchError) {
+                const msg =
+                  searchError instanceof Error
+                    ? searchError.message
+                    : String(searchError);
+                console.warn("[ChatStream] web_search searchWeb failed", searchError);
+                researchFailed = true;
+                researchErrorText = msg.includes("not configured")
+                  ? "Web search is not configured. Please contact support."
+                  : msg.includes("429") || msg.includes("rate limit")
+                    ? "Search rate limit reached. Please wait a moment and try again."
+                    : `Web search failed: ${msg.slice(0, 200)}`;
+
+                if (researchSessionId) {
+                  await updateResearchSession(researchSessionId, {
+                    status: "failed",
+                    errorMessage: researchErrorText,
+                    completedAt: new Date(),
+                  }).catch(() => {});
+                }
+
+                writeEvent(res, "research.error", {
+                  messageId: assistantMessageId,
+                  message: researchErrorText,
+                });
+                // Skip the rest of the research block.
+                break researchBlock;
+              }
               researchSources = sources;
 
               // Update research session with sources
@@ -860,15 +893,66 @@ export function registerChatStream(app: Express) {
                 label: "Writing your answer",
               });
 
-              responseText = await streamWebAnswer({
-                query: content ?? "",
+              try {
+                responseText = await streamWebAnswer({
+                  query: content ?? "",
+                  sources: researchSources,
+                  signal: generationSignal,
+                  onDelta: delta =>
+                    writeEvent(res, "assistant.delta", {
+                      messageId: assistantMessageId,
+                      delta,
+                    }),
+                });
+              } catch (answerError) {
+                const msg =
+                  answerError instanceof Error
+                    ? answerError.message
+                    : String(answerError);
+                console.warn("[ChatStream] web_search streamWebAnswer failed", answerError);
+                researchFailed = true;
+                researchErrorText = `Could not generate an answer from search results: ${msg.slice(0, 200)}`;
+
+                if (researchSessionId) {
+                  await updateResearchSession(researchSessionId, {
+                    status: "failed",
+                    errorMessage: researchErrorText,
+                    completedAt: new Date(),
+                  }).catch(() => {});
+                }
+
+                writeEvent(res, "research.error", {
+                  messageId: assistantMessageId,
+                  message: researchErrorText,
+                  sources: researchSources.length ? researchSources : undefined,
+                });
+                break researchBlock;
+              }
+
+              // Keep only the sources the answer actually cited. Numbers are
+              // renumbered contiguously so [n] always resolves to the same
+              // source in the persisted list.
+              const normalized = normalizeCitedSources(
+                responseText,
+                researchSources
+              );
+              responseText = normalized.answer;
+              researchSources = normalized.sources;
+
+              // The client assembled the raw answer from deltas with the
+              // original numbering. Send the rewritten text so it swaps in
+              // atomically with the renumbered sources below — never leaving
+              // an inline citation pointing at the wrong source.
+              writeEvent(res, "research.rewrite", {
+                messageId: assistantMessageId,
+                content: responseText,
+              });
+
+              // Re-emit so the live chat shows exactly the sources used,
+              // matching the answer's inline citations.
+              writeEvent(res, "research.sources", {
+                messageId: assistantMessageId,
                 sources: researchSources,
-                signal: generationSignal,
-                onDelta: delta =>
-                  writeEvent(res, "assistant.delta", {
-                    messageId: assistantMessageId,
-                    delta,
-                  }),
               });
 
               // Persist the structured sources alongside the answer.
@@ -885,6 +969,8 @@ export function registerChatStream(app: Express) {
               if (researchSessionId) {
                 await updateResearchSession(researchSessionId, {
                   status: "completed",
+                  sourcesCount: researchSources.length,
+                  sourcesData: researchSources,
                   completedAt: new Date(),
                 });
               }
@@ -895,6 +981,7 @@ export function registerChatStream(app: Express) {
               });
             } else {
               // Deep Research — genuine multi-step workflow.
+              try {
               writeEvent(res, "research.stage", {
                 messageId: assistantMessageId,
                 stage: "understanding",
@@ -957,33 +1044,29 @@ export function registerChatStream(app: Express) {
                 sources: result.sources,
                 summary: result.summary,
               });
+              } catch (error) {
+                const msg =
+                  error instanceof Error ? error.message : String(error);
+                console.warn("[ChatStream] deep_research failed", error);
+                researchFailed = true;
+                researchErrorText = `Deep research could not be completed: ${msg.slice(0, 200)}`;
+
+                if (researchSessionId) {
+                  await updateResearchSession(researchSessionId, {
+                    status: "failed",
+                    errorMessage: researchErrorText,
+                    completedAt: new Date(),
+                  }).catch(() => {});
+                }
+
+                writeEvent(res, "research.error", {
+                  messageId: assistantMessageId,
+                  message: researchErrorText,
+                  sources: researchSources.length ? researchSources : undefined,
+                });
+              }
             }
-          } catch (error) {
-            console.warn(
-              `[ChatStream] ${activeResearchMode} failed`,
-              error
-            );
-            researchFailed = true;
-            researchErrorText =
-              activeResearchMode === "web_search"
-                ? "Web search is temporarily unavailable. Please try again."
-                : "Deep research could not be completed. Please try again.";
-            
-            // Mark research session as failed
-            if (researchSessionId) {
-              await updateResearchSession(researchSessionId, {
-                status: "failed",
-                errorMessage: researchErrorText,
-                completedAt: new Date(),
-              });
-            }
-            
-            writeEvent(res, "research.error", {
-              messageId: assistantMessageId,
-              message: researchErrorText,
-              sources: researchSources.length ? researchSources : undefined,
-            });
-          }
+          } // end researchBlock
         }
 
         // ------------------------------------------------------------------

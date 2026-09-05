@@ -10,9 +10,9 @@ import type { ComponentType } from "react";
 import {
   FileSpreadsheet,
   FileText,
-  FlaskConical,
+  Globe,
   Presentation,
-  Search,
+  Telescope,
 } from "lucide-react";
 import type {
   CapabilityMode,
@@ -105,7 +105,7 @@ const RESEARCH: CapabilityOption[] = [
     kind: "research",
     title: "Web Search",
     description: "Search the web and answer using real, current sources.",
-    icon: Search,
+    icon: Globe,
     iconColor: "text-sky-500",
     iconBg: "bg-sky-500/10",
     placeholder: "What would you like to search for?",
@@ -117,7 +117,7 @@ const RESEARCH: CapabilityOption[] = [
     title: "Deep Research",
     description:
       "Research a topic in depth, analyze multiple sources, and generate a structured research report.",
-    icon: FlaskConical,
+    icon: Telescope,
     iconColor: "text-violet-500",
     iconBg: "bg-violet-500/10",
     placeholder: "What topic would you like me to research?",

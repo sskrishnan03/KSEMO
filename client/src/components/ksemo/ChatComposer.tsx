@@ -36,7 +36,6 @@ import {
   Mic,
   Paperclip,
   Plus,
-  Sparkles,
   Square,
   Volume2,
   VolumeX,
@@ -50,10 +49,7 @@ import React, {
   useState,
   type ChangeEvent,
 } from "react";
-import { SourceList } from "./SourceList";
 import { FileResultCard } from "./FileResultCard";
-import { ResearchProgress } from "./ResearchProgress";
-import { parseContentWithSources } from "@shared/research";
 
 export const getLibrarySubmenuClass = (isCentered: boolean) =>
   `absolute left-1/2 -translate-x-1/2 z-50 max-h-[calc(100dvh-${isCentered ? "12rem" : "6rem"})] w-full max-w-3xl rounded-xl border border-border bg-popover p-0 text-popover-foreground shadow-xl`;
@@ -494,7 +490,7 @@ export const ChatComposer = memo(function ChatComposer({
                     </DropdownMenuTrigger>
                   </TooltipTrigger>
                   <TooltipContent side="bottom">
-                    Add a file or browse Library
+                    {MENU_TITLE}
                   </TooltipContent>
                 </Tooltip>
 <DropdownMenuContent
@@ -505,7 +501,7 @@ sideOffset={8}
                   className="ksemo-thin-scroll w-56 rounded-xl max-h-[16rem] overflow-y-auto"
                 >
                   <DropdownMenuItem onClick={() => fileInputRef.current?.click()}>
-                    <Paperclip className="mr-2 size-4" /> Upload files
+                    <Paperclip className="mr-2 size-4 text-blue-500" /> Upload files
                   </DropdownMenuItem>
                   {onTakeScreenshot && (
                     <DropdownMenuItem
@@ -514,7 +510,7 @@ sideOffset={8}
                         onTakeScreenshot();
                       }}
                     >
-                      <Camera className="mr-2 size-4" />
+                      <Camera className="mr-2 size-4 text-rose-500" />
                       Take Screenshot
                     </DropdownMenuItem>
                   )}
@@ -524,15 +520,14 @@ sideOffset={8}
                       setToolsOpen(false);
                     }}
                   >
-                    <Library className="mr-2 size-4" />
+                    <Library className="mr-2 size-4 text-amber-500" />
                     Browse Library
                   </DropdownMenuItem>
                   {!voiceChatActive && (
                     <>
-                      <DropdownMenuSeparator />
                       <DropdownMenuSub>
                         <DropdownMenuSubTrigger>
-                          <FilePlus2 className="mr-2 size-4" />
+                          <FilePlus2 className="mr-2 size-4 text-fuchsia-500" />
                           Create Files
                         </DropdownMenuSubTrigger>
                         <DropdownMenuSubContent
@@ -566,42 +561,26 @@ sideOffset={8}
                           })}
                         </DropdownMenuSubContent>
                       </DropdownMenuSub>
-                      <DropdownMenuSub>
-                        <DropdownMenuSubTrigger>
-                          <Sparkles className="mr-2 size-4" />
-                          Search & Research
-                        </DropdownMenuSubTrigger>
-                        <DropdownMenuSubContent
-                          sideOffset={6}
-                          alignOffset={-56}
-                          className="w-48 max-h-[14rem] overflow-y-auto"
-                          style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
-                        >
-                          {CAPABILITY_SECTIONS.find(s => s.id === "research")?.options.map(option => {
-                            const Icon = option.icon;
-                            const isActive = activeMode === option.mode;
-                            return (
-                              <DropdownMenuItem
-                                key={option.mode}
-                                onSelect={() => {
-                                  if (isActive) {
-                                    onModeChange?.(null);
-                                  } else {
-                                    onModeChange?.(option.mode);
-                                  }
-                                  setToolsOpen(false);
-                                }}
-                              >
-                                <Icon className={`mr-2 size-4 ${option.iconColor}`} />
-                                {option.title}
-                                {isActive && (
-                                  <Check className="ml-auto size-4 text-foreground" />
-                                )}
-                              </DropdownMenuItem>
-                            );
-                          })}
-                        </DropdownMenuSubContent>
-                      </DropdownMenuSub>
+                      <DropdownMenuSeparator />
+                      {CAPABILITY_SECTIONS.find(s => s.id === "research")?.options.map(option => {
+                        const Icon = option.icon;
+                        const isActive = activeMode === option.mode;
+                        return (
+                          <DropdownMenuItem
+                            key={option.mode}
+                            onSelect={() => {
+                              onModeChange?.(isActive ? null : option.mode);
+                              setToolsOpen(false);
+                            }}
+                          >
+                            <Icon className={`mr-2 size-4 ${option.iconColor}`} />
+                            {option.title}
+                            {isActive && (
+                              <Check className="ml-auto size-4 text-foreground" />
+                            )}
+                          </DropdownMenuItem>
+                        );
+                      })}
                     </>
                   )}
                 </DropdownMenuContent>

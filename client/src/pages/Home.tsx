@@ -63,7 +63,7 @@ import {
 import { createPublicConversationUrl } from "../lib/ksemoInteraction";
 import { saveEditedUserMessageAndRegenerate } from "../lib/editRegeneration";
 import { buildStreamingDrafts } from "../lib/streamingDrafts";
-import { type CapabilityMode } from "@shared/research";
+import { type CapabilityMode, type ResearchProgressStage, type Source } from "@shared/research";
 import { restoreUserMessageVersionAndRegenerate } from "../lib/historyRestoration";
 
 type StreamConversation = {
@@ -903,7 +903,8 @@ export default function Home() {
           attachmentFileIds: selectedAttachments.length
             ? selectedAttachments.map(file => file.fileId)
             : undefined,
-          activeMode: activeMode ?? undefined,
+          mode: activeMode ?? "chat",
+          activeMode: activeMode ?? "chat",
         }),
       });
       if (!response.ok || !response.body) {
@@ -1106,6 +1107,123 @@ export default function Home() {
                 )
               );
             }
+          } else if (eventName === "research.stage") {
+            lastProgressAt = Date.now();
+            if (isViewingThisStream()) {
+              const stage = (data.stage as ResearchProgressStage) || "searching";
+              const msgId = str(data.messageId);
+              setChatMessages(current =>
+                current.map(message =>
+                  message.id === msgId
+                    ? {
+                        ...message,
+                        researchProgress: {
+                          ...(message.researchProgress ?? {}),
+                          stage,
+                        },
+                      }
+                    : message
+                )
+              );
+            }
+          } else if (eventName === "research.sources") {
+            lastProgressAt = Date.now();
+            if (isViewingThisStream()) {
+              const incoming = data.sources as
+                | Array<Partial<Source>>
+                | undefined;
+              const msgId = str(data.messageId);
+              if (Array.isArray(incoming) && incoming.length) {
+                const incomingIds = new Set(
+                  incoming.map(s => s.sourceId).filter(Boolean)
+                );
+                const now = new Date().toISOString();
+                setChatMessages(current =>
+                  current.map(message => {
+                    if (message.id !== msgId) return message;
+                    const existing = message.sources ?? [];
+                    const merged = [
+                      ...existing.filter(
+                        s => !s.sourceId || !incomingIds.has(s.sourceId)
+                      ),
+                      ...incoming.map((s, i): Source => ({
+                        sourceId: s.sourceId ?? `local-src-${Date.now()}-${i}`,
+                        title: s.title ?? "",
+                        url: s.url ?? "",
+                        domain: s.domain ?? "",
+                        retrievedDate: s.retrievedDate ?? now,
+                        description: s.description,
+                        publishedDate: s.publishedDate,
+                        publisher: s.publisher,
+                        faviconUrl: s.faviconUrl,
+                        sourceType: s.sourceType,
+                      })),
+                    ];
+                    return { ...message, sources: merged };
+                  })
+                );
+              }
+            }
+          } else if (eventName === "research.rewrite") {
+            // The answer's citation numbers were renumbered server-side once the
+            // final answer was assembled. Swap the streamed text with the
+            // rewritten one so inline [n] markers always match the sources list.
+            lastProgressAt = Date.now();
+            const rewritten = typeof data.content === "string" ? data.content : "";
+            if (rewritten && isViewingThisStream()) {
+              const msgId = str(data.messageId);
+              // Apply any still-buffered deltas first so a pending rAF flush
+              // cannot re-append the old text onto the rewritten answer.
+              flushPendingDeltas();
+              setChatMessages(current =>
+                current.map(message =>
+                  message.id === msgId
+                    ? { ...message, content: rewritten }
+                    : message
+                )
+              );
+            }
+          } else if (eventName === "research.completed") {
+            lastProgressAt = Date.now();
+            if (isViewingThisStream()) {
+              const msgId = str(data.messageId);
+              setChatMessages(current =>
+                current.map(message =>
+                  message.id === msgId
+                    ? {
+                        ...message,
+                        researchProgress: {
+                          ...(message.researchProgress ?? {}),
+                          stage: "completed",
+                        },
+                      }
+                    : message
+                )
+              );
+            }
+          } else if (eventName === "research.error") {
+            lastProgressAt = Date.now();
+            errorMessage =
+              str(data.message) ||
+              "Web search could not complete. Please try again.";
+            if (isViewingThisStream()) {
+              const msgId = str(data.messageId);
+              setChatMessages(current =>
+                current.map(message =>
+                  message.id === msgId
+                    ? {
+                        ...message,
+                        researchProgress: {
+                          stage: "error",
+                          errorMessage:
+                            str(data.message) ||
+                            "Web search could not complete.",
+                        },
+                      }
+                    : message
+                )
+              );
+            }
           }
         }
       };
@@ -1273,6 +1391,7 @@ export default function Home() {
     if (user?.id) rememberNewChatIntent(user.id);
     setPrimaryWorkspace(null);
     setAttachmentNotices([]);
+    setActiveMode("chat");
     window.speechSynthesis?.cancel();
     setSpeakingMessageId(null);
     setSpeechState("idle");

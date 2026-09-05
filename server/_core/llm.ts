@@ -77,6 +77,62 @@ export type StreamDelta = {
   delta: string;
 };
 
+// ---------------------------------------------------------------------------
+// Assistant-text sanitization
+//
+// Some Gemini OpenAI-compatible streams emit internal placeholders like
+// "[blocked]" inside a delta when the safety filter truncates part of a
+// response. These are provider implementation markers, never legitimate user
+// content, so they must not reach the chat UI. We strip them at the stream
+// boundary and log the occurrence server-side; the client renderer additionally
+// sanitizes final text so a marker that spans two deltas can never leak either.
+// ---------------------------------------------------------------------------
+
+// Matches `[blocked]` / `[error]` / `[failed]` / `[undefined]` / `[null]` /
+// `[object Object]` (case-insensitive). A run of 2+ ellipsis dots adjacent to
+// the marker (either side) is a truncation artifact and is stripped with it; a
+// single leading period or full stop is real sentence punctuation and survives.
+const INTERNAL_MARKER =
+  /\[(?:blocked|error|failed|undefined|null|object\s+object)\]/gi;
+const MARKER_WITH_PREFIXED_ELLIPSIS =
+  /[.。…]{2,}\s*\[(?:blocked|error|failed|undefined|null|object\s+object)\]/gi;
+const MARKER_WITH_TRAILING_ELLIPSIS =
+  /\[(?:blocked|error|failed|undefined|null|object\s+object)\]\s*[.。…]{2,}/gi;
+
+let lastMarkerLogAt = 0;
+
+function logMarkerStripped(): void {
+  const now = Date.now();
+  if (now - lastMarkerLogAt > 1_000) {
+    lastMarkerLogAt = now;
+    console.warn(
+      "[llm] Stripped an internal marker (e.g. [blocked]) from assistant output."
+    );
+  }
+}
+
+/**
+ * Removes internal implementation markers from assistant text. Returns the
+ * sanitized string; empty input is returned unchanged.
+ */
+export function sanitizeAssistantText(text: string): string {
+  if (!text) return text;
+  let cleaned = text
+    .replace(MARKER_WITH_PREFIXED_ELLIPSIS, () => {
+      logMarkerStripped();
+      return "";
+    })
+    .replace(MARKER_WITH_TRAILING_ELLIPSIS, () => {
+      logMarkerStripped();
+      return "";
+    })
+    .replace(INTERNAL_MARKER, () => {
+      logMarkerStripped();
+      return "";
+    });
+  return cleaned.replace(/[ \t]{2,}/g, " ").trim();
+}
+
 export type ToolCall = {
   id: string;
   type: "function";
@@ -514,7 +570,14 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
       );
     }
 
-    return (await response.json()) as InvokeResult;
+    const result = (await response.json()) as InvokeResult;
+    for (const choice of result.choices) {
+      const content = choice?.message?.content;
+      if (typeof content === "string" && content) {
+        choice.message.content = sanitizeAssistantText(content);
+      }
+    }
+    return result;
   };
 
   const targets = buildRequestTargets();
@@ -606,10 +669,14 @@ export async function* streamLLM(
               const parsed = JSON.parse(data) as {
                 choices?: Array<{ delta?: { content?: string } }>;
               };
-              const delta = parsed.choices?.[0]?.delta?.content;
-              if (delta) {
+              const raw = parsed.choices?.[0]?.delta?.content;
+              if (raw) {
+                // Mark the stream as progressed even if the chunk is fully
+                // stripped, so a later provider fallback never re-runs an
+                // already-started answer.
                 yieldedDelta = true;
-                yield { type: "delta", delta };
+                const delta = sanitizeAssistantText(raw);
+                if (delta) yield { type: "delta", delta };
               }
             } catch {
               // Ignore malformed provider keep-alives while preserving the visible stream.
