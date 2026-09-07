@@ -112,6 +112,18 @@ function logMarkerStripped(): void {
 }
 
 /**
+ * Removes internal implementation markers from assistant streaming delta.
+ * Crucially preserves leading and trailing spaces so tokens stitch together cleanly.
+ */
+export function sanitizeAssistantDelta(delta: string): string {
+  if (!delta) return delta;
+  return delta
+    .replace(MARKER_WITH_PREFIXED_ELLIPSIS, "")
+    .replace(MARKER_WITH_TRAILING_ELLIPSIS, "")
+    .replace(INTERNAL_MARKER, "");
+}
+
+/**
  * Removes internal implementation markers from assistant text. Returns the
  * sanitized string; empty input is returned unchanged.
  */
@@ -481,7 +493,7 @@ const fetchWithBackoff = async (
     : new Error("LLM request failed after exhausting retries");
 };
 
-const DEFAULT_LLM_MODEL = "gemini-3.6-flash";
+const DEFAULT_LLM_MODEL = "gemini-flash-latest";
 
 // Separate free-tier quota bucket on the primary provider; used automatically
 // when the requested model is unavailable or rate-limited.
@@ -675,7 +687,7 @@ export async function* streamLLM(
                 // stripped, so a later provider fallback never re-runs an
                 // already-started answer.
                 yieldedDelta = true;
-                const delta = sanitizeAssistantText(raw);
+                const delta = sanitizeAssistantDelta(raw);
                 if (delta) yield { type: "delta", delta };
               }
             } catch {

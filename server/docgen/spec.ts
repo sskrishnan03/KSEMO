@@ -118,6 +118,7 @@ export const FORMAT_EXTENSIONS: Record<DocFormat, string> = {
   xlsx: "xlsx",
   pptx: "pptx",
   txt: "txt",
+  md: "md",
 };
 
 export const FORMAT_MIME: Record<DocFormat, string> = {
@@ -126,6 +127,7 @@ export const FORMAT_MIME: Record<DocFormat, string> = {
   xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
   txt: "text/plain",
+  md: "text/markdown",
 };
 
 export const DEFAULT_SUMMARY: Record<DocFormat, string> = {

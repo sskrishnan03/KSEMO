@@ -1,11 +1,12 @@
 import type { ComponentType } from "react";
 import {
+  FileCode,
   FileSpreadsheet,
   FileText,
   Presentation,
 } from "lucide-react";
 
-export type DocFormat = "pdf" | "docx" | "xlsx" | "pptx" | "txt";
+export type DocFormat = "pdf" | "docx" | "xlsx" | "pptx" | "txt" | "md";
 
 export type DocFormatOption = {
   format: DocFormat;
@@ -56,6 +57,14 @@ export const DOC_FORMAT_OPTIONS: DocFormatOption[] = [
     icon: FileText,
     colorClass: "bg-slate-500/10 text-slate-500",
     iconColor: "text-slate-500",
+  },
+  {
+    format: "md",
+    label: "Markdown",
+    hint: "Formatted Markdown document (.md)",
+    icon: FileCode,
+    colorClass: "bg-violet-500/10 text-violet-500",
+    iconColor: "text-violet-500",
   },
 ];
 

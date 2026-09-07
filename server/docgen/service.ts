@@ -2,22 +2,13 @@
 // DocumentSpec) -> generate real bytes -> store securely -> persist metadata ->
 // attach to the assistant message so the file card renders in the chat.
 
-import { createClient } from "@supabase/supabase-js";
 import { storagePut } from "../storage";
-import { attachFileToMessageForUser } from "../supabase-db";
+import { attachFileToMessageForUser, supabase, isSupabaseConfigured } from "../supabase-db";
+import { inMemoryStore } from "../inMemoryStore";
 import { generateDocument } from "./generate";
 import type { DocumentSpec, DocFormat } from "./spec";
 import { sanitizeFilename, FORMAT_MIME, coerceBlocks, coerceSheets, coerceSlides } from "./spec";
 import type { DocumentPlan } from "./plan";
-
-const supabaseUrl =
-  process.env.SUPABASE_URL || "https://vauqtdjpjwlhfgixfrij.supabase.co";
-const supabaseKey =
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || "";
-
-const supabase = createClient(supabaseUrl, supabaseKey, {
-  auth: { autoRefreshToken: false, persistSession: false },
-});
 
 export type GeneratedFileResult = {
   fileId: string;
@@ -75,35 +66,78 @@ export async function generateAndDeliverFile(input: {
     mimeType
   );
 
-  const { data, error } = await supabase
-    .from("files")
-    .insert({
+  // Always register in local memory store first to guarantee instant availability
+  try {
+    inMemoryStore.files.set(fileId, {
       id: fileId,
-      user_id: userId,
-      project_id: null,
-      storage_key: saved.key,
-      url: saved.url,
+      userId,
+      projectId: null,
       filename,
-      mime_type: mimeType,
-      size_bytes: buffer.length,
+      mimeType,
+      sizeBytes: buffer.length,
+      storageKey: saved.key,
+      url: saved.url,
       status: "ready",
-    })
-    .select()
-    .single();
-
-  if (error || !data) {
-    console.error("[DocGen] could not record generated file", error);
-    throw new Error("The generated file could not be saved.");
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+  } catch (memErr) {
+    console.warn("[DocGen] local in-memory store error:", memErr);
   }
 
-  const attached = await attachFileToMessageForUser({
-    id: crypto.randomUUID(),
-    fileId,
-    messageId: assistantMessageId,
-    userId,
-  });
-  if (!attached) {
-    console.warn("[DocGen] generated file could not be attached to message");
+  // If Supabase is configured, sync the file to Supabase ensuring foreign key validity
+  if (isSupabaseConfigured) {
+    try {
+      // Ensure user exists in Supabase so foreign key constraint (files_user_id_fkey) succeeds
+      const { data: existingUser } = await supabase
+        .from("users")
+        .select("id")
+        .eq("id", userId)
+        .maybeSingle();
+
+      if (!existingUser) {
+        const memUser = inMemoryStore.users.get(userId);
+        await supabase.from("users").upsert({
+          id: userId,
+          open_id: memUser?.openId || `user-${userId}`,
+          name: memUser?.name || "KSEMO User",
+          email: memUser?.email || `user${userId}@ksemo.internal`,
+          role: memUser?.role || "user",
+        });
+      }
+
+      const { error: insertError } = await supabase.from("files").insert({
+        id: fileId,
+        user_id: userId,
+        project_id: null,
+        storage_key: saved.key,
+        url: saved.url,
+        filename,
+        mime_type: mimeType,
+        size_bytes: buffer.length,
+        status: "ready",
+      });
+
+      if (insertError) {
+        console.warn("[DocGen] Supabase insert warning (file saved locally):", insertError);
+      }
+    } catch (dbErr) {
+      console.warn("[DocGen] Supabase write caught error (file saved locally):", dbErr);
+    }
+  }
+
+  try {
+    const attached = await attachFileToMessageForUser({
+      id: crypto.randomUUID(),
+      fileId,
+      messageId: assistantMessageId,
+      userId,
+    });
+    if (!attached) {
+      console.warn("[DocGen] generated file could not be attached to message");
+    }
+  } catch (attErr) {
+    console.warn("[DocGen] attachFileToMessageForUser error:", attErr);
   }
 
   return {

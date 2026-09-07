@@ -1,6 +1,8 @@
 import type { CreateExpressContextOptions } from "@trpc/server/adapters/express";
 import type { User } from "../supabase-db";
 import { sdk } from "./sdk";
+import { COOKIE_NAME } from "@shared/const";
+import { getSessionCookieOptions } from "./cookies";
 
 export type TrpcContext = {
   req: CreateExpressContextOptions["req"];
@@ -14,15 +16,12 @@ export async function createContext(
   let user: User | null = null;
 
   try {
-    console.log("[Context] Authenticating request for:", opts.req.url);
     user = await sdk.authenticateRequest(opts.req);
-    console.log(
-      "[Context] Authentication result:",
-      user ? "SUCCESS" : "FAILED"
-    );
-  } catch (error) {
-    // Authentication is optional for public procedures.
-    console.log("[Context] Authentication error:", String(error));
+  } catch {
+    try {
+      const cookieOptions = getSessionCookieOptions(opts.req);
+      opts.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
+    } catch {}
     user = null;
   }
 

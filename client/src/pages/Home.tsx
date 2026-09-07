@@ -41,11 +41,14 @@ import {
   FileCreationCard,
   type FileCreationStage,
 } from "../components/ksemo/FileCreationCard";
+import type { DocFormat } from "@/lib/docFormats";
 import AuthStage from "./AuthStage";
 import { ConversationSidebar } from "../components/ksemo/ConversationSidebar";
 import { MessageContent, type KsemoMessage } from "../components/ksemo/MessageContent";
+import { getAuthHeaders } from "@/lib/authHeaders";
 
 import { SettingsDialog } from "../components/ksemo/SettingsDialog";
+import { useGlobalShortcuts } from "../hooks/useGlobalShortcuts";
 import { ShareConversationDialog } from "../components/ksemo/ShareConversationDialog";
 import { ConfirmDeleteDialog } from "../components/ksemo/ConfirmDeleteDialog";
 import { KsemoTextDialogPanel } from "../components/ksemo/DialogPanels";
@@ -230,6 +233,9 @@ export default function Home() {
   } | null>(null);
   const [activeMode, setActiveMode] = useState<CapabilityMode>("chat");
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsInitialTab, setSettingsInitialTab] = useState<
+    "account" | "security" | "appearance" | "shortcuts" | "data" | "memory" | "feedback"
+  >("account");
   const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(
     null
   );
@@ -888,6 +894,7 @@ export default function Home() {
     let streamConversation: StreamConversation | null = null;
     let responseText = "";
     try {
+      const authHeaders = getAuthHeaders();
       const response = await fetch("/api/chat/stream", {
         method: "POST",
         credentials: "include",
@@ -895,6 +902,7 @@ export default function Home() {
         headers: {
           "content-type": "application/json",
           accept: "text/event-stream",
+          ...authHeaders,
         },
         body: JSON.stringify({
           conversationId: conversationId ?? undefined,
@@ -908,7 +916,12 @@ export default function Home() {
         }),
       });
       if (!response.ok || !response.body) {
-        throw new Error("The response stream could not be started.");
+        let serverError = "";
+        try {
+          const errData = await response.json();
+          serverError = errData?.error || "";
+        } catch {}
+        throw new Error(serverError || "The response stream could not be started.");
       }
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
@@ -1126,6 +1139,28 @@ export default function Home() {
                 )
               );
             }
+          } else if (eventName === "research.plan") {
+            lastProgressAt = Date.now();
+            if (isViewingThisStream()) {
+              const incomingPlan = Array.isArray(data.plan)
+                ? (data.plan as string[])
+                : [];
+              const msgId = str(data.messageId);
+              setChatMessages(current =>
+                current.map(message =>
+                  message.id === msgId
+                    ? {
+                        ...message,
+                        researchProgress: {
+                          ...(message.researchProgress ?? {}),
+                          stage: message.researchProgress?.stage ?? "planning",
+                          plan: incomingPlan,
+                        },
+                      }
+                    : message
+                )
+              );
+            }
           } else if (eventName === "research.sources") {
             lastProgressAt = Date.now();
             if (isViewingThisStream()) {
@@ -1244,10 +1279,14 @@ export default function Home() {
     } catch (error) {
       if ((error as Error).name === "AbortError" && !stalled)
         userStopped = true;
-      else if ((error as Error).name !== "AbortError")
+      else if ((error as Error).name !== "AbortError") {
+        const caught = (error as Error)?.message;
         errorMessage =
           errorMessage ??
-          "KSEMO could not start a response. Your message was kept.";
+          (caught && caught !== "The response stream could not be started."
+            ? caught
+            : "KSEMO could not start a response. Your message was kept.");
+      }
     } finally {
       clearInterval(watchdog);
     }
@@ -1976,6 +2015,23 @@ export default function Home() {
     setSidebarOpen(false);
   });
   const stableOnSettings = usePersistFn(() => setSettingsOpen(true));
+
+  useGlobalShortcuts({
+    onNewChat: stableNewChat,
+    onToggleSidebar: () => {
+      if (typeof window !== "undefined" && window.innerWidth < 768) {
+        setSidebarOpen(prev => !prev);
+      } else {
+        stableOnToggleCollapsed();
+      }
+    },
+    onOpenSettings: (tab) => {
+      if (tab) setSettingsInitialTab(tab as any);
+      setSettingsOpen(true);
+    },
+    onModeChange: (mode) => setActiveMode(mode),
+    focusTargetId: "ksemo-composer-textarea",
+  });
   const stableOnSupport = usePersistFn((topic: "faq" | "privacy" | "terms") =>
     setLocation(`/support/${topic}`)
   );
@@ -2075,7 +2131,7 @@ export default function Home() {
       value={composerValue}
       onValueChange={setComposerValue}
       activeMode={activeMode}
-      onModeChange={setActiveMode}
+      onModeChange={mode => setActiveMode(mode || "chat")}
       onAttachment={stableAttachFromComposer}
       attachmentNotices={
         isAttachmentPreview
@@ -2340,7 +2396,7 @@ export default function Home() {
                       value={composerValue}
                       onValueChange={setComposerValue}
                       activeMode={activeMode}
-                      onModeChange={setActiveMode}
+                      onModeChange={mode => setActiveMode(mode || "chat")}
                       onAttachment={stableAttachFromComposer}
                       attachmentNotices={
                         isAttachmentPreview
@@ -2385,6 +2441,7 @@ export default function Home() {
       <SettingsDialog
         open={settingsOpen || isSettingsPreview}
         onOpenChange={setSettingsOpen}
+        initialTab={settingsInitialTab}
         user={user}
         onSignOut={stableLogout}
         onAllChatsDeleted={stableOnAllChatsDeleted}

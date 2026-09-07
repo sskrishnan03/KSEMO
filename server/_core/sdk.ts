@@ -200,51 +200,23 @@ class SDKServer {
     cookieValue: string | undefined | null
   ): Promise<{ openId: string; appId: string; name: string } | null> {
     if (!cookieValue) {
-      console.warn("[Auth] Missing session cookie");
       return null;
     }
 
     try {
       const secretKey = this.getSessionSecret();
-      console.log(
-        "[Auth] Verifying session with secret length:",
-        secretKey.length
-      );
-      console.log("[Auth] Current appId:", ENV.appId);
 
       const { payload } = await jwtVerify(cookieValue, secretKey, {
         algorithms: ["HS256"],
       });
       const { openId, appId, name } = payload as Record<string, unknown>;
 
-      console.log(
-        "[Auth] Session payload - openId:",
-        openId,
-        "appId:",
-        appId,
-        "name:",
-        name
-      );
-
       if (
         !isNonEmptyString(openId) ||
         !isNonEmptyString(appId) ||
         !isNonEmptyString(name)
       ) {
-        console.warn("[Auth] Session payload missing required fields");
         return null;
-      }
-
-      // Optional: Verify appId matches current environment
-      if (ENV.appId && appId !== ENV.appId) {
-        console.warn(
-          "[Auth] Session appId mismatch - expected:",
-          ENV.appId,
-          "got:",
-          appId
-        );
-        // For now, allow mismatch to avoid breaking existing sessions
-        // In production, you might want to be stricter here
       }
 
       return {
@@ -252,8 +224,7 @@ class SDKServer {
         appId,
         name,
       };
-    } catch (error) {
-      console.warn("[Auth] Session verification failed", String(error));
+    } catch {
       return null;
     }
   }
@@ -282,32 +253,42 @@ class SDKServer {
     } as GetUserInfoWithJwtResponse;
   }
 
-  async authenticateRequest(req: Request): Promise<AuthenticatedUser> {
-    // 1. Prefer the session cookie (regular OAuth login).
-    const cookies = this.parseCookies(req.headers.cookie);
-    let sessionToken = cookies.get(COOKIE_NAME);
+  async authenticateRequest(req: Request): Promise<AuthenticatedUser | null> {
+    let sessionToken: string | undefined;
 
-    // 2. Fallback to the Authorization header (Preview auto-login via
-    //    sessionStorage), used when the browser blocks iframe cookies such as
-    //    Safari ITP, private browsing, or iOS/Android WebView.
-    if (!sessionToken) {
-      const authHeader = req.headers.authorization;
-      if (typeof authHeader === "string" && authHeader.startsWith("Bearer ")) {
-        sessionToken = authHeader.slice(7);
+    // 1. Check Authorization header (used for iframe / preview / Safari token fallback)
+    const authHeader = req.headers.authorization;
+    if (typeof authHeader === "string" && authHeader.startsWith("Bearer ")) {
+      const token = authHeader.slice(7).trim();
+      if (token) {
+        sessionToken = token;
       }
     }
 
-    const session = await this.verifySession(sessionToken);
+    let session = sessionToken ? await this.verifySession(sessionToken) : null;
 
+    // 2. If Authorization header was not present or didn't verify, check session cookie
     if (!session) {
-      throw ForbiddenError("Invalid session cookie");
+      const cookies = this.parseCookies(req.headers.cookie);
+      const cookieToken = cookies.get(COOKIE_NAME);
+      if (cookieToken && cookieToken !== sessionToken) {
+        const cookieSession = await this.verifySession(cookieToken);
+        if (cookieSession) {
+          session = cookieSession;
+          sessionToken = cookieToken;
+        }
+      }
+    }
+
+    if (!session || !sessionToken) {
+      return null;
     }
 
     if (session.openId.startsWith(CRON_OPEN_ID_PREFIX)) {
       const userInfo = await this.getUserInfoWithJwt(sessionToken ?? "");
       const taskUid = userInfo.taskUid ?? null;
       if (!taskUid) {
-        throw ForbiddenError("Cron session missing task_uid");
+        return null;
       }
       return buildCronUser(userInfo);
     }
@@ -345,14 +326,13 @@ class SDKServer {
           lastSignedIn: signedInAt,
         });
         user = await db.getUserByOpenId(userInfo.openId);
-      } catch (error) {
-        console.error("[Auth] Failed to sync user from OAuth:", error);
-        throw ForbiddenError("Failed to sync user info");
+      } catch {
+        return null;
       }
     }
 
     if (!user) {
-      throw ForbiddenError("User not found");
+      return null;
     }
 
     await db.upsertUser({

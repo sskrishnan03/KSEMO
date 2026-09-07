@@ -1,5 +1,6 @@
 import { trpc } from "@/lib/trpc";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { getAuthHeaders } from "@/lib/authHeaders";
 
 export type VoiceSessionState =
   | "idle"
@@ -683,6 +684,7 @@ export function useVoiceSession(options: {
       
       console.log('[VoiceSession] Request body:', JSON.stringify(requestBody, null, 2));
       
+      const authHeaders = getAuthHeaders();
       const response = await fetch("/api/chat/stream", {
         method: "POST",
         credentials: "include",
@@ -690,12 +692,19 @@ export function useVoiceSession(options: {
         headers: {
           "content-type": "application/json",
           accept: "text/event-stream",
+          ...authHeaders,
         },
         body: JSON.stringify(requestBody),
       });
       lastActivityAt = Date.now();
-      if (!response.ok || !response.body)
-        throw new Error("The response stream could not be started.");
+      if (!response.ok || !response.body) {
+        let serverError = "";
+        try {
+          const errData = await response.json();
+          serverError = errData?.error || "";
+        } catch {}
+        throw new Error(serverError || "The response stream could not be started.");
+      }
 
       streamOpenRef.current = true;
       const reader = response.body.getReader();

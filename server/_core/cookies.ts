@@ -22,7 +22,7 @@ function isSecureRequest(req: Request) {
 
 export function getSessionCookieOptions(
   req: Request
-): Pick<CookieOptions, "domain" | "httpOnly" | "path" | "sameSite" | "secure"> {
+): CookieOptions {
   const hostname = req.hostname || "";
   const isLocal =
     LOCAL_HOSTS.has(hostname) ||
@@ -30,8 +30,9 @@ export function getSessionCookieOptions(
     hostname === "::1" ||
     isIpAddress(hostname);
 
-  // Only set domain for non-local, non-IP hosts
-  const shouldSetDomain = hostname && !isLocal;
+  // Avoid setting explicit wildcard domain for Cloud Run (*.run.app) as it is on the Public Suffix List
+  const isCloudRun = hostname.endsWith(".run.app");
+  const shouldSetDomain = hostname && !isLocal && !isCloudRun;
 
   const domain =
     shouldSetDomain && !hostname.startsWith(".")
@@ -40,14 +41,14 @@ export function getSessionCookieOptions(
         ? hostname
         : undefined;
 
-  const secure = isSecureRequest(req);
+  const secure = !isLocal || isSecureRequest(req);
   return {
     httpOnly: true,
     path: "/",
     domain,
-    // SameSite=None requires Secure; fall back to Lax on plain HTTP (local dev)
-    // so browsers don't reject the session cookie.
+    // SameSite=None + Secure + partitioned allows cookies to work in cross-origin iframes
     sameSite: secure ? "none" : "lax",
     secure,
-  };
+    partitioned: true,
+  } as CookieOptions;
 }

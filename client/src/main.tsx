@@ -7,6 +7,7 @@ import superjson from "superjson";
 import App from "./App";
 import { startLogin } from "./const";
 import "./index.css";
+import { getAuthHeaders } from "./lib/authHeaders";
 
 const queryClient = new QueryClient();
 
@@ -43,24 +44,7 @@ const trpcClient = trpc.createClient({
       url: "/api/trpc",
       transformer: superjson,
       headers() {
-        // Auto-login fallback: when the browser blocks iframe cookies
-        // (Safari ITP / private browsing / WebView), the runtime mirrors the
-        // session into sessionStorage so we can forward it as a Bearer token.
-        // The regular OAuth cookie flow keeps working and takes priority server-side.
-        try {
-          const raw = sessionStorage.getItem("ksemo-cookie");
-          if (raw) {
-            const prefix = `${COOKIE_NAME}=`;
-            const pair = raw.split(";").find(s => s.trim().startsWith(prefix));
-            const token = pair?.trim().slice(prefix.length);
-            if (token) {
-              return { Authorization: `Bearer ${token}` };
-            }
-          }
-        } catch {
-          // sessionStorage unavailable
-        }
-        return {};
+        return getAuthHeaders();
       },
       fetch(input, init) {
         return globalThis.fetch(input, {

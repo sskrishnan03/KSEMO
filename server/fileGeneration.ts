@@ -12,7 +12,8 @@
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, Table, TableRow, TableCell, WidthType, BorderStyle } from "docx";
 import PptxGenJS from "pptxgenjs";
 import * as XLSX from "xlsx";
-import { createPdfFile } from "../client/src/lib/conversationExport";
+import { generatePdf as generatePdfDoc } from "./docgen/generate";
+import type { DocBlock } from "./docgen/spec";
 
 export type FileFormat = "pdf" | "docx" | "xlsx" | "pptx" | "txt";
 
@@ -57,14 +58,58 @@ export async function generateFile(request: FileGenerationRequest): Promise<Gene
  * Generate a PDF file with professional formatting.
  */
 async function generatePdf(content: string, title?: string, description?: string): Promise<GeneratedFile> {
-  // For now, use the existing PDF generation from conversationExport
-  // This can be enhanced with more sophisticated PDF formatting
-  const pdfBlob = createPdfFile(content);
-  const arrayBuffer = await pdfBlob.arrayBuffer();
-  const buffer = Buffer.from(arrayBuffer);
-  
+  const lines = content.split("\n");
+  const blocks: DocBlock[] = [];
+  let currentParagraph = "";
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith("# ")) {
+      if (currentParagraph) {
+        blocks.push({ type: "paragraph", text: currentParagraph });
+        currentParagraph = "";
+      }
+      blocks.push({ type: "heading", level: 1, text: trimmed.slice(2).trim() });
+    } else if (trimmed.startsWith("## ")) {
+      if (currentParagraph) {
+        blocks.push({ type: "paragraph", text: currentParagraph });
+        currentParagraph = "";
+      }
+      blocks.push({ type: "heading", level: 2, text: trimmed.slice(3).trim() });
+    } else if (trimmed.startsWith("### ")) {
+      if (currentParagraph) {
+        blocks.push({ type: "paragraph", text: currentParagraph });
+        currentParagraph = "";
+      }
+      blocks.push({ type: "heading", level: 3, text: trimmed.slice(4).trim() });
+    } else if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
+      if (currentParagraph) {
+        blocks.push({ type: "paragraph", text: currentParagraph });
+        currentParagraph = "";
+      }
+      blocks.push({ type: "bulletList", items: [trimmed.slice(2).trim()] });
+    } else if (!trimmed) {
+      if (currentParagraph) {
+        blocks.push({ type: "paragraph", text: currentParagraph });
+        currentParagraph = "";
+      }
+    } else {
+      currentParagraph = currentParagraph ? `${currentParagraph} ${trimmed}` : trimmed;
+    }
+  }
+  if (currentParagraph) {
+    blocks.push({ type: "paragraph", text: currentParagraph });
+  }
+
+  const buffer = await generatePdfDoc({
+    format: "pdf",
+    title: title || "Generated Document",
+    description,
+    blocks: blocks.length ? blocks : [{ type: "paragraph", text: content }],
+  });
+
   const filename = title ? `${sanitizeFilename(title)}.pdf` : "generated_document.pdf";
-  
+
   return {
     filename,
     mimeType: "application/pdf",
@@ -298,7 +343,7 @@ async function generatePptx(content: string, title?: string, description?: strin
   }
   
   // If no slides were created, add a title slide
-  if (pptx.slides.length === 0) {
+  if ((pptx as any).slides?.length === 0) {
     const titleSlide = pptx.addSlide();
     titleSlide.addText(title || "Presentation", {
       x: 0.5,
@@ -324,7 +369,7 @@ async function generatePptx(content: string, title?: string, description?: strin
     }
   }
   
-  const buffer = await pptx.write({ outputType: 'nodebuffer' });
+  const buffer = (await pptx.write({ outputType: 'nodebuffer' })) as Buffer;
   const filename = title ? `${sanitizeFilename(title)}.pptx` : "generated_presentation.pptx";
   
   return {

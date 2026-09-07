@@ -11,7 +11,7 @@ import { streamLLM, sanitizeAssistantText, type Message } from "../_core/llm";
 import type { Source } from "@shared/research";
 import { fetchPageText } from "./webSearch";
 
-const ANSWER_MODEL = "gemini-flash-lite-latest";
+const ANSWER_MODEL = "gemini-flash-latest";
 
 // How many sources get their page content retrieved for grounding. Beyond this
 // cap we rely on the snippet-level evidence the search provider already gives
@@ -68,7 +68,7 @@ export async function streamWebAnswer(opts: {
     "Open with a short overview that directly answers the question, then support it with specific, clearly explained claims (use a short numbered list only when it genuinely helps name the examples). " +
     "Ground every factual claim in the evidence and place inline citation markers like [1] or [1][2] immediately after the specific fact they support. " +
     "Cite ONLY the sources you actually used for that section — never cite a number you did not rely on, and never invent a citation or a source. You may cite the same source multiple times. " +
-    "Do NOT write any bracketed placeholder tokens such as [blocked], [error], or [failed] — never use a bracket for anything other than a numeric citation. " +
+    "Use square brackets strictly for numeric citations like [1] or [2]. " +
     "Never claim a comparison or ranking (e.g. 'ranked #1 in the world', 'the single greatest') unless a provided source expressly supports it. " +
     "Distinguish the basis of each claim: historical reputation, statistical performance, public polls, expert rankings, or official awards. Where different sources use different criteria, say so instead of merging them into one false universal ranking. " +
     "If a fact appears in no source, do not present it as established. Be concise and accurate. If the sources do not answer the question, clearly state that the available sources do not cover it. " +

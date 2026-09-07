@@ -29,13 +29,19 @@ export function isGoogleOAuthConfigured(): boolean {
 }
 
 function callbackUrl(req: Request): string {
-  // Allow override via environment variable for Render/deployed environments
+  // Allow override via environment variable for local or specifically configured deployments
   const override = process.env.GOOGLE_OAUTH_REDIRECT_URI;
   if (override) {
-    return override;
+    const isLocal =
+      req.hostname === "localhost" || req.hostname === "127.0.0.1";
+    if (isLocal || !override.includes("localhost")) {
+      return override;
+    }
   }
-  const url = `${req.protocol}://${req.get("host")}/api/auth/google/callback`;
-  return url;
+  const proto =
+    (req.headers["x-forwarded-proto"] as string) || req.protocol || "http";
+  const host = req.get("host");
+  return `${proto}://${host}/api/auth/google/callback`;
 }
 
 export function registerGoogleOAuthRoutes(app: Express) {

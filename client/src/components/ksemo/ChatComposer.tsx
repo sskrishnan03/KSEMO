@@ -404,6 +404,7 @@ export const ChatComposer = memo(function ChatComposer({
           {/* Text Input Area */}
           <div className="relative flex flex-1">
             <Textarea
+              id="ksemo-composer-textarea"
               ref={textareaRef}
               value={value}
               onChange={event => onValueChange(event.target.value)}

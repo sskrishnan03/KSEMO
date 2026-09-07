@@ -167,7 +167,7 @@ export function VoiceChat({
     } as Record<string, unknown>);
   }, [
     composer,
-    composer?.props,
+    (composer as any)?.props,
     micOff,
     handleMicToggle,
     requestExit,

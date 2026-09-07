@@ -20,6 +20,7 @@ import fs from "fs";
 import { buildUserMemoryContext } from "./memory/retrieval";
 import { memorizeConversation } from "./memory/autoMemorize";
 import { planDocument } from "./docgen/plan";
+import { likelyFormatHint, looksLikeFileRequest } from "./docgen/detect";
 import {
   buildDocumentSpec,
   generateAndDeliverFile,
@@ -290,6 +291,15 @@ function writeEvent(res: Response, event: string, payload: unknown) {
  */
 function resolveCapabilityMode(raw: string | undefined | null): CapabilityMode {
   const value = (raw ?? "").toLowerCase().trim();
+  if (
+    value === "create_file" ||
+    value === "create_files" ||
+    value === "doc" ||
+    value === "document" ||
+    value === "file"
+  ) {
+    return "pdf";
+  }
   const valid: CapabilityMode[] = [
     "chat",
     "pdf",
@@ -297,6 +307,7 @@ function resolveCapabilityMode(raw: string | undefined | null): CapabilityMode {
     "xlsx",
     "pptx",
     "txt",
+    "md",
     "web_search",
     "deep_research",
   ];
@@ -314,6 +325,10 @@ export function registerChatStream(app: Express) {
     try {
       user = await sdk.authenticateRequest(req);
     } catch {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
+    if (!user) {
       res.status(401).json({ error: "Authentication required" });
       return;
     }
@@ -997,6 +1012,19 @@ export function registerChatStream(app: Express) {
                     stage,
                     label: label ?? stage,
                   }),
+                onPlan: plan =>
+                  writeEvent(res, "research.plan", {
+                    messageId: assistantMessageId,
+                    plan,
+                  }),
+                onSourcesGathered: sources => {
+                  if (sources && sources.length) {
+                    writeEvent(res, "research.sources", {
+                      messageId: assistantMessageId,
+                      sources,
+                    });
+                  }
+                },
                 onDelta: delta =>
                   writeEvent(res, "assistant.delta", {
                     messageId: assistantMessageId,

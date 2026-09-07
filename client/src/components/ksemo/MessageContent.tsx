@@ -35,7 +35,6 @@ import { ShareIcon } from "./icons";
 import React, { memo, useEffect, useMemo, useState } from "react";
 import { Streamdown } from "streamdown";
 import { KsemoMarkdownCode } from "./code-block";
-import { FileResultCard } from "./FileResultCard";
 import { SourcesControl } from "./research/SourcesControl";
 import { SearchActivity } from "./research/SearchActivity";
 import { SourceCitation } from "./SourceCitation";
@@ -63,6 +62,8 @@ type KsemoMessage = {
   researchProgress?: {
     stage: "understanding" | "planning" | "searching" | "retrieving" | "analyzing" | "comparing" | "writing" | "completed" | "error";
     mode?: ResearchMode;
+    plan?: string[];
+    label?: string;
     errorMessage?: string;
   };
   /** Live sources streamed while a web search / deep research runs. */
@@ -424,6 +425,8 @@ export const MessageContent = memo(function MessageContent({
             stage={message.researchProgress?.stage}
             active={researchInProgress}
             sourceCount={activeSources.length}
+            sources={activeSources}
+            plan={message.researchProgress?.plan}
             className="mb-1"
           />
         )}
@@ -477,37 +480,8 @@ export const MessageContent = memo(function MessageContent({
           />
         )}
         
-        {/* File generation result card */}
-        {!isUser && message.fileGeneration && message.fileGeneration.status === "created" && message.attachments?.length === 1 && (
-          <div className="mt-3">
-            <FileResultCard
-              file={{
-                filename: message.attachments[0].filename,
-                mimeType: message.attachments[0].mimeType || "application/octet-stream",
-                size: message.attachments[0].sizeBytes || 0,
-                downloadUrl: message.attachments[0].url,
-                status: "completed",
-              }}
-              onDownload={() => {
-                const link = document.createElement('a');
-                link.href = message.attachments![0].url;
-                link.download = message.attachments![0].filename;
-                link.click();
-              }}
-            />
-          </div>
-        )}
-        
-        {/* File generation error state */}
-        {!isUser && message.fileGeneration && message.fileGeneration.status === "error" && (
-          <div className="mt-3 p-3 rounded-lg border border-red-200 bg-red-50 dark:border-red-900/30 dark:bg-red-950/20">
-            <p className="text-sm text-red-800 dark:text-red-200">
-              {message.fileGeneration.errorMessage || "Failed to generate file. Please try again."}
-            </p>
-          </div>
-        )}
-        
-        {!isUser && message.attachments?.length ? (
+        {/* Attachments (e.g. images, uploaded files; generated document is presented via primary FileCreationCard) */}
+        {!isUser && message.attachments?.length && !message.fileGeneration ? (
           <div className="mt-2 flex max-w-full flex-col items-start gap-2">
             {message.attachments.map(file => {
               const kind = getFileKind(file.filename, file.mimeType);

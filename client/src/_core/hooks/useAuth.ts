@@ -43,6 +43,10 @@ export function useAuth(options?: UseAuthOptions) {
       // header-based sessions are logged out too. The backend cookie is cleared by the logout mutation.
       try {
         sessionStorage.removeItem("ksemo-cookie");
+        localStorage.removeItem("ksemo-cookie");
+        sessionStorage.removeItem("ksemo-token");
+        localStorage.removeItem("ksemo-token");
+        localStorage.removeItem("ksemo-user-info");
       } catch {}
       utils.auth.me.setData(undefined, null);
       await utils.auth.me.invalidate();

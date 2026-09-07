@@ -40,13 +40,13 @@ interface FileResultCardProps {
   className?: string;
 }
 
-const FILE_TYPE_CONFIG: Record<FileFormat, { icon: typeof FileOutput; color: string; bgClass: string; label: string }> = {
-  pdf: { icon: FileOutput, color: "text-red-500", bgClass: "bg-red-500/10", label: "PDF" },
-  docx: { icon: FileText, color: "text-blue-600", bgClass: "bg-blue-500/10", label: "Word" },
-  xlsx: { icon: FileSpreadsheet, color: "text-emerald-600", bgClass: "bg-emerald-500/10", label: "Excel" },
-  pptx: { icon: Presentation, color: "text-orange-500", bgClass: "bg-orange-500/10", label: "PowerPoint" },
-  txt: { icon: FileText, color: "text-slate-500", bgClass: "bg-slate-500/10", label: "Text" },
-  md: { icon: FileCode2, color: "text-indigo-500", bgClass: "bg-indigo-500/10", label: "Markdown" },
+const FILE_TYPE_CONFIG: Record<FileFormat, { icon: typeof FileOutput; label: string }> = {
+  pdf: { icon: FileOutput, label: "PDF" },
+  docx: { icon: FileText, label: "Word" },
+  xlsx: { icon: FileSpreadsheet, label: "Excel" },
+  pptx: { icon: Presentation, label: "PowerPoint" },
+  txt: { icon: FileText, label: "Text" },
+  md: { icon: FileCode2, label: "Markdown" },
 };
 
 function formatFileSize(bytes: number): string {
@@ -75,8 +75,8 @@ export function FileResultCard({ file, onDownload, className }: FileResultCardPr
       )}
     >
       {/* File Icon */}
-      <div className={`flex size-12 shrink-0 items-center justify-center rounded-lg ${config.bgClass}`}>
-        <Icon className={`size-6 ${config.color}`} />
+      <div className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-muted text-foreground border border-border">
+        <Icon className="size-5" />
       </div>
 
       {/* File Info */}
@@ -94,19 +94,19 @@ export function FileResultCard({ file, onDownload, className }: FileResultCardPr
             {formatFileSize(file.size)}
           </span>
           {file.status === "completed" && (
-            <span className="flex items-center gap-1 text-xs text-green-600">
-              <CheckCircle2 className="size-3" />
-              Created successfully
+            <span className="flex items-center gap-1 text-xs text-foreground font-medium">
+              <CheckCircle2 className="size-3 text-primary" />
+              Generated
             </span>
           )}
           {file.status === "generating" && (
             <span className="flex items-center gap-1 text-xs text-muted-foreground">
-              <Loader2 className="size-3 animate-spin" />
-              Generating...
+              <Loader2 className="size-3 animate-spin text-primary" />
+              Compiling...
             </span>
           )}
           {file.status === "error" && (
-            <span className="flex items-center gap-1 text-xs text-red-600">
+            <span className="flex items-center gap-1 text-xs text-destructive">
               <AlertCircle className="size-3" />
               {file.error || "Failed to create file"}
             </span>

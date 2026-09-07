@@ -22,16 +22,17 @@ export type CapabilityMode =
   | "xlsx"
   | "pptx"
   | "txt"
+  | "md"
   | "web_search"
   | "deep_research";
 
 /** A mode in the CREATE section of the capability menu. */
-export type CreateMode = "pdf" | "docx" | "xlsx" | "pptx" | "txt";
+export type CreateMode = "pdf" | "docx" | "xlsx" | "pptx" | "txt" | "md";
 
 /**
  * File format type for file generation.
  */
-export type FileFormat = "pdf" | "docx" | "xlsx" | "pptx" | "txt";
+export type FileFormat = "pdf" | "docx" | "xlsx" | "pptx" | "txt" | "md";
 
 /** A mode in the SEARCH & RESEARCH section of the capability menu. */
 export type ResearchMode = "web_search" | "deep_research";
@@ -42,6 +43,7 @@ export const CREATE_MODES: CreateMode[] = [
   "xlsx",
   "pptx",
   "txt",
+  "md",
 ];
 
 export const RESEARCH_MODES: ResearchMode[] = ["web_search", "deep_research"];

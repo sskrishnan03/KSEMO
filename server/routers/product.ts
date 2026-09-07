@@ -1,27 +1,9 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { createClient } from "@supabase/supabase-js";
 import { storagePut } from "../storage";
 import { extractFileText, extensionOf } from "../fileExtract";
 import { protectedProcedure, router } from "../_core/trpc";
-
-// The anon key cannot be used here: RLS policies require a Supabase Auth
-// session (auth.uid()), which a server-side client never has. Use the service
-// role key like supabase-db.ts; ownership is enforced per-query via user_id.
-const supabaseUrl =
-  process.env.SUPABASE_URL || "https://vauqtdjpjwlhfgixfrij.supabase.co";
-const supabaseKey =
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || "";
-
-if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
-  console.error(
-    "[Workspace] SUPABASE_SERVICE_ROLE_KEY missing - RLS will block files/projects"
-  );
-}
-
-const supabase = createClient(supabaseUrl, supabaseKey, {
-  auth: { autoRefreshToken: false, persistSession: false },
-});
+import { supabase } from "../supabase-db";
 
 const entityId = z.string().min(8).max(36);
 const projectInput = z.object({

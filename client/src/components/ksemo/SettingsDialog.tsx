@@ -38,6 +38,7 @@ import {
   ExternalLink,
   HelpCircle,
   KeyRound,
+  Keyboard,
   Lightbulb,
   Link2,
   LogOut,
@@ -81,6 +82,7 @@ type SettingsTab =
   | "account"
   | "security"
   | "appearance"
+  | "shortcuts"
   | "data"
   | "memory"
   | "feedback";
@@ -107,6 +109,7 @@ const settingsNavItems: Array<{
   { id: "account", label: "Account", icon: User },
   { id: "security", label: "Security", icon: ShieldCheck },
   { id: "appearance", label: "Appearance", icon: Palette },
+  { id: "shortcuts", label: "Shortcuts", icon: Keyboard },
   { id: "data", label: "Data Control", icon: Trash2 },
   { id: "memory", label: "Memory", icon: Brain },
   { id: "feedback", label: "Feedback", icon: MessageSquare },
@@ -172,6 +175,22 @@ const settingsSearchIndex: Array<{
     tab: "appearance",
     label: "Theme",
     hint: "Appearance",
+  },
+
+  {
+    tab: "shortcuts",
+    label: "Keyboard shortcuts",
+    hint: "Shortcuts",
+  },
+  {
+    tab: "shortcuts",
+    label: "Cmd+K Focus Search Input",
+    hint: "Shortcuts",
+  },
+  {
+    tab: "shortcuts",
+    label: "Global hotkeys and navigation",
+    hint: "Shortcuts",
   },
 
   {
@@ -366,6 +385,7 @@ export const SettingsDialog = memo(function SettingsDialog({
   onAllChatsDeleted,
   onAccountDeleted,
   onOpenConversation,
+  initialTab,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -374,8 +394,15 @@ export const SettingsDialog = memo(function SettingsDialog({
   onAllChatsDeleted: () => void;
   onAccountDeleted?: () => void;
   onOpenConversation?: (conversationId: string) => void;
+  initialTab?: SettingsTab;
 }) {
-  const [activeTab, setActiveTab] = useState<SettingsTab>("account");
+  const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab || "account");
+
+  useEffect(() => {
+    if (initialTab && open) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab, open]);
   const [archivedOpen, setArchivedOpen] = useState(false);
   const [sharedOpen, setSharedOpen] = useState(false);
   const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
@@ -498,6 +525,18 @@ export const SettingsDialog = memo(function SettingsDialog({
               )}
               {activeTab === "security" && <SecuritySection user={user} />}
               {activeTab === "appearance" && <AppearanceSection />}
+              {activeTab === "shortcuts" && (
+                <ShortcutsSection
+                  onTryFocusComposer={() => {
+                    onOpenChange(false);
+                    setTimeout(() => {
+                      document
+                        .getElementById("ksemo-composer-textarea")
+                        ?.focus();
+                    }, 150);
+                  }}
+                />
+              )}
               {activeTab === "data" && (
                 <DataSection
                   onOpenArchived={() => setArchivedOpen(true)}
@@ -1918,5 +1957,167 @@ function SharedChatsDialog({
         }}
       />
     </>
+  );
+}
+
+function ShortcutsSection({
+  onTryFocusComposer,
+}: {
+  onTryFocusComposer?: () => void;
+}) {
+  const isMac =
+    typeof navigator !== "undefined" &&
+    navigator.platform.toUpperCase().indexOf("MAC") >= 0;
+  const modKey = isMac ? "⌘" : "Ctrl";
+
+  const categories = [
+    {
+      title: "Core Navigation & Input",
+      items: [
+        {
+          label: "Focus Search / Chat Input",
+          keys: [modKey, "K"],
+          description:
+            "Instantly jump to the message input or active search bar from anywhere.",
+          badge: "Most Used",
+        },
+        {
+          label: "Open Keyboard Shortcuts",
+          keys: [modKey, "/"],
+          description: "Open this keyboard shortcuts reference guide instantly.",
+        },
+        {
+          label: "Open Settings",
+          keys: [modKey, ","],
+          description:
+            "Open the account, appearance, and system settings dialog.",
+        },
+        {
+          label: "Toggle Sidebar",
+          keys: [modKey, "B"],
+          description: "Expand or collapse the conversation history sidebar.",
+        },
+        {
+          label: "New Conversation",
+          keys: [modKey, "Shift", "O"],
+          description: "Start a fresh chat conversation.",
+        },
+      ],
+    },
+    {
+      title: "Studio File Creation Modes",
+      items: [
+        {
+          label: "PDF Document Studio",
+          keys: [modKey, "Shift", "P"],
+          description:
+            "Switch composer to generate styled, print-ready PDF documents.",
+        },
+        {
+          label: "Word (.docx) Studio",
+          keys: [modKey, "Shift", "D"],
+          description:
+            "Switch composer to create Microsoft Word editable documents.",
+        },
+        {
+          label: "Excel (.xlsx) Studio",
+          keys: [modKey, "Shift", "X"],
+          description:
+            "Switch composer to build structured multi-sheet workbooks.",
+        },
+        {
+          label: "PowerPoint (.pptx) Studio",
+          keys: [modKey, "Shift", "S"],
+          description:
+            "Switch composer to craft professional slide presentation decks.",
+        },
+      ],
+    },
+    {
+      title: "Search & Research Modes",
+      items: [
+        {
+          label: "Live Web Search",
+          keys: [modKey, "Shift", "W"],
+          description:
+            "Switch composer to search current web documentation & news.",
+        },
+        {
+          label: "Deep Research Dossier",
+          keys: [modKey, "Shift", "R"],
+          description:
+            "Switch composer to trigger multi-step, citation-backed deep research.",
+        },
+      ],
+    },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h3 className="text-base font-semibold tracking-[-0.02em]">
+            Keyboard Shortcuts
+          </h3>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Speed up your workflow and navigate KSEMO with global hotkeys.
+          </p>
+        </div>
+        {onTryFocusComposer && (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={onTryFocusComposer}
+            className="shrink-0 text-xs"
+          >
+            Try {modKey}+K Now
+          </Button>
+        )}
+      </div>
+
+      <div className="space-y-6">
+        {categories.map(cat => (
+          <div key={cat.title} className="space-y-2.5">
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              {cat.title}
+            </h4>
+            <div className="divide-y divide-border/60 rounded-xl border border-border/80 bg-muted/20">
+              {cat.items.map(item => (
+                <div
+                  key={item.label}
+                  className="flex items-center justify-between gap-3 px-3.5 py-2.5"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-foreground">
+                        {item.label}
+                      </span>
+                      {item.badge && (
+                        <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                          {item.badge}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {item.description}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1">
+                    {item.keys.map((k, i) => (
+                      <kbd
+                        key={i}
+                        className="inline-flex min-w-6 items-center justify-center rounded-md border border-border/80 bg-background px-1.5 py-0.5 font-mono text-[11px] font-semibold text-foreground shadow-2xs"
+                      >
+                        {k}
+                      </kbd>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }

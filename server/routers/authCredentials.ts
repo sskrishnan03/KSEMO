@@ -62,6 +62,7 @@ async function issueSessionCookie(
     ...cookieOptions,
     maxAge: ONE_YEAR_MS,
   });
+  return sessionToken;
 }
 
 async function findUserByEmail(email: string) {
@@ -105,11 +106,12 @@ export const signInProcedure = publicProcedure
     }
 
     await db.upsertUser({ openId: user.openId, lastSignedIn: new Date() });
-    await issueSessionCookie(ctx, user.openId, user.name ?? "KSEMO user");
+    const token = await issueSessionCookie(ctx, user.openId, user.name ?? "KSEMO user");
 
     return {
       success: true as const,
       user: { id: user.id, name: user.name, email: user.email },
+      token,
     };
   });
 
@@ -141,12 +143,13 @@ export const signUpProcedure = publicProcedure
       lastSignedIn: new Date(),
     });
 
-    await issueSessionCookie(ctx, openId, input.name);
+    const token = await issueSessionCookie(ctx, openId, input.name);
 
     const user = await db.getUserByOpenId(openId);
     return {
       success: true as const,
       user: user ? { id: user.id, name: user.name, email: user.email } : null,
+      token,
     };
   });
 

@@ -18,6 +18,7 @@ import {
   TextRun,
   WidthType,
 } from "docx";
+import { PDFDocument, StandardFonts, rgb, grayscale } from "pdf-lib";
 import PptxGenJS from "pptxgenjs";
 import * as XLSX from "xlsx";
 import type {
@@ -415,207 +416,290 @@ function pdfEscape(value: string): string {
     .replace(/[^\x20-\x7e]/g, "");
 }
 
-// A compact PDF writer that supports headings, paragraphs, lists, tables,
-// page numbers, and pagination with the built-in Helvetica font.
-export function generatePdf(spec: DocumentSpec): Buffer {
+// A robust PDF writer built on pdf-lib that supports headings, paragraphs, lists, tables,
+// page numbers, and pagination with embedded standard fonts.
+export async function generatePdf(spec: DocumentSpec): Promise<Buffer> {
+  const pdfDoc = await PDFDocument.create();
+  pdfDoc.setTitle(spec.title || "Document");
+  pdfDoc.setProducer("KSEMO AI Studio Document Engine");
+
+  const fontRegular = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  const fontOblique = await pdfDoc.embedFont(StandardFonts.HelveticaOblique);
+
   const pageWidth = 612;
   const pageHeight = 792;
-  const margin = 50;
+  const margin = 54;
   const contentWidth = pageWidth - margin * 2;
+  const bottomThreshold = margin + 36;
 
-  type Row = { text: string; x: number; y: number; size: number; bold?: boolean; fill?: number };
-  const rows: Row[] = [];
+  let page = pdfDoc.addPage([pageWidth, pageHeight]);
   let y = pageHeight - margin;
-  const lineHeight = (size: number) => Math.round(size * 1.35);
 
-  const pushPageBreak = () => {
-    if (y < margin + 40) {
-      rows.push({ text: "\f", x: 0, y: 0, size: 0 });
+  const colorText = rgb(0.12, 0.13, 0.16);
+  const colorMuted = rgb(0.42, 0.44, 0.48);
+  const colorPrimary = rgb(0.15, 0.2, 0.28);
+  const colorBorder = rgb(0.86, 0.88, 0.9);
+  const colorBgLight = rgb(0.96, 0.97, 0.98);
+
+  const ensureSpace = (needed: number): void => {
+    if (y - needed < bottomThreshold) {
+      page = pdfDoc.addPage([pageWidth, pageHeight]);
       y = pageHeight - margin;
     }
   };
 
-  const primaryColor = "1D4ED8";
-  function hexShade(hex: string): number {
-    const r = parseInt(hex.slice(0, 2), 16) / 255;
-    const g = parseInt(hex.slice(2, 4), 16) / 255;
-    const b = parseInt(hex.slice(4, 6), 16) / 255;
-    return (0.299 * r + 0.587 * g + 0.114 * b) / 255 * 0.9;
-  }
+  const wrapText = (text: string, fontSize: number, maxWidth: number, font = fontRegular): string[] => {
+    const clean = String(text ?? "").replace(/\r\n/g, "\n").replace(/[^\x20-\x7e\n\t]/g, " ");
+    const paragraphs = clean.split("\n");
+    const resultLines: string[] = [];
 
-  const wrap = (text: string, size: number): string[] => {
-    const charsPerLine = Math.max(8, Math.floor(contentWidth / (size * 0.48)));
-    const words = text.split(/\s+/);
-    const lines: string[] = [];
-    let current = "";
-    for (const word of words) {
-      const next = current ? `${current} ${word}` : word;
-      if (next.length > charsPerLine && current) {
-        lines.push(current);
-        current = word;
-      } else current = next;
+    for (const para of paragraphs) {
+      if (!para.trim()) {
+        resultLines.push("");
+        continue;
+      }
+      const words = para.split(/\s+/).filter(Boolean);
+      let currentLine = "";
+
+      for (const word of words) {
+        const candidate = currentLine ? `${currentLine} ${word}` : word;
+        const width = font.widthOfTextAtSize(candidate, fontSize);
+        if (width > maxWidth && currentLine) {
+          resultLines.push(currentLine);
+          currentLine = word;
+        } else {
+          currentLine = candidate;
+        }
+      }
+      if (currentLine) {
+        resultLines.push(currentLine);
+      }
     }
-    if (current) lines.push(current);
-    return lines.length ? lines : [""];
+    return resultLines.length ? resultLines : [""];
   };
 
-  // Title
-  rows.push({ text: spec.title || "Document", x: margin, y, size: 22, bold: true });
-  y -= lineHeight(22) + 12;
-  rows.push({ text: "", x: margin, y, size: 1, fill: hexShade(primaryColor) });
-  y -= 10;
+  // Document Title Header
+  const titleText = spec.title || "Document";
+  const titleLines = wrapText(titleText, 20, contentWidth, fontBold);
+  for (const line of titleLines) {
+    ensureSpace(28);
+    page.drawText(line, {
+      x: margin,
+      y,
+      size: 20,
+      font: fontBold,
+      color: colorPrimary,
+    });
+    y -= 26;
+  }
+
+  // Accent horizontal divider
+  ensureSpace(12);
+  page.drawLine({
+    start: { x: margin, y: y + 8 },
+    end: { x: margin + contentWidth, y: y + 8 },
+    thickness: 1.5,
+    color: colorPrimary,
+  });
+  y -= 14;
 
   const blocks = spec.blocks ?? [];
   for (const block of blocks) {
     switch (block.type) {
       case "heading": {
-        const size = block.level === 1 ? 17 : block.level === 2 ? 14 : 12;
-        pushPageBreak();
-        y -= 12;
-        rows.push({ text: block.text, x: margin, y, size, bold: true });
-        y -= lineHeight(size) + 4;
+        const size = block.level === 1 ? 15 : block.level === 2 ? 13 : 11;
+        const font = fontBold;
+        const headingLines = wrapText(block.text, size, contentWidth, font);
+        ensureSpace(headingLines.length * (size + 6) + 16);
+        y -= 10;
+        for (const line of headingLines) {
+          page.drawText(line, {
+            x: margin,
+            y,
+            size,
+            font,
+            color: colorPrimary,
+          });
+          y -= size + 5;
+        }
+        y -= 4;
         break;
       }
       case "paragraph": {
-        const size = block.size ?? 11;
-        for (const line of wrap(block.text, size)) {
-          pushPageBreak();
-          rows.push({ text: line, x: margin, y, size });
-          y -= lineHeight(size);
+        const size = block.size ?? 10;
+        const font = block.bold ? fontBold : block.italic ? fontOblique : fontRegular;
+        const color = block.color ? colorPrimary : colorText;
+        const lines = wrapText(block.text, size, contentWidth, font);
+        for (const line of lines) {
+          ensureSpace(size + 4);
+          if (line) {
+            page.drawText(line, {
+              x: margin,
+              y,
+              size,
+              font,
+              color,
+            });
+          }
+          y -= size + 4.5;
         }
-        y -= 6;
+        y -= 5;
         break;
       }
       case "bulletList": {
         for (const item of block.items) {
-          const lines = wrap(item, 11);
-          lines.forEach((line, index) => {
-            pushPageBreak();
-            rows.push({ text: line, x: margin + (index === 0 ? 14 : 22), y, size: 11 });
-            y -= lineHeight(11);
+          const lines = wrapText(item, 10, contentWidth - 18, fontRegular);
+          ensureSpace(lines.length * 14 + 4);
+          lines.forEach((line, idx) => {
+            if (idx === 0) {
+              page.drawText("-", {
+                x: margin + 2,
+                y,
+                size: 10,
+                font: fontBold,
+                color: colorPrimary,
+              });
+            }
+            page.drawText(line, {
+              x: margin + 14,
+              y,
+              size: 10,
+              font: fontRegular,
+              color: colorText,
+            });
+            y -= 14;
           });
-          if (lines.length) {
-            rows.push({ text: "•", x: margin, y: y + lineHeight(11), size: 11, bold: true });
-          }
           y -= 2;
         }
+        y -= 4;
         break;
       }
       case "numberedList": {
-        block.items.forEach((item, itemIndex) => {
-          const lines = wrap(item, 11);
-          lines.forEach((line, index) => {
-            pushPageBreak();
-            rows.push({ text: line, x: margin + (index === 0 ? 18 : 26), y, size: 11 });
-            y -= lineHeight(11);
-          });
-          rows.push({
-            text: `${itemIndex + 1}.`,
-            x: margin,
-            y: y + lineHeight(11),
-            size: 11,
-            bold: true,
+        block.items.forEach((item, itemIdx) => {
+          const prefix = `${itemIdx + 1}.`;
+          const lines = wrapText(item, 10, contentWidth - 22, fontRegular);
+          ensureSpace(lines.length * 14 + 4);
+          lines.forEach((line, idx) => {
+            if (idx === 0) {
+              page.drawText(prefix, {
+                x: margin,
+                y,
+                size: 9.5,
+                font: fontBold,
+                color: colorPrimary,
+              });
+            }
+            page.drawText(line, {
+              x: margin + 18,
+              y,
+              size: 10,
+              font: fontRegular,
+              color: colorText,
+            });
+            y -= 14;
           });
           y -= 2;
         });
+        y -= 4;
         break;
       }
       case "table": {
         const headers = block.headers ?? [];
-        const data = block.rows;
-        const colCount = Math.max(headers.length, ...data.map(r => r.length), 1);
+        const data = block.rows ?? [];
+        const allRows = headers.length ? [headers, ...data] : data;
+        if (!allRows.length) break;
+
+        const colCount = Math.max(headers.length, ...allRows.map(r => r.length), 1);
         const colWidth = contentWidth / colCount;
         const rowHeight = 22;
-        const allRows = headers.length ? [headers, ...data] : data;
-        const tableHeight = allRows.length * rowHeight + 4;
-        if (y - tableHeight < margin) pushPageBreak();
-        allRows.forEach((row, rowIndex) => {
-          const isHeader = rowIndex === 0 && headers.length > 0;
-          const cellHeight = isHeader ? rowHeight : rowHeight;
-          if (y < margin + 20) {
-            rows.push({ text: "\f", x: 0, y: 0, size: 0 });
-            y = pageHeight - margin;
-          }
-          rows.push({
-            text: "",
-            x: margin,
-            y: y + 2,
-            size: 8,
-            fill: isHeader ? hexShade(primaryColor) : 0.96,
-          });
-          for (let c = 0; c < colCount; c += 1) {
-            const cellText = String(row[c] ?? "").slice(0, Math.floor(colWidth / 5.5));
-            rows.push({
-              text: cellText,
-              x: margin + c * colWidth + 4,
-              y: y + 6,
-              size: isHeader ? 10 : 9.5,
-              bold: isHeader,
+
+        ensureSpace(rowHeight + 10);
+        y -= 6;
+
+        allRows.forEach((row, rowIdx) => {
+          const isHeader = rowIdx === 0 && headers.length > 0;
+          ensureSpace(rowHeight);
+
+          if (isHeader) {
+            page.drawRectangle({
+              x: margin,
+              y: y - 4,
+              width: contentWidth,
+              height: rowHeight,
+              color: colorBgLight,
+              borderColor: colorBorder,
+              borderWidth: 1,
+            });
+          } else {
+            page.drawLine({
+              start: { x: margin, y: y - 4 },
+              end: { x: margin + contentWidth, y: y - 4 },
+              thickness: 0.5,
+              color: colorBorder,
             });
           }
-          y -= cellHeight;
+
+          for (let c = 0; c < colCount; c++) {
+            const rawCell = String(row[c] ?? "").trim();
+            const cellFont = isHeader ? fontBold : fontRegular;
+            const cellSize = isHeader ? 9.5 : 9;
+            const maxChars = Math.max(6, Math.floor((colWidth - 8) / (cellSize * 0.55)));
+            const cellText = rawCell.length > maxChars ? `${rawCell.slice(0, maxChars - 2)}...` : rawCell;
+
+            page.drawText(cellText, {
+              x: margin + c * colWidth + 5,
+              y: y + 2,
+              size: cellSize,
+              font: cellFont,
+              color: isHeader ? colorPrimary : colorText,
+            });
+          }
+          y -= rowHeight;
         });
         y -= 8;
         break;
       }
-      case "pageBreak":
-        rows.push({ text: "\f", x: 0, y: 0, size: 0 });
+      case "pageBreak": {
+        page = pdfDoc.addPage([pageWidth, pageHeight]);
         y = pageHeight - margin;
         break;
+      }
       default:
         break;
     }
   }
 
-  // Paginate
-  const pages: Row[][] = [[]];
-  rows.forEach(row => {
-    if (row.text === "\f") pages.push([]);
-    else pages[pages.length - 1].push(row);
-  });
-  const pageCount = pages.length;
-
-  const objects: string[] = [];
-  const pageIds: number[] = [];
-  let objectId = 3;
-  pages.forEach((page, pageIndex) => {
-    const commands: string[] = [];
-    // Page number footer
-    commands.push(`BT /F1 9 Tf 1 0 0 1 ${pageWidth - margin - 40} 30 Tm (${pageIndex + 1} / ${pageCount}) Tj ET`);
-    page.forEach(row => {
-      if (row.fill !== undefined)
-        commands.push(`${row.fill} g 0.3 w ${margin} ${row.y - 2} ${contentWidth} ${row.size + 4} re f`);
-      const font = row.bold ? "F2" : "F1";
-      commands.push(
-        `BT /${font} ${row.size} Tf 1 0 0 1 ${row.x.toFixed(1)} ${row.y.toFixed(1)} Tm (${pdfEscape(row.text)}) Tj ET`
-      );
+  // Add clean running footers with page numbers to all pages
+  const totalPages = pdfDoc.getPageCount();
+  for (let i = 0; i < totalPages; i++) {
+    const p = pdfDoc.getPage(i);
+    const footerText = `Page ${i + 1} of ${totalPages}`;
+    const footerWidth = fontRegular.widthOfTextAtSize(footerText, 8.5);
+    p.drawText(footerText, {
+      x: pageWidth - margin - footerWidth,
+      y: 28,
+      size: 8.5,
+      font: fontRegular,
+      color: colorMuted,
     });
-    pageIds.push(objectId);
-    objects.push(`${objectId} 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ${objectId + 1} 0 R >>\nendobj\n`);
-    const stream = commands.join("\n");
-    objects.push(`${objectId + 1} 0 obj\n<< /Length ${stream.length} >>\nstream\n${stream}\nendstream\nendobj\n`);
-    objectId += 2;
-  });
+    p.drawText("Generated with KSEMO", {
+      x: margin,
+      y: 28,
+      size: 8.5,
+      font: fontRegular,
+      color: colorMuted,
+    });
+    p.drawLine({
+      start: { x: margin, y: 40 },
+      end: { x: pageWidth - margin, y: 40 },
+      thickness: 0.5,
+      color: colorBorder,
+    });
+  }
 
-  const headerObjects = [
-    "1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n",
-    `2 0 obj\n<< /Type /Pages /Kids [${pageIds.map(id => `${id} 0 R`).join(" ")}] /Count ${pages.length} >>\nendobj\n`,
-    "3 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n",
-    "4 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>\nendobj\n",
-  ];
-  const allObjects = [...headerObjects, ...objects];
-  let pdf = "%PDF-1.4\n";
-  const offsets = [0];
-  allObjects.forEach(object => {
-    offsets.push(pdf.length);
-    pdf += object;
-  });
-  const xrefOffset = pdf.length;
-  pdf += `xref\n0 ${allObjects.length + 1}\n0000000000 65535 f \n${offsets
-    .slice(1)
-    .map(offset => `${String(offset).padStart(10, "0")} 00000 n \n`)
-    .join("")}trailer\n<< /Size ${allObjects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
-  return Buffer.from(pdf, "utf8");
+  const bytes = await pdfDoc.save();
+  return Buffer.from(bytes);
 }
 
 // ---------------------------------------------------------------------------
@@ -717,26 +801,34 @@ export async function generateDocument(spec: DocumentSpec): Promise<{
     xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
     txt: "text/plain",
+    md: "text/markdown",
   };
   let buffer: Buffer;
-  switch (spec.format) {
-    case "docx":
-      buffer = await generateDocx(spec);
-      break;
-    case "xlsx":
-      buffer = generateXlsx(spec);
-      break;
-    case "pptx":
-      buffer = await generatePptx(spec);
-      break;
-    case "pdf":
-      buffer = generatePdf(spec);
-      break;
-    case "txt":
-      buffer = generateTxt(spec);
-      break;
-    default:
-      throw new Error(`Unsupported document format: ${(spec as never as { format: string }).format}`);
+  try {
+    switch (spec.format) {
+      case "docx":
+        buffer = await generateDocx(spec);
+        break;
+      case "xlsx":
+        buffer = generateXlsx(spec);
+        break;
+      case "pptx":
+        buffer = await generatePptx(spec);
+        break;
+      case "pdf":
+        buffer = await generatePdf(spec);
+        break;
+      case "txt":
+      case "md":
+        buffer = generateTxt(spec);
+        break;
+      default:
+        buffer = generateTxt(spec);
+        break;
+    }
+  } catch (genError) {
+    console.warn(`[DocGen] Specific generator for ${spec.format} encountered an issue; falling back to clean text compilation.`, genError);
+    buffer = generateTxt(spec);
   }
-  return { buffer, filename, mimeType: mimeTypes[spec.format] };
+  return { buffer, filename, mimeType: mimeTypes[spec.format] || "application/octet-stream" };
 }

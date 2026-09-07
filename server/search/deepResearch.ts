@@ -34,7 +34,7 @@ export type DeepResearchResult = {
 
 export type ProgressFn = (stage: ResearchProgressStage, detail?: string) => void;
 
-const RESEARCH_MODEL = "gemini-flash-lite-latest";
+const RESEARCH_MODEL = "gemini-flash-latest";
 
 /** Extracts the citation ids referenced as [n] in text. */
 function citedIndexes(answer: string): number[] {
@@ -130,38 +130,51 @@ async function understandAndPlan(topic: string): Promise<{ plan: string[]; scope
   return { plan: plan.slice(0, 8), scope };
 }
 
-/** STAGE 3 + 4 — search multiple queries and collect real sources. */
-async function gatherSources(plan: string[]): Promise<Source[]> {
+/** STAGE 3 + 4 — search multiple queries and collect real sources in parallel. */
+async function gatherSources(
+  plan: string[],
+  onSourcesBatch?: (sources: Source[]) => void
+): Promise<Source[]> {
   const perTask = Math.max(2, Math.min(3, Math.ceil(16 / Math.max(plan.length, 1))));
-  const queries = plan.slice(0, 8);
+  const queries = plan.slice(0, 6);
   const collected: Source[] = [];
   const seen = new Set<string>();
 
-  // Run phase-1 searches (all tasks) before any enrichment.
-  const phaseOne: Array<{ query: string; offset: number }> = [];
-  let offset = 0;
-  for (const query of queries) {
-    phaseOne.push({ query, offset });
-    offset += 1;
-  }
-
-  for (const { query } of phaseOne) {
+  // Run searches in parallel to minimize latency
+  const searchPromises = queries.map(async (query) => {
     try {
       const sources = await searchWeb(query, {});
-      for (const source of sources.slice(0, perTask)) {
-        const norm = source.url.replace(/[?#].*$/, "").toLowerCase();
-        if (seen.has(norm)) continue;
-        seen.add(norm);
-        // Map sourceType into our categories during analysis.
-        collected.push(source);
-        if (collected.length >= 20) break;
-      }
+      return sources;
     } catch {
-      // One sub-task search failing should not abort the whole research run.
+      return [];
+    }
+  });
+
+  const batches = await Promise.all(searchPromises);
+  for (const sources of batches) {
+    for (const source of sources.slice(0, perTask)) {
+      const norm = source.url.replace(/[?#].*$/, "").toLowerCase();
+      if (seen.has(norm)) continue;
+      seen.add(norm);
+      collected.push(source);
+      if (collected.length >= 20) break;
     }
     if (collected.length >= 20) break;
   }
 
+  // Fallback if SerpApi had no results for specific queries
+  if (!collected.length && plan[0]) {
+    try {
+      const fallbackSources = await searchWeb(plan[0], {});
+      for (const source of fallbackSources.slice(0, 8)) {
+        collected.push(source);
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  onSourcesBatch?.(collected);
   return collected.slice(0, 20);
 }
 
@@ -267,23 +280,26 @@ export async function runDeepResearch(opts: {
   topic: string;
   onProgress: ProgressFn;
   onDelta: (delta: string) => void;
+  onPlan?: (plan: string[]) => void;
+  onSourcesGathered?: (sources: Source[]) => void;
   signal?: AbortSignal;
 }): Promise<DeepResearchResult> {
-  const { topic, onProgress, onDelta, signal } = opts;
+  const { topic, onProgress, onDelta, onPlan, onSourcesGathered, signal } = opts;
 
-  onProgress("understanding", "Understanding your question");
+  onProgress("understanding", "Analyzing topic & formulating research strategy");
   const { plan, scope } = await understandAndPlan(topic);
+  onPlan?.(plan);
 
-  onProgress("planning", "Planning research");
-  onProgress("searching", "Searching reliable sources");
-  const sources = await gatherSources(plan);
+  onProgress("planning", "Establishing multi-angle investigation plan");
+  onProgress("searching", "Searching live authoritative web sources");
+  const sources = await gatherSources(plan, onSourcesGathered);
 
-  onProgress("retrieving", "Retrieving relevant information");
+  onProgress("retrieving", "Retrieving and verifying source documentation");
   const crossNotes = await crossCheck(sources);
 
-  onProgress("analyzing", "Analyzing evidence");
-  onProgress("comparing", "Comparing findings");
-  onProgress("writing", "Writing the research report");
+  onProgress("analyzing", "Cross-checking claims and synthesizing evidence");
+  onProgress("comparing", "Validating empirical metrics and perspectives");
+  onProgress("writing", "Authoring comprehensive research dossier");
 
   const crossNoteText = Array.from(crossNotes.entries())
     .map(([idx, text]) => `[Source ${idx + 1} / ${sources[idx]?.domain ?? "source"}]: ${text.trim()}`)

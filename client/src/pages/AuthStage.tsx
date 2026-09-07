@@ -83,10 +83,28 @@ function SignInForm({
   }>({});
   const [formError, setFormError] = useState<string | null>(null);
 
-  const signIn = trpc.auth.signIn.useMutation({
-    onSuccess: async () => {
-      await utils.auth.me.invalidate();
+  const saveTokenAndProceed = async (data: { token?: string; user?: any }) => {
+    if (data?.token) {
+      try {
+        sessionStorage.setItem("ksemo-token", data.token);
+        localStorage.setItem("ksemo-token", data.token);
+        sessionStorage.setItem("ksemo-cookie", `app_session_id=${data.token}`);
+        localStorage.setItem("ksemo-cookie", `app_session_id=${data.token}`);
+      } catch {}
+    }
+    if (data?.user) {
+      utils.auth.me.setData(undefined, data.user);
+    }
+    await utils.auth.me.invalidate();
+    await utils.auth.me.refetch();
+    if (window.location.pathname !== "/") {
       navigate("/");
+    }
+  };
+
+  const signIn = trpc.auth.signIn.useMutation({
+    onSuccess: async data => {
+      await saveTokenAndProceed(data);
     },
     onError: error => {
       setFormError(error.message || "Could not sign you in. Please try again.");
@@ -105,6 +123,13 @@ function SignInForm({
     if (Object.keys(errors).length > 0) return;
 
     signIn.mutate({ email: email.trim(), password });
+  }
+
+  function handleDemoSignIn() {
+    setEmail("demo@ksemo.ai");
+    setPassword("password123");
+    setFormError(null);
+    signIn.mutate({ email: "demo@ksemo.ai", password: "password123" });
   }
 
   return (
@@ -141,6 +166,15 @@ function SignInForm({
           {signIn.isPending ? "Signing in…" : "Sign in"}
         </span>
       </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        onClick={handleDemoSignIn}
+        disabled={signIn.isPending}
+        className="h-9 w-full rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-accent/60"
+      >
+        Quick Sign-in as Demo User
+      </Button>
       <div className="flex items-center justify-between gap-2">
         <button
           type="button"
@@ -162,6 +196,7 @@ function SignInForm({
 }
 
 function SignUpForm({ onSignin }: { onSignin: () => void }) {
+  const [, navigate] = useLocation();
   const utils = trpc.useUtils();
 
   const [name, setName] = useState("");
@@ -179,9 +214,23 @@ function SignUpForm({ onSignin }: { onSignin: () => void }) {
   const [formError, setFormError] = useState<string | null>(null);
 
   const signUp = trpc.auth.signUp.useMutation({
-    onSuccess: async () => {
+    onSuccess: async data => {
+      if (data?.token) {
+        try {
+          sessionStorage.setItem("ksemo-token", data.token);
+          localStorage.setItem("ksemo-token", data.token);
+          sessionStorage.setItem("ksemo-cookie", `app_session_id=${data.token}`);
+          localStorage.setItem("ksemo-cookie", `app_session_id=${data.token}`);
+        } catch {}
+      }
+      if (data?.user) {
+        utils.auth.me.setData(undefined, data.user as any);
+      }
       await utils.auth.me.invalidate();
-      window.location.href = "/";
+      await utils.auth.me.refetch();
+      if (window.location.pathname !== "/") {
+        navigate("/");
+      }
     },
     onError: error => {
       if (error.data?.code === "CONFLICT") {
