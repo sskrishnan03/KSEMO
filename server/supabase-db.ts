@@ -17,8 +17,6 @@ import type {
   Memory,
   MemorySettings,
   InsertMemory,
-  ResearchSession,
-  InsertResearchSession,
   VoiceSession,
   DbUser,
   DbConversation,
@@ -42,8 +40,6 @@ export type {
   Memory,
   MemorySettings,
   InsertMemory,
-  ResearchSession,
-  InsertResearchSession,
   VoiceSession,
   DbUser,
   DbConversation,
@@ -371,7 +367,7 @@ export async function saveUserMemoryFacts(
   );
 }
 
-// Voice & Research sessions
+// Voice sessions
 export async function createVoiceSession(input: {
   id: string;
   userId: number;
@@ -386,26 +382,6 @@ export async function updateVoiceSessionForUser(
   status: VoiceSession["status"]
 ): Promise<void> {
   return inMemoryStore.updateVoiceSessionForUser(id, userId, status);
-}
-
-export async function createResearchSession(
-  input: InsertResearchSession
-): Promise<ResearchSession> {
-  return inMemoryStore.createResearchSession(input);
-}
-
-export async function updateResearchSession(
-  sessionId: string,
-  values: Partial<ResearchSession>
-): Promise<void> {
-  return inMemoryStore.updateResearchSession(sessionId, values);
-}
-
-export async function getResearchSessionForUser(
-  sessionId: string,
-  userId: number
-): Promise<ResearchSession | undefined> {
-  return inMemoryStore.getResearchSessionForUser(sessionId, userId);
 }
 
 // Projects & Files

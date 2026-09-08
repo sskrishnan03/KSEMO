@@ -3,7 +3,6 @@ import {
   attachFileToMessageForUser,
   createConversationForUser,
   createMessage,
-  createResearchSession,
   getConversationForUser,
   getUserPreferences,
   listMessageFilesForUser,
@@ -11,7 +10,6 @@ import {
   removeFollowingAssistantDuplicatesForUser,
   updateConversationForUser,
   updateMessage,
-  updateResearchSession,
 } from "./supabase-db";
 import { streamLLM, type Message } from "./_core/llm";
 import { sdk } from "./_core/sdk";
@@ -26,12 +24,7 @@ import {
   generateAndDeliverFile,
   type GeneratedFileResult,
 } from "./docgen/service";
-import type { CapabilityMode, Source } from "@shared/research";
-import { embedSourcesInContent, parseContentWithSources } from "@shared/research";
-import { searchWeb } from "./search/webSearch";
-import { streamWebAnswer } from "./search/searchAnswer";
-import { runDeepResearch } from "./search/deepResearch";
-import { normalizeCitedSources } from "./search/sources";
+import type { CapabilityMode } from "@shared/capabilities";
 
 const BASE_SYSTEM_INSTRUCTION =
   "You are KSEMO, a thoughtful and reliable AI assistant. Be clear, accurate, respectful, and practical. Use Markdown when it improves readability. Never claim to have completed work you cannot verify. You can perform math, logic, code analysis, and general reasoning directly — do not refuse calculation or analysis questions. When asked about the current time or date, state that you do not have access to a real-time clock but you can help with time-zone conversions, date math, and scheduling if the user provides a reference time or zone.";
@@ -308,8 +301,6 @@ function resolveCapabilityMode(raw: string | undefined | null): CapabilityMode {
     "pptx",
     "txt",
     "md",
-    "web_search",
-    "deep_research",
   ];
   return (valid as string[]).includes(value)
     ? (value as CapabilityMode)
@@ -339,7 +330,7 @@ export function registerChatStream(app: Express) {
       regenerateAssistantMessageId?: string;
       attachmentFileIds?: string[];
       documentFormat?: string;
-      /** The active capability mode. See shared/research.ts. */
+      /** The active capability mode. See shared/capabilities.ts. */
       mode?: string;
       /** Backward-compatible alias sent by older clients (`activeMode`). */
       activeMode?: string;
@@ -675,7 +666,7 @@ export function registerChatStream(app: Express) {
         let fileModeFailed = false;
         const isRegenerationTurn = Boolean(body.regenerateAssistantMessageId);
         // Resolve the active capability mode (moves Normal Chat -> a specific
-        // file format / web search / deep research). `mode` is the source of
+        // file format). `mode` is the source of
         // truth; `documentFormat` is kept for backward compatibility.
         const requestedMode = resolveCapabilityMode(
           body.mode ?? body.activeMode ?? body.documentFormat ?? "chat"
@@ -690,20 +681,7 @@ export function registerChatStream(app: Express) {
         const forcedFormat = FILE_FORMATS.has(requestedMode)
           ? (requestedMode as GeneratedFileResult["format"])
           : null;
-        const isWebSearchMode = requestedMode === "web_search";
-        const isDeepResearchMode = requestedMode === "deep_research";
-        const isResearchTurn = isWebSearchMode || isDeepResearchMode;
-        const activeResearchMode = isResearchTurn ? requestedMode : null;
 
-        // Structured sources gathered during a research run; delivered to the
-        // client progressively via SSE and persisted with the message.
-        let researchSources: Awaited<ReturnType<typeof searchWeb>> = [];
-        let researchFailed = false;
-        let researchErrorText: string | null = null;
-        // The final content (answer + embedded sources) persisted for a
-        // successful research run; reused during settlement so we never
-        // overwrite it with an empty/partial stream.
-        let researchEmbeddedContent: string | null = null;
 
         if (!isRegenerationTurn && forcedFormat) {
           try {
@@ -812,301 +790,14 @@ export function registerChatStream(app: Express) {
         }
 
         // ------------------------------------------------------------------
-        // Web Search & Deep Research — explicit separate modes. They run ONLY
-        // when the corresponding mode is active and never bleed into Normal
-        // Chat or File Creation.
-        // ------------------------------------------------------------------
-        if (isResearchTurn && activeResearchMode) {
-          // Create research session for tracking
-          let researchSessionId: string | null = null;
-          try {
-            const researchSession = await createResearchSession({
-              id: crypto.randomUUID(),
-              userId: user.id,
-              conversationId: conversation.id,
-              messageId: assistantMessageId,
-              researchMode: activeResearchMode,
-              query: content ?? "",
-            });
-            researchSessionId = researchSession.id;
-          } catch (error) {
-            console.warn("[ChatStream] Failed to create research session", error);
-          }
-
-          researchBlock: {
-            if (activeResearchMode === "web_search") {
-              writeEvent(res, "research.stage", {
-                messageId: assistantMessageId,
-                stage: "searching",
-                label: "Searching the web",
-              });
-
-              // Real live search. On failure we report a real outage rather
-              // than pretending a search happened.
-              let sources: Source[];
-              try {
-                sources = await searchWeb(content ?? "");
-              } catch (searchError) {
-                const msg =
-                  searchError instanceof Error
-                    ? searchError.message
-                    : String(searchError);
-                console.warn("[ChatStream] web_search searchWeb failed", searchError);
-                researchFailed = true;
-                researchErrorText = msg.includes("not configured")
-                  ? "Web search is not configured. Please contact support."
-                  : msg.includes("429") || msg.includes("rate limit")
-                    ? "Search rate limit reached. Please wait a moment and try again."
-                    : `Web search failed: ${msg.slice(0, 200)}`;
-
-                if (researchSessionId) {
-                  await updateResearchSession(researchSessionId, {
-                    status: "failed",
-                    errorMessage: researchErrorText,
-                    completedAt: new Date(),
-                  }).catch(() => {});
-                }
-
-                writeEvent(res, "research.error", {
-                  messageId: assistantMessageId,
-                  message: researchErrorText,
-                });
-                // Skip the rest of the research block.
-                break researchBlock;
-              }
-              researchSources = sources;
-
-              // Update research session with sources
-              if (researchSessionId) {
-                await updateResearchSession(researchSessionId, {
-                  sourcesCount: sources.length,
-                  sourcesData: sources,
-                });
-              }
-
-              writeEvent(res, "research.stage", {
-                messageId: assistantMessageId,
-                stage: "analyzing",
-                label: "Analyzing results",
-              });
-
-              if (!researchSources.length) {
-                writeEvent(res, "research.sources", {
-                  messageId: assistantMessageId,
-                  sources: [],
-                });
-              } else {
-                writeEvent(res, "research.sources", {
-                  messageId: assistantMessageId,
-                  sources: researchSources,
-                });
-              }
-
-              writeEvent(res, "research.stage", {
-                messageId: assistantMessageId,
-                stage: "writing",
-                label: "Writing your answer",
-              });
-
-              try {
-                responseText = await streamWebAnswer({
-                  query: content ?? "",
-                  sources: researchSources,
-                  signal: generationSignal,
-                  onDelta: delta =>
-                    writeEvent(res, "assistant.delta", {
-                      messageId: assistantMessageId,
-                      delta,
-                    }),
-                });
-              } catch (answerError) {
-                const msg =
-                  answerError instanceof Error
-                    ? answerError.message
-                    : String(answerError);
-                console.warn("[ChatStream] web_search streamWebAnswer failed", answerError);
-                researchFailed = true;
-                researchErrorText = `Could not generate an answer from search results: ${msg.slice(0, 200)}`;
-
-                if (researchSessionId) {
-                  await updateResearchSession(researchSessionId, {
-                    status: "failed",
-                    errorMessage: researchErrorText,
-                    completedAt: new Date(),
-                  }).catch(() => {});
-                }
-
-                writeEvent(res, "research.error", {
-                  messageId: assistantMessageId,
-                  message: researchErrorText,
-                  sources: researchSources.length ? researchSources : undefined,
-                });
-                break researchBlock;
-              }
-
-              // Keep only the sources the answer actually cited. Numbers are
-              // renumbered contiguously so [n] always resolves to the same
-              // source in the persisted list.
-              const normalized = normalizeCitedSources(
-                responseText,
-                researchSources
-              );
-              responseText = normalized.answer;
-              researchSources = normalized.sources;
-
-              // The client assembled the raw answer from deltas with the
-              // original numbering. Send the rewritten text so it swaps in
-              // atomically with the renumbered sources below — never leaving
-              // an inline citation pointing at the wrong source.
-              writeEvent(res, "research.rewrite", {
-                messageId: assistantMessageId,
-                content: responseText,
-              });
-
-              // Re-emit so the live chat shows exactly the sources used,
-              // matching the answer's inline citations.
-              writeEvent(res, "research.sources", {
-                messageId: assistantMessageId,
-                sources: researchSources,
-              });
-
-              // Persist the structured sources alongside the answer.
-              researchEmbeddedContent = embedSourcesInContent(
-                responseText,
-                researchSources
-              );
-              await updateMessage(assistantMessageId, {
-                content: researchEmbeddedContent,
-                status: "streaming",
-              });
-
-              // Mark research session as completed
-              if (researchSessionId) {
-                await updateResearchSession(researchSessionId, {
-                  status: "completed",
-                  sourcesCount: researchSources.length,
-                  sourcesData: researchSources,
-                  completedAt: new Date(),
-                });
-              }
-
-              writeEvent(res, "research.completed", {
-                messageId: assistantMessageId,
-                sources: researchSources,
-              });
-            } else {
-              // Deep Research — genuine multi-step workflow.
-              try {
-              writeEvent(res, "research.stage", {
-                messageId: assistantMessageId,
-                stage: "understanding",
-                label: "Understanding your question",
-              });
-
-              const result = await runDeepResearch({
-                topic: content ?? "",
-                signal: generationSignal,
-                onProgress: (stage: string, label?: string) =>
-                  writeEvent(res, "research.stage", {
-                    messageId: assistantMessageId,
-                    stage,
-                    label: label ?? stage,
-                  }),
-                onPlan: plan =>
-                  writeEvent(res, "research.plan", {
-                    messageId: assistantMessageId,
-                    plan,
-                  }),
-                onSourcesGathered: sources => {
-                  if (sources && sources.length) {
-                    writeEvent(res, "research.sources", {
-                      messageId: assistantMessageId,
-                      sources,
-                    });
-                  }
-                },
-                onDelta: delta =>
-                  writeEvent(res, "assistant.delta", {
-                    messageId: assistantMessageId,
-                    delta,
-                  }),
-              });
-
-              researchSources = result.sources;
-
-              if (result.sources.length) {
-                writeEvent(res, "research.sources", {
-                  messageId: assistantMessageId,
-                  sources: result.sources,
-                });
-              }
-              if (result.summary) {
-                writeEvent(res, "research.summary", {
-                  messageId: assistantMessageId,
-                  summary: result.summary,
-                });
-              }
-
-              // Persist the structured sources with the written report.
-              researchEmbeddedContent = embedSourcesInContent(
-                result.answer,
-                result.sources
-              );
-              await updateMessage(assistantMessageId, {
-                content: researchEmbeddedContent,
-                status: "streaming",
-              });
-
-              // Mark research session as completed
-              if (researchSessionId) {
-                await updateResearchSession(researchSessionId, {
-                  status: "completed",
-                  sourcesCount: result.sources.length,
-                  sourcesData: result.sources,
-                  completedAt: new Date(),
-                });
-              }
-
-              writeEvent(res, "research.completed", {
-                messageId: assistantMessageId,
-                sources: result.sources,
-                summary: result.summary,
-              });
-              } catch (error) {
-                const msg =
-                  error instanceof Error ? error.message : String(error);
-                console.warn("[ChatStream] deep_research failed", error);
-                researchFailed = true;
-                researchErrorText = `Deep research could not be completed: ${msg.slice(0, 200)}`;
-
-                if (researchSessionId) {
-                  await updateResearchSession(researchSessionId, {
-                    status: "failed",
-                    errorMessage: researchErrorText,
-                    completedAt: new Date(),
-                  }).catch(() => {});
-                }
-
-                writeEvent(res, "research.error", {
-                  messageId: assistantMessageId,
-                  message: researchErrorText,
-                  sources: researchSources.length ? researchSources : undefined,
-                });
-              }
-            }
-          } // end researchBlock
-        }
-
-        // ------------------------------------------------------------------
-        // Normal Chat — only runs when NOT in file/research creation mode.
+        // Normal Chat — only runs when NOT in file creation mode.
         // When a special mode was active and completed (or failed), this block
         // is skipped entirely so the modes never bleed into each other.
         // ------------------------------------------------------------------
         if (
           !deliveredFile &&
           !fileModeFailed &&
-          !forcedFormat &&
-          !isResearchTurn
+          !forcedFormat
         ) {
           try {
             responseText = await runGeneration(
@@ -1158,86 +849,13 @@ export function registerChatStream(app: Express) {
         // whole response is intentionally killed and we just mark the message.
         const userCancelled = controller.signal.aborted;
 
-        if (researchFailed && !userCancelled) {
-          // A research mode was active but generation failed. Settle as
-          // failed — do NOT fall back to normal chat. Persist whatever partial
-          // answer we have (with any sources gathered so far) so we do not
-          // lose the streamed content.
-          const partialAnswer = researchEmbeddedContent
-            ? researchEmbeddedContent
-            : embedSourcesInContent(responseText || researchErrorText || "", researchSources);
-          await updateMessage(assistantMessageId, {
-            content: partialAnswer,
-            status: "failed",
-          });
-          terminalStatusWritten = true;
-        } else if (isResearchTurn && !researchFailed && !userCancelled) {
-          // Research completed successfully. The full content (answer + sources)
-          // was already persisted during the research run; here we only promote
-          // the status so we never clobber the embedded sources.
-          await updateMessage(assistantMessageId, {
-            content:
-              researchEmbeddedContent ??
-              embedSourcesInContent(responseText || "", researchSources),
-            model:
-              usedFallbackModel
-                ? QUOTA_FALLBACK_MODEL
-                : (preferences?.selectedModel ?? null),
-            status: "completed",
-          });
-          terminalStatusWritten = true;
-          writeEvent(res, "assistant.completed", {
-            messageId: assistantMessageId,
-          });
-          if (usedFallbackModel) {
-            writeEvent(res, "assistant.modelFallback", {
-              messageId: assistantMessageId,
-              model: QUOTA_FALLBACK_MODEL,
-            });
-          }
-          
-          // Generate intelligent title after first assistant response
-          // Only do this for new conversations (not regenerations)
-          if (!body.regenerateAssistantMessageId && content) {
-            const messages = await listMessagesForConversation(conversation.id);
-            const userMessages = messages.filter(m => m.role === "user");
-            const assistantMessages = messages.filter(m => m.role === "assistant");
-            
-            // Only update title if this is the first assistant response
-            if (assistantMessages.length === 1 && userMessages.length > 0) {
-              const intelligentTitle = createTitle(content, responseText);
-              if (intelligentTitle !== conversation.title) {
-                await updateConversationForUser(conversation.id, user.id, {
-                  title: intelligentTitle,
-                });
-                writeEvent(res, "conversation.titleUpdated", {
-                  conversationId: conversation.id,
-                  title: intelligentTitle,
-                });
-              }
-            }
-          }
-          
-          void memorizeConversation(user.id, conversation.id);
-        } else if (fileModeFailed && !userCancelled) {
+        if (fileModeFailed && !userCancelled) {
           // File Creation Mode was active but generation failed. Settle the
           // message as failed — do NOT fall back to normal chat. The two
           // modes must remain strictly separated.
           await updateMessage(assistantMessageId, {
             content: responseText || "",
             status: "failed",
-          });
-          terminalStatusWritten = true;
-        } else if (isResearchTurn && userCancelled) {
-          // Research was cancelled by the user. Persist any partial content
-          // gathered so far (falling back to the streamed answer) so it is
-          // not lost, then mark the message cancelled.
-          const cancelledContent = researchEmbeddedContent
-            ? researchEmbeddedContent
-            : embedSourcesInContent(responseText || "", researchSources);
-          await updateMessage(assistantMessageId, {
-            content: cancelledContent,
-            status: "cancelled",
           });
           terminalStatusWritten = true;
         } else if ((generationError || timedOut) && !controller.signal.aborted) {
@@ -1281,6 +899,29 @@ export function registerChatStream(app: Express) {
                 model: QUOTA_FALLBACK_MODEL,
               });
             }
+
+            // Generate intelligent title after first assistant response
+            // Only do this for new conversations (not regenerations)
+            if (!body.regenerateAssistantMessageId && content) {
+              const messages = await listMessagesForConversation(conversation.id);
+              const userMessages = messages.filter(m => m.role === "user");
+              const assistantMessages = messages.filter(m => m.role === "assistant");
+
+              // Only update title if this is the first assistant response
+              if (assistantMessages.length === 1 && userMessages.length > 0) {
+                const intelligentTitle = createTitle(content, responseText);
+                if (intelligentTitle !== conversation.title) {
+                  await updateConversationForUser(conversation.id, user.id, {
+                    title: intelligentTitle,
+                  });
+                  writeEvent(res, "conversation.titleUpdated", {
+                    conversationId: conversation.id,
+                    title: intelligentTitle,
+                  });
+                }
+              }
+            }
+
             // Capture durable facts from this conversation in the background;
             // this never blocks the response (see memorizeConversation).
             void memorizeConversation(user.id, conversation.id);

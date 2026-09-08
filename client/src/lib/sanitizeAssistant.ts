@@ -4,7 +4,7 @@
  * The server strips internal provider markers ([blocked], [error], ...) from
  * each streamed delta, but a marker can theoretically span two deltas. This
  * render-level pass guarantees no internal marker ever reaches the screen or
- * the clipboard, whatever path the text took (live stream, research rewrite,
+ * the clipboard, whatever path the text took (live stream, regeneration,
  * or a legacy row persisted before sanitization existed).
  */
 

@@ -32,14 +32,10 @@ import {
   X,
 } from "lucide-react";
 import { ShareIcon } from "./icons";
-import React, { memo, useEffect, useMemo, useState } from "react";
+import React, { memo, useEffect, useState } from "react";
 import { Streamdown } from "streamdown";
 import { KsemoMarkdownCode } from "./code-block";
-import { SourcesControl } from "./research/SourcesControl";
-import { SearchActivity } from "./research/SearchActivity";
-import { SourceCitation } from "./SourceCitation";
 import { sanitizeAssistantText } from "@/lib/sanitizeAssistant";
-import { parseContentWithSources, type ResearchMode, type Source } from "@shared/research";
 
 type KsemoMessage = {
   id: string;
@@ -59,109 +55,13 @@ type KsemoMessage = {
     status: "processing" | "created" | "error";
     errorMessage?: string;
   };
-  researchProgress?: {
-    stage: "understanding" | "planning" | "searching" | "retrieving" | "analyzing" | "comparing" | "writing" | "completed" | "error";
-    mode?: ResearchMode;
-    plan?: string[];
-    label?: string;
-    errorMessage?: string;
-  };
-  /** Live sources streamed while a web search / deep research runs. */
-  sources?: Source[];
 };
 
-// Stable Streamdown component map so the internal `marked.Lexer` cache is not
-// invalidated on every render (a fresh `components` object defeats Streamdown's
-// memo and forces a full re-parse of the message on each streaming flush).
-const KSEMO_MARKDOWN_COMPONENTS = {
-  code: KsemoMarkdownCode,
-  a: KsemoMarkdownSourceLink,
-};
-
-type KsemoFile = NonNullable<KsemoMessage["attachments"]>[number];
-
-/**
- * Living reference to the current message's sources, read by the custom
- * markdown link renderer (KsemoMarkdownSourceLink). Kept as a module ref so the
- * Streamdown `components` map stays object-identical across renders and is not
- * re-parsed on every streaming flush.
- */
-const citationSourcesRef: { current: Source[] } = { current: [] };
-
-/**
- * Callback wired by MessageContent so hovering an inline citation also
- * highlights the matching card in the Sources panel.
- */
-const citationHoverRef: {
-  current: ((source: Source | null) => void) | null;
-} = { current: null };
-
-/** Sentinel protocol marking a generated inline citation link. */
-const CITE_PROTOCOL = "ksemocite:";
-
-/**
- * Rewrites inline citation markers like [1] or [1][2] into real markdown links
- * that route to our citation component. Only markers that map to an existing
- * source are converted; anything else is left untouched so no broken citation
- * is ever rendered.
- */
-function prepareCitationMarkdown(content: string): string {
-  if (citationSourcesRef.current.length === 0) return content;
-  return content.replace(/\[(\d+)\]/g, (match, num) => {
-    const index = Number(num);
-    if (
-      !Number.isInteger(index) ||
-      index < 1 ||
-      index > citationSourcesRef.current.length
-    ) {
-      return match;
-    }
-    return `[${num}](${CITE_PROTOCOL}//${index})`;
-  });
-}
-
-/**
- * Builds a clean plain-text representation (answer + numbered sources) so the
- * clipboard copy never includes embedded source metadata or broken objects.
- */
-function buildCopyText(answer: string, sources: Source[]): string {
-  let text = answer;
-  if (sources.length > 0) {
-    const sourceLines = sources
-      .map((s, i) => `${i + 1}. ${s.title} — ${s.url}`)
-      .join("\n");
-    text = `${answer.trimEnd()}\n\nSources:\n${sourceLines}`;
-  }
-  return text;
-}
-
-/**
- * Custom renderer for markdown anchors. Links whose href uses the citation
- * sentinel programmatically become clickable SourceCitation pills (opening the
- * exact mapped source and showing a preview on hover/focus/tap). All other
- * links render as safe external links.
- */
-function KsemoMarkdownSourceLink({
+function KsemoMarkdownLink({
   href,
   children,
   ...props
 }: React.AnchorHTMLAttributes<HTMLAnchorElement>) {
-  if (href?.startsWith(CITE_PROTOCOL)) {
-    const index = Number(href.slice(CITE_PROTOCOL.length + 2));
-    const source = citationSourcesRef.current[index - 1];
-    if (source) {
-      return (
-        <SourceCitation
-          source={source}
-          citationNumber={index}
-          onHover={src => citationHoverRef.current?.(src)}
-        />
-      );
-    }
-    // Fall back to plain text marker if the source is not available.
-    return <span>{`[${index}]`}</span>;
-  }
-
   if (href && !/^(https?:|mailto:|#)/i.test(href)) {
     // Block dangerous javascript: URIs and other non-safe schemes.
     return <span {...props}>{children}</span>;
@@ -173,6 +73,16 @@ function KsemoMarkdownSourceLink({
     </a>
   );
 }
+
+// Stable Streamdown component map so the internal `marked.Lexer` cache is not
+// invalidated on every render (a fresh `components` object defeats Streamdown's
+// memo and forces a full re-parse of the message on each streaming flush).
+const KSEMO_MARKDOWN_COMPONENTS = {
+  code: KsemoMarkdownCode,
+  a: KsemoMarkdownLink,
+};
+
+type KsemoFile = NonNullable<KsemoMessage["attachments"]>[number];
 
 function formatBytes(bytes?: number): string | null {
   if (typeof bytes !== "number" || Number.isNaN(bytes) || bytes < 0) return null;
@@ -233,47 +143,8 @@ export const MessageContent = memo(function MessageContent({
     ? getFileKind(previewFile.filename, previewFile.mimeType)
     : null;
 
-  // Parse sources from message content for research results. The sanitizer is a
-  // render-level safety net: the server strips internal markers per streamed
-  // delta, but this pass guarantees one that spanned two deltas (or lives in a
-  // legacy row) never reaches the visible answer or the clipboard.
-  const { answer: cleanContent, sources } = parseContentWithSources(
-    sanitizeAssistantText(message.content)
-  );
-
-  // While a research run is live, prefer the sources streamed to the message so
-  // the Sources panel fills in before the final answer settles. Once the run
-  // completes (or on a reload), the embedded sources in `sources` win.
-  const activeSources =
-    message.sources && message.sources.length > 0
-      ? message.sources
-      : sources;
-
-  const researchProgress = message.researchProgress;
-  const researchInProgress = Boolean(
-    researchProgress &&
-      researchProgress.stage !== "completed" &&
-      researchProgress.stage !== "error"
-  );
-  // Whether the message belongs to a web-search or deep-research workflow
-  // (either still running or already finished with sources).
-  const hasResearchWorkflow = Boolean(
-    researchProgress || activeSources.length > 0
-  );
-
-  // Publish the current sources to the citation link renderer (module-level ref
-  // keeps the Streamdown components map stable so it is not re-parsed on every
-  // streaming flush).
-  citationSourcesRef.current = activeSources;
-  const [hoveredSource, setHoveredSource] = useState<Source | null>(null);
-  const hoveredSourceId = hoveredSource?.sourceId ?? null;
-  citationHoverRef.current = (source: Source | null) =>
-    setHoveredSource(source);
-
-  const citationContent = useMemo(
-    () => prepareCitationMarkdown(cleanContent),
-    [cleanContent]
-  );
+  // Sanitize assistant content
+  const cleanContent = sanitizeAssistantText(message.content);
 
   useEffect(() => {
     if (lightboxIndex === null) return;
@@ -297,18 +168,8 @@ export const MessageContent = memo(function MessageContent({
     return () => window.removeEventListener("keydown", onKey);
   }, [previewFile]);
 
-  useEffect(() => {
-    if (!hoveredSource) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setHoveredSource(null);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [hoveredSource]);
-
   async function copyMessage() {
-    const copyText = buildCopyText(cleanContent, sources);
-    await navigator.clipboard.writeText(copyText);
+    await navigator.clipboard.writeText(cleanContent);
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1_500);
   }
@@ -418,27 +279,6 @@ export const MessageContent = memo(function MessageContent({
             );
           })()
         ) : null}
-        {/* Search activity — quiet status line, sits directly above the answer */}
-        {!isUser && hasResearchWorkflow && (
-          <SearchActivity
-            mode={message.researchProgress?.mode ?? "web_search"}
-            stage={message.researchProgress?.stage}
-            active={researchInProgress}
-            sourceCount={activeSources.length}
-            sources={activeSources}
-            plan={message.researchProgress?.plan}
-            className="mb-1"
-          />
-        )}
-
-        {!isUser &&
-          message.researchProgress?.stage === "error" &&
-          message.researchProgress.errorMessage && (
-            <div className="mt-3 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-              {message.researchProgress.errorMessage}
-            </div>
-          )}
-
         <div
           className={cn(
             "text-[15px] leading-6",
@@ -454,7 +294,7 @@ export const MessageContent = memo(function MessageContent({
               <Streamdown
                 components={KSEMO_MARKDOWN_COMPONENTS}
               >
-                {citationContent}
+                {cleanContent}
               </Streamdown>
             </div>
           ) : message.status === "streaming" &&
@@ -470,15 +310,6 @@ export const MessageContent = memo(function MessageContent({
             </div>
           ) : null}
         </div>
-
-        {/* Sources control for web search and deep research */}
-        {!isUser && activeSources.length > 0 && (
-          <SourcesControl
-            sources={activeSources}
-            activeSourceId={hoveredSourceId}
-            className="mt-3"
-          />
-        )}
         
         {/* Attachments (e.g. images, uploaded files; generated document is presented via primary FileCreationCard) */}
         {!isUser && message.attachments?.length && !message.fileGeneration ? (

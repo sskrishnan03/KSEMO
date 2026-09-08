@@ -23,7 +23,7 @@ import {
   CAPABILITY_SECTIONS,
   getCapabilityOption,
 } from "@/lib/capabilities";
-import { type CapabilityMode } from "@shared/research";
+import { type CapabilityMode } from "@shared/capabilities";
 import {
   ArrowUp,
   AudioLines,
@@ -63,7 +63,7 @@ const COMPACT_INPUT_MAX_HEIGHT = 112;
 const EXPANDED_INPUT_MAX_HEIGHT = 320;
 const MIN_INPUT_HEIGHT = 40;
 
-const MENU_TITLE = "Create, Search & Research";
+const MENU_TITLE = "Create";
 
 export const ChatComposer = memo(function ChatComposer({
   onSend,
@@ -562,26 +562,6 @@ sideOffset={8}
                           })}
                         </DropdownMenuSubContent>
                       </DropdownMenuSub>
-                      <DropdownMenuSeparator />
-                      {CAPABILITY_SECTIONS.find(s => s.id === "research")?.options.map(option => {
-                        const Icon = option.icon;
-                        const isActive = activeMode === option.mode;
-                        return (
-                          <DropdownMenuItem
-                            key={option.mode}
-                            onSelect={() => {
-                              onModeChange?.(isActive ? null : option.mode);
-                              setToolsOpen(false);
-                            }}
-                          >
-                            <Icon className={`mr-2 size-4 ${option.iconColor}`} />
-                            {option.title}
-                            {isActive && (
-                              <Check className="ml-auto size-4 text-foreground" />
-                            )}
-                          </DropdownMenuItem>
-                        );
-                      })}
                     </>
                   )}
                 </DropdownMenuContent>

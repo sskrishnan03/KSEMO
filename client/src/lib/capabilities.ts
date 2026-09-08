@@ -1,5 +1,5 @@
 /**
- * Capability configuration for the "Create, Search & Research" workspace.
+ * Capability configuration for the Create & Document system.
  *
  * This is the single scalable registry of every capability offered through the
  * Plus (+) button. Adding a future capability (image generation, agent mode,
@@ -10,17 +10,14 @@ import type { ComponentType } from "react";
 import {
   FileSpreadsheet,
   FileText,
-  Globe,
   Presentation,
-  Telescope,
 } from "lucide-react";
 import type {
   CapabilityMode,
   CreateMode,
-  ResearchMode,
-} from "@shared/research";
+} from "@shared/capabilities";
 
-export type CapabilityKind = "create" | "research";
+export type CapabilityKind = "create";
 
 export type CapabilityOption = {
   /** The mode this entry arms. */
@@ -99,44 +96,16 @@ const CREATE: CapabilityOption[] = [
   },
 ];
 
-const RESEARCH: CapabilityOption[] = [
-  {
-    mode: "web_search",
-    kind: "research",
-    title: "Web Search",
-    description: "Search the web and answer using real, current sources.",
-    icon: Globe,
-    iconColor: "text-sky-500",
-    iconBg: "bg-sky-500/10",
-    placeholder: "What would you like to search for?",
-    chipLabel: "Web Search",
-  },
-  {
-    mode: "deep_research",
-    kind: "research",
-    title: "Deep Research",
-    description:
-      "Research a topic in depth, analyze multiple sources, and generate a structured research report.",
-    icon: Telescope,
-    iconColor: "text-violet-500",
-    iconBg: "bg-violet-500/10",
-    placeholder: "What topic would you like me to research?",
-    chipLabel: "Deep Research",
-  },
-] as CapabilityOption[];
-
 export const CAPABILITY_SECTIONS: Array<{
-  id: "create" | "research";
+  id: "create";
   heading: string;
   options: CapabilityOption[];
 }> = [
   { id: "create", heading: "CREATE", options: CREATE },
-  { id: "research", heading: "SEARCH & RESEARCH", options: RESEARCH },
 ];
 
 export const ALL_CAPABILITIES: CapabilityOption[] = [
   ...CREATE,
-  ...RESEARCH,
 ];
 
 const MODE_INDEX = new Map<CapabilityMode, CapabilityOption>(
@@ -148,11 +117,7 @@ export function getCapabilityOption(mode: CapabilityMode): CapabilityOption {
 }
 
 export function isFileMode(mode: CapabilityMode): mode is CreateMode {
-  return mode !== "chat" && mode !== "web_search" && mode !== "deep_research";
-}
-
-export function isResearchCapability(mode: CapabilityMode): mode is ResearchMode {
-  return mode === "web_search" || mode === "deep_research";
+  return mode !== "chat";
 }
 
 /** Placeholder text for a given active mode (used by Normal Chat). */

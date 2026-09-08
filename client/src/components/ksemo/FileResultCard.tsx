@@ -23,7 +23,7 @@ import {
   Loader2,
   AlertCircle,
 } from "lucide-react";
-import { type FileFormat } from "@shared/research";
+import { type FileFormat } from "@shared/capabilities";
 
 export interface FileResult {
   filename: string;

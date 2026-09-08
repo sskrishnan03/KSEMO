@@ -15,8 +15,6 @@ import type {
   Memory,
   MemorySettings,
   InsertMemory,
-  ResearchSession,
-  InsertResearchSession,
   VoiceSession,
   DbUser,
   DbConversation,
@@ -41,7 +39,6 @@ class InMemoryStore {
   files = new Map<string, KsemoFile>();
   attachments = new Map<string, Attachment>();
   voiceSessions = new Map<string, VoiceSession>();
-  researchSessions = new Map<string, ResearchSession>();
   tasks = new Map<string, Task>();
   taskActivities = new Map<string, TaskActivity[]>();
 
@@ -612,7 +609,7 @@ class InMemoryStore {
     return saved;
   }
 
-  // --- Voice & Research ---
+  // --- Voice ---
 
   async createVoiceSession(input: {
     id: string;
@@ -641,47 +638,6 @@ class InMemoryStore {
       session.status = status;
       session.updatedAt = new Date();
     }
-  }
-
-  async createResearchSession(input: InsertResearchSession): Promise<ResearchSession> {
-    const now = new Date();
-    const session: ResearchSession = {
-      id: input.id,
-      userId: input.userId,
-      conversationId: input.conversationId ?? null,
-      messageId: input.messageId ?? null,
-      researchMode: input.researchMode ?? "web_search",
-      query: input.query,
-      status: input.status || "running",
-      sourcesCount: input.sourcesCount ?? 0,
-      sourcesData: input.sourcesData ?? [],
-      errorMessage: input.errorMessage ?? null,
-      startedAt: now,
-      completedAt: null,
-      createdAt: now,
-      updatedAt: now,
-    };
-    this.researchSessions.set(session.id, session);
-    return session;
-  }
-
-  async updateResearchSession(
-    sessionId: string,
-    values: Partial<ResearchSession>
-  ): Promise<void> {
-    const session = this.researchSessions.get(sessionId);
-    if (session) {
-      Object.assign(session, values, { updatedAt: new Date() });
-    }
-  }
-
-  async getResearchSessionForUser(
-    sessionId: string,
-    userId: number
-  ): Promise<ResearchSession | undefined> {
-    const session = this.researchSessions.get(sessionId);
-    if (!session || session.userId !== userId) return undefined;
-    return session;
   }
 
   // --- Projects & Files ---

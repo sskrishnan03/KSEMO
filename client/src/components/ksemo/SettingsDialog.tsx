@@ -2033,23 +2033,6 @@ function ShortcutsSection({
         },
       ],
     },
-    {
-      title: "Search & Research Modes",
-      items: [
-        {
-          label: "Live Web Search",
-          keys: [modKey, "Shift", "W"],
-          description:
-            "Switch composer to search current web documentation & news.",
-        },
-        {
-          label: "Deep Research Dossier",
-          keys: [modKey, "Shift", "R"],
-          description:
-            "Switch composer to trigger multi-step, citation-backed deep research.",
-        },
-      ],
-    },
   ];
 
   return (

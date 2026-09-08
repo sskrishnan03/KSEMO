@@ -1,5 +1,5 @@
 /**
- * Server-side file generation engine for the Create, Search & Research system.
+ * Server-side file generation engine.
  * 
  * This module handles the generation of various file formats:
  * - PDF: Professional formatted documents
@@ -101,14 +101,15 @@ async function generatePdf(content: string, title?: string, description?: string
     blocks.push({ type: "paragraph", text: currentParagraph });
   }
 
+  const filename = title ? `${sanitizeFilename(title)}.pdf` : "generated_document.pdf";
+
   const buffer = await generatePdfDoc({
     format: "pdf",
+    filename,
     title: title || "Generated Document",
-    description,
+    summary: description,
     blocks: blocks.length ? blocks : [{ type: "paragraph", text: content }],
   });
-
-  const filename = title ? `${sanitizeFilename(title)}.pdf` : "generated_document.pdf";
 
   return {
     filename,

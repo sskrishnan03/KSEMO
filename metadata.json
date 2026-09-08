@@ -1,6 +1,6 @@
 {
   "name": "KSEMO",
-  "description": "AI assistant with durable memory, document creation, deep research, and voice capabilities.",
+  "description": "AI assistant with durable memory, document creation, and voice capabilities.",
   "requestFramePermissions": ["microphone"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

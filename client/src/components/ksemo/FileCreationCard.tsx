@@ -31,7 +31,7 @@ export type FileCreationStage =
 
 const STAGES_PIPELINE = [
   { id: "analyzing", label: "Outline", detail: "Analyzing prompt & structuring document schema...", progress: 20 },
-  { id: "researching", label: "Research", detail: "Synthesizing factual points, analysis & citations...", progress: 40 },
+  { id: "researching", label: "Synthesize", detail: "Synthesizing domain knowledge, facts & structured insights...", progress: 40 },
   { id: "planning", label: "Layout", detail: "Structuring sections, tables & document typography...", progress: 60 },
   { id: "content_generated", label: "Draft", detail: "Drafting complete multi-section document content...", progress: 80 },
   { id: "formatting", label: "Compile", detail: "Compiling native binary document & vector layout...", progress: 92 },

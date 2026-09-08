@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { toast } from "sonner";
-import type { CapabilityMode } from "@shared/research";
+import type { CapabilityMode } from "@shared/capabilities";
 
 export type GlobalShortcutsOptions = {
   onNewChat?: () => void;
@@ -91,14 +91,6 @@ export function useGlobalShortcuts({
           e.preventDefault();
           onModeChange("pptx");
           toast.info("Switched to PowerPoint Presentation mode");
-        } else if (key === "w") {
-          e.preventDefault();
-          onModeChange("web_search");
-          toast.info("Switched to Live Web Search mode");
-        } else if (key === "r") {
-          e.preventDefault();
-          onModeChange("deep_research");
-          toast.info("Switched to Deep Research mode");
         }
       }
     };

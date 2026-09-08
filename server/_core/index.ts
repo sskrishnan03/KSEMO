@@ -1,3 +1,15 @@
+// Suppress Node.js experimental warnings (e.g. experimental localStorage warning)
+const originalEmitWarning = process.emitWarning;
+process.emitWarning = ((warning: any, ...args: any[]) => {
+  if (
+    (typeof warning === "string" && warning.includes("localStorage")) ||
+    (typeof warning === "object" && warning?.name === "ExperimentalWarning")
+  ) {
+    return;
+  }
+  return (originalEmitWarning as any).call(process, warning, ...args);
+}) as any;
+
 import "dotenv/config";
 import express from "express";
 import { createServer } from "http";
@@ -58,7 +70,7 @@ async function startServer() {
 
   const port = 3000;
   server.listen(port, "0.0.0.0", () => {
-    console.log(`Server running on http://0.0.0.0:${port}/`);
+    console.log(`\n  ➜  Local:   http://localhost:${port}/\n`);
   });
 }
 
