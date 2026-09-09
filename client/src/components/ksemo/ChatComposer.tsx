@@ -462,7 +462,7 @@ export const ChatComposer = memo(function ChatComposer({
         compactBottomSpacing ? "pb-5" : "pb-4"
       )}
     >
-      <div className="relative rounded-2xl p-1.5 shadow-sm transition-shadow focus-within:shadow-md" style={{ backgroundColor: "#20201F", border: "1px solid #353534" }}>
+      <div className="relative rounded-[20px] p-1.5 shadow-sm transition-shadow focus-within:shadow-md" style={{ backgroundColor: "#20201F", border: "1px solid #353534" }}>
         {isDragActive && (
           <div className="pointer-events-none fixed inset-0 z-[100] flex items-center justify-center bg-card/80 backdrop-blur-sm">
             <div className="rounded-2xl border-2 border-dashed border-primary/60 bg-card px-10 py-8 shadow-xl">
