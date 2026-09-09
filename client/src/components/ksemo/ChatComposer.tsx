@@ -205,6 +205,55 @@ export const ChatComposer = memo(function ChatComposer({
       ? [{ fileId: attachmentNotice.name, ...attachmentNotice }]
       : []);
 
+  // ---- Slash command ("/") menu state ----
+  const slashPanelRef = useRef<HTMLDivElement>(null);
+  const [slashHighlight, setSlashHighlight] = useState(0);
+  const slashCreateOptions = useMemo(
+    () => CAPABILITY_SECTIONS.find(s => s.id === "create")?.options ?? [],
+    []
+  );
+  const isSlashActive =
+    !voiceChatActive &&
+    activeMode === "chat" &&
+    value.startsWith("/") &&
+    value.length >= 1;
+  const slashQuery = isSlashActive ? value.slice(1) : "";
+  const slashFiltered = useMemo(() => {
+    if (!isSlashActive) return [];
+    const q = slashQuery.trim().toLowerCase();
+    if (!q) return slashCreateOptions;
+    return slashCreateOptions.filter(o =>
+      o.title.toLowerCase().includes(q) ||
+      o.mode.toLowerCase().includes(q) ||
+      o.description.toLowerCase().includes(q)
+    );
+  }, [isSlashActive, slashQuery, slashCreateOptions]);
+
+  useEffect(() => {
+    if (isSlashActive) setSlashHighlight(0);
+  }, [slashQuery, isSlashActive]);
+
+  useEffect(() => {
+    if (!isSlashActive) return;
+    const closeSlash = (event: PointerEvent) => {
+      const clickedInPanel = slashPanelRef.current?.contains(event.target as Node);
+      const clickedInEditor = editorRef.current?.contains(event.target as Node);
+      if (!clickedInPanel && !clickedInEditor) {
+        onValueChange("");
+      }
+    };
+    document.addEventListener("pointerdown", closeSlash);
+    return () => document.removeEventListener("pointerdown", closeSlash);
+  }, [isSlashActive, onValueChange]);
+
+  function selectSlashOption(mode: CapabilityMode) {
+    onValueChange("");
+    onModeChange?.(mode);
+    requestAnimationFrame(() => {
+      placeCaretAtEnd();
+    });
+  }
+
   function renderEditorDom(nextMode: CapabilityMode, nextValue: string) {
     const editor = editorRef.current;
     if (!editor) return;
@@ -544,6 +593,36 @@ export const ChatComposer = memo(function ChatComposer({
               onInput={handleEditorInput}
               onPaste={handlePaste}
               onKeyDown={event => {
+                if (isSlashActive) {
+                  if (event.key === "Escape") {
+                    event.preventDefault();
+                    onValueChange("");
+                    return;
+                  }
+                  if (event.key === "ArrowDown") {
+                    event.preventDefault();
+                    setSlashHighlight(current => {
+                      const max = Math.max(0, slashFiltered.length - 1);
+                      return Math.min(max, current + 1);
+                    });
+                    return;
+                  }
+                  if (event.key === "ArrowUp") {
+                    event.preventDefault();
+                    setSlashHighlight(current => Math.max(0, current - 1));
+                    return;
+                  }
+                  if (
+                    event.key === "Tab" ||
+                    (event.key === "Enter" && !event.shiftKey)
+                  ) {
+                    event.preventDefault();
+                    const option =
+                      slashFiltered[slashHighlight] ?? slashFiltered[0];
+                    if (option) selectSlashOption(option.mode);
+                    return;
+                  }
+                }
                 if (event.key === "Enter" && !event.shiftKey) {
                   event.preventDefault();
                   submit();
@@ -877,6 +956,51 @@ export const ChatComposer = memo(function ChatComposer({
             </div>
           </div>
         </div>
+
+        {/* Slash command ("/") menu — matches the Create Files submenu exactly */}
+        {isSlashActive && (
+          <div
+            ref={slashPanelRef}
+            className={cn(
+              "ksemo-thin-scroll absolute left-0 z-50 w-44 max-h-[16rem] overflow-y-auto rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-md",
+              menuPlacement === "below"
+                ? "top-[calc(100%+2px)]"
+                : "bottom-[calc(100%+2px)]"
+            )}
+          >
+            {slashFiltered.length === 0 ? (
+              <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                No matches
+              </div>
+            ) : (
+              slashFiltered.map((option, index) => {
+                const Icon = option.icon;
+                const isActive = activeMode === option.mode;
+                return (
+                  <div
+                    key={option.mode}
+                    role="menuitem"
+                    tabIndex={-1}
+                    onMouseEnter={() => setSlashHighlight(index)}
+                    onClick={() => selectSlashOption(option.mode)}
+                    className={cn(
+                      "flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-hidden transition-colors",
+                      index === slashHighlight
+                        ? "bg-accent text-accent-foreground"
+                        : "hover:bg-accent hover:text-accent-foreground"
+                    )}
+                  >
+                    <Icon className="mr-2 size-4 text-muted-foreground" />
+                    {option.title}
+                    {isActive && (
+                      <Check className="ml-auto size-4 text-foreground" />
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
