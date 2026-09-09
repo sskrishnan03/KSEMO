@@ -1,5 +1,4 @@
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
@@ -44,6 +43,7 @@ import {
 import React, {
   memo,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -64,6 +64,26 @@ const EXPANDED_INPUT_MAX_HEIGHT = 320;
 const MIN_INPUT_HEIGHT = 40;
 
 const MENU_TITLE = "Create";
+
+const MODE_TOKEN_COLORS: Record<string, string> = {
+  pdf: "#ef4444",
+  docx: "#2563eb",
+  xlsx: "#059669",
+  pptx: "#f97316",
+  txt: "#0ea5e9",
+};
+
+const MODE_TOKEN_LABELS: Record<string, string> = {
+  pdf: "pdf",
+  docx: "docx",
+  xlsx: "xlsx",
+  pptx: "pptx",
+  txt: "txt",
+};
+
+function getModeToken(mode: CapabilityMode): string {
+  return MODE_TOKEN_LABELS[mode] ?? getCapabilityOption(mode).title;
+}
 
 export const ChatComposer = memo(function ChatComposer({
   onSend,
@@ -158,7 +178,7 @@ export const ChatComposer = memo(function ChatComposer({
   selectedVoiceName?: string | null;
   onVoiceChatVoiceSelect?: (name: string) => void;
 }) {
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const editorRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const libraryPanelRef = useRef<HTMLDivElement>(null);
   const [libraryOpen, setLibraryOpen] = useState(initialLibraryOpen);
@@ -168,6 +188,13 @@ export const ChatComposer = memo(function ChatComposer({
   const [expanded, setExpanded] = useState(false);
   const [canExpand, setCanExpand] = useState(false);
   const dragCounterRef = useRef(0);
+  const editorModeRef = useRef<CapabilityMode>("chat");
+  const lastSyncedValueRef = useRef<string | null>(null);
+  const activeModeOption =
+    activeMode && activeMode !== "chat"
+      ? getCapabilityOption(activeMode)
+      : null;
+  const isEditorDisabled = isGenerating || isRecording || isTranscribing;
   const displayedLibraryFiles = useMemo(
     () => filterLibraryItems(libraryFiles, libraryQuery),
     [libraryFiles, libraryQuery]
@@ -178,25 +205,113 @@ export const ChatComposer = memo(function ChatComposer({
       ? [{ fileId: attachmentNotice.name, ...attachmentNotice }]
       : []);
 
+  function renderEditorDom(nextMode: CapabilityMode, nextValue: string) {
+    const editor = editorRef.current;
+    if (!editor) return;
+    editor.textContent = "";
+    if (nextMode !== "chat") {
+      const token = document.createElement("span");
+      token.dataset.mode = nextMode;
+      token.style.color = MODE_TOKEN_COLORS[nextMode] ?? "inherit";
+      token.style.fontWeight = "600";
+      token.textContent = `/${getModeToken(nextMode)}`;
+      editor.appendChild(token);
+      editor.appendChild(document.createTextNode(" "));
+    }
+    if (nextValue) {
+      editor.appendChild(document.createTextNode(nextValue));
+    }
+    editorModeRef.current = nextMode;
+    lastSyncedValueRef.current = nextValue;
+  }
+
+  function placeCaretAtEnd() {
+    const editor = editorRef.current;
+    if (!editor) return;
+    editor.focus({ preventScroll: true });
+    const range = document.createRange();
+    range.selectNodeContents(editor);
+    range.collapse(false);
+    const selection = window.getSelection();
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+  }
+
+  function isBackspaceTargetingModeToken(
+    editor: HTMLDivElement,
+    nextValue: string
+  ): boolean {
+    const selection = window.getSelection();
+    if (!selection || !selection.isCollapsed) return false;
+    const range = selection.getRangeAt(0);
+    const container = range.startContainer;
+    const token = editor.querySelector("[data-mode]") as HTMLElement | null;
+    if (token && (container === token || token.contains(container))) return true;
+    if (nextValue === "") return true;
+    const question = editor.lastChild;
+    if (question && container === question && range.startOffset === 0)
+      return true;
+    return false;
+  }
+
+  function handleEditorInput() {
+    const editor = editorRef.current;
+    if (!editor) return;
+    const full = editor.textContent ?? "";
+    const mode = editorModeRef.current;
+    let nextMode = mode;
+    let typed = full;
+    if (mode !== "chat") {
+      const token = `/${getModeToken(mode)}`;
+      if (full.startsWith(token)) {
+        typed = full.slice(token.length).replace(/^ /, "");
+      } else {
+        nextMode = "chat";
+        typed = full;
+      }
+    }
+    editorModeRef.current = nextMode;
+    lastSyncedValueRef.current = typed;
+    if (nextMode === "chat" && mode !== "chat") {
+      onModeChange?.(null);
+    }
+    onValueChange(typed);
+  }
+
+  useLayoutEffect(() => {
+    const editor = editorRef.current;
+    if (!editor) return;
+    const mode = activeMode ?? "chat";
+    const changed =
+      editorModeRef.current !== mode ||
+      lastSyncedValueRef.current !== value;
+    if (changed) {
+      renderEditorDom(mode, value);
+      if (mode !== "chat" || value !== "") {
+        placeCaretAtEnd();
+      }
+    }
+  }, [activeMode, value]);
+
   useEffect(() => {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
+    const editor = editorRef.current;
+    if (!editor) return;
     const frame = requestAnimationFrame(() => {
       // Reset to auto first to allow shrinking
-      textarea.style.height = "auto";
+      editor.style.height = "auto";
       // Then size to actual scrollHeight, capped by the current mode
       const cap = expanded
         ? EXPANDED_INPUT_MAX_HEIGHT
         : COMPACT_INPUT_MAX_HEIGHT;
       const height = Math.max(
-        Math.min(textarea.scrollHeight, cap),
+        Math.min(editor.scrollHeight, cap),
         MIN_INPUT_HEIGHT
       );
-      textarea.style.height = `${height}px`;
-      setCanExpand(textarea.scrollHeight > COMPACT_INPUT_MAX_HEIGHT);
+      editor.style.height = `${height}px`;
+      setCanExpand(editor.scrollHeight > COMPACT_INPUT_MAX_HEIGHT);
     });
     return () => cancelAnimationFrame(frame);
-  }, [value, expanded]);
+  }, [value, expanded, activeMode]);
 
   useEffect(() => {
     if (expanded && !canExpand) setExpanded(false);
@@ -215,8 +330,13 @@ export const ChatComposer = memo(function ChatComposer({
   function submit() {
     const content = value.trim();
     if ((!content && !visibleAttachmentNotices.length) || isGenerating) return;
-    onSend(content);
+    const payload =
+      activeMode && activeMode !== "chat"
+        ? `${getModeToken(activeMode)} ${content}`
+        : content;
+    onSend(payload.trim());
     onValueChange("");
+    onModeChange?.(null);
   }
 
   function selectFile(event: ChangeEvent<HTMLInputElement>) {
@@ -225,15 +345,22 @@ export const ChatComposer = memo(function ChatComposer({
     for (const file of files) onAttachment?.(file);
   }
 
-  function handlePaste(event: React.ClipboardEvent<HTMLTextAreaElement>) {
+  function handlePaste(event: React.ClipboardEvent<HTMLDivElement>) {
     const items = Array.from(event.clipboardData?.items ?? []);
     const files = items
       .filter(item => item.kind === "file")
       .map(item => item.getAsFile())
       .filter((file): file is File => file !== null);
-    if (!files.length) return;
-    event.preventDefault();
-    for (const file of files) onAttachment?.(file);
+    if (files.length) {
+      event.preventDefault();
+      for (const file of files) onAttachment?.(file);
+      return;
+    }
+    const text = event.clipboardData?.getData("text/plain");
+    if (text) {
+      event.preventDefault();
+      document.execCommand("insertText", false, text);
+    }
   }
 
   useEffect(() => {
@@ -402,26 +529,45 @@ export const ChatComposer = memo(function ChatComposer({
         {/* Main Composer Content */}
         <div className="flex flex-col">
           {/* Text Input Area */}
-          <div className="relative flex flex-1">
-            <Textarea
+          <div className="relative flex flex-1 items-start">
+            <div
               id="ksemo-composer-textarea"
-              ref={textareaRef}
-              value={value}
-              onChange={event => onValueChange(event.target.value)}
+              ref={editorRef}
+              contentEditable={isEditorDisabled ? "false" : "true"}
+              suppressContentEditableWarning
+              spellCheck={false}
+              autoCorrect="off"
+              autoCapitalize="off"
+              role="textbox"
+              aria-multiline="true"
+              aria-label="Message KSEMO"
+              onInput={handleEditorInput}
               onPaste={handlePaste}
               onKeyDown={event => {
                 if (event.key === "Enter" && !event.shiftKey) {
                   event.preventDefault();
                   submit();
                 }
+                if (
+                  event.key === "Backspace" &&
+                  activeMode &&
+                  activeMode !== "chat" &&
+                  editorRef.current &&
+                  isBackspaceTargetingModeToken(
+                    editorRef.current,
+                    value
+                  )
+                ) {
+                  event.preventDefault();
+                  onModeChange?.(null);
+                }
               }}
-              disabled={isGenerating || isRecording || isTranscribing}
               className={cn(
-                "min-h-10 resize-none border-0 !bg-transparent pl-2.5 py-1 text-[15px] leading-6 md:text-[15px] shadow-none focus-visible:ring-0 dark:!bg-transparent flex-1 ![field-sizing:manual]",
+                "min-h-10 min-w-0 flex-1 overflow-y-auto whitespace-pre-wrap border-0 !bg-transparent pl-2.5 py-1 text-[15px] leading-6 md:text-[15px] shadow-none focus-visible:ring-0 outline-none dark:!bg-transparent",
                 expanded ? "max-h-80" : "max-h-28",
                 canExpand ? "pr-10" : "pr-1"
               )}
-              aria-label="Message KSEMO"
+              style={{ height: "40px" }}
             />
             {canExpand && (
               <Tooltip>
@@ -447,7 +593,7 @@ export const ChatComposer = memo(function ChatComposer({
                 </TooltipContent>
               </Tooltip>
             )}
-            {value.length === 0 && (
+            {value.length === 0 && !activeModeOption && (
               <span
                 key={
                   voiceChatActive
@@ -456,14 +602,10 @@ export const ChatComposer = memo(function ChatComposer({
                       ? activeMode
                       : "chat"
                 }
-                className="pointer-events-none absolute left-2.5 top-1 text-[15px] leading-6 text-muted-foreground animate-[ksemo-placeholder-rise_800ms_ease-out]"
+                className="pointer-events-none absolute left-2.5 top-[7px] text-[15px] leading-6 text-muted-foreground animate-[ksemo-placeholder-rise_800ms_ease-out]"
                 aria-hidden="true"
               >
-                {voiceChatActive
-                  ? VOICE_PLACEHOLDER
-                  : activeMode && activeMode !== "chat"
-                    ? getCapabilityOption(activeMode).placeholder
-                    : CHAT_PLACEHOLDER}
+                {voiceChatActive ? VOICE_PLACEHOLDER : CHAT_PLACEHOLDER}
               </span>
             )}
           </div>
@@ -497,12 +639,13 @@ export const ChatComposer = memo(function ChatComposer({
 <DropdownMenuContent
                   align="start"
                   side={menuPlacement === "below" ? "bottom" : "top"}
-sideOffset={8}
+                  sideOffset={8}
+                  alignOffset={-8}
                   collisionPadding={12}
-                  className="ksemo-thin-scroll w-56 rounded-xl max-h-[16rem] overflow-y-auto"
+                  className="ksemo-thin-scroll w-48 rounded-xl max-h-[16rem] overflow-y-auto"
                 >
                   <DropdownMenuItem onClick={() => fileInputRef.current?.click()}>
-                    <Paperclip className="mr-2 size-4 text-blue-500" /> Upload files
+                    <Paperclip className="mr-2 size-4" /> Upload files
                   </DropdownMenuItem>
                   {onTakeScreenshot && (
                     <DropdownMenuItem
@@ -511,7 +654,7 @@ sideOffset={8}
                         onTakeScreenshot();
                       }}
                     >
-                      <Camera className="mr-2 size-4 text-rose-500" />
+                      <Camera className="mr-2 size-4" />
                       Take Screenshot
                     </DropdownMenuItem>
                   )}
@@ -521,21 +664,21 @@ sideOffset={8}
                       setToolsOpen(false);
                     }}
                   >
-                    <Library className="mr-2 size-4 text-amber-500" />
+                    <Library className="mr-2 size-4" />
                     Browse Library
                   </DropdownMenuItem>
                   {!voiceChatActive && (
                     <>
                       <DropdownMenuSub>
                         <DropdownMenuSubTrigger>
-                          <FilePlus2 className="mr-2 size-4 text-fuchsia-500" />
+                          <FilePlus2 className="mr-2 size-4" />
                           Create Files
                         </DropdownMenuSubTrigger>
                         <DropdownMenuSubContent
                           sideOffset={6}
-                          alignOffset={-56}
-                          className="w-48 max-h-[14rem] overflow-y-auto"
-                          style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+                          alignOffset={-84}
+                          collisionPadding={16}
+                          className="ksemo-thin-scroll w-44 rounded-xl max-h-[16rem] overflow-y-auto shadow-md"
                         >
                           {CAPABILITY_SECTIONS.find(s => s.id === "create")?.options.map(option => {
                             const Icon = option.icon;
@@ -548,11 +691,14 @@ sideOffset={8}
                                     onModeChange?.(null);
                                   } else {
                                     onModeChange?.(option.mode);
+                                    requestAnimationFrame(() => {
+                                      placeCaretAtEnd();
+                                    });
                                   }
                                   setToolsOpen(false);
                                 }}
                               >
-                                <Icon className={`mr-2 size-4 ${option.iconColor}`} />
+                                <Icon className="mr-2 size-4" />
                                 {option.title}
                                 {isActive && (
                                   <Check className="ml-auto size-4 text-foreground" />
@@ -566,36 +712,6 @@ sideOffset={8}
                   )}
                 </DropdownMenuContent>
               </DropdownMenu>
-              {/* Active mode indicator (after the + button) */}
-              {activeMode && activeMode !== "chat" && (
-                <span className="flex items-center gap-1.5 rounded-full border border-border bg-muted py-1 pl-1.5 pr-1 text-xs font-medium text-foreground">
-                  {(() => {
-                    const option = getCapabilityOption(activeMode);
-                    const Icon = option.icon;
-                    return (
-                      <>
-                        <Icon className={`size-4 shrink-0 ${option.iconColor}`} />
-                        <span className="whitespace-nowrap">
-                          {option.chipLabel}
-                        </span>
-                      </>
-                    );
-                  })()}
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button
-                        type="button"
-                        onClick={() => onModeChange?.(null)}
-                        className="flex size-5 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                        aria-label="Cancel active mode"
-                      >
-                        <X className="size-3" />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom">Cancel</TooltipContent>
-                  </Tooltip>
-                </span>
-              )}
             </div>
 
             {/* Right Side Controls */}
