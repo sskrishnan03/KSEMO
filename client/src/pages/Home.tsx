@@ -2415,8 +2415,8 @@ const EmptyState = memo(function EmptyState({
   composer: React.ReactNode;
 }) {
   return (
-    <div className="mx-auto flex h-full w-full max-w-3xl flex-col justify-center px-5 pb-4">
-      <div className="mb-4 text-center sm:mb-5">
+    <div className="mx-auto flex h-full w-full max-w-3xl flex-col justify-center px-0 pb-4 sm:px-5">
+      <div className="mb-4 px-5 text-center sm:mb-5 sm:px-0">
         <p className="whitespace-nowrap text-[17px] font-bold tracking-[-0.04em] text-foreground sm:text-xl sm:tracking-[-0.025em]">
           {greeting}
         </p>
