@@ -416,24 +416,24 @@ export const MessageContent = memo(function MessageContent({
             {action(
               "Copy message",
               copied ? (
-                <Check className="size-3.5" />
+                <Check className="size-4" />
               ) : (
-                <Copy className="size-3.5" />
+                <Copy className="size-4" />
               ),
               copyMessage
             )}
             {onShare &&
-              action("Share message", <ShareIcon className="size-3.5" />, () =>
+              action("Share message", <ShareIcon className="size-4" />, () =>
                 onShare(message)
               )}
             {onEdit &&
-              action("Edit message", <Pencil className="size-3.5" />, () =>
+              action("Edit message", <Pencil className="size-4" />, () =>
                 onEdit(message)
               )}
             {onViewHistory &&
               action(
                 "View version history",
-                <History className="size-3.5" />,
+                <History className="size-4" />,
                 () => onViewHistory(message)
               )}
           </div>
@@ -444,34 +444,34 @@ export const MessageContent = memo(function MessageContent({
               action(
                 copied ? "Copied" : "Copy response",
                 copied ? (
-                  <Check className="size-3.5" />
+                  <Check className="size-4" />
                 ) : (
-                  <Copy className="size-3.5" />
+                  <Copy className="size-4" />
                 ),
                 copyMessage
               )}
             {message.content &&
               onShare &&
-              action("Share response", <ShareIcon className="size-3.5" />, () =>
+              action("Share response", <ShareIcon className="size-4" />, () =>
                 onShare(message)
               )}
             {message.status !== "failed" &&
               onRegenerate &&
               action(
                 "Regenerate response",
-                <RotateCcw className="size-3.5" />,
+                <RotateCcw className="size-4" />,
                 () => onRegenerate(message)
               )}
             {onFeedback && (
               <>
                 {action(
                   "Helpful response",
-                  <ThumbsUp className="size-3.5" />,
+                  <ThumbsUp className="size-4" />,
                   () => onFeedback(message.id, "up")
                 )}
                 {action(
                   "Unhelpful response",
-                  <ThumbsDown className="size-3.5" />,
+                  <ThumbsDown className="size-4" />,
                   () => onFeedback(message.id, "down")
                 )}
               </>
@@ -660,11 +660,11 @@ function MessageOverflow({
             <Button
               variant="ghost"
               size="icon"
-              className="size-8 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground"
+              className="size-7 rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
               aria-label="More message actions"
               data-has-delete={onDelete ? "true" : "false"}
             >
-              <Ellipsis className="size-3.5" />
+              <Ellipsis className="size-4" />
             </Button>
           </DropdownMenuTrigger>
         </TooltipTrigger>
@@ -678,13 +678,13 @@ function MessageOverflow({
       >
         {onStopReading ? (
           <DropdownMenuItem onClick={onStopReading}>
-            <Square className="mr-2 size-3.5 fill-current" />
+            <Square className="mr-2 size-4 fill-current" />
             Stop reading
           </DropdownMenuItem>
         ) : (
           onReadAloud && (
             <DropdownMenuItem onClick={onReadAloud}>
-              <Volume2 className="mr-2 size-3.5" />
+              <Volume2 className="mr-2 size-4" />
               Read aloud
             </DropdownMenuItem>
           )
@@ -697,7 +697,7 @@ function MessageOverflow({
             onClick={() => onDelete(message)}
             variant="destructive"
           >
-            <Trash2 className="mr-2 size-3.5" />
+            <Trash2 className="mr-2 size-4" />
             Delete message
           </DropdownMenuItem>
         )}

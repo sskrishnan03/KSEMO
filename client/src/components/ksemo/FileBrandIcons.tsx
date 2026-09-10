@@ -2,6 +2,7 @@ import { memo, useId } from "react";
 import type { ComponentType } from "react";
 import {
   ExcelLogo,
+  ImageLogo,
   PdfLogo,
   PowerPointLogo,
   TextLogo,
@@ -29,6 +30,7 @@ const BRAND_LOGOS: Partial<Record<FileBrandVariant, ComponentType<{ className?: 
   excel: ExcelLogo,
   powerpoint: PowerPointLogo,
   text: TextLogo,
+  image: ImageLogo,
 };
 
 type BrandStyle = {

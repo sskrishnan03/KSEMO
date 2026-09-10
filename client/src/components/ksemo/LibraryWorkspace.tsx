@@ -2,8 +2,12 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Loading } from "@/components/ui/loading";
 import { trpc } from "@/lib/trpc";
 import { ConfirmDeleteDialog } from "./ConfirmDeleteDialog";
@@ -18,17 +22,28 @@ import { cn } from "@/lib/utils";
 import {
   Check,
   CheckCircle2,
+  Download,
   FolderOpen,
   Grid2X2,
   Library,
   List,
   MessageSquareText,
+  MoreVertical,
+  Pencil,
   Search,
   Star,
   Trash2,
   Upload,
   X,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { ShareIcon } from "./icons";
 import React, {
   memo,
   useCallback,
@@ -112,6 +127,12 @@ export function LibraryWorkspace({
   const [deleteTarget, setDeleteTarget] = useState<
     LibraryWorkspaceFile[] | null
   >(null);
+  const [renameTarget, setRenameTarget] = useState<LibraryWorkspaceFile | null>(
+    null
+  );
+  const [shareTarget, setShareTarget] = useState<LibraryWorkspaceFile | null>(
+    null
+  );
   const [isDragging, setIsDragging] = useState(false);
   const [openedFile, setOpenedFile] = useState<LibraryWorkspaceFile | null>(
     null
@@ -157,6 +178,11 @@ export function LibraryWorkspace({
   });
   const removeMutation = trpc.workspace.files.remove.useMutation({
     onError: () => toast.error("KSEMO could not remove that file."),
+  });
+  const renameMutation = trpc.workspace.files.rename.useMutation({
+    onSuccess: () => invalidateFiles(),
+    onError: error =>
+      toast.error(error.message || "KSEMO could not rename that file."),
   });
   const allFiles = (filesQuery.data ?? []) as LibraryWorkspaceFile[];
   const files = useMemo(
@@ -260,13 +286,37 @@ export function LibraryWorkspace({
     []
   );
 
+  const requestRename = useCallback(
+    (file: LibraryWorkspaceFile) => setRenameTarget(file),
+    []
+  );
+
+  async function confirmRename() {
+    if (!renameTarget) return;
+    const newName = renameTarget.filename.trim();
+    if (!newName) return;
+    try {
+      await renameMutation.mutateAsync({
+        id: renameTarget.id,
+        filename: newName,
+      });
+      setRenameTarget(null);
+    } catch {
+      // The mutation-level message provides the actionable error state.
+    }
+  }
+
+  const requestShare = useCallback(
+    (file: LibraryWorkspaceFile) => setShareTarget(file),
+    []
+  );
+
   function selectVisibleFiles() {
     setSelectedIds(current => selectVisibleLibraryItems(current, files));
   }
 
   async function confirmRemoval() {
     if (!deleteTarget?.length) return;
-    const count = deleteTarget.length;
     try {
       await Promise.all(
         deleteTarget.map(file => removeMutation.mutateAsync({ id: file.id }))
@@ -278,9 +328,6 @@ export function LibraryWorkspace({
       });
       setDeleteTarget(null);
       await invalidateFiles();
-      toast.success(
-        `${count} ${count === 1 ? "item permanently deleted" : "items permanently deleted"}`
-      );
     } catch {
       // The mutation-level message provides the actionable error state.
     }
@@ -407,12 +454,7 @@ export function LibraryWorkspace({
           </div>
         </section>
 
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
-          <p className="text-xs text-muted-foreground">
-            {files.length} {files.length === 1 ? "item" : "items"} shown · Tap
-            or click any item to select it. Supported: PDF, Word, Excel,
-            PowerPoint, text, data, and images up to 25 MB each.
-          </p>
+        <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
           <Button
             type="button"
             size="sm"
@@ -483,6 +525,8 @@ export function LibraryWorkspace({
                     selected={selectedIds.has(file.id)}
                     onToggle={toggleFile}
                     onToggleFavorite={toggleFavorite}
+                    onRename={requestRename}
+                    onShare={requestShare}
                     onDelete={requestDelete}
                   />
                 ))}
@@ -496,6 +540,8 @@ export function LibraryWorkspace({
                     selected={selectedIds.has(file.id)}
                     onToggle={toggleFile}
                     onToggleFavorite={toggleFavorite}
+                    onRename={requestRename}
+                    onShare={requestShare}
                     onDelete={requestDelete}
                   />
                 ))}
@@ -509,6 +555,40 @@ export function LibraryWorkspace({
           )}
         </div>
       </div>
+
+      <Dialog
+        open={Boolean(renameTarget)}
+        onOpenChange={open => {
+          if (!open) setRenameTarget(null);
+        }}
+      >
+        <DialogContent className="rounded-2xl sm:max-w-md">
+          {renameTarget && (
+            <RenameFilePanel
+              file={renameTarget}
+              busy={renameMutation.isPending}
+              onCancel={() => setRenameTarget(null)}
+              onSave={confirmRename}
+              onValueChange={filename =>
+                setRenameTarget(current =>
+                  current ? { ...current, filename } : current
+                )
+              }
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(shareTarget)}
+        onOpenChange={open => {
+          if (!open) setShareTarget(null);
+        }}
+      >
+        <DialogContent className="rounded-2xl sm:max-w-md">
+          {shareTarget && <ShareFilePanel file={shareTarget} onClose={() => setShareTarget(null)} />}
+        </DialogContent>
+      </Dialog>
 
       <ConfirmDeleteDialog
         open={Boolean(deleteTarget)}
@@ -653,16 +733,15 @@ function FilePreview({
         )}
       />
     );
-  return (
-    <span
-      className={cn(
-        "flex items-center justify-center",
-        compact ? "size-11 rounded-lg bg-muted" : "size-full bg-muted/45"
-      )}
-    >
+  if (compact)
+    return (
       <visual.Icon
-        className={cn(compact ? "size-5" : "size-9", visual.className)}
+        className={cn("size-9 shrink-0", visual.className)}
       />
+    );
+  return (
+    <span className="flex size-full items-center justify-center bg-muted/45">
+      <visual.Icon className={cn("size-9", visual.className)} />
     </span>
   );
 }
@@ -672,17 +751,20 @@ const LibraryGridCard = memo(function LibraryGridCard({
   selected,
   onToggle,
   onToggleFavorite,
+  onRename,
+  onShare,
   onDelete,
 }: {
   file: LibraryWorkspaceFile;
   selected: boolean;
   onToggle: (id: string) => void;
   onToggleFavorite: (file: LibraryWorkspaceFile) => void;
+  onRename: (file: LibraryWorkspaceFile) => void;
+  onShare: (file: LibraryWorkspaceFile) => void;
   onDelete: (file: LibraryWorkspaceFile) => void;
 }) {
   const image = file.mimeType?.startsWith("image/");
   const isFavorite = Boolean(file.isFavorite);
-  const visual = fileVisualFor(file.filename, file.mimeType);
   const selectWithKeyboard = (event: React.KeyboardEvent<HTMLElement>) => {
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
@@ -719,6 +801,71 @@ const LibraryGridCard = memo(function LibraryGridCard({
       >
         <SelectionCircle selected={selected} />
       </button>
+      {!selected && (
+        <div className="pointer-events-none absolute right-2.5 top-2.5 z-10 scale-90 opacity-0 transition-[opacity,transform] duration-150 group-hover:pointer-events-auto group-hover:scale-100 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:scale-100 group-focus-within:opacity-100 group-active:pointer-events-auto group-active:scale-100 group-active:opacity-100 focus-visible:pointer-events-auto focus-visible:scale-100 focus-visible:opacity-100 max-lg:pointer-events-auto max-lg:scale-100 max-lg:opacity-100">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                onClick={event => event.stopPropagation()}
+                className="flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                aria-label={`More options for ${file.filename}`}
+              >
+                <MoreVertical className="size-4" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-44">
+              <DropdownMenuItem
+                onClick={event => {
+                  event.stopPropagation();
+                  window.open(file.url, "_blank");
+                }}
+              >
+                <Download className="mr-2 size-4" />
+                Download
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={event => {
+                  event.stopPropagation();
+                  onRename(file);
+                }}
+              >
+                <Pencil className="mr-2 size-4" />
+                Rename
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={event => {
+                  event.stopPropagation();
+                  onShare(file);
+                }}
+              >
+                <ShareIcon className="mr-2 size-4" />
+                Share
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={event => {
+                  event.stopPropagation();
+                  onToggleFavorite(file);
+                }}
+              >
+                <Star className={cn("mr-2 size-4", isFavorite && "fill-current")} />
+                {isFavorite ? "Remove from favorites" : "Add to favorites"}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={event => {
+                  event.stopPropagation();
+                  onDelete(file);
+                }}
+                variant="destructive"
+              >
+                <Trash2 className="mr-2 size-4" />
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      )}
       <a
         href={file.url}
         target="_blank"
@@ -729,64 +876,20 @@ const LibraryGridCard = memo(function LibraryGridCard({
         <FilePreview file={file} />
       </a>
       <div className="p-3">
-        <div className="flex items-start gap-2">
-          <span className="mt-0.5">
-            <visual.Icon
-              className={cn("size-3.5", visual.className)}
-              aria-hidden
-            />
-          </span>
-          <a
-            href={file.url}
-            target="_blank"
-            rel="noreferrer"
-            onClick={event => event.stopPropagation()}
-            className="min-w-0 flex-1"
-          >
-            <p className="truncate text-sm font-medium hover:underline">
-              {file.filename}
-            </p>
-            <p className="mt-0.5 text-[11px] text-muted-foreground">
-              {image ? "Image" : kindLabel(file.filename)} ·{" "}
-              {bytesLabel(file.sizeBytes)}
-            </p>
-          </a>
-          <div className="flex shrink-0 items-center gap-0.5">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={event => {
-                event.stopPropagation();
-                onToggleFavorite(file);
-              }}
-              className={cn(
-                "size-7 rounded-lg",
-                isFavorite
-                  ? "text-amber-500"
-                  : "text-muted-foreground max-lg:opacity-100 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
-              )}
-              aria-label={
-                isFavorite
-                  ? `Remove ${file.filename} from favorites`
-                  : `Add ${file.filename} to favorites`
-              }
-            >
-              <Star className={cn("size-3.5", isFavorite && "fill-current")} />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={event => {
-                event.stopPropagation();
-                onDelete(file);
-              }}
-              className="size-7 rounded-lg text-muted-foreground max-lg:opacity-100 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 hover:text-destructive"
-              aria-label={`Delete ${file.filename}`}
-            >
-              <Trash2 className="size-3.5" />
-            </Button>
-          </div>
-        </div>
+        <a
+          href={file.url}
+          target="_blank"
+          rel="noreferrer"
+          onClick={event => event.stopPropagation()}
+          className="block"
+        >
+          <p className="truncate text-sm font-medium hover:underline">
+            {file.filename}
+          </p>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">
+            {image ? "Image" : kindLabel(file.filename)}
+          </p>
+        </a>
       </div>
     </article>
   );
@@ -797,17 +900,20 @@ const LibraryListRow = memo(function LibraryListRow({
   selected,
   onToggle,
   onToggleFavorite,
+  onRename,
+  onShare,
   onDelete,
 }: {
   file: LibraryWorkspaceFile;
   selected: boolean;
   onToggle: (id: string) => void;
   onToggleFavorite: (file: LibraryWorkspaceFile) => void;
+  onRename: (file: LibraryWorkspaceFile) => void;
+  onShare: (file: LibraryWorkspaceFile) => void;
   onDelete: (file: LibraryWorkspaceFile) => void;
 }) {
   const image = file.mimeType?.startsWith("image/");
   const isFavorite = Boolean(file.isFavorite);
-  const visual = fileVisualFor(file.filename, file.mimeType);
   const selectWithKeyboard = (event: React.KeyboardEvent<HTMLElement>) => {
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
@@ -862,43 +968,74 @@ const LibraryListRow = memo(function LibraryListRow({
           {file.filename}
         </p>
         <p className="mt-0.5 text-xs text-muted-foreground">
-          {image ? "Image" : kindLabel(file.filename)} · {file.mimeType} ·{" "}
-          {bytesLabel(file.sizeBytes)}
+          {image ? "Image" : kindLabel(file.filename)} · {file.mimeType}
         </p>
       </a>
-      <div className="flex shrink-0 items-center gap-0.5">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={event => {
-            event.stopPropagation();
-            onToggleFavorite(file);
-          }}
-          className={cn(
-            "size-8 rounded-lg",
-            isFavorite ? "text-amber-500" : "text-muted-foreground"
-          )}
-          aria-label={
-            isFavorite
-              ? `Remove ${file.filename} from favorites`
-              : `Add ${file.filename} to favorites`
-          }
-        >
-          <Star className={cn("size-3.5", isFavorite && "fill-current")} />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={event => {
-            event.stopPropagation();
-            onDelete(file);
-          }}
-          className="size-8 rounded-lg text-muted-foreground hover:text-destructive"
-          aria-label={`Delete ${file.filename}`}
-        >
-          <Trash2 className="size-3.5" />
-        </Button>
-      </div>
+      {!selected && (
+        <div className="pointer-events-none scale-90 opacity-0 transition-[opacity,transform] duration-150 group-hover:pointer-events-auto group-hover:scale-100 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:scale-100 group-focus-within:opacity-100 group-active:pointer-events-auto group-active:scale-100 group-active:opacity-100 focus-visible:pointer-events-auto focus-visible:scale-100 focus-visible:opacity-100 max-lg:pointer-events-auto max-lg:scale-100 max-lg:opacity-100">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                onClick={event => event.stopPropagation()}
+                className="flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                aria-label={`More options for ${file.filename}`}
+              >
+                <MoreVertical className="size-4" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-44">
+              <DropdownMenuItem
+                onClick={event => {
+                  event.stopPropagation();
+                  window.open(file.url, "_blank");
+                }}
+              >
+                <Download className="mr-2 size-4" />
+                Download
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={event => {
+                  event.stopPropagation();
+                  onRename(file);
+                }}
+              >
+                <Pencil className="mr-2 size-4" />
+                Rename
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={event => {
+                  event.stopPropagation();
+                  onShare(file);
+                }}
+              >
+                <ShareIcon className="mr-2 size-4" />
+                Share
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={event => {
+                  event.stopPropagation();
+                  onToggleFavorite(file);
+                }}
+              >
+                <Star className={cn("mr-2 size-4", isFavorite && "fill-current")} />
+                {isFavorite ? "Remove from favorites" : "Add to favorites"}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={event => {
+                  event.stopPropagation();
+                  onDelete(file);
+                }}
+                variant="destructive"
+              >
+                <Trash2 className="mr-2 size-4" />
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      )}
     </article>
   );
 });
@@ -925,4 +1062,145 @@ const KIND_LABELS: Record<string, string> = {
 
 function kindLabel(filename: string) {
   return KIND_LABELS[extensionOfFilename(filename)] ?? "File";
+}
+
+function RenameFilePanel({
+  file,
+  busy,
+  onCancel,
+  onSave,
+  onValueChange,
+}: {
+  file: LibraryWorkspaceFile;
+  busy: boolean;
+  onCancel: () => void;
+  onSave: () => void;
+  onValueChange: (value: string) => void;
+}) {
+  const handleFocus = (event: React.FocusEvent<HTMLInputElement>) => {
+    const input = event.currentTarget;
+    requestAnimationFrame(() => {
+      const end = input.value.length;
+      input.setSelectionRange(end, end);
+      input.scrollLeft = input.scrollWidth;
+    });
+  };
+  return (
+    <div className="space-y-5 py-3">
+      <div className="text-left">
+        <h2 className="text-xl font-semibold tracking-[-0.02em]">
+          Rename file
+        </h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Give this file a new name. Its format will stay the same.
+        </p>
+      </div>
+      <Input
+        autoFocus
+        value={file.filename}
+        onChange={event => onValueChange(event.target.value)}
+        onFocus={handleFocus}
+        onKeyDown={event => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            if (file.filename.trim()) onSave();
+          }
+        }}
+        aria-label="New file name"
+        className="h-11 rounded-xl text-base"
+      />
+      <div className="flex justify-end gap-2">
+        <Button variant="ghost" onClick={onCancel} className="h-10 rounded-xl">
+          Cancel
+        </Button>
+        <Button
+          onClick={onSave}
+          disabled={!file.filename.trim() || busy}
+          className="h-10 rounded-xl"
+        >
+          {busy ? "Renaming…" : "Save"}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function ShareFilePanel({
+  file,
+  onClose,
+}: {
+  file: LibraryWorkspaceFile;
+  onClose: () => void;
+}) {
+  const [email, setEmail] = useState("");
+  const shareUrl = file.url;
+  async function copyLink() {
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      toast.success("Link copied to clipboard");
+    } catch {
+      toast.error("Could not copy the link.");
+    }
+  }
+  function emailLink() {
+    const subject = encodeURIComponent(`Share: ${file.filename}`);
+    const body = encodeURIComponent(`${file.filename}\n\n${shareUrl}`);
+    window.location.href = `mailto:${email.trim()}?subject=${subject}&body=${body}`;
+  }
+  return (
+    <div className="space-y-4 py-2">
+      <DialogHeader className="text-left">
+        <DialogTitle className="text-xl font-semibold tracking-[-0.02em]">
+          Share file
+        </DialogTitle>
+        <DialogDescription>
+          Send “{file.filename}” to anyone by sharing its link.
+        </DialogDescription>
+      </DialogHeader>
+      <div className="rounded-xl border border-border bg-muted/60 p-3">
+        <p className="text-sm font-medium">File link</p>
+        <p className="mt-1 text-xs leading-5 text-muted-foreground">
+          Anyone with this link can open the file. Only you can delete or
+          rename it.
+        </p>
+        <div className="mt-3 flex gap-2">
+          <Input
+            value={shareUrl}
+            readOnly
+            className="h-9 min-w-0 rounded-lg text-xs"
+            aria-label="File link"
+          />
+          <Button onClick={copyLink} className="h-9 shrink-0 rounded-lg">
+            Copy link
+          </Button>
+        </div>
+      </div>
+      <div className="rounded-xl border border-border p-3">
+        <Label htmlFor="share-file-email" className="text-sm">
+          Email
+        </Label>
+        <p className="mt-1 text-xs leading-5 text-muted-foreground">
+          Open your email app with the link included. Sending remains under
+          your control.
+        </p>
+        <div className="mt-3 flex gap-2">
+          <Input
+            id="share-file-email"
+            value={email}
+            onChange={event => setEmail(event.target.value)}
+            placeholder="recipient@example.com"
+            type="email"
+            className="h-9 rounded-lg"
+          />
+          <Button
+            onClick={emailLink}
+            className="h-9 shrink-0 rounded-lg"
+            disabled={!email.trim()}
+          >
+            Email
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
 }

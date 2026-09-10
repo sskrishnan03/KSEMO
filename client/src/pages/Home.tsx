@@ -1599,9 +1599,6 @@ export default function Home() {
             linked: true,
           },
         ]);
-        toast.success(
-          "File added to your library. Send your message to include it in this conversation."
-        );
       } else {
         setAttachmentNotices(current => [
           ...current,
@@ -1613,9 +1610,6 @@ export default function Home() {
             linked: false,
           },
         ]);
-        toast.success(
-          "File added to your private library. Send a message to include it in a new chat."
-        );
       }
     } catch {
       toast.error("KSEMO could not add that file.");
@@ -1736,11 +1730,7 @@ export default function Home() {
       existing.add(key);
       return true;
     }).length;
-    if (addedCount > 0) {
-      toast.success(
-        `${addedCount} file${addedCount > 1 ? "s" : ""} selected. Send your message to include ${addedCount > 1 ? "them" : "it"} in this conversation.`
-      );
-    } else {
+    if (addedCount === 0) {
       toast.info("Those files are already attached.");
     }
   }

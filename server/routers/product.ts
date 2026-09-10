@@ -306,6 +306,40 @@ export const workspaceRouter = router({
           });
         return { success: true } as const;
       }),
+    rename: protectedProcedure
+      .input(
+        z.object({
+          id: entityId,
+          filename: z.string().trim().min(1).max(255),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const { data: existing, error: fetchError } = await supabase
+          .from("files")
+          .select("id")
+          .eq("id", input.id)
+          .eq("user_id", ctx.user.id)
+          .single();
+
+        if (fetchError || !existing)
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "File not found.",
+          });
+
+        const { error } = await supabase
+          .from("files")
+          .update({ filename: input.filename })
+          .eq("id", input.id)
+          .eq("user_id", ctx.user.id);
+
+        if (error)
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to rename file",
+          });
+        return { success: true } as const;
+      }),
     upload: protectedProcedure
       .input(
         z.object({

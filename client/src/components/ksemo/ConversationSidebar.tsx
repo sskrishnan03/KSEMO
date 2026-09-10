@@ -22,6 +22,7 @@ import {
   ChevronsLeft,
   ChevronsRight,
   Copy,
+  CopyPlus,
   Download,
   Ellipsis,
   ExternalLink,
@@ -41,6 +42,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { ShareIcon } from "./icons";
+import { PdfFileIcon, WordFileIcon } from "./FileBrandIcons";
 import React, { memo, useMemo, useRef, useState } from "react";
 
 type Conversation = {
@@ -526,7 +528,7 @@ const ConversationActionsMenu = memo(function ConversationActionsMenu({
           variant="ghost"
           size="icon"
           className={cn(
-            "size-7 shrink-0 rounded-md text-muted-foreground opacity-0 ml-0 mr-1.5",
+            "size-8 shrink-0 rounded-md text-muted-foreground opacity-0 ml-0 mr-1.5",
             "transition-[opacity,background-color,color] duration-150",
             "group-hover:opacity-100 group-hover:text-foreground",
             "hover:bg-accent hover:text-foreground",
@@ -534,7 +536,7 @@ const ConversationActionsMenu = memo(function ConversationActionsMenu({
           )}
           aria-label={`Actions for ${conversation.title}`}
         >
-          <Ellipsis className="size-3.5" />
+          <Ellipsis className="size-4" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent
@@ -544,28 +546,28 @@ const ConversationActionsMenu = memo(function ConversationActionsMenu({
         className="w-44 rounded-xl"
       >
         <DropdownMenuItem onClick={() => onRename(conversation)}>
-          <Pencil className="mr-2 size-3.5" />
+          <Pencil className="mr-2 size-4" />
           Rename
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => onPin(conversation)}>
-          <Pin className="mr-2 size-3.5" />
+          <Pin className="mr-2 size-4" />
           {conversation.isPinned ? "Unpin" : "Pin"}
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => onShare(conversation)}>
-          <ShareIcon className="mr-2 size-3.5" />
+          <ShareIcon className="mr-2 size-4" />
           Share
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => onArchive(conversation)}>
-          <Archive className="mr-2 size-3.5" />
+          <Archive className="mr-2 size-4" />
           Archive
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => onDuplicate(conversation)}>
-          <Copy className="mr-2 size-3.5" />
+          <CopyPlus className="mr-2 size-4" />
           Duplicate
         </DropdownMenuItem>
         <DropdownMenuSub>
           <DropdownMenuSubTrigger>
-            <Download className="mr-2 size-3.5" />
+            <Download className="mr-2 size-4" />
             Export
           </DropdownMenuSubTrigger>
           <DropdownMenuSubContent
@@ -574,11 +576,11 @@ const ConversationActionsMenu = memo(function ConversationActionsMenu({
             className="w-44 rounded-xl"
           >
             <DropdownMenuItem onClick={() => onExport(conversation, "pdf")}>
-              <FileText className="mr-2 size-3.5" />
+              <PdfFileIcon className="mr-2 size-5" />
               Download PDF
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => onExport(conversation, "word")}>
-              <FileText className="mr-2 size-3.5" />
+              <WordFileIcon className="mr-2 size-5" />
               Download Word
             </DropdownMenuItem>
           </DropdownMenuSubContent>
@@ -588,7 +590,7 @@ const ConversationActionsMenu = memo(function ConversationActionsMenu({
           onClick={() => onDelete(conversation)}
           variant="destructive"
         >
-          <Trash2 className="mr-2 size-3.5" />
+          <Trash2 className="mr-2 size-4" />
           Delete
         </DropdownMenuItem>
       </DropdownMenuContent>
@@ -672,7 +674,7 @@ const ConversationTitleButton = memo(function ConversationTitleButton({
       aria-label={conversation.title}
       className="flex min-w-0 flex-1 items-center gap-2 self-stretch py-2 pl-1 pr-0 text-left text-[13px] leading-5"
     >
-      <MessageCircle className="size-[20px] shrink-0 stroke-[2.4] text-white transition-colors group-hover:text-white" />
+      <MessageCircle className="size-[20px] shrink-0 text-foreground/70 transition-colors group-hover:text-foreground" />
       <Tooltip open={showTooltip}>
         <TooltipTrigger asChild>
           <span

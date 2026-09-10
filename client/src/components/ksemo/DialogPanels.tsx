@@ -20,6 +20,14 @@ export function KsemoTextDialogPanel({
   onCancel: () => void;
   onAction: () => void;
 }) {
+  const placeCaretAtEnd = (event: React.FocusEvent<HTMLInputElement>) => {
+    const input = event.currentTarget;
+    requestAnimationFrame(() => {
+      const end = input.value.length;
+      input.setSelectionRange(end, end);
+      input.scrollLeft = input.scrollWidth;
+    });
+  };
   return (
     <>
       <div className="space-y-2 py-2">
@@ -39,6 +47,7 @@ export function KsemoTextDialogPanel({
             maxLength={120}
             className="h-10 rounded-xl"
             autoFocus
+            onFocus={placeCaretAtEnd}
           />
         )}
       </div>

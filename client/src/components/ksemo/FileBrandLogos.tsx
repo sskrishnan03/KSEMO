@@ -21,6 +21,7 @@ const PALETTES = {
   excel: { from: "#22C55E", to: "#15803D" },
   powerpoint: { from: "#FB923C", to: "#C2410C" },
   text: { from: "#64748B", to: "#334155" },
+  image: { from: "#0EA5E9", to: "#075985" },
 } as const;
 
 function FormatIcon({
@@ -245,6 +246,38 @@ export const TextLogo = memo(function TextLogo({ className }: BrandLogoProps) {
       <rect x="14" y="24.7" width="16.5" height="2.3" rx="1.15" fill="#CBD5E1" />
       <rect x="14" y="29" width="20" height="2.3" rx="1.15" fill="#CBD5E1" />
       <rect x="14" y="33.3" width="10.5" height="2.3" rx="1.15" fill="#CBD5E1" />
+    </FormatIcon>
+  );
+});
+
+/*
+ * Image — white page with a folded corner and a framed picture: sky-blue
+ * photo with a sun and mountain in the corner. Reads "photo" instantly while
+ * still matching the other document logos. Keeps a sky-blue tile so image
+ * files stay recognizable beside the colorful Office set.
+ */
+export const ImageLogo = memo(function ImageLogo({ className }: BrandLogoProps) {
+  const uid = useGradientId();
+  const pageId = `${uid}-page`;
+  return (
+    <FormatIcon palette={PALETTES.image} className={className}>
+      <defs>
+        <linearGradient id={pageId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#ffffff" />
+          <stop offset="1" stopColor="#F0F7FB" />
+        </linearGradient>
+      </defs>
+      <PageShadow />
+      <rect x="11.5" y="9" width="25" height="30" rx="4" fill={`url(#${pageId})`} />
+      <path d="M36.5 9 v5 a5 5 0 0 1 -5 -5 z" fill="#DCEAF4" />
+      <rect x="14.5" y="15" width="19" height="15" rx="1.5" fill="#BFDBFE" />
+      <rect x="14.5" y="15" width="19" height="15" rx="1.5" fill="#0284C7" opacity="0.25" />
+      <circle cx="20" cy="19.5" r="1.5" fill="#FDE68A" />
+      <path d="M16 29.5 L22.5 23.5 L25.5 26.5 L28.5 23.5 L32 29.5 Z" fill="#065F46" />
+      <path d="M22.5 23.5 L25.5 26.5 L24 29.5 L21.8 29.5 Z" fill="#94A3B8" />
+      <rect x="14.5" y="14" width="19" height="1.8" rx="0.9" fill="#0284C7" opacity="0.45" />
+      <rect x="14.5" y="28.2" width="19" height="1.8" rx="0.9" fill="#0284C7" opacity="0.45" />
+      <rect x="15.2" y="34" width="4.4" height="2" rx="1" fill="#64748B" />
     </FormatIcon>
   );
 });

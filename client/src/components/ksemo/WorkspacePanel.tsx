@@ -83,7 +83,6 @@ export const WorkspacePanel = memo(function WorkspacePanel({
   const fileUpload = trpc.workspace.files.upload.useMutation({
     onSuccess: () => {
       utils.workspace.files.list.invalidate();
-      toast.success("File added to Library");
     },
     onError: error =>
       toast.error(error.message || "File could not be uploaded."),
@@ -92,7 +91,7 @@ export const WorkspacePanel = memo(function WorkspacePanel({
     onSuccess: () => utils.workspace.files.list.invalidate(),
   });
   const fileAttach = trpc.workspace.files.attachToConversation.useMutation({
-    onSuccess: () => toast.success("File attached to the active conversation"),
+    onSuccess: () => {},
     onError: () =>
       toast.error("File could not be attached to this conversation."),
   });
@@ -200,7 +199,7 @@ export const WorkspacePanel = memo(function WorkspacePanel({
                           {file.filename}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {file.mimeType} · {bytesLabel(file.sizeBytes)}
+                          {file.mimeType}
                         </p>
                       </a>
                       {activeConversationId && (

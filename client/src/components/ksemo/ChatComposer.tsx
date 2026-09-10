@@ -513,7 +513,7 @@ export const ChatComposer = memo(function ChatComposer({
           className="sr-only"
         />
         {visibleAttachmentNotices.length > 0 && (
-          <div className="mx-1 mb-0.5 flex items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="mx-1 mb-0.5 flex items-center gap-2 overflow-x-auto px-2 pt-2 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {visibleAttachmentNotices.map(item => {
               const isImage =
                 (item.url || item.mimeType) &&
@@ -523,17 +523,17 @@ export const ChatComposer = memo(function ChatComposer({
               return isImage && item.url ? (
                 <div
                   key={item.fileId}
-                  className="group relative size-16 shrink-0 overflow-hidden rounded-xl border border-border shadow-sm"
+                  className="group relative size-16 shrink-0"
                 >
                   <img
                     src={item.url}
                     alt={item.name}
-                    className="h-full w-full object-cover"
+                    className="h-full w-full rounded-xl border border-border object-cover shadow-sm"
                   />
                   {onClearAttachment && (
                     <button
                       onClick={() => onClearAttachment(item.fileId)}
-                      className="absolute right-1 top-1 flex size-5 items-center justify-center rounded-full border border-border bg-card/90 text-foreground opacity-0 shadow-md backdrop-blur outline-none transition-opacity hover:bg-muted focus-visible:ring-0 group-hover:opacity-100"
+                      className="absolute -right-2 -top-2 flex size-5 items-center justify-center rounded-full border border-border bg-card text-foreground opacity-0 shadow-md outline-none transition-opacity hover:bg-muted focus-visible:ring-0 group-hover:opacity-100"
                       aria-label="Remove screenshot"
                     >
                       <X className="size-3" />
@@ -545,11 +545,11 @@ export const ChatComposer = memo(function ChatComposer({
                   key={item.fileId}
                   className="group flex h-16 shrink-0 items-center gap-3 rounded-xl border border-border bg-muted py-2 pl-2 pr-3 shadow-sm transition-colors hover:bg-accent"
                 >
-                  <span
-                    className={`flex size-10 shrink-0 items-center justify-center rounded-lg ${kind.colorClass}`}
-                  >
-                    <kind.icon className="size-5" />
-                  </span>
+<span
+                className={`flex size-11 shrink-0 items-center justify-center rounded-lg ${kind.colorClass}`}
+              >
+                <kind.icon className="size-6" />
+              </span>
                   <span className="flex min-w-0 flex-col">
                     <span className="max-w-[150px] truncate text-[13px] font-semibold text-foreground">
                       {item.name}
@@ -1232,13 +1232,13 @@ export function LibraryPickerContent({
                     <img
                       src={file.url}
                       alt={file.filename}
-                      className="size-10 shrink-0 rounded-md object-cover"
+                      className="size-12 shrink-0 rounded-md object-cover"
                     />
                   ) : (
                     <span
-                      className={`flex size-10 shrink-0 items-center justify-center rounded-md ${kind.colorClass}`}
+                      className={`flex size-12 shrink-0 items-center justify-center rounded-md ${kind.colorClass}`}
                     >
-                      <kind.icon className="size-5" />
+                      <kind.icon className="size-6" />
                     </span>
                   )}
                   <div className="flex min-w-0 flex-1 flex-col">
@@ -1247,11 +1247,6 @@ export function LibraryPickerContent({
                     </span>
                     <span className="text-xs text-muted-foreground">
                       {kind.label}
-                      {file.sizeBytes && (
-                        <span className="ml-1">
-                          ({(file.sizeBytes / 1024).toFixed(1)} KB)
-                        </span>
-                      )}
                     </span>
                   </div>
                   {isSelected && (
