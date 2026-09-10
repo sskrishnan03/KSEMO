@@ -54,6 +54,15 @@ type KsemoMessage = {
     format: string;
     status: "processing" | "created" | "error";
     errorMessage?: string;
+    message?: string;
+    researchSourceCount?: number;
+    sources?: Array<{ title: string; url: string; publisher?: string }>;
+    metrics?: {
+      pages?: number;
+      sheets?: number;
+      slides?: number;
+      words?: number;
+    };
   };
 };
 

@@ -1,29 +1,37 @@
 import {
-  FileCode2,
-  FileSpreadsheet,
-  FileText,
-  type LucideIcon,
-} from "lucide-react";
+  CodeFileIcon,
+  ExcelFileIcon,
+  GenericFileIcon,
+  ImageFileIcon,
+  PdfFileIcon,
+  PowerPointFileIcon,
+  TextFileIcon,
+  WordFileIcon,
+  type FileBrandIconComponent,
+  type FileBrandVariant,
+  brandVariantForExt,
+} from "@/components/ksemo/FileBrandIcons";
 
 export type FileVisual = {
-  Icon: LucideIcon;
+  Icon: FileBrandIconComponent;
+  variant: FileBrandVariant;
   className: string;
 };
 
 const EXT_VISUALS: Record<string, FileVisual> = {
-  pdf: { Icon: FileText, className: "text-red-500" },
-  doc: { Icon: FileText, className: "text-blue-500" },
-  docx: { Icon: FileText, className: "text-blue-500" },
-  xls: { Icon: FileSpreadsheet, className: "text-emerald-600" },
-  xlsx: { Icon: FileSpreadsheet, className: "text-emerald-600" },
-  ppt: { Icon: FileText, className: "text-amber-500" },
-  pptx: { Icon: FileText, className: "text-amber-500" },
-  json: { Icon: FileCode2, className: "text-violet-500" },
-  xml: { Icon: FileCode2, className: "text-violet-500" },
-  yml: { Icon: FileCode2, className: "text-violet-500" },
-  yaml: { Icon: FileCode2, className: "text-violet-500" },
-  txt: { Icon: FileText, className: "text-muted-foreground" },
-  log: { Icon: FileText, className: "text-muted-foreground" },
+  pdf: { Icon: PdfFileIcon, variant: "pdf", className: "" },
+  doc: { Icon: WordFileIcon, variant: "word", className: "" },
+  docx: { Icon: WordFileIcon, variant: "word", className: "" },
+  xls: { Icon: ExcelFileIcon, variant: "excel", className: "" },
+  xlsx: { Icon: ExcelFileIcon, variant: "excel", className: "" },
+  ppt: { Icon: PowerPointFileIcon, variant: "powerpoint", className: "" },
+  pptx: { Icon: PowerPointFileIcon, variant: "powerpoint", className: "" },
+  json: { Icon: CodeFileIcon, variant: "code", className: "" },
+  xml: { Icon: CodeFileIcon, variant: "code", className: "" },
+  yml: { Icon: CodeFileIcon, variant: "code", className: "" },
+  yaml: { Icon: CodeFileIcon, variant: "code", className: "" },
+  txt: { Icon: TextFileIcon, variant: "text", className: "" },
+  log: { Icon: TextFileIcon, variant: "text", className: "" },
 };
 
 export function extensionOfFilename(filename: string): string {
@@ -84,15 +92,25 @@ export function guessMimeType(filename: string) {
   return map[ext] ?? "application/octet-stream";
 }
 
-// Picks a recognizable icon + tint for a library file based on its
-// extension, falling back to MIME hints for images and unknown types.
+// Picks a recognizable brand tile for a library file based on its extension,
+// falling back to MIME hints for images and unknown types.
 export function fileVisualFor(
   filename: string,
   mimeType?: string | null
 ): FileVisual {
-  const visual = EXT_VISUALS[extensionOfFilename(filename)];
+  const ext = extensionOfFilename(filename);
+  const visual = EXT_VISUALS[ext];
   if (visual) return visual;
+  const imageVariant = brandVariantForExt("img");
   if (mimeType && mimeType.startsWith("image/"))
-    return { Icon: FileText, className: "text-sky-500" };
-  return { Icon: FileText, className: "text-muted-foreground" };
+    return {
+      Icon: ImageFileIcon,
+      variant: imageVariant,
+      className: "",
+    };
+  return {
+    Icon: GenericFileIcon,
+    variant: brandVariantForExt(ext),
+    className: "",
+  };
 }

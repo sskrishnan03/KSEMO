@@ -40,9 +40,10 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-# KSEMO debug logs and local uploads
+# KSEMO debug logs, local uploads, and durable store snapshot
 .ksemo-logs/
 .ksemo-uploads/
+.ksemo-data/
 
 # Runtime data
 pids

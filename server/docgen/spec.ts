@@ -8,8 +8,7 @@ export type DocFormat =
   | "docx"
   | "xlsx"
   | "pptx"
-  | "txt"
-  | "md";
+  | "txt";
 
 export type DocParagraph = {
   type: "paragraph";
@@ -81,6 +80,12 @@ export type SlideDefinition = {
   footnote?: string;
 };
 
+export type SourceReference = {
+  title: string;
+  url: string;
+  publisher?: string;
+};
+
 export type DocumentSpec = {
   format: DocFormat;
   filename: string;
@@ -93,6 +98,8 @@ export type DocumentSpec = {
   slides?: SlideDefinition[];
   // Optional orienting description shown as the AI's chat reply.
   summary?: string;
+  // Web sources used to research and ground the document content.
+  sources?: SourceReference[];
 };
 
 export const DOC_FORMATS: DocFormat[] = [
@@ -109,7 +116,6 @@ export const FORMAT_LABELS: Record<DocFormat, string> = {
   xlsx: "Excel spreadsheet",
   pptx: "PowerPoint presentation",
   txt: "Text file",
-  md: "Markdown document",
 };
 
 export const FORMAT_EXTENSIONS: Record<DocFormat, string> = {
@@ -118,7 +124,6 @@ export const FORMAT_EXTENSIONS: Record<DocFormat, string> = {
   xlsx: "xlsx",
   pptx: "pptx",
   txt: "txt",
-  md: "md",
 };
 
 export const FORMAT_MIME: Record<DocFormat, string> = {
@@ -127,7 +132,6 @@ export const FORMAT_MIME: Record<DocFormat, string> = {
   xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
   txt: "text/plain",
-  md: "text/markdown",
 };
 
 export const DEFAULT_SUMMARY: Record<DocFormat, string> = {
@@ -136,7 +140,6 @@ export const DEFAULT_SUMMARY: Record<DocFormat, string> = {
   xlsx: "I created the requested Excel spreadsheet.",
   pptx: "I created the requested PowerPoint presentation.",
   txt: "I created the requested text file.",
-  md: "I created the requested Markdown document.",
 };
 
 export function sanitizeFilename(format: DocFormat, requested?: string): string {

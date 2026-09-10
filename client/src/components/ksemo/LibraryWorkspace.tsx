@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Loading } from "@/components/ui/loading";
 import { trpc } from "@/lib/trpc";
 import { ConfirmDeleteDialog } from "./ConfirmDeleteDialog";
+import { KsemoFilePreviewOverlay } from "./KsemoFilePreviewOverlay";
 import {
   extensionOfFilename,
   fileVisualFor,
@@ -32,6 +33,7 @@ import React, {
   memo,
   useCallback,
   type ChangeEvent,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -97,11 +99,11 @@ async function fileToBase64(file: File) {
 }
 
 export function LibraryWorkspace({
-  onBackToChat,
   onChatWithFiles,
+  initialFileId,
 }: {
-  onBackToChat: () => void;
   onChatWithFiles?: (files: LibraryWorkspaceFile[]) => void;
+  initialFileId?: string | null;
 }) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<LibraryFilter>("all");
@@ -111,10 +113,23 @@ export function LibraryWorkspace({
     LibraryWorkspaceFile[] | null
   >(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [openedFile, setOpenedFile] = useState<LibraryWorkspaceFile | null>(
+    null
+  );
+  const initialOpenedRef = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const utils = trpc.useUtils();
   const invalidateFiles = () => utils.workspace.files.list.invalidate();
   const filesQuery = trpc.workspace.files.list.useQuery();
+  useEffect(() => {
+    if (!initialFileId || initialOpenedRef.current) return;
+    const file = (filesQuery.data ?? []).find(item => item.id === initialFileId);
+    if (file) {
+      initialOpenedRef.current = true;
+      setSelectedIds(current => new Set(current).add(file.id));
+      setOpenedFile(file);
+    }
+  }, [initialFileId, filesQuery.data]);
   const uploadMutation = trpc.workspace.files.upload.useMutation({
     onSuccess: invalidateFiles,
     onError: error => {
@@ -323,13 +338,6 @@ export function LibraryWorkspace({
           </div>
           <div className="flex shrink-0 flex-wrap gap-2">
             <Button
-              variant="outline"
-              className="rounded-xl"
-              onClick={onBackToChat}
-            >
-              Back to chat
-            </Button>
-            <Button
               className="rounded-xl bg-foreground text-background hover:bg-foreground/90"
               onClick={() => fileInputRef.current?.click()}
               disabled={uploadMutation.isPending}
@@ -521,6 +529,12 @@ export function LibraryWorkspace({
         busy={removeMutation.isPending}
         onConfirm={confirmRemoval}
       />
+      {openedFile && (
+        <KsemoFilePreviewOverlay
+          file={openedFile}
+          onClose={() => setOpenedFile(null)}
+        />
+      )}
     </main>
   );
 }

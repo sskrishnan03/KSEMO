@@ -1,12 +1,20 @@
 import type { ComponentType } from "react";
 import {
-  FileCode,
-  FileSpreadsheet,
-  FileText,
-  Presentation,
-} from "lucide-react";
+  ExcelFileIcon,
+  PdfFileIcon,
+  PowerPointFileIcon,
+  TextFileIcon,
+  WordFileIcon,
+} from "@/components/ksemo/FileBrandIcons";
 
-export type DocFormat = "pdf" | "docx" | "xlsx" | "pptx" | "txt" | "md";
+export type DocFormat =
+  | "pdf"
+  | "docx"
+  | "xlsx"
+  | "pptx"
+  | "txt"
+  | "markdown"
+  | "csv";
 
 export type DocFormatOption = {
   format: DocFormat;
@@ -22,49 +30,57 @@ export const DOC_FORMAT_OPTIONS: DocFormatOption[] = [
     format: "pdf",
     label: "PDF",
     hint: "Styled, print-ready document",
-    icon: FileText,
+    icon: PdfFileIcon,
     colorClass: "bg-red-500/10 text-red-500",
-    iconColor: "text-red-500",
+    iconColor: "",
   },
   {
     format: "docx",
     label: "Word",
     hint: "Editable Word document (.docx)",
-    icon: FileText,
+    icon: WordFileIcon,
     colorClass: "bg-blue-500/10 text-blue-500",
-    iconColor: "text-blue-600",
+    iconColor: "",
   },
   {
     format: "xlsx",
     label: "Excel",
     hint: "Spreadsheet with tables (.xlsx)",
-    icon: FileSpreadsheet,
+    icon: ExcelFileIcon,
     colorClass: "bg-emerald-500/10 text-emerald-500",
-    iconColor: "text-emerald-600",
+    iconColor: "",
   },
   {
     format: "pptx",
     label: "PowerPoint",
     hint: "Slide presentation (.pptx)",
-    icon: Presentation,
+    icon: PowerPointFileIcon,
     colorClass: "bg-orange-500/10 text-orange-500",
-    iconColor: "text-orange-500",
+    iconColor: "",
   },
   {
     format: "txt",
     label: "Text",
     hint: "Plain text notes",
-    icon: FileText,
+    icon: TextFileIcon,
     colorClass: "bg-slate-500/10 text-slate-500",
-    iconColor: "text-slate-500",
+    iconColor: "",
   },
   {
-    format: "md",
+    format: "markdown",
     label: "Markdown",
-    hint: "Formatted Markdown document (.md)",
-    icon: FileCode,
+    hint: "Markdown document (.md)",
+    icon: TextFileIcon,
     colorClass: "bg-violet-500/10 text-violet-500",
-    iconColor: "text-violet-500",
+    iconColor: "",
+  },
+  {
+    format: "csv",
+    label: "CSV",
+    hint: "Comma-separated data",
+    icon: TextFileIcon,
+    colorClass: "bg-teal-500/10 text-teal-500",
+    iconColor: "",
   },
 ];
 

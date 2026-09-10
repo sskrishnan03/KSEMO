@@ -742,58 +742,16 @@ export function generateTxt(spec: DocumentSpec): Buffer {
 }
 
 // ---------------------------------------------------------------------------
-// MARKDOWN (.md)
-// ---------------------------------------------------------------------------
-
-export function generateMarkdown(spec: DocumentSpec): Buffer {
-  const lines: string[] = [`# ${spec.title || "Document"}`, "", "---", ""];
-  for (const block of spec.blocks ?? []) {
-    switch (block.type) {
-      case "heading": {
-        const prefix = "#".repeat(Math.min(6, Math.max(1, block.level || 2)));
-        lines.push(`${prefix} ${block.text}`, "");
-        break;
-      }
-      case "paragraph":
-        lines.push(block.text, "");
-        break;
-      case "bulletList":
-        block.items.forEach(item => (item.trim().startsWith("-") || item.trim().startsWith("*") ? lines.push(item) : lines.push(`- ${item}`)));
-        lines.push("");
-        break;
-      case "numberedList":
-        block.items.forEach((item, i) => lines.push(`${i + 1}. ${item}`));
-        lines.push("");
-        break;
-      case "table":
-        if ((block.headers ?? []).length) {
-          lines.push(`| ${block.headers!.join(" | ")} |`);
-          lines.push(`| ${block.headers!.map(() => "---").join(" | ")} |`);
-          block.rows.forEach(row =>
-            lines.push(`| ${row.map(c => c.replace(/\|/g, "\\|")).join(" | ")} |`)
-          );
-          lines.push("");
-        }
-        break;
-      case "pageBreak":
-        lines.push("---", "");
-        break;
-      default:
-        break;
-    }
-  }
-  return Buffer.from(lines.join("\n"), "utf8");
-}
-
-// ---------------------------------------------------------------------------
 // Dispatcher
 // ---------------------------------------------------------------------------
 
-export async function generateDocument(spec: DocumentSpec): Promise<{
+export type GeneratedArtifact = {
   buffer: Buffer;
   filename: string;
   mimeType: string;
-}> {
+};
+
+export async function generateDocument(spec: DocumentSpec): Promise<GeneratedArtifact> {
   const filename = sanitizeFilename(spec.format, spec.filename);
   const mimeTypes: Record<string, string> = {
     pdf: "application/pdf",
@@ -801,7 +759,6 @@ export async function generateDocument(spec: DocumentSpec): Promise<{
     xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
     txt: "text/plain",
-    md: "text/markdown",
   };
   let buffer: Buffer;
   try {
@@ -819,7 +776,6 @@ export async function generateDocument(spec: DocumentSpec): Promise<{
         buffer = await generatePdf(spec);
         break;
       case "txt":
-      case "md":
         buffer = generateTxt(spec);
         break;
       default:

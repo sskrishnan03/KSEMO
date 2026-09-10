@@ -17,12 +17,11 @@ import { resolveStoragePath } from "./storage";
 import fs from "fs";
 import { buildUserMemoryContext } from "./memory/retrieval";
 import { memorizeConversation } from "./memory/autoMemorize";
-import { planDocument } from "./docgen/plan";
 import { likelyFormatHint, looksLikeFileRequest } from "./docgen/detect";
 import {
-  buildDocumentSpec,
-  generateAndDeliverFile,
+  runDocumentPipeline,
   type GeneratedFileResult,
+  type PipelineProgressEvent,
 } from "./docgen/service";
 import type { CapabilityMode } from "@shared/capabilities";
 
@@ -300,7 +299,6 @@ function resolveCapabilityMode(raw: string | undefined | null): CapabilityMode {
     "xlsx",
     "pptx",
     "txt",
-    "md",
   ];
   return (valid as string[]).includes(value)
     ? (value as CapabilityMode)
@@ -685,95 +683,41 @@ export function registerChatStream(app: Express) {
 
         if (!isRegenerationTurn && forcedFormat) {
           try {
-            writeEvent(res, "file.progress", {
-              messageId: assistantMessageId,
-              stage: "analyzing",
+            // Run the full intelligent document generation pipeline.
+            // Each pipeline stage emits real progress events that the
+            // client renders as meaningful live stages.
+            deliveredFile = await runDocumentPipeline({
+              userId: user.id,
+              assistantMessageId,
+              conversationId: conversation.id,
+              userMessage: content ?? "",
               format: forcedFormat,
-            });
-
-            const plannerHistory: Message[] = filteredAssistantContext
-              .filter(msg => msg.role === "user" || msg.role === "assistant")
-              .slice(-8);
-            const last = plannerHistory[plannerHistory.length - 1];
-            if (
-              last &&
-              last.role === "user" &&
-              typeof last.content === "string" &&
-              last.content === content
-            ) {
-              plannerHistory.pop();
-            }
-
-            writeEvent(res, "file.progress", {
-              messageId: assistantMessageId,
-              stage: "researching",
-              format: forcedFormat,
-            });
-
-            const plan = await planDocument(
-              content ?? "",
-              plannerHistory,
-              forcedFormat
-            );
-
-            if (plan.kind === "file") {
-              const planFormat = plan.format;
-
-              writeEvent(res, "file.progress", {
-                messageId: assistantMessageId,
-                stage: "planning",
-                format: planFormat,
-              });
-
-              const spec = buildDocumentSpec(plan);
-
-              writeEvent(res, "file.progress", {
-                messageId: assistantMessageId,
-                stage: "content_generated",
-                format: planFormat,
-              });
-
-              writeEvent(res, "file.progress", {
-                messageId: assistantMessageId,
-                stage: "formatting",
-                format: planFormat,
-              });
-
-              deliveredFile = await generateAndDeliverFile({
-                userId: user.id,
-                assistantMessageId,
-                conversationId: conversation.id,
-                spec,
-                summary: plan.summary,
-              });
-
-              writeEvent(res, "file.progress", {
-                messageId: assistantMessageId,
-                stage: "validating",
-                format: planFormat,
-              });
-
-              writeEvent(res, "file.created", {
-                messageId: assistantMessageId,
-                file: deliveredFile,
-              });
-
-              responseText = deliveredFile.summary;
-              for (let i = 0; i < responseText.length; i += 64) {
-                writeEvent(res, "assistant.delta", {
+              history: filteredAssistantContext,
+              onProgress: (event: PipelineProgressEvent) => {
+                writeEvent(res, "file.progress", {
                   messageId: assistantMessageId,
-                  delta: responseText.slice(i, i + 64),
+                  stage: event.stage,
+                  format: event.format,
+                  message: event.message,
+                  researchSourceCount: event.researchSourceCount,
+                  researchFindingCount: event.researchFindingCount,
+                  qualityPassed: event.qualityPassed,
+                  qualityIssueCount: event.qualityIssueCount,
                 });
-              }
-            } else {
-              // The planner decided this message does not need a file even
-              // though a format was forced. Treat this as a file-mode failure
-              // rather than silently dropping into normal chat — the two
-              // modes must remain strictly separated.
-              fileModeFailed = true;
-              writeEvent(res, "file.error", {
+              },
+              signal: generationSignal,
+            });
+
+            writeEvent(res, "file.created", {
+              messageId: assistantMessageId,
+              file: deliveredFile,
+            });
+
+            responseText = deliveredFile.summary;
+            for (let i = 0; i < responseText.length; i += 64) {
+              writeEvent(res, "assistant.delta", {
                 messageId: assistantMessageId,
-                message: "KSEMO could not create a file for this request. Please try a different request.",
+                delta: responseText.slice(i, i + 64),
               });
             }
           } catch (error) {
@@ -784,7 +728,9 @@ export function registerChatStream(app: Express) {
             fileModeFailed = true;
             writeEvent(res, "file.error", {
               messageId: assistantMessageId,
-              message: "File generation could not be completed.",
+              message: error instanceof Error
+                ? `File generation failed: ${error.message}`
+                : "File generation could not be completed. Please try again.",
             });
           }
         }

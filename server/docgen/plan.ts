@@ -1,16 +1,17 @@
 // AI-driven document planning. Given the user's latest message (plus chat
-// context), this asks the LLM to decide whether a file should be generated and,
-// if so, to produce the structured content that the deterministic generators
-// will turn into a real file. It keeps "format when not specified" behaviour
-// sane by choosing a sensible default and advertising alternatives.
+// context and optional web research), this asks the LLM to produce the
+// structured content that the deterministic generators will turn into a real
+// file. When research results are available, the planner incorporates the
+// gathered facts, findings, and source references into the document plan.
 
-import { invokeLLM, type Message } from "../_core/llm";
+import { invokeLLM, DEFAULT_LLM_MODEL, type Message } from "../_core/llm";
 import type { DocBlock, DocFormat, SheetDefinition, SlideDefinition } from "./spec";
+import type { ResearchResult } from "./research";
 
 export type DocumentPlan =
   | {
       kind: "file";
-      format: "pdf" | "docx" | "xlsx" | "pptx" | "txt" | "md";
+      format: "pdf" | "docx" | "xlsx" | "pptx" | "txt";
       filename: string;
       title: string;
       summary: string;
@@ -19,8 +20,34 @@ export type DocumentPlan =
         sheets?: unknown[];
         slides?: unknown[];
       };
+      sources?: Array<{ title: string; url: string; publisher?: string }>;
     }
   | { kind: "none" };
+
+function buildResearchContextBlock(research?: ResearchResult): string {
+  if (!research || !research.needed || research.findings.length === 0) return "";
+
+  const findingsText = research.findings
+    .map(
+      (f, i) =>
+        `${i + 1}. ${f.topic} (confidence: ${f.confidence})\n   ${f.content}\n   Sources: ${f.sources.join(", ")}`
+    )
+    .join("\n\n");
+
+  const sourcesText = research.sources
+    .map((s, i) => `${i + 1}. ${s.title} — ${s.url}${s.publisher ? ` (${s.publisher})` : ""}`)
+    .join("\n");
+
+  return `
+RESEARCH FINDINGS (gathered from web sources — USE these facts in the document):
+${findingsText}
+
+AVAILABLE SOURCES (cite these in the document where appropriate):
+${sourcesText}
+
+IMPORTANT: Ground the document content in these research findings. Use specific facts, numbers, dates, and names from the findings. Include a "Sources" or "References" section at the end of the document listing the sources used.
+`;
+}
 
 const FORMAT_INSTRUCTIONS = `
 You are part of a document-generation assistant. Decide whether the user's latest
@@ -33,22 +60,22 @@ Available output formats and their codes:
 - xlsx -> an Excel spreadsheet (use the "sheets" structure)
 - pptx -> a PowerPoint presentation (use the "slides" structure)
 - txt  -> a plain text file
-- md   -> a Markdown document (headings, lists, tables, code blocks, links)
 
 Return a JSON object (no markdown fences). Schema:
 {
   "createFile": true|false,
-  "format": "pdf"|"docx"|"xlsx"|"pptx"|"txt"|"md",
+  "format": "pdf"|"docx"|"xlsx"|"pptx"|"txt",
   "filename": "a url-safe base name WITHOUT extension, e.g. Project_Report",
   "title": "document title",
   "summary": "a short, friendly sentence telling the user what you created and its format",
   "content": {
-     "blocks": [ ... ]   // for pdf/docx/txt/md: an array of content blocks
+     "blocks": [ ... ]   // for pdf/docx/txt: an array of content blocks
      // OR
      "sheets": [ ... ]   // for xlsx
      // OR
      "slides": [ ... ]   // for pptx
-  }
+  },
+  "sources": [ { "title": "...", "url": "...", "publisher": "..." } ]
 }
 
 Rules:
@@ -73,12 +100,27 @@ Rules:
 - content.slides is a JSON array (for pptx):
     {"title":"Slide heading","bullets":["...","..."],"table":{"headers":["A"],"rows":[["..."]]},"footnote":"..."}
   The first slide is treated as a title slide (title + subtitle + bullets).
+- "sources" is an optional array of source references used in the document.
+  Include this when research findings were provided.
 
-Number of blocks/slides: be generous and thorough.
+COMPLETENESS REQUIREMENT (most important rule): Produce a COMPLETE, MULTI-PAGE
+document — never a stub or short draft. For document formats (pdf/docx/txt)
+generate 6-10 detailed Level 1/2 sections; every section must contain 2-3
+substantial paragraphs of 100-200 words (specific, concrete, and well-written)
+plus bullet or numbered lists and at least one data table where useful. For
+xlsx generate at least 3 sheets with rich, realistic data. For pptx generate
+at least 8 slides with real, substantive content. Do not abbreviate, truncate,
+or summarize away the depth the user asked for — answer the request fully.
 `;
 
-function buildForcedSystemPrompt(format: DocFormat, userMessage: string): string {
+function buildForcedSystemPrompt(
+  format: DocFormat,
+  userMessage: string,
+  research?: ResearchResult
+): string {
   const formatUpper = format.toUpperCase();
+  const researchBlock = buildResearchContextBlock(research);
+
   let structureExample = "";
 
   if (format === "xlsx") {
@@ -157,7 +199,7 @@ function buildForcedSystemPrompt(format: DocFormat, userMessage: string): string
   ]
 }`;
   } else {
-    // pdf, docx, txt, md
+    // pdf, docx, txt — all use the blocks structure
     structureExample = `
 "content": {
   "blocks": [
@@ -196,9 +238,11 @@ You MUST generate a complete, extensive, professional ${formatUpper} file answer
 - Set "filename": a clear, clean snake_case filename without extension (e.g., "artificial_intelligence_overview").
 - Set "title": a polished, professional title for the document.
 - Set "summary": a clear statement explaining the document created and its contents.
-- Generate EXTENSIVE, THOROUGH content:
-  ${format === "xlsx" ? "Generate at least 2 detailed spreadsheets with rich data, headers, numbers, and realistic categories." : format === "pptx" ? "Generate at least 6-8 comprehensive slides covering all facets of the prompt." : "Generate at least 4-7 detailed sections with Level 1/2 headings, substantial paragraphs, bullet lists, and structured data tables."}
-
+- Generate EXTENSIVE, THOROUGH CONTENT — this is the most important directive.
+  The document MUST be complete and multi-page (or rich and multi-sheet/slide).
+  Never return a short stub:
+  ${format === "xlsx" ? "Generate at least 3 detailed spreadsheets with rich realistic data, headers, numbers, and categories, including an overview sheet and a detailed breakdown sheet." : format === "pptx" ? "Generate at least 8 comprehensive slides covering every facet of the prompt: title, agenda, concepts, analysis, comparative data, key findings, risks, and a roadmap/conclusion." : "Generate 6-10 detailed sections with Level 1/2 headings. Every section must contain 2-3 substantial paragraphs of 100-200 words each, plus bullet lists and at least one structured data table. Include an Executive Summary, an In-Depth Analysis, a Comparative Data/Metrics section, and a Recommendations/Conclusion section."}
+${researchBlock ? `\n${researchBlock}\n` : ""}
 Output VALID JSON ONLY (no markdown code blocks, no backticks):
 {
   "createFile": true,
@@ -206,6 +250,7 @@ Output VALID JSON ONLY (no markdown code blocks, no backticks):
   "filename": "document_name",
   "title": "Document Title",
   "summary": "Generated comprehensive ${formatUpper} file on [Topic].",
+  ${researchBlock ? '"sources": [{"title": "...", "url": "...", "publisher": "..."}],' : ""}
   ${structureExample}
 }`;
 }
@@ -213,24 +258,28 @@ Output VALID JSON ONLY (no markdown code blocks, no backticks):
 export async function planDocument(
   userMessage: string,
   history: Message[],
-  forcedFormat?: Extract<DocumentPlan, { kind: "file" }>["format"] | null
+  forcedFormat?: Extract<DocumentPlan, { kind: "file" }>["format"] | null,
+  research?: ResearchResult
 ): Promise<DocumentPlan> {
   const forced = normalizeFormat(forcedFormat);
 
   if (forced) {
-    const systemContent = buildForcedSystemPrompt(forced, userMessage);
-    const userContent = `User query / topic:\n${userMessage}\n\nGenerate the complete ${forced.toUpperCase()} document JSON now:`;
+    const systemContent = buildForcedSystemPrompt(forced, userMessage, research);
+    const researchHint = research?.needed
+      ? `\n\nResearch was performed. Findings: ${research.findings.length} topics, ${research.sourceCount} sources. Use the provided research findings to create an accurate, well-sourced document.`
+      : "";
+    const userContent = `User query / topic:\n${userMessage}${researchHint}\n\nGenerate the complete ${forced.toUpperCase()} document JSON now:`;
 
     try {
       const result = await invokeLLM({
-        model: "gemini-flash-latest",
+        model: DEFAULT_LLM_MODEL,
         messages: [
           { role: "system", content: systemContent },
           ...history.slice(-6),
           { role: "user", content: userContent },
         ],
         responseFormat: { type: "json_object" },
-        maxTokens: 6000,
+        maxTokens: 10000,
       });
 
       const raw = result.choices?.[0]?.message?.content;
@@ -240,31 +289,33 @@ export async function planDocument(
 
       const parsed = parsePlanJson(text);
       if (parsed) {
-        return buildPlanFromParsed(parsed, forced, userMessage);
+        return buildPlanFromParsed(parsed, forced, userMessage, research);
       }
 
-      // If JSON parsing failed, construct from raw text
-      return synthesizeFallbackPlan(userMessage, forced, text);
+      return synthesizeFallbackPlan(userMessage, forced, text, research);
     } catch (error) {
       console.warn(`[DocGen] planning call with forced ${forced} failed; synthesizing document.`, error);
-      return synthesizeFallbackPlan(userMessage, forced);
+      return synthesizeFallbackPlan(userMessage, forced, undefined, research);
     }
   }
 
   // Automatic document detection when format is not pre-selected
   const systemContent = FORMAT_INSTRUCTIONS;
-  const userContent = `User's latest message:\n${userMessage}\n\nProduce the JSON plan now.`;
+  const researchHint = research?.needed
+    ? `\n\nResearch findings are available with ${research.findings.length} topics and ${research.sourceCount} sources. Use them if the document would benefit from factual, research-grounded content.`
+    : "";
+  const userContent = `User's latest message:\n${userMessage}${researchHint}\n\nProduce the JSON plan now.`;
 
   try {
     const result = await invokeLLM({
-      model: "gemini-flash-latest",
+      model: DEFAULT_LLM_MODEL,
       messages: [
         { role: "system", content: systemContent },
         ...history.slice(-8),
         { role: "user", content: userContent },
       ],
       responseFormat: { type: "json_object" },
-      maxTokens: 4096,
+      maxTokens: 8192,
     });
     const raw = result.choices?.[0]?.message?.content;
     const text = Array.isArray(raw)
@@ -276,7 +327,7 @@ export async function planDocument(
     if (parsed.createFile !== true) return { kind: "none" };
     const format = normalizeFormat(parsed.format);
     if (!format) return { kind: "none" };
-    return buildPlanFromParsed(parsed, format, userMessage);
+    return buildPlanFromParsed(parsed, format, userMessage, research);
   } catch (error) {
     console.warn("[DocGen] planning call failed; no file generated.", error);
     return { kind: "none" };
@@ -286,7 +337,8 @@ export async function planDocument(
 function buildPlanFromParsed(
   parsed: Record<string, any>,
   format: DocFormat,
-  userMessage: string
+  userMessage: string,
+  research?: ResearchResult
 ): DocumentPlan & { kind: "file" } {
   const title = String(parsed.title ?? cleanTitleFromMessage(userMessage)).slice(0, 160);
   const filename = String(parsed.filename ?? sanitizeTitle(title)).slice(0, 120);
@@ -315,6 +367,31 @@ function buildPlanFromParsed(
     content.blocks = buildFallbackBlocks(title, userMessage);
   }
 
+  // Collect source references from parsed plan + research results
+  const sources: Array<{ title: string; url: string; publisher?: string }> = [];
+  if (Array.isArray(parsed.sources)) {
+    for (const s of parsed.sources) {
+      if (s && typeof s === "object" && typeof (s as any).url === "string") {
+        sources.push({
+          title: String((s as any).title || "Source"),
+          url: String((s as any).url),
+          publisher: (s as any).publisher ? String((s as any).publisher) : undefined,
+        });
+      }
+    }
+  }
+  if (research?.sources) {
+    for (const rs of research.sources) {
+      if (!sources.some(s => s.url === rs.url)) {
+        sources.push({
+          title: rs.title,
+          url: rs.url,
+          publisher: rs.publisher,
+        });
+      }
+    }
+  }
+
   return {
     kind: "file",
     format,
@@ -322,13 +399,14 @@ function buildPlanFromParsed(
     title,
     summary,
     content,
+    sources: sources.length > 0 ? sources : undefined,
   };
 }
 
 function cleanTitleFromMessage(message: string): string {
   const cleaned = message
     .replace(/^(create|generate|write|make|build|give me|can you make|please make)\s+(a|an|the)?\s*/i, "")
-    .replace(/(pdf|word document|docx|excel|spreadsheet|xlsx|powerpoint|presentation|pptx|text file|markdown|file)\s*/gi, "")
+    .replace(/(pdf|word document|docx|excel|spreadsheet|xlsx|powerpoint|presentation|pptx|text file|txt|file)\s*/gi, "")
     .replace(/[^\w\s-]/g, "")
     .trim();
   if (!cleaned) return "Comprehensive Document";
@@ -355,7 +433,7 @@ function normalizeFormat(value: unknown): DocFormat | null {
     .trim()
     .toLowerCase()
     .replace(/^\./, "");
-  const valid: DocFormat[] = ["pdf", "docx", "xlsx", "pptx", "txt", "md"];
+  const valid: DocFormat[] = ["pdf", "docx", "xlsx", "pptx", "txt"];
   return valid.includes(v as DocFormat) ? (v as DocFormat) : null;
 }
 
@@ -385,10 +463,17 @@ function parsePlanJson(text: string): Record<string, any> | null {
 function synthesizeFallbackPlan(
   userMessage: string,
   format: DocFormat,
-  rawText?: string
+  rawText?: string,
+  research?: ResearchResult
 ): DocumentPlan & { kind: "file" } {
   const title = cleanTitleFromMessage(userMessage);
   const filename = sanitizeTitle(title);
+
+  const sources = research?.sources?.map(s => ({
+    title: s.title,
+    url: s.url,
+    publisher: s.publisher,
+  }));
 
   if (format === "xlsx") {
     return {
@@ -398,6 +483,7 @@ function synthesizeFallbackPlan(
       title,
       summary: `I've prepared your comprehensive Excel spreadsheet on "${title}" with detailed data modeling.`,
       content: { sheets: buildFallbackSheets(title, userMessage) },
+      sources,
     };
   }
 
@@ -409,6 +495,7 @@ function synthesizeFallbackPlan(
       title,
       summary: `I've created your multi-slide PowerPoint presentation on "${title}" with structured slide layouts.`,
       content: { slides: buildFallbackSlides(title, userMessage) },
+      sources,
     };
   }
 
@@ -418,17 +505,57 @@ function synthesizeFallbackPlan(
     filename,
     title,
     summary: `I've created your detailed ${format.toUpperCase()} document on "${title}" with full sections and analysis.`,
-    content: { blocks: buildFallbackBlocks(title, userMessage, rawText) },
+    content: { blocks: buildFallbackBlocks(title, userMessage, rawText, research) },
+    sources,
   };
 }
 
-function buildFallbackBlocks(title: string, userMessage: string, rawText?: string): DocBlock[] {
+function buildFallbackBlocks(title: string, userMessage: string, rawText?: string, research?: ResearchResult): DocBlock[] {
   const blocks: DocBlock[] = [
     { type: "heading", level: 1, text: title },
     {
       type: "paragraph",
       text: `This document provides an exhaustive, structured analysis and documentation regarding ${title}, directly responding to the inquiry: "${userMessage}".`,
     },
+  ];
+
+  // If we have research findings, build content from them
+  if (research?.needed && research.findings.length > 0) {
+    // Add findings-based sections
+    const findingGroups = new Map<string, typeof research.findings>();
+    for (const finding of research.findings) {
+      const key = finding.topic;
+      if (!findingGroups.has(key)) findingGroups.set(key, []);
+      findingGroups.get(key)!.push(finding);
+    }
+
+    let sectionIdx = 1;
+    for (const [topic, findings] of findingGroups) {
+      blocks.push({ type: "heading", level: 2, text: `${sectionIdx}. ${topic}` });
+      for (const finding of findings) {
+        blocks.push({ type: "paragraph", text: finding.content });
+      }
+      sectionIdx++;
+    }
+
+    // Add sources section
+    if (research.sources.length > 0) {
+      blocks.push({ type: "pageBreak" });
+      blocks.push({ type: "heading", level: 2, text: "References" });
+      for (const source of research.sources) {
+        blocks.push({
+          type: "paragraph",
+          text: `${source.title} — ${source.url}`,
+          size: 9,
+        });
+      }
+    }
+
+    return blocks;
+  }
+
+  // Fallback: generic template content
+  blocks.push(
     { type: "heading", level: 2, text: "Executive Summary" },
     {
       type: "paragraph",
@@ -464,8 +591,8 @@ function buildFallbackBlocks(title: string, userMessage: string, rawText?: strin
         "Establish an ongoing monitoring framework with proactive alerting and telemetry.",
         "Conduct periodic reviews to ensure continuous alignment with long-term strategic goals.",
       ],
-    },
-  ];
+    }
+  );
 
   if (rawText && rawText.length > 50) {
     const paragraphs = rawText
@@ -562,4 +689,3 @@ function buildFallbackSlides(title: string, userMessage: string): SlideDefinitio
     },
   ];
 }
-

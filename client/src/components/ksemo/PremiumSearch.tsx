@@ -1,4 +1,3 @@
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Loading } from "@/components/ui/loading";
 import { cn } from "@/lib/utils";
@@ -189,15 +188,6 @@ export function SearchWorkspace({
               Search across your conversations and messages. Find specific chats
               or message content quickly.
             </p>
-          </div>
-          <div className="flex shrink-0 flex-wrap gap-2">
-            <Button
-              variant="outline"
-              className="rounded-xl"
-              onClick={onBackToChat}
-            >
-              Back to chat
-            </Button>
           </div>
         </header>
 

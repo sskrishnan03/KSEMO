@@ -1,4 +1,6 @@
 import crypto from "crypto";
+import fs from "fs";
+import path from "path";
 import type {
   User,
   InsertUser,
@@ -20,6 +22,88 @@ import type {
   DbConversation,
   DbMessage,
 } from "../supabase-schema/04-types";
+
+// Durable snapshot persistence: the store keeps the exact same in-memory
+// behavior but mirrors itself to .ksemo-data/store.json on every mutation so
+// chats, users, and identity survive server restarts. Persistence is skipped
+// in tests and can be relocated with KSEMO_STORE_FILE.
+const STORE_ENV_OVERRIDE = process.env.KSEMO_STORE_FILE?.trim();
+const DEFAULT_STORE_FILE = path.join(process.cwd(), ".ksemo-data", "store.json");
+const STORE_FILE = STORE_ENV_OVERRIDE || DEFAULT_STORE_FILE;
+const SAVE_DEBOUNCE_MS = 250;
+const STORE_VERSION = 1;
+const DATE_MARKER = "$ksemoDate";
+// Persistence is skipped in tests unless a store file is explicitly requested
+// (tests can point KSEMO_STORE_FILE at a temp path to test real durability).
+const SAVE_DISABLED = !STORE_ENV_OVERRIDE && process.env.NODE_ENV === "test";
+
+// Dates can't round-trip through JSON naively, so they are tagged with a
+// marker key before serialization and revived on load. Chat content that is
+// literally `{"$ksemoDate":"..."}` is the only (negligible) collision risk.
+// Note: a JSON.stringify *replacer* can't catch Dates because Date.prototype
+// toJSON() runs before the replacer, so the tagging happens up front.
+function tagDatesForStorage(value: unknown): unknown {
+  if (value instanceof Date) return { [DATE_MARKER]: value.toISOString() };
+  if (Array.isArray(value)) return value.map(tagDatesForStorage);
+  if (value && typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
+      out[key] = tagDatesForStorage(item);
+    }
+    return out;
+  }
+  return value;
+}
+
+function dateTagReviver(_key: string, value: any) {
+  if (
+    value &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    Object.keys(value).length === 1 &&
+    typeof value[DATE_MARKER] === "string"
+  ) {
+    const revived = new Date(value[DATE_MARKER]);
+    return Number.isNaN(revived.getTime()) ? value : revived;
+  }
+  return value;
+}
+
+interface StoreSnapshot {
+  v: number;
+  users: Array<[number, User]>;
+  usersByOpenId: Array<[string, number]>;
+  usersByEmail: Array<[string, number]>;
+  conversations: Array<[string, Conversation]>;
+  messages: Array<[string, Message]>;
+  messageVersions: Array<[string, MessageVersion[]]>;
+  messageFeedback: Array<[string, MessageFeedback]>;
+  userPreferences: Array<[number, UserPreference]>;
+  memories: Array<[string, Memory]>;
+  memorySettings: Array<[number, MemorySettings]>;
+  projects: Array<[string, Project]>;
+  files: Array<[string, KsemoFile]>;
+  attachments: Array<[string, Attachment]>;
+  voiceSessions: Array<[string, VoiceSession]>;
+  tasks: Array<[string, Task]>;
+  taskActivities: Array<[string, TaskActivity[]]>;
+  nextUserId: number;
+}
+
+function readStoredSnapshot(): StoreSnapshot | null {
+  try {
+    if (!fs.existsSync(STORE_FILE)) return null;
+    const raw = fs.readFileSync(STORE_FILE, "utf8");
+    if (!raw.trim()) return null;
+    const parsed = JSON.parse(raw, dateTagReviver);
+    if (!parsed || typeof parsed !== "object" || parsed.v !== STORE_VERSION)
+      return null;
+    return parsed as StoreSnapshot;
+  } catch (error) {
+    console.warn("[KSEMO] Could not read persisted store, starting fresh:", error);
+    return null;
+  }
+}
 
 class InMemoryStore {
   users = new Map<number, User>();
@@ -43,9 +127,120 @@ class InMemoryStore {
   taskActivities = new Map<string, TaskActivity[]>();
 
   private nextUserId = 1;
+  private saveTimer: NodeJS.Timeout | null = null;
+  private saveErrorLogged = false;
 
   constructor() {
-    this.seedDefaults();
+    const snapshot = SAVE_DISABLED ? null : readStoredSnapshot();
+    if (snapshot) {
+      this.restoreSnapshot(snapshot);
+    } else {
+      this.seedDefaults();
+    }
+    this.installShutdownFlush();
+  }
+
+  private installShutdownFlush() {
+    if (SAVE_DISABLED) return;
+    const flush = () => this.persistNow();
+    process.once("beforeExit", flush);
+    process.once("SIGINT", flush);
+    process.once("SIGTERM", flush);
+  }
+
+  /** Debounced write of the full store to disk. Safe to call after any mutation. */
+  requestPersist(): void {
+    if (SAVE_DISABLED) return;
+    if (this.saveTimer) clearTimeout(this.saveTimer);
+    this.saveTimer = setTimeout(() => {
+      this.saveTimer = null;
+      this.persistNow();
+    }, SAVE_DEBOUNCE_MS);
+    if (this.saveTimer.unref) this.saveTimer.unref();
+  }
+
+  /** Synchronous, immediate snapshot write (used on shutdown too). */
+  persistNow(): void {
+    if (SAVE_DISABLED) return;
+    try {
+      fs.mkdirSync(path.dirname(STORE_FILE), { recursive: true });
+      const snapshot = JSON.stringify(
+        tagDatesForStorage(this.captureSnapshot()),
+        null,
+        2
+      );
+      const tmpFile = `${STORE_FILE}.tmp`;
+      fs.writeFileSync(tmpFile, snapshot, "utf8");
+      fs.renameSync(tmpFile, STORE_FILE);
+      this.saveErrorLogged = false;
+    } catch (error) {
+      if (!this.saveErrorLogged) {
+        console.error("[KSEMO] Failed to persist store:", error);
+        this.saveErrorLogged = true;
+      }
+    }
+  }
+
+  private captureSnapshot(): StoreSnapshot {
+    return {
+      v: STORE_VERSION,
+      users: Array.from(this.users.entries()),
+      usersByOpenId: Array.from(this.usersByOpenId.entries()),
+      usersByEmail: Array.from(this.usersByEmail.entries()),
+      conversations: Array.from(this.conversations.entries()),
+      messages: Array.from(this.messages.entries()),
+      messageVersions: Array.from(this.messageVersions.entries()),
+      messageFeedback: Array.from(this.messageFeedback.entries()),
+      userPreferences: Array.from(this.userPreferences.entries()),
+      memories: Array.from(this.memories.entries()),
+      memorySettings: Array.from(this.memorySettings.entries()),
+      projects: Array.from(this.projects.entries()),
+      files: Array.from(this.files.entries()),
+      attachments: Array.from(this.attachments.entries()),
+      voiceSessions: Array.from(this.voiceSessions.entries()),
+      tasks: Array.from(this.tasks.entries()),
+      taskActivities: Array.from(this.taskActivities.entries()),
+      nextUserId: this.nextUserId,
+    };
+  }
+
+  private restoreSnapshot(snapshot: StoreSnapshot) {
+    for (const [key, value] of snapshot.users || []) this.users.set(key, value);
+    for (const [key, value] of snapshot.usersByOpenId || [])
+      this.usersByOpenId.set(key, value);
+    for (const [key, value] of snapshot.usersByEmail || [])
+      this.usersByEmail.set(key, value);
+    for (const [key, value] of snapshot.conversations || [])
+      this.conversations.set(key, value);
+    for (const [key, value] of snapshot.messages || []) this.messages.set(key, value);
+    for (const [key, value] of snapshot.messageVersions || [])
+      this.messageVersions.set(key, value);
+    for (const [key, value] of snapshot.messageFeedback || [])
+      this.messageFeedback.set(key, value);
+    for (const [key, value] of snapshot.userPreferences || [])
+      this.userPreferences.set(key, value);
+    for (const [key, value] of snapshot.memories || []) this.memories.set(key, value);
+    for (const [key, value] of snapshot.memorySettings || [])
+      this.memorySettings.set(key, value);
+    for (const [key, value] of snapshot.projects || []) this.projects.set(key, value);
+    for (const [key, value] of snapshot.files || []) this.files.set(key, value);
+    for (const [key, value] of snapshot.attachments || [])
+      this.attachments.set(key, value);
+    for (const [key, value] of snapshot.voiceSessions || [])
+      this.voiceSessions.set(key, value);
+    for (const [key, value] of snapshot.tasks || []) this.tasks.set(key, value);
+    for (const [key, value] of snapshot.taskActivities || [])
+      this.taskActivities.set(key, value);
+    this.nextUserId = Math.max(1, Number(snapshot.nextUserId) || 0);
+
+    // Rebuild identity indexes directly from users so a stale filename cannot
+    // break lookups (e.g. after an email address changes).
+    this.usersByOpenId.clear();
+    this.usersByEmail.clear();
+    for (const [id, user] of this.users) {
+      if (user.openId) this.usersByOpenId.set(user.openId, id);
+      if (user.email) this.usersByEmail.set(user.email.toLowerCase(), id);
+    }
   }
 
   private seedDefaults() {
@@ -73,7 +268,7 @@ class InMemoryStore {
 
     this.userPreferences.set(demoUser.id, {
       userId: demoUser.id,
-      selectedModel: "gemini-2.5-flash",
+      selectedModel: "gemini-flash-lite-latest",
       persona: "balanced",
       customInstructions: null,
       speechRate: 1.0,
@@ -148,6 +343,7 @@ class InMemoryStore {
         this.usersByEmail.set(newUser.email.toLowerCase(), id);
       }
     }
+    this.requestPersist();
   }
 
   async getUserByOpenId(openId: string): Promise<User | undefined> {
@@ -167,6 +363,7 @@ class InMemoryStore {
     if (!user) return undefined;
     user.name = name;
     user.updatedAt = new Date();
+    this.requestPersist();
     return user;
   }
 
@@ -176,6 +373,7 @@ class InMemoryStore {
     this.users.delete(userId);
     this.usersByOpenId.delete(user.openId);
     if (user.email) this.usersByEmail.delete(user.email.toLowerCase());
+    this.requestPersist();
     return true;
   }
 
@@ -232,6 +430,7 @@ class InMemoryStore {
       updatedAt: now,
     };
     this.conversations.set(conv.id, conv);
+    this.requestPersist();
     return conv;
   }
 
@@ -255,6 +454,7 @@ class InMemoryStore {
     if (!conv || conv.userId !== userId) return undefined;
 
     Object.assign(conv, values, { updatedAt: new Date() });
+    this.requestPersist();
     return conv;
   }
 
@@ -289,6 +489,7 @@ class InMemoryStore {
           this.messages.delete(msgId);
         }
       }
+      this.requestPersist();
     }
   }
 
@@ -300,6 +501,7 @@ class InMemoryStore {
         count++;
       }
     }
+    this.requestPersist();
     return count;
   }
 
@@ -311,6 +513,7 @@ class InMemoryStore {
     if (!conv || conv.userId !== userId) return undefined;
     conv.deletedAt = new Date();
     conv.updatedAt = new Date();
+    this.requestPersist();
     return conv;
   }
 
@@ -322,6 +525,7 @@ class InMemoryStore {
     if (!conv || conv.userId !== userId) return undefined;
     conv.deletedAt = null;
     conv.updatedAt = new Date();
+    this.requestPersist();
     return conv;
   }
 
@@ -349,6 +553,7 @@ class InMemoryStore {
     const conv = this.conversations.get(msg.conversationId);
     if (conv) conv.updatedAt = new Date();
 
+    this.requestPersist();
     return msg;
   }
 
@@ -359,6 +564,7 @@ class InMemoryStore {
     const msg = this.messages.get(id);
     if (!msg) return;
     Object.assign(msg, values, { updatedAt: new Date() });
+    this.requestPersist();
   }
 
   async getMessageForUser(
@@ -381,6 +587,7 @@ class InMemoryStore {
     const conv = this.conversations.get(msg.conversationId);
     if (!conv || conv.userId !== userId) return false;
     this.messages.delete(messageId);
+    this.requestPersist();
     return true;
   }
 
@@ -406,6 +613,7 @@ class InMemoryStore {
         break;
       }
     }
+    if (deletedIds.length > 0) this.requestPersist();
     return deletedIds;
   }
 
@@ -432,6 +640,7 @@ class InMemoryStore {
 
     msg.content = input.content;
     msg.updatedAt = new Date();
+    this.requestPersist();
     return msg;
   }
 
@@ -461,6 +670,7 @@ class InMemoryStore {
       createdAt: new Date(),
       updatedAt: new Date(),
     });
+    this.requestPersist();
   }
 
   async searchConversationMessages(userId: number, query: string): Promise<any[]> {
@@ -520,7 +730,7 @@ class InMemoryStore {
     }
     const created: UserPreference = {
       userId,
-      selectedModel: values.selectedModel ?? "gemini-2.5-flash",
+      selectedModel: values.selectedModel ?? "gemini-flash-lite-latest",
       persona: values.persona ?? "balanced",
       customInstructions: values.customInstructions ?? null,
       speechRate: values.speechRate ?? 1.0,
@@ -530,6 +740,7 @@ class InMemoryStore {
       updatedAt: now,
     };
     this.userPreferences.set(userId, created);
+    this.requestPersist();
     return created;
   }
 
@@ -558,6 +769,7 @@ class InMemoryStore {
       updatedAt: now,
     };
     this.memorySettings.set(userId, created);
+    this.requestPersist();
     return created;
   }
 
@@ -606,6 +818,7 @@ class InMemoryStore {
       });
       saved++;
     }
+    if (saved > 0) this.requestPersist();
     return saved;
   }
 
@@ -625,6 +838,7 @@ class InMemoryStore {
       updatedAt: new Date(),
     };
     this.voiceSessions.set(session.id, session);
+    this.requestPersist();
     return session;
   }
 
@@ -637,6 +851,7 @@ class InMemoryStore {
     if (session && session.userId === userId) {
       session.status = status;
       session.updatedAt = new Date();
+      this.requestPersist();
     }
   }
 
@@ -671,6 +886,7 @@ class InMemoryStore {
       updatedAt: now,
     };
     this.projects.set(project.id, project);
+    this.requestPersist();
     return project;
   }
 
@@ -707,6 +923,7 @@ class InMemoryStore {
       createdAt: new Date(),
     };
     this.attachments.set(att.id, att);
+    this.requestPersist();
     return att;
   }
 
@@ -725,6 +942,7 @@ class InMemoryStore {
     const item = { ...input, createdAt: new Date() };
     list.push(item);
     this.taskActivities.set(input.taskId, list);
+    this.requestPersist();
     return item;
   }
 
@@ -737,6 +955,7 @@ class InMemoryStore {
       const item = list.find((a: any) => a.id === id);
       if (item && item.userId === userId) {
         Object.assign(item, values);
+        this.requestPersist();
         break;
       }
     }
@@ -1072,6 +1291,7 @@ class MockQueryBuilder implements PromiseLike<any> {
         }
 
         const res = this.isSingle ? inserted[0] ?? null : inserted;
+        inMemoryStore.requestPersist();
         return { data: res, error: null, count: inserted.length };
       }
 
@@ -1131,6 +1351,7 @@ class MockQueryBuilder implements PromiseLike<any> {
             }
           }
         }
+        inMemoryStore.requestPersist();
         return { data: rows, error: null, count: rows.length };
       }
 
@@ -1144,6 +1365,7 @@ class MockQueryBuilder implements PromiseLike<any> {
           else if (this.table === "attachments") inMemoryStore.attachments.delete(row.id);
           else if (this.table === "conversations") inMemoryStore.conversations.delete(row.id);
         }
+        inMemoryStore.requestPersist();
         return { data: rows, error: null, count: rows.length };
       }
 

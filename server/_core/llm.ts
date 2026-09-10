@@ -493,7 +493,7 @@ const fetchWithBackoff = async (
     : new Error("LLM request failed after exhausting retries");
 };
 
-const DEFAULT_LLM_MODEL = "gemini-flash-latest";
+export const DEFAULT_LLM_MODEL = "gemini-flash-lite-latest";
 
 // Separate free-tier quota bucket on the primary provider; used automatically
 // when the requested model is unavailable or rate-limited.

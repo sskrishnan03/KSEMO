@@ -8,12 +8,12 @@
  */
 import type { ComponentType } from "react";
 import {
-  File,
-  FilePenLine,
-  FileText,
-  MonitorPlay,
-  Table2,
-} from "lucide-react";
+  ExcelFileIcon,
+  PdfFileIcon,
+  PowerPointFileIcon,
+  TextFileIcon,
+  WordFileIcon,
+} from "@/components/ksemo/FileBrandIcons";
 import type {
   CapabilityMode,
   CreateMode,
@@ -46,7 +46,7 @@ const CREATE: CapabilityOption[] = [
     kind: "create",
     title: "PDF",
     description: "Create a formatted PDF document.",
-    icon: FileText,
+    icon: PdfFileIcon,
     iconColor: "text-red-500",
     iconBg: "bg-red-500/15",
     placeholder: "Describe the PDF you want to create...",
@@ -57,7 +57,7 @@ const CREATE: CapabilityOption[] = [
     kind: "create",
     title: "Word",
     description: "Create a Word document.",
-    icon: FilePenLine,
+    icon: WordFileIcon,
     iconColor: "text-blue-600",
     iconBg: "bg-blue-500/15",
     placeholder: "Describe the Word document you want to create...",
@@ -68,7 +68,7 @@ const CREATE: CapabilityOption[] = [
     kind: "create",
     title: "Excel",
     description: "Create a structured Excel spreadsheet.",
-    icon: Table2,
+    icon: ExcelFileIcon,
     iconColor: "text-emerald-600",
     iconBg: "bg-emerald-500/15",
     placeholder: "Describe the spreadsheet you want to create...",
@@ -79,7 +79,7 @@ const CREATE: CapabilityOption[] = [
     kind: "create",
     title: "PowerPoint",
     description: "Create a professional PowerPoint presentation.",
-    icon: MonitorPlay,
+    icon: PowerPointFileIcon,
     iconColor: "text-orange-500",
     iconBg: "bg-orange-500/15",
     placeholder: "Describe the presentation you want to create...",
@@ -90,7 +90,7 @@ const CREATE: CapabilityOption[] = [
     kind: "create",
     title: "Text",
     description: "Create a plain text file.",
-    icon: File,
+    icon: TextFileIcon,
     iconColor: "text-sky-500",
     iconBg: "bg-sky-500/15",
     placeholder: "Describe the text file you want to create...",

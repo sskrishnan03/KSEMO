@@ -40,6 +40,8 @@ import {
 import {
   FileCreationCard,
   type FileCreationStage,
+  type FileMetrics,
+  type FileSource,
 } from "../components/ksemo/FileCreationCard";
 import type { DocFormat } from "@/lib/docFormats";
 import AuthStage from "./AuthStage";
@@ -230,6 +232,11 @@ export default function Home() {
     format: string;
     status: "processing" | "created" | "error";
     createdAt: number;
+    message?: string;
+    researchSourceCount?: number;
+    sources?: FileSource[];
+    metrics?: FileMetrics;
+    fileId?: string;
   } | null>(null);
   const [activeMode, setActiveMode] = useState<CapabilityMode>("chat");
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -531,16 +538,49 @@ export default function Home() {
     // so the next scroll must snap to the newest message rather than animate.
     pendingOpenScrollRef.current = true;
     isNearBottomRef.current = true;
-    const serverMessages = activeQuery.data.messages.map(message => ({
-      id: message.id,
-      role: message.role,
-      content: message.content,
-      status: message.status,
-      attachments: message.attachments,
-      fileGeneration: (message as Record<string, unknown>).fileGeneration as
-        | { stage: string; format: string; status: "processing" | "created" | "error" }
-        | undefined,
-    }));
+    const serverMessages = activeQuery.data.messages.map(message => {
+      const firstAttachment = message.attachments?.[0];
+      const rawExt = firstAttachment?.filename
+        ? (firstAttachment.filename.split(".").pop() ?? "").toLowerCase()
+        : "";
+      const format = rawExt === "md" ? "markdown" : rawExt;
+      const hasGeneratedFile =
+        (message as Record<string, unknown>).fileGeneration !== undefined ||
+        (message.role === "assistant" &&
+          message.status === "completed" &&
+          (message.attachments ?? []).length > 0);
+      const fileGeneration = (
+        message as Record<string, unknown>
+      ).fileGeneration as
+        | {
+            stage: string;
+            format: string;
+            status: "processing" | "created" | "error";
+            message?: string;
+            researchSourceCount?: number;
+          }
+        | undefined;
+      return {
+        id: message.id,
+        role: message.role,
+        content: message.content,
+        status: message.status,
+        attachments: message.attachments,
+        // The server does not persist the fileGeneration envelope, so after a
+        // refresh we rebuild a completed card from the generated-file
+        // attachment (assistant messages only carry attachments from the
+        // document pipeline). This keeps the card identical across reloads.
+        fileGeneration:
+          fileGeneration ??
+          (hasGeneratedFile
+            ? {
+                stage: "completed",
+                format: format || "pdf",
+                status: "created" as const,
+              }
+            : undefined),
+      };
+    });
     setChatMessages(current => {
       if (!current.length) return serverMessages;
       const serverIds = new Set(serverMessages.map(message => message.id));
@@ -852,6 +892,20 @@ export default function Home() {
         : undefined,
       now: draftNow,
     }) as KsemoMessage[];
+    // In file creation mode the backend is guaranteed to run the document
+    // pipeline, so seed the generation card immediately on the optimistic
+    // assistant draft — no blank wait while the first progress event travels.
+    if (activeMode !== "chat") {
+      for (const message of drafts) {
+        if (message.role === "assistant" && message.status === "streaming") {
+          message.fileGeneration = {
+            stage: "analyzing",
+            format: activeMode,
+            status: "processing" as const,
+          };
+        }
+      }
+    }
     setChatMessages(drafts);
     setFileGeneration(null);
     // The selected format is intentionally NOT cleared here: it persists in the
@@ -1005,6 +1059,8 @@ export default function Home() {
           } else if (eventName === "file.progress") {
             lastProgressAt = Date.now();
             const progressStage = str(data.stage) || "analyzing";
+            const progressMessage = str(data.message ?? "") || undefined;
+            const researchSourceCount = typeof data.researchSourceCount === "number" ? data.researchSourceCount : undefined;
             setFileGeneration(current => {
               const progressFormat = str(data.format ?? "") || current?.format || "";
               return {
@@ -1013,6 +1069,8 @@ export default function Home() {
                 format: progressFormat,
                 status: "processing",
                 createdAt: current?.createdAt ?? Date.now(),
+                message: progressMessage,
+                researchSourceCount: researchSourceCount ?? current?.researchSourceCount,
               };
             });
             if (isViewingThisStream()) {
@@ -1027,6 +1085,8 @@ export default function Home() {
                           stage: progressStage,
                           format: resolvedFormat,
                           status: "processing" as const,
+                          message: progressMessage,
+                          researchSourceCount: researchSourceCount,
                         },
                       }
                     : message
@@ -1061,12 +1121,31 @@ export default function Home() {
             }
           } else if (eventName === "file.created") {
             lastProgressAt = Date.now();
+            const fileData = data.file as
+              | {
+                  fileId?: string;
+                  filename?: string;
+                  mimeType?: string;
+                  url?: string;
+                  sizeBytes?: number;
+                  sources?: FileSource[];
+                  metrics?: FileMetrics;
+                }
+              | undefined;
+            const fileSources = fileData?.sources?.length
+              ? fileData.sources
+              : undefined;
+            const fileMetrics = fileData?.metrics;
             setFileGeneration(current => ({
               messageId: str(data.messageId),
               stage: "completed",
               format: current?.format || "",
               status: "created",
               createdAt: current?.createdAt ?? Date.now(),
+              researchSourceCount: current?.researchSourceCount,
+              sources: fileSources ?? current?.sources,
+              metrics: fileMetrics ?? current?.metrics,
+              fileId: fileData?.fileId ?? current?.fileId,
             }));
             if (isViewingThisStream()) {
               const createdMsgId = str(data.messageId);
@@ -1079,6 +1158,9 @@ export default function Home() {
                           stage: "completed",
                           format: fileGeneration?.format || "",
                           status: "created" as const,
+                          researchSourceCount: fileGeneration?.researchSourceCount,
+                          sources: fileSources ?? fileGeneration?.sources,
+                          metrics: fileMetrics ?? fileGeneration?.metrics,
                         },
                       }
                     : message
@@ -1086,15 +1168,6 @@ export default function Home() {
               );
             }
             utils.workspace.files.list.invalidate();
-            const fileData = data.file as
-              | {
-                  fileId?: string;
-                  filename?: string;
-                  mimeType?: string;
-                  url?: string;
-                  sizeBytes?: number;
-                }
-              | undefined;
             const assistantId = str(data.messageId);
             if (fileData?.fileId && isViewingThisStream()) {
               setChatMessages(current =>
@@ -2054,7 +2127,6 @@ export default function Home() {
       <main className="relative flex min-w-0 flex-1 flex-col">
         {activePrimaryWorkspace === "library" ? (
           <LibraryWorkspace
-            onBackToChat={() => setPrimaryWorkspace(null)}
             onChatWithFiles={startChatWithLibraryFiles}
           />
         ) : activePrimaryWorkspace === "search" ? (
@@ -2178,20 +2250,24 @@ export default function Home() {
                     return (
                       <Fragment key={message.id}>
                   {(() => {
-                    const activeFileGen =
+const activeFileGen =
                       fileGeneration && fileGeneration.messageId === message.id
                         ? fileGeneration
                         : message.fileGeneration
-                          ? {
-                              messageId: message.id,
-                              stage: message.fileGeneration.stage,
-                              format: message.fileGeneration.format,
-                              status: message.fileGeneration.status,
-                              createdAt: 0,
-                            }
-                          : null;
+                            ? {
+                                messageId: message.id,
+                                stage: message.fileGeneration.stage,
+                                format: message.fileGeneration.format,
+                                status: message.fileGeneration.status,
+                                createdAt: 0,
+                                message: message.fileGeneration.message,
+                                researchSourceCount: message.fileGeneration.researchSourceCount,
+                                sources: message.fileGeneration.sources,
+                                metrics: message.fileGeneration.metrics,
+                              }
+                            : null;
                     return activeFileGen ? (
-                      <div className="mb-2">
+                      <div className="mb-2 animate-in fade-in-0 duration-150">
                         <FileCreationCard
                           stage={
                             activeFileGen.status === "created"
@@ -2205,8 +2281,11 @@ export default function Home() {
                           }
                           filename={message.attachments?.[0]?.filename}
                           fileUrl={message.attachments?.[0]?.url}
-                          fileMimeType={message.attachments?.[0]?.mimeType}
                           fileSizeBytes={message.attachments?.[0]?.sizeBytes}
+                          researchSourceCount={activeFileGen.researchSourceCount}
+                          sources={activeFileGen.sources}
+                          metrics={activeFileGen.metrics}
+                          onRetry={() => regenerateMessage(message)}
                         />
                       </div>
                     ) : null;

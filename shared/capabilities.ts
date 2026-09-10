@@ -17,16 +17,15 @@ export type CapabilityMode =
   | "docx"
   | "xlsx"
   | "pptx"
-  | "txt"
-  | "md";
+  | "txt";
 
 /** A mode in the CREATE section of the capability menu. */
-export type CreateMode = "pdf" | "docx" | "xlsx" | "pptx" | "txt" | "md";
+export type CreateMode = "pdf" | "docx" | "xlsx" | "pptx" | "txt";
 
 /**
  * File format type for file generation.
  */
-export type FileFormat = "pdf" | "docx" | "xlsx" | "pptx" | "txt" | "md";
+export type FileFormat = "pdf" | "docx" | "xlsx" | "pptx" | "txt";
 
 export const CREATE_MODES: CreateMode[] = [
   "pdf",
@@ -34,7 +33,6 @@ export const CREATE_MODES: CreateMode[] = [
   "xlsx",
   "pptx",
   "txt",
-  "md",
 ];
 
 export function isCreateMode(value: unknown): value is CreateMode {

@@ -464,7 +464,7 @@ export const fileGenerationRouter = router({
   generate: protectedProcedure
     .input(
       z.object({
-        format: z.enum(["pdf", "docx", "xlsx", "pptx", "txt", "md"]),
+        format: z.enum(["pdf", "docx", "xlsx", "pptx", "txt"]),
         content: z.string().min(1),
         title: z.string().optional(),
         description: z.string().optional(),

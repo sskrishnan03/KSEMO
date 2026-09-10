@@ -17,7 +17,6 @@ import {
   FileText,
   FileSpreadsheet,
   Presentation,
-  FileCode2,
   Download,
   CheckCircle2,
   Loader2,
@@ -46,7 +45,6 @@ const FILE_TYPE_CONFIG: Record<FileFormat, { icon: typeof FileOutput; label: str
   xlsx: { icon: FileSpreadsheet, label: "Excel" },
   pptx: { icon: Presentation, label: "PowerPoint" },
   txt: { icon: FileText, label: "Text" },
-  md: { icon: FileCode2, label: "Markdown" },
 };
 
 function formatFileSize(bytes: number): string {
