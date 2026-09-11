@@ -149,9 +149,6 @@ export const MessageContent = memo(function MessageContent({
   const images = (message.attachments ?? []).filter(f =>
     f.mimeType?.startsWith("image/")
   );
-  const previewKind = previewFile
-    ? getFileKind(previewFile.filename, previewFile.mimeType)
-    : null;
 
   // Sanitize assistant content
   const cleanContent = sanitizeAssistantText(message.content);
@@ -608,34 +605,19 @@ export const MessageContent = memo(function MessageContent({
         </div>
       )}
 
-      {previewFile && previewKind && (
+      {previewFile && (
         <div
           className="fixed inset-0 z-[110] flex items-center justify-center bg-black/80 p-4"
           onClick={() => setPreviewFile(null)}
         >
           <div
-            className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-border bg-background shadow-2xl"
+            className="flex h-[calc(100vh-2rem)] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-border bg-background shadow-2xl"
             onClick={e => e.stopPropagation()}
           >
             <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
-              <div className="flex min-w-0 items-center gap-2.5">
-                <span
-                  className={`flex size-8 shrink-0 items-center justify-center rounded-lg ${previewKind.colorClass}`}
-                >
-                  <previewKind.icon className="size-4" />
-                </span>
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-foreground">
-                    {previewFile.filename}
-                  </p>
-                  <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                    {previewKind.label}
-                    {previewFile.sizeBytes !== undefined
-                      ? ` · ${formatBytes(previewFile.sizeBytes) ?? ""}`
-                      : ""}
-                  </p>
-                </div>
-              </div>
+              <p className="truncate text-sm font-medium text-foreground">
+                {previewFile.filename}
+              </p>
               <div className="flex shrink-0 items-center gap-1">
                 <Button
                   variant="ghost"
@@ -672,29 +654,26 @@ export const MessageContent = memo(function MessageContent({
                 </Button>
               </div>
             </div>
-            <div className="min-h-0 flex-1 overflow-hidden bg-muted/30">
+            <div className="min-h-0 flex-1 overflow-auto bg-muted/30">
               {previewFile.mimeType?.startsWith("image/") ? (
-                <img
-                  src={previewFile.url}
-                  alt={previewFile.filename}
-                  className="mx-auto h-full max-h-[70vh] w-auto object-contain"
-                />
+                <div className="flex h-full w-full items-center justify-center p-4">
+                  <img
+                    src={previewFile.url}
+                    alt={previewFile.filename}
+                    className="max-h-full max-w-full object-contain"
+                  />
+                </div>
               ) : previewFile.mimeType === "application/pdf" ||
                 /\.pdf$/i.test(previewFile.filename) ? (
                 <iframe
                   src={previewFile.url}
                   title={previewFile.filename}
-                  className="h-[70vh] w-full"
+                  className="h-full w-full"
                 />
               ) : (
-                <div className="flex h-[50vh] flex-col items-center justify-center gap-3 p-6 text-center">
-                  <span
-                    className={`flex size-12 items-center justify-center rounded-xl ${previewKind.colorClass}`}
-                  >
-                    <previewKind.icon className="size-6" />
-                  </span>
+                <div className="flex min-h-full w-full flex-col items-center justify-center gap-3 p-6 text-center">
                   <p className="text-sm text-muted-foreground">
-                    This file type can't be previewed inline.
+                    Can't preview this file type inline.
                   </p>
                   <Button asChild size="sm">
                     <a
