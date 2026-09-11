@@ -241,10 +241,10 @@ export default function Home() {
   );
   const [primaryWorkspace, setPrimaryWorkspace] = useState<
     "library" | "search" | null
-  >(null);
+  >(() => inlineWorkspaceSection);
   const [chatFilesOpen, setChatFilesOpen] = useState(false);
   const [voiceChatOpen, setVoiceChatOpen] = useState(false);
-  const activePrimaryWorkspace = primaryWorkspace ?? inlineWorkspaceSection;
+  const activePrimaryWorkspace = primaryWorkspace;
   const [shareTarget, setShareTarget] = useState<{
     id: string;
     title: string;
@@ -503,6 +503,7 @@ export default function Home() {
     if (!activeConversationId) return;
     if (seededConversationIdRef.current === activeConversationId) return;
     if (activeQuery.isLoading || !activeQuery.data) return;
+    if (activeQuery.data.conversation?.id !== activeConversationId) return;
     seededConversationIdRef.current = activeConversationId;
     // The conversation's full history is about to render into an empty thread,
     // so the next scroll must snap to the newest message rather than animate.
@@ -1337,6 +1338,11 @@ export default function Home() {
     setActiveConversationId(null);
     if (user?.id) rememberNewChatIntent(user.id);
     setPrimaryWorkspace(null);
+    if (typeof window !== "undefined" && window.location.search.includes("workspace=")) {
+      const next = new URL(window.location.href);
+      next.searchParams.delete("workspace");
+      window.history.replaceState({}, "", next.pathname + (next.search ? next.search : ""));
+    }
     setAttachmentNotices([]);
     setActiveMode("chat");
     window.speechSynthesis?.cancel();
@@ -1667,9 +1673,21 @@ export default function Home() {
   }
 
   function selectConversation(id: string) {
+    setPrimaryWorkspace(null);
+    setSidebarOpen(false);
+
+    if (typeof window !== "undefined" && window.location.search.includes("workspace=")) {
+      const next = new URL(window.location.href);
+      next.searchParams.delete("workspace");
+      window.history.replaceState({}, "", next.pathname + (next.search ? next.search : ""));
+    }
+
     if (id === activeConversationId) {
       // Clicking the chat that is already open still jumps straight to the
       // newest message (e.g. after scrolling up to read older messages).
+      if (chatMessages.length === 0 && activeQuery.data?.messages) {
+        seededConversationIdRef.current = null;
+      }
       isNearBottomRef.current = true;
       scrollChatToEnd("auto");
       return;
@@ -1678,13 +1696,12 @@ export default function Home() {
     // is still streaming in the background. That stream keeps running and the
     // finished response is saved to its original conversation.
     setChatMessages([]);
+    seededConversationIdRef.current = null;
     isNearBottomRef.current = true;
     pendingOpenScrollRef.current = true;
-    setPrimaryWorkspace(null);
     setActiveConversationId(id);
     if (user?.id) storeActiveConversationId(user.id, id);
     setAttachmentNotices([]);
-    setSidebarOpen(false);
   }
 
   function speak(text: string, messageId: string) {
@@ -1834,19 +1851,27 @@ export default function Home() {
   });
   const stableCloseWorkspace = usePersistFn(() => {
     setPrimaryWorkspace(null);
+    if (typeof window !== "undefined" && window.location.search.includes("workspace=")) {
+      const next = new URL(window.location.href);
+      next.searchParams.delete("workspace");
+      window.history.replaceState({}, "", next.pathname + (next.search ? next.search : ""));
+    }
   });
-  const stableOnSettings = usePersistFn(() => setSettingsOpen(true));
+  const stableOnSettings = usePersistFn(() => {
+    setSettingsOpen(true);
+    setSidebarOpen(false);
+  });
 
   useEffect(() => {
     if (!activePrimaryWorkspace) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        setPrimaryWorkspace(null);
+        stableCloseWorkspace();
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [activePrimaryWorkspace]);
+  }, [activePrimaryWorkspace, stableCloseWorkspace]);
 
   useGlobalShortcuts({
     onNewChat: stableNewChat,
@@ -1864,9 +1889,10 @@ export default function Home() {
     onModeChange: mode => setActiveMode(mode),
     focusTargetId: "ksemo-composer-textarea",
   });
-  const stableOnSupport = usePersistFn((topic: "faq" | "privacy" | "terms") =>
-    setLocation(`/support/${topic}`)
-  );
+  const stableOnSupport = usePersistFn((topic: "faq" | "privacy" | "terms") => {
+    setSidebarOpen(false);
+    setLocation(`/support/${topic}`);
+  });
   const stableOnSearchSelect = usePersistFn((id: string) => {
     selectConversation(id);
   });
