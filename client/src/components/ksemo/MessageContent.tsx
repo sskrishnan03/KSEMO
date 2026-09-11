@@ -346,7 +346,7 @@ export const MessageContent = memo(function MessageContent({
                   )}
                 </div>
               ) : (
-                <>
+                <div className="relative w-full pb-9">
                   <p
                     ref={userTextRef}
                     className="w-full whitespace-pre-wrap text-left"
@@ -357,13 +357,13 @@ export const MessageContent = memo(function MessageContent({
                     <button
                       type="button"
                       onClick={() => setUserExpanded(false)}
-                      className="mt-1 flex items-center gap-1 self-end rounded-full bg-sidebar px-3 py-1 text-[15px] text-foreground/70 transition-colors hover:bg-accent hover:text-foreground"
+                      className="absolute -bottom-2.5 -right-3.5 flex items-center gap-1 rounded-full bg-sidebar px-3 py-1 text-[15px] text-foreground/70 transition-colors hover:bg-accent hover:text-foreground"
                     >
                       Show less
                       <ChevronDown className="size-3.5 rotate-180 transition-transform" />
                     </button>
                   )}
-                </>
+                </div>
               )
             ) : cleanContent ? (
               <div className="ksemo-markdown prose prose-neutral max-w-none text-[15px] leading-6 dark:prose-invert">
