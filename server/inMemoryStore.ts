@@ -453,7 +453,9 @@ class InMemoryStore {
     const conv = this.conversations.get(id);
     if (!conv || conv.userId !== userId) return undefined;
 
-    Object.assign(conv, values, { updatedAt: new Date() });
+    Object.assign(conv, values);
+    const isTitleOnly = Object.keys(values).length === 1 && "title" in values;
+    if (!isTitleOnly) conv.updatedAt = new Date();
     this.requestPersist();
     return conv;
   }
@@ -902,6 +904,8 @@ class InMemoryStore {
             mimeType: file.mimeType,
             sizeBytes: file.sizeBytes,
             url: file.url,
+            storageKey: file.storageKey,
+            contentText: file.contentText ?? null,
           });
         }
       }
@@ -1258,6 +1262,7 @@ class MockQueryBuilder implements PromiseLike<any> {
               sizeBytes: row.size_bytes || row.sizeBytes || 0,
               storageKey: row.storage_key || row.storageKey || "",
               url: row.url || "",
+              contentText: row.content_text || row.contentText || null,
               status: "ready",
               createdAt: new Date(),
               updatedAt: new Date(),

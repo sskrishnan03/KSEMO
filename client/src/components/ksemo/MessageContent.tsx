@@ -3,7 +3,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -21,7 +20,6 @@ import {
   Download,
   Ellipsis,
   ExternalLink,
-  History,
   Pencil,
   RotateCcw,
   Square,
@@ -122,7 +120,6 @@ export const MessageContent = memo(function MessageContent({
   onFeedback,
   onShare,
   onDelete,
-  onViewHistory,
 }: {
   message: KsemoMessage;
   onSpeak: (text: string, messageId: string) => void;
@@ -139,7 +136,6 @@ export const MessageContent = memo(function MessageContent({
   onFeedback?: (messageId: string, value: "up" | "down") => void;
   onShare?: (message: KsemoMessage) => void;
   onDelete?: (message: KsemoMessage) => void;
-  onViewHistory?: (message: KsemoMessage) => void;
 }) {
   const [copied, setCopied] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
@@ -430,12 +426,6 @@ export const MessageContent = memo(function MessageContent({
               action("Edit message", <Pencil className="size-4" />, () =>
                 onEdit(message)
               )}
-            {onViewHistory &&
-              action(
-                "View version history",
-                <History className="size-4" />,
-                () => onViewHistory(message)
-              )}
           </div>
         )}
         {!isUser && (message.content || message.status === "failed") && (
@@ -688,9 +678,6 @@ function MessageOverflow({
               Read aloud
             </DropdownMenuItem>
           )
-        )}
-        {(onReadAloud || onStopReading) && onDelete && (
-          <DropdownMenuSeparator />
         )}
         {onDelete && (
           <DropdownMenuItem

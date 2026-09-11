@@ -64,6 +64,7 @@ export const ConversationSidebar = memo(function ConversationSidebar({
   onNew,
   onSelect,
   onRename,
+  onRenameSubmit,
   onPin,
   onDuplicate,
   onArchive,
@@ -87,6 +88,7 @@ export const ConversationSidebar = memo(function ConversationSidebar({
   onNew: () => void;
   onSelect: (id: string) => void;
   onRename: (conversation: Conversation) => void;
+  onRenameSubmit: (id: string, title: string) => void;
   onPin: (conversation: Conversation) => void;
   onDuplicate: (conversation: Conversation) => void;
   onArchive: (conversation: Conversation) => void;
@@ -110,6 +112,25 @@ export const ConversationSidebar = memo(function ConversationSidebar({
     [conversations]
   );
   const compact = collapsed;
+
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+
+  const startRename = (conversation: Conversation) => {
+    setRenamingId(conversation.id);
+    setRenameValue(conversation.title);
+  };
+  const confirmRename = () => {
+    if (!renamingId) return;
+    const title = renameValue.trim();
+    if (title) onRenameSubmit(renamingId, title);
+    setRenamingId(null);
+    setRenameValue("");
+  };
+  const cancelRename = () => {
+    setRenamingId(null);
+    setRenameValue("");
+  };
 
   const asideRef = useRef<HTMLElement>(null);
   const navRef = useRef<HTMLElement>(null);
@@ -218,7 +239,7 @@ export const ConversationSidebar = memo(function ConversationSidebar({
                     variant="ghost"
                     size="icon"
                     onClick={onToggleCollapsed}
-                    className="absolute inset-0 size-8 rounded-xl opacity-0 transition-all duration-150 group-hover/brand:scale-100 group-hover/brand:opacity-100 group-focus-within/brand:scale-100 group-focus-within/brand:opacity-100 hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-ring active:scale-95"
+                    className="absolute inset-0 size-8 rounded-xl opacity-0 transition-all duration-150 group-hover/brand:scale-100 group-hover/brand:opacity-100 group-focus-within/brand:scale-100 group-focus-within/brand:opacity-100 hover:bg-sidebar-accent active:scale-95"
                     aria-label="Expand sidebar"
                   >
                     <ChevronsRight className="size-4" />
@@ -288,6 +309,12 @@ export const ConversationSidebar = memo(function ConversationSidebar({
                   activeConversationId={activeConversationId}
                   onSelect={onSelect}
                   onRename={onRename}
+                  renamingId={renamingId}
+                  renameValue={renameValue}
+                  onStartRename={startRename}
+                  onRenameValueChange={setRenameValue}
+                  onConfirmRename={confirmRename}
+                  onCancelRename={cancelRename}
                   onPin={onPin}
                   onDuplicate={onDuplicate}
                   onArchive={onArchive}
@@ -302,6 +329,12 @@ export const ConversationSidebar = memo(function ConversationSidebar({
                 activeConversationId={activeConversationId}
                 onSelect={onSelect}
                 onRename={onRename}
+                renamingId={renamingId}
+                renameValue={renameValue}
+                onStartRename={startRename}
+                onRenameValueChange={setRenameValue}
+                onConfirmRename={confirmRename}
+                onCancelRename={cancelRename}
                 onPin={onPin}
                 onDuplicate={onDuplicate}
                 onArchive={onArchive}
@@ -408,6 +441,12 @@ const ConversationGroup = memo(function ConversationGroup({
   activeConversationId,
   onSelect,
   onRename,
+  renamingId,
+  renameValue,
+  onStartRename,
+  onRenameValueChange,
+  onConfirmRename,
+  onCancelRename,
   onPin,
   onDuplicate,
   onArchive,
@@ -421,6 +460,12 @@ const ConversationGroup = memo(function ConversationGroup({
   activeConversationId: string | null;
   onSelect: (id: string) => void;
   onRename: (conversation: Conversation) => void;
+  renamingId: string | null;
+  renameValue: string;
+  onStartRename: (conversation: Conversation) => void;
+  onRenameValueChange: (value: string) => void;
+  onConfirmRename: () => void;
+  onCancelRename: () => void;
   onPin: (conversation: Conversation) => void;
   onDuplicate: (conversation: Conversation) => void;
   onArchive: (conversation: Conversation) => void;
@@ -455,6 +500,7 @@ const ConversationGroup = memo(function ConversationGroup({
             const isRowActive = activeConversationId === conversation.id;
             const isHovered = hoveredId === conversation.id;
             const isMenuOpen = openMenuId === conversation.id;
+            const isRenaming = renamingId === conversation.id;
             return (
               <div
                 key={conversation.id}
@@ -462,28 +508,43 @@ const ConversationGroup = memo(function ConversationGroup({
                 onMouseLeave={() => setHoveredId(null)}
                 className={cn(
                   "group flex items-center rounded-lg pr-0",
-                  (isRowActive || isHovered || isMenuOpen) && "bg-sidebar-accent"
+                  (isRowActive || isHovered || isMenuOpen) &&
+                    !isRenaming &&
+                    "bg-sidebar-accent"
                 )}
               >
-                <ConversationTitleButton
-                  conversation={conversation}
-                  onSelect={onSelect}
-                  isRowHovered={isHovered || isMenuOpen}
-                />
-                <ConversationActionsMenu
-                  conversation={conversation}
-                  isMenuOpen={isMenuOpen}
-                  onMenuOpenChange={open =>
-                    setOpenMenuId(open ? conversation.id : null)
-                  }
-                  onRename={onRename}
-                  onPin={onPin}
-                  onDuplicate={onDuplicate}
-                  onArchive={onArchive}
-                  onShare={onShare}
-                  onExport={onExport}
-                  onDelete={onDelete}
-                />
+                {isRenaming ? (
+                  <ConversationInlineRename
+                    value={renameValue}
+                    onChange={onRenameValueChange}
+                    onSave={() => {
+                      if (renameValue.trim()) onConfirmRename();
+                    }}
+                    onCancel={onCancelRename}
+                  />
+                ) : (
+                  <>
+                    <ConversationTitleButton
+                      conversation={conversation}
+                      onSelect={onSelect}
+                      isRowHovered={isHovered || isMenuOpen}
+                    />
+                    <ConversationActionsMenu
+                      conversation={conversation}
+                      isMenuOpen={isMenuOpen}
+                      onMenuOpenChange={open =>
+                        setOpenMenuId(open ? conversation.id : null)
+                      }
+                      onRename={() => onStartRename(conversation)}
+                      onPin={onPin}
+                      onDuplicate={onDuplicate}
+                      onArchive={onArchive}
+                      onShare={onShare}
+                      onExport={onExport}
+                      onDelete={onDelete}
+                    />
+                  </>
+                )}
               </div>
             );
           })}
@@ -495,6 +556,48 @@ const ConversationGroup = memo(function ConversationGroup({
         </div>
       )}
     </section>
+  );
+});
+
+const ConversationInlineRename = memo(function ConversationInlineRename({
+  value,
+  onChange,
+  onSave,
+  onCancel,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  onSave: () => void;
+  onCancel: () => void;
+}) {
+  const placeCaretAtEnd = (event: React.FocusEvent<HTMLInputElement>) => {
+    const input = event.currentTarget;
+    requestAnimationFrame(() => {
+      const end = input.value.length;
+      input.setSelectionRange(end, end);
+      input.scrollLeft = input.scrollWidth;
+    });
+  };
+  return (
+    <div className="flex min-w-0 flex-1 items-center gap-2 self-stretch py-2 pl-1 pr-0">
+      <MessageCircle className="size-[20px] shrink-0 text-foreground/70" />
+      <input
+        autoFocus
+        value={value}
+        onChange={event => onChange(event.target.value)}
+        onFocus={placeCaretAtEnd}
+        onBlur={() => onSave()}
+        onKeyDown={event => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            onSave();
+          }
+          if (event.key === "Escape") onCancel();
+        }}
+        aria-label="Rename conversation"
+        className="min-w-0 flex-1 bg-transparent text-sm font-medium text-foreground caret-foreground outline-none placeholder:text-muted-foreground"
+      />
+    </div>
   );
 });
 
@@ -672,7 +775,7 @@ const ConversationTitleButton = memo(function ConversationTitleButton({
     <button
       onClick={() => onSelect(conversation.id)}
       aria-label={conversation.title}
-      className="flex min-w-0 flex-1 items-center gap-2 self-stretch py-2 pl-1 pr-0 text-left text-[13px] leading-5"
+      className="flex min-w-0 flex-1 items-center gap-2 self-stretch py-2 pl-1 pr-0 text-left text-sm leading-5"
     >
       <MessageCircle className="size-[20px] shrink-0 text-foreground/70 transition-colors group-hover:text-foreground" />
       <Tooltip open={showTooltip}>

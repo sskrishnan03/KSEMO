@@ -20,7 +20,6 @@ import { startLogin } from "@/const";
 import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
 import {
-  FileText,
   Files,
   Menu,
   MoreHorizontal,
@@ -28,9 +27,8 @@ import {
   Trash2,
 } from "lucide-react";
 import { ShareIcon } from "../components/ksemo/icons";
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import React, { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { memo } from "react";
-import { toast } from "sonner";
 import { useLocation } from "wouter";
 import { ChatComposer } from "../components/ksemo/ChatComposer";
 import {
@@ -53,8 +51,6 @@ import { SettingsDialog } from "../components/ksemo/SettingsDialog";
 import { useGlobalShortcuts } from "../hooks/useGlobalShortcuts";
 import { ShareConversationDialog } from "../components/ksemo/ShareConversationDialog";
 import { ConfirmDeleteDialog } from "../components/ksemo/ConfirmDeleteDialog";
-import { KsemoTextDialogPanel } from "../components/ksemo/DialogPanels";
-import { MessageHistoryDialogPanel } from "../components/ksemo/MessageHistoryDialogPanel";
 import { useVoiceInput } from "../hooks/useVoiceInput";
 import { usePersistFn } from "../hooks/usePersistFn";
 import { WorkspacePanel } from "../components/ksemo/WorkspacePanel";
@@ -69,8 +65,6 @@ import { createPublicConversationUrl } from "../lib/ksemoInteraction";
 import { saveEditedUserMessageAndRegenerate } from "../lib/editRegeneration";
 import { buildStreamingDrafts } from "../lib/streamingDrafts";
 import { type CapabilityMode } from "@shared/capabilities";
-import { restoreUserMessageVersionAndRegenerate } from "../lib/historyRestoration";
-
 type StreamConversation = {
   conversationId: string;
   title: string;
@@ -193,7 +187,6 @@ export default function Home() {
   const isEditPreview = interactionPreview === "edit";
   const isEditRegeneratedPreview = interactionPreview === "editRegenerated";
   const isEditSavingPreview = interactionPreview === "editSaving";
-  const isHistoryPreview = interactionPreview === "history";
   const isSettingsPreview = interactionPreview === "settings";
   const isWorkspaceDeletePreview = interactionPreview === "workspaceDelete";
   const isAttachmentPreview = interactionPreview === "attachment";
@@ -241,7 +234,7 @@ export default function Home() {
   const [activeMode, setActiveMode] = useState<CapabilityMode>("chat");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsInitialTab, setSettingsInitialTab] = useState<
-    "account" | "security" | "appearance" | "shortcuts" | "data" | "memory" | "feedback"
+    "account" | "security" | "appearance" | "data" | "memory" | "feedback"
   >("account");
   const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(
     null
@@ -271,9 +264,6 @@ export default function Home() {
     null
   );
   const [editValue, setEditValue] = useState("");
-  const [historyMessage, setHistoryMessage] = useState<KsemoMessage | null>(
-    null
-  );
   const [deleteTarget, setDeleteTarget] = useState<{
     kind: "conversation" | "message";
     id: string;
@@ -390,10 +380,9 @@ export default function Home() {
   const preferenceMutation = trpc.preferences.update.useMutation({
     onSuccess: () => {
       utils.preferences.get.invalidate();
-      toast.success("Assistant settings saved");
       setSettingsOpen(false);
     },
-    onError: () => toast.error("Settings could not be saved."),
+    onError: () => {},
   });
   const voicePreferencesMutation = trpc.preferences.update.useMutation({
     onSuccess: () => {
@@ -444,7 +433,6 @@ export default function Home() {
   const archiveMutation = trpc.conversation.setArchived.useMutation({
     onSuccess: () => {
       utils.conversation.list.invalidate();
-      toast.success("Conversation archived");
     },
   });
   const pinMutation = trpc.conversation.setPinned.useMutation({
@@ -463,57 +451,37 @@ export default function Home() {
             : null
         );
         utils.conversation.list.invalidate();
-        toast.success(
-          data.isPublic ? "Public sharing enabled" : "Public sharing disabled"
-        );
       },
-      onError: () => toast.error("KSEMO could not update public sharing."),
+      onError: () => {},
     });
   const permanentDeleteMutation = trpc.conversation.remove.useMutation({
     onSuccess: () => {
       utils.conversation.list.invalidate();
-      toast.success("Conversation permanently deleted");
     },
   });
   const duplicateMutation = trpc.conversation.duplicate.useMutation({
     onSuccess: conversation => {
       utils.conversation.list.invalidate();
       setActiveConversationId(conversation.id);
-      toast.success("Conversation duplicated");
     },
   });
   const messageEditMutation = trpc.message.edit.useMutation({
     onSuccess: (_, variables) => {
       if (activeConversationId)
         utils.conversation.get.invalidate({ id: activeConversationId });
-      utils.message.history.invalidate({ id: variables.id });
-      toast.success("Message updated");
     },
-    onError: () => toast.error("KSEMO could not update that message."),
-  });
-  const messageHistoryQuery = trpc.message.history.useQuery(
-    { id: historyMessage?.id ?? "history-preview" },
-    { enabled: Boolean(historyMessage) }
-  );
-  const messageRestoreMutation = trpc.message.restoreVersion.useMutation({
-    onSuccess: (_, variables) => {
-      if (activeConversationId)
-        utils.conversation.get.invalidate({ id: activeConversationId });
-      utils.message.history.invalidate({ id: variables.id });
-    },
-    onError: () => toast.error("KSEMO could not restore that version."),
+    onError: () => {},
   });
   const messageFeedbackMutation = trpc.message.feedback.useMutation({
-    onSuccess: () => toast.success("Thanks for the feedback."),
-    onError: () => toast.error("Feedback could not be saved."),
+    onSuccess: () => {},
+    onError: () => {},
   });
   const messageRemoveMutation = trpc.message.remove.useMutation({
     onSuccess: () => {
       if (activeConversationId)
         utils.conversation.get.invalidate({ id: activeConversationId });
-      toast.success("Message permanently deleted");
     },
-    onError: () => toast.error("KSEMO could not delete that message."),
+    onError: () => {},
   });
   const composerFileUpload = trpc.workspace.files.upload.useMutation();
   const composerFileAttach =
@@ -521,7 +489,7 @@ export default function Home() {
   const voice = useVoiceInput({
     onTranscript: text =>
       setComposerValue(current => (current ? `${current} ${text}` : text)),
-    onError: message => toast.error(message),
+    onError: () => {},
   });
   // chatMessages is the single source of truth for the open conversation's
   // messages. The server query only seeds it once per conversation and is
@@ -717,9 +685,6 @@ export default function Home() {
           window.history.replaceState({}, "", window.location.pathname);
         })
         .catch(() => {
-          toast.error(
-            "That shared conversation is unavailable in this KSEMO account."
-          );
           window.history.replaceState({}, "", window.location.pathname);
           if (conversationQuery.data.length)
             setActiveConversationId(conversationQuery.data[0].id);
@@ -1258,7 +1223,6 @@ export default function Home() {
       flushPendingDeltas();
       if (!completedConversation) {
         setComposerValue(current => (current ? current : content));
-        if (failureMessage) toast.error(failureMessage);
         if (options.regenerateAssistantMessageId || options.replaceUserMessageId) {
           // The turn ids are already server-recognized; keep the layout intact
           // and mark the in-flight bubble as failed so Retry is available.
@@ -1280,8 +1244,6 @@ export default function Home() {
         return;
       }
 
-      if (failureMessage) toast.error(failureMessage);
-
       setChatMessages(current =>
         current.map(message =>
           message.role === "assistant" && message.status === "streaming"
@@ -1293,8 +1255,6 @@ export default function Home() {
             : message
         )
       );
-    } else if (failureMessage) {
-      toast.error(failureMessage);
     }
 
     if (completedConversation) {
@@ -1394,10 +1354,7 @@ export default function Home() {
       link.download = `${slug}.${format === "word" ? "doc" : "pdf"}`;
       link.click();
       URL.revokeObjectURL(url);
-      toast.success(`Conversation exported as ${format.toUpperCase()}`);
-    } catch {
-      toast.error("KSEMO could not export this conversation.");
-    }
+    } catch {}
   }
 
   function conversationShareUrl(token: string) {
@@ -1409,10 +1366,7 @@ export default function Home() {
     const url = conversationShareUrl(shareTarget.shareToken);
     try {
       await navigator.clipboard.writeText(url);
-      toast.success("Public conversation link copied");
-    } catch {
-      toast.error("KSEMO could not copy the conversation link.");
-    }
+    } catch {}
   }
 
   function openEmailShare() {
@@ -1458,41 +1412,6 @@ export default function Home() {
     setEditValue(message.content);
   }
 
-  async function restoreMessageVersion(versionId: string, content: string) {
-    const message = historyMessage;
-    if (!message) return;
-    try {
-      const result = await restoreUserMessageVersionAndRegenerate({
-        messageId: message.id,
-        versionId,
-        restoredContent: content,
-        messages: chatMessages,
-        restore: async (messageId, restoredVersionId) => {
-          await messageRestoreMutation.mutateAsync({
-            id: messageId,
-            versionId: restoredVersionId,
-          });
-        },
-        regenerate: async (restoredContent, assistantMessageId) => {
-          void sendMessage(restoredContent, {
-            regenerateAssistantMessageId: assistantMessageId,
-            replaceUserMessageId: message.id,
-          });
-        },
-      });
-      setHistoryMessage(null);
-      setEditingMessage(null);
-      setChatMessages(current =>
-        current.map(item =>
-          item.id === message.id ? { ...item, content } : item
-        )
-      );
-      if (!result.regenerated) toast.success("Message version restored.");
-    } catch {
-      // The mutation reports a recoverable error to the user.
-    }
-  }
-
   async function saveEditedMessage() {
     const message = editingMessage;
     const content = editValue.trim();
@@ -1525,7 +1444,6 @@ export default function Home() {
           item.id === message.id ? { ...item, content } : item
         )
       );
-      if (!result.regenerated) toast.success("Your message was updated.");
     } catch {
       // The mutation-level error message already informs the user.
     }
@@ -1545,7 +1463,6 @@ export default function Home() {
       }
     }
     if (message.role !== "assistant" || !sourceUser) {
-      toast.error("KSEMO could not find the user turn for this response.");
       return;
     }
     if (message.id.startsWith("local-")) {
@@ -1563,11 +1480,9 @@ export default function Home() {
 
   async function attachFromComposer(file: File) {
     if (file.size > 25 * 1024 * 1024 || !file.type) {
-      toast.error("Choose a recognized file smaller than 25 MB.");
       return;
     }
     if (hasDuplicateAttachment(attachmentNotices, file.name)) {
-      toast.info(`"${file.name}" is already attached.`);
       return;
     }
     try {
@@ -1611,16 +1526,11 @@ export default function Home() {
           },
         ]);
       }
-    } catch {
-      toast.error("KSEMO could not add that file.");
-    }
+    } catch {}
   }
 
   async function captureScreenshot() {
     if (!navigator.mediaDevices?.getDisplayMedia) {
-      toast.error(
-        "Screen capture is not supported in this browser."
-      );
       return;
     }
     let stream: MediaStream | null = null;
@@ -1631,7 +1541,6 @@ export default function Home() {
       });
       const track = stream.getVideoTracks()[0];
       if (!track) {
-        toast.error("Screen capture failed. Please try again.");
         return;
       }
       const video = document.createElement("video");
@@ -1649,7 +1558,6 @@ export default function Home() {
       const ctx = canvas.getContext("2d");
       if (!ctx) {
         track.stop();
-        toast.error("Screen capture failed. Please try again.");
         return;
       }
       ctx.drawImage(video, 0, 0);
@@ -1659,7 +1567,6 @@ export default function Home() {
         canvas.toBlob(resolve, "image/png", 0.92)
       );
       if (!blob) {
-        toast.error("Screen capture failed. Please try again.");
         return;
       }
       const timestamp = Date.now();
@@ -1677,10 +1584,8 @@ export default function Home() {
         error instanceof Error ? error.name : String(error);
       if (name === "NotAllowedError") return;
       if (name === "NotReadableError") {
-        toast.error("Could not read the captured screen. Please try again.");
         return;
       }
-      toast.error("Screen capture failed. Please try again.");
     }
   }
 
@@ -1721,18 +1626,6 @@ export default function Home() {
     setAttachmentNotices(current =>
       appendUniqueAttachments(current, newAttachments)
     );
-    const existing = new Set(
-      attachmentNotices.map(item => item.name.trim().toLowerCase())
-    );
-    const addedCount = newAttachments.filter(file => {
-      const key = file.name.trim().toLowerCase();
-      if (existing.has(key)) return false;
-      existing.add(key);
-      return true;
-    }).length;
-    if (addedCount === 0) {
-      toast.info("Those files are already attached.");
-    }
   }
 
   function startChatWithLibraryFiles(
@@ -1761,9 +1654,6 @@ export default function Home() {
         linked: false,
       }))
     );
-    toast.success(
-      `${unique.length} ${unique.length === 1 ? "file is" : "files are"} ready for a new chat.`
-    );
   }
 
   function selectConversation(id: string) {
@@ -1789,7 +1679,6 @@ export default function Home() {
 
   function speak(text: string, messageId: string) {
     if (!("speechSynthesis" in window)) {
-      toast.error("Speech playback is not supported in this browser.");
       return;
     }
     window.speechSynthesis.cancel();
@@ -1847,7 +1736,6 @@ export default function Home() {
   const stableRegenerateMessage = usePersistFn(regenerateMessage);
   const stableShareMessage = usePersistFn(shareMessage);
   const stableDeleteMessage = usePersistFn(deleteMessage);
-  const stableRestoreMessageVersion = usePersistFn(restoreMessageVersion);
   const stableVoiceAction = usePersistFn(
     voice.state === "recording" ? voice.stop : voice.start
   );
@@ -1863,9 +1751,6 @@ export default function Home() {
     }
     utils.conversation.list.invalidate();
   });
-  const stableOnViewHistory = usePersistFn(
-    (userMessage: KsemoMessage) => setHistoryMessage(userMessage)
-  );
   const stableOnFeedback = usePersistFn(
     (messageId: string, value: "up" | "down") =>
       messageFeedbackMutation.mutate({ messageId, value })
@@ -1886,6 +1771,9 @@ export default function Home() {
       setRenameValue(conversation.title);
     }
   );
+  const stableRenameSubmit = usePersistFn((id: string, title: string) => {
+    renameMutation.mutate({ id, title });
+  });
   const stableOnDuplicate = usePersistFn(
     (conversation: { id: string }) =>
       duplicateMutation.mutate({ id: conversation.id })
@@ -2011,12 +1899,6 @@ export default function Home() {
     if (!open) setEditingMessage(null);
   });
   const stableEditAction = usePersistFn(() => void saveEditedMessage());
-  const stableEditSecondaryAction = usePersistFn(() => {
-    if (editingMessage) setHistoryMessage(editingMessage);
-  });
-  const stableHistoryOpen = usePersistFn((open: boolean) => {
-    if (!open) setHistoryMessage(null);
-  });
   const stableDeleteDialogOpen = usePersistFn((open: boolean) => {
     if (!open) setDeleteTarget(null);
   });
@@ -2099,6 +1981,7 @@ export default function Home() {
         onNew={stableNewChat}
         onSelect={stableSelectConversation}
         onRename={stableOnRename}
+        onRenameSubmit={stableRenameSubmit}
         onDuplicate={stableOnDuplicate}
         onArchive={stableOnArchive}
         onPin={stableOnPin}
@@ -2298,7 +2181,6 @@ const activeFileGen =
                         onRetry={stableRegenerateMessage}
                         onShare={stableShareMessage}
                         onDelete={stableDeleteMessage}
-                        onViewHistory={stableOnViewHistory}
                         onFeedback={stableOnFeedback}
                       />
                       </Fragment>
@@ -2416,7 +2298,7 @@ const activeFileGen =
         open={Boolean(editingMessage) || isEditPreview}
         onOpenChange={stableEditDialogOpen}
         title="Edit message"
-        description="Your earlier version stays safely recorded. Saving updates the following KSEMO response from this exact edited message."
+        description="Your earlier version stays safely recorded."
         label="Message"
         value={
           isEditPreview ? "Can you make this answer more concise?" : editValue
@@ -2425,29 +2307,6 @@ const activeFileGen =
         multiline
         actionLabel="Save"
         onAction={stableEditAction}
-        secondaryActionLabel={
-          editingMessage ? "View version history" : undefined
-        }
-        onSecondaryAction={stableEditSecondaryAction}
-      />
-      <MessageHistoryDialog
-        open={Boolean(historyMessage) || isHistoryPreview}
-        onOpenChange={stableHistoryOpen}
-        versions={
-          isHistoryPreview
-            ? [
-                {
-                  id: "version-preview",
-                  content:
-                    "Could you make this plan concise and include the top three priorities?",
-                  createdAt: new Date("2026-08-20T10:00:00Z"),
-                },
-              ]
-            : (messageHistoryQuery.data ?? [])
-        }
-        loading={messageHistoryQuery.isLoading && !isHistoryPreview}
-        restoring={messageRestoreMutation.isPending}
-        onRestore={stableRestoreMessageVersion}
       />
       <ConfirmDeleteDialog
         open={Boolean(deleteTarget) || isDeletePreview}
@@ -2522,72 +2381,80 @@ const KsemoTextDialog = memo(function KsemoTextDialog({
   secondaryActionLabel?: string;
   onSecondaryAction?: () => void;
 }) {
+  const placeCaretAtEnd = (event: React.FocusEvent<HTMLInputElement>) => {
+    const input = event.currentTarget;
+    requestAnimationFrame(() => {
+      const end = input.value.length;
+      input.setSelectionRange(end, end);
+      input.scrollLeft = input.scrollWidth;
+    });
+  };
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="rounded-2xl sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="text-xl font-semibold tracking-[-0.02em]">
-            {title}
-          </DialogTitle>
-          <DialogDescription>{description}</DialogDescription>
-        </DialogHeader>
-        {secondaryActionLabel && onSecondaryAction && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-fit px-0 text-xs text-muted-foreground hover:bg-transparent hover:text-foreground"
-            onClick={onSecondaryAction}
-          >
-            {secondaryActionLabel}
-          </Button>
-        )}
-        <KsemoTextDialogPanel
-          label={label}
-          value={value}
-          onValueChange={onValueChange}
-          multiline={multiline}
-          actionLabel={actionLabel}
-          onCancel={() => onOpenChange(false)}
-          onAction={onAction}
-        />
-      </DialogContent>
-    </Dialog>
-  );
-});
-
-const MessageHistoryDialog = memo(function MessageHistoryDialog({
-  open,
-  onOpenChange,
-  versions,
-  loading,
-  restoring,
-  onRestore,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  versions: Array<{ id: string; content: string; createdAt: Date }>;
-  loading: boolean;
-  restoring: boolean;
-  onRestore: (id: string, content: string) => void;
-}) {
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[80dvh] overflow-y-auto rounded-2xl sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle className="text-xl font-semibold tracking-[-0.02em]">
-            Message version history
-          </DialogTitle>
-          <DialogDescription>
-            Restoring a prior version preserves the current text as a new
-            version. KSEMO will safely regenerate only the following response.
-          </DialogDescription>
-        </DialogHeader>
-        <MessageHistoryDialogPanel
-          versions={versions}
-          loading={loading}
-          restoring={restoring}
-          onRestore={onRestore}
-        />
+      <DialogContent className="rounded-2xl border bg-background sm:max-w-sm">
+        <div className="py-1">
+          <div className="space-y-1">
+            <h2 className="text-lg font-semibold tracking-[-0.02em]">{title}</h2>
+            {description && (
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                {description}
+              </p>
+            )}
+          </div>
+          <div className="mt-4">
+            {multiline ? (
+              <textarea
+                id="ksemo-dialog-value"
+                value={value}
+                onChange={event => onValueChange(event.target.value)}
+                autoFocus
+                className="min-h-32 w-full resize-none rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:border-foreground/70 transition-colors"
+              />
+            ) : (
+              <input
+                id="rename-conversation-input"
+                value={value}
+                onChange={event => onValueChange(event.target.value)}
+                maxLength={120}
+                autoFocus
+                onFocus={placeCaretAtEnd}
+                onKeyDown={event => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    if (value.trim()) onAction();
+                  }
+                }}
+                className="h-11 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none focus-visible:border-foreground/70 transition-colors"
+              />
+            )}
+          </div>
+          <div className="mt-5 flex items-center justify-end gap-2">
+            {secondaryActionLabel && onSecondaryAction && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="mr-auto h-9 rounded-lg px-4 text-muted-foreground hover:text-foreground"
+                onClick={onSecondaryAction}
+              >
+                {secondaryActionLabel}
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              onClick={() => onOpenChange(false)}
+              className="h-9 rounded-lg px-4"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={onAction}
+              disabled={!value.trim()}
+              className="h-9 rounded-lg px-5 bg-foreground text-background hover:bg-foreground/90"
+            >
+              {actionLabel}
+            </Button>
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
   );

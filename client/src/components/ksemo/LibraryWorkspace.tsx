@@ -27,6 +27,7 @@ import {
   Grid2X2,
   Library,
   List,
+  ListChecks,
   MessageSquareText,
   MoreVertical,
   Pencil,
@@ -53,7 +54,6 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { toast } from "sonner";
 
 export type LibraryFilter = "all" | "favorites" | "images" | "files";
 export type LibraryView = "grid" | "list";
@@ -153,9 +153,7 @@ export function LibraryWorkspace({
   }, [initialFileId, filesQuery.data]);
   const uploadMutation = trpc.workspace.files.upload.useMutation({
     onSuccess: invalidateFiles,
-    onError: error => {
-      toast.error(error.message || "KSEMO could not add that file.");
-    },
+    onError: () => {},
   });
   const favoriteMutation = trpc.workspace.files.setFavorite.useMutation({
     // Optimistic: flip the star instantly, roll back only on failure.
@@ -172,17 +170,15 @@ export function LibraryWorkspace({
     onError: (_error, _variables, context) => {
       if (context?.previous)
         utils.workspace.files.list.setData(undefined, context.previous);
-      toast.error("KSEMO could not update that favorite.");
     },
     onSettled: () => utils.workspace.files.list.invalidate(),
   });
   const removeMutation = trpc.workspace.files.remove.useMutation({
-    onError: () => toast.error("KSEMO could not remove that file."),
+    onError: () => {},
   });
   const renameMutation = trpc.workspace.files.rename.useMutation({
     onSuccess: () => invalidateFiles(),
-    onError: error =>
-      toast.error(error.message || "KSEMO could not rename that file."),
+    onError: () => {},
   });
   const allFiles = (filesQuery.data ?? []) as LibraryWorkspaceFile[];
   const files = useMemo(
@@ -203,22 +199,11 @@ export function LibraryWorkspace({
 
     const oversized = picked.filter(file => file.size > MAX_UPLOAD_BYTES);
     if (oversized.length > 0) {
-      toast.error(
-        `${oversized.length} ${oversized.length === 1 ? "file exceeds" : "files exceed"} the 25 MB limit.`
-      );
       return;
     }
 
     const unsupported = picked.filter(file => !isSupportedUpload(file));
     if (unsupported.length > 0) {
-      toast.error(
-        `Unsupported: ${unsupported
-          .slice(0, 3)
-          .map(file => file.name)
-          .join(
-            ", "
-          )}${unsupported.length > 3 ? "…" : ""}. PDF, Word, Excel, PowerPoint, text, data, and image files are supported.`
-      );
       return;
     }
 
@@ -231,7 +216,7 @@ export function LibraryWorkspace({
             dataBase64,
           })
         )
-        .catch(() => toast.error(`Could not read ${file.name}`));
+        .catch(() => {});
     }
   }
 
@@ -377,10 +362,8 @@ export function LibraryWorkspace({
                 Library
               </h1>
             </div>
-            <p className="mt-1.5 max-w-xl text-sm leading-6 text-muted-foreground">
-              Your private space for files and images. Documents are analyzed so
-              you can ask questions about them in chat. Select one or more items
-              to chat with them together.
+            <p className="mt-1.5 max-w-xl text-sm text-muted-foreground">
+              Your private space for files and images you can chat about.
             </p>
           </div>
           <div className="flex shrink-0 flex-wrap gap-2">
@@ -440,32 +423,19 @@ export function LibraryWorkspace({
             >
               <ViewButton
                 label="Grid"
-                icon={<Grid2X2 className="size-3.5" />}
+                icon={<Grid2X2 className="size-4" />}
                 active={view === "grid"}
                 onClick={() => setView("grid")}
               />
               <ViewButton
                 label="List"
-                icon={<List className="size-3.5" />}
+                icon={<List className="size-4" />}
                 active={view === "list"}
                 onClick={() => setView("list")}
               />
             </div>
           </div>
         </section>
-
-        <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            className="rounded-lg"
-            onClick={selectVisibleFiles}
-            disabled={!files.length || allVisibleSelected}
-          >
-            Select visible
-          </Button>
-        </div>
 
         {selectedFiles.length > 0 && (
           <section
@@ -479,34 +449,45 @@ export function LibraryWorkspace({
                 {selectedFiles.length === 1 ? "item" : "items"} selected
               </p>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-center gap-1.5">
               <Button
+                type="button"
                 size="sm"
-                className="rounded-lg"
-                onClick={chatWithSelected}
+                variant="ghost"
+                className="rounded-lg bg-muted/30 hover:bg-muted/60 hover:text-foreground"
+                onClick={selectVisibleFiles}
+                disabled={allVisibleSelected}
               >
-                <MessageSquareText className="mr-1.5 size-3.5" />
-                Chat with selected
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="rounded-lg hover:bg-destructive/10 hover:text-destructive"
-                onClick={() => setDeleteTarget(selectedFiles)}
-              >
-                <Trash2 className="mr-1.5 size-3.5" />
-                {selectedFiles.length === allFiles.length && allFiles.length > 1
-                  ? "Delete all"
-                  : "Delete selected"}
+                <ListChecks className="size-3.5" />
+                Select all
               </Button>
               <Button
                 size="sm"
                 variant="ghost"
-                className="rounded-lg"
+                className="rounded-lg bg-muted/30 hover:bg-muted/60 hover:text-foreground"
                 onClick={() => setSelectedIds(new Set())}
               >
-                <X className="mr-1.5 size-3.5" />
+                <X className="size-3.5" />
                 Clear
+              </Button>
+              <Button
+                size="sm"
+                className="rounded-lg bg-foreground text-background hover:bg-foreground/90"
+                onClick={chatWithSelected}
+              >
+                <MessageSquareText className="size-3.5" />
+                Chat
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="rounded-lg bg-muted/30 hover:bg-destructive/10 hover:text-destructive"
+                onClick={() => setDeleteTarget(selectedFiles)}
+              >
+                <Trash2 className="size-3.5" />
+                {selectedFiles.length === allFiles.length && allFiles.length > 1
+                  ? "Remove all"
+                  : "Remove"}
               </Button>
             </div>
           </section>
@@ -562,7 +543,7 @@ export function LibraryWorkspace({
           if (!open) setRenameTarget(null);
         }}
       >
-        <DialogContent className="rounded-2xl sm:max-w-md">
+        <DialogContent className="rounded-2xl border bg-background sm:max-w-sm">
           {renameTarget && (
             <RenameFilePanel
               file={renameTarget}
@@ -598,7 +579,7 @@ export function LibraryWorkspace({
         title={
           deleteTarget?.length === 1
             ? "Delete this file?"
-            : "Delete selected files?"
+            : "Remove these files from your library?"
         }
         description={
           deleteTarget?.length === 1
@@ -676,7 +657,7 @@ function SelectionCircle({ selected }: { selected: boolean }) {
         "flex size-5 items-center justify-center rounded-full border transition-colors",
         selected
           ? "border-foreground bg-foreground text-background"
-          : "border-muted-foreground/60 bg-background text-transparent"
+          : "border-foreground/40 bg-foreground/5 text-transparent"
       )}
     >
       <Check className="size-3" />
@@ -693,7 +674,7 @@ function EmptyLibrary({
   return (
     <div className="grid min-h-72 place-items-center rounded-2xl border border-dashed border-border bg-muted/20 p-7 text-center">
       <div>
-        <FolderOpen className="mx-auto size-7 text-muted-foreground" />
+        <FolderOpen className="mx-auto size-10 text-muted-foreground" />
         <h2 className="mt-4 text-base font-medium">
           {hasQuery ? "No items match this view" : "Your Library is ready"}
         </h2>
@@ -736,12 +717,12 @@ function FilePreview({
   if (compact)
     return (
       <visual.Icon
-        className={cn("size-9 shrink-0", visual.className)}
+        className={cn("size-10 shrink-0", visual.className)}
       />
     );
   return (
     <span className="flex size-full items-center justify-center bg-muted/45">
-      <visual.Icon className={cn("size-9", visual.className)} />
+      <visual.Icon className={cn("size-12", visual.className)} />
     </span>
   );
 }
@@ -780,10 +761,10 @@ const LibraryGridCard = memo(function LibraryGridCard({
       aria-label={`${selected ? "Deselect" : "Select"} ${file.filename}`}
       aria-pressed={selected}
       className={cn(
-        "group relative cursor-pointer overflow-hidden rounded-2xl border bg-card transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-        selected
-          ? "border-foreground ring-1 ring-foreground/30"
-          : "border-border hover:border-foreground/30"
+"group relative cursor-pointer overflow-hidden rounded-2xl border bg-card transition-colors focus-visible:outline-none",
+          selected
+            ? "border-foreground ring-1 ring-foreground/40"
+            : "border-border hover:border-foreground/60"
       )}
     >
       <button
@@ -793,7 +774,7 @@ const LibraryGridCard = memo(function LibraryGridCard({
           onToggle(file.id);
         }}
         className={cn(
-          "pointer-events-none absolute left-2.5 top-2.5 z-10 rounded-full bg-background/90 p-0.5 shadow-sm transition-[opacity,transform] duration-150 group-hover:pointer-events-auto group-hover:scale-100 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:scale-100 group-focus-within:opacity-100 group-active:pointer-events-auto group-active:scale-100 group-active:opacity-100 focus-visible:pointer-events-auto focus-visible:scale-100 focus-visible:opacity-100 max-lg:pointer-events-auto max-lg:scale-100 max-lg:opacity-100",
+          "pointer-events-none absolute left-2.5 top-2.5 z-10 rounded-full p-0.5 transition-[opacity,transform] duration-150 group-hover:pointer-events-auto group-hover:scale-100 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:scale-100 group-focus-within:opacity-100 group-active:pointer-events-auto group-active:scale-100 group-active:opacity-100 focus-visible:pointer-events-auto focus-visible:scale-100 focus-visible:opacity-100 max-lg:pointer-events-auto max-lg:scale-100 max-lg:opacity-100",
           selected ? "scale-100 opacity-100" : "scale-90 opacity-0"
         )}
         aria-label={`${selected ? "Deselect" : "Select"} ${file.filename}`}
@@ -929,7 +910,7 @@ const LibraryListRow = memo(function LibraryListRow({
       aria-label={`${selected ? "Deselect" : "Select"} ${file.filename}`}
       aria-pressed={selected}
       className={cn(
-        "group flex cursor-pointer items-center gap-3 p-3 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        "group flex cursor-pointer items-center gap-3 p-3 transition-colors focus-visible:outline-none",
         selected && "bg-muted/65"
       )}
     >
@@ -1086,37 +1067,43 @@ function RenameFilePanel({
     });
   };
   return (
-    <div className="space-y-5 py-3">
-      <div className="text-left">
-        <h2 className="text-xl font-semibold tracking-[-0.02em]">
+    <div className="py-1">
+      <div className="space-y-1">
+        <h2 className="text-lg font-semibold tracking-[-0.02em]">
           Rename file
         </h2>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <p className="text-sm leading-relaxed text-muted-foreground">
           Give this file a new name. Its format will stay the same.
         </p>
       </div>
-      <Input
-        autoFocus
-        value={file.filename}
-        onChange={event => onValueChange(event.target.value)}
-        onFocus={handleFocus}
-        onKeyDown={event => {
-          if (event.key === "Enter") {
-            event.preventDefault();
-            if (file.filename.trim()) onSave();
-          }
-        }}
-        aria-label="New file name"
-        className="h-11 rounded-xl text-base"
-      />
-      <div className="flex justify-end gap-2">
-        <Button variant="ghost" onClick={onCancel} className="h-10 rounded-xl">
+      <div className="mt-4">
+        <Input
+          autoFocus
+          value={file.filename}
+          onChange={event => onValueChange(event.target.value)}
+          onFocus={handleFocus}
+          onKeyDown={event => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              if (file.filename.trim()) onSave();
+            }
+          }}
+          aria-label="New file name"
+          className="h-11 rounded-xl text-base"
+        />
+      </div>
+      <div className="mt-5 flex items-center justify-end gap-2">
+        <Button
+          variant="ghost"
+          onClick={onCancel}
+          className="h-9 rounded-lg px-4"
+        >
           Cancel
         </Button>
         <Button
           onClick={onSave}
           disabled={!file.filename.trim() || busy}
-          className="h-10 rounded-xl"
+          className="h-9 rounded-lg bg-foreground px-5 text-background hover:bg-foreground/90"
         >
           {busy ? "Renaming…" : "Save"}
         </Button>
@@ -1137,9 +1124,8 @@ function ShareFilePanel({
   async function copyLink() {
     try {
       await navigator.clipboard.writeText(shareUrl);
-      toast.success("Link copied to clipboard");
     } catch {
-      toast.error("Could not copy the link.");
+      // ignore copy failure
     }
   }
   function emailLink() {

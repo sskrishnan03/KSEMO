@@ -27,7 +27,6 @@ import {
 import { useTheme, type ThemeMode } from "@/contexts/ThemeContext";
 import { trpc } from "@/lib/trpc";
 import { createPublicConversationUrl } from "@/lib/ksemoInteraction";
-import { toast } from "sonner";
 import { ConfirmDeleteDialog } from "./ConfirmDeleteDialog";
 import {
   Archive,
@@ -38,7 +37,6 @@ import {
   ExternalLink,
   HelpCircle,
   KeyRound,
-  Keyboard,
   Lightbulb,
   Link2,
   LogOut,
@@ -82,7 +80,6 @@ type SettingsTab =
   | "account"
   | "security"
   | "appearance"
-  | "shortcuts"
   | "data"
   | "memory"
   | "feedback";
@@ -109,7 +106,6 @@ const settingsNavItems: Array<{
   { id: "account", label: "Account", icon: User },
   { id: "security", label: "Security", icon: ShieldCheck },
   { id: "appearance", label: "Appearance", icon: Palette },
-  { id: "shortcuts", label: "Shortcuts", icon: Keyboard },
   { id: "data", label: "Data Control", icon: Trash2 },
   { id: "memory", label: "Memory", icon: Brain },
   { id: "feedback", label: "Feedback", icon: MessageSquare },
@@ -175,22 +171,6 @@ const settingsSearchIndex: Array<{
     tab: "appearance",
     label: "Theme",
     hint: "Appearance",
-  },
-
-  {
-    tab: "shortcuts",
-    label: "Keyboard shortcuts",
-    hint: "Shortcuts",
-  },
-  {
-    tab: "shortcuts",
-    label: "Cmd+K Focus Search Input",
-    hint: "Shortcuts",
-  },
-  {
-    tab: "shortcuts",
-    label: "Global hotkeys and navigation",
-    hint: "Shortcuts",
   },
 
   {
@@ -320,14 +300,14 @@ function SettingsSearch({
           onKeyDown={onKeyDown}
           placeholder="Search settings…"
           aria-label="Search settings"
-          className="h-10 w-full rounded-xl border border-border bg-muted/40 pr-9 pl-9 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-primary/40 focus:ring-2 focus:ring-primary/20"
+          className="h-10 w-full rounded-xl border border-border bg-muted/40 pr-9 pl-9 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-foreground/70"
         />
         {query && (
           <button
             type="button"
             onClick={() => setQuery("")}
             aria-label="Clear settings search"
-            className="absolute top-1/2 right-2 flex size-6 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+            className="absolute top-1/2 right-2 flex size-6 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground"
           >
             <X className="size-3.5" />
           </button>
@@ -409,18 +389,13 @@ export const SettingsDialog = memo(function SettingsDialog({
   const [confirmDeleteAccount, setConfirmDeleteAccount] = useState(false);
   const utils = trpc.useUtils();
   const removeAllMutation = trpc.conversation.removeAll.useMutation({
-    onSuccess: result => {
+    onSuccess: () => {
       utils.conversation.list.invalidate();
-      toast.success(
-        result.removed === 1
-          ? "1 chat deleted"
-          : `${result.removed} chats deleted`
-      );
       setConfirmDeleteAll(false);
       onOpenChange(false);
       onAllChatsDeleted();
     },
-    onError: () => toast.error("Could not delete all chats."),
+    onError: () => {},
   });
   const deleteAccountMutation = trpc.auth.deleteAccount.useMutation({
     onSuccess: () => {
@@ -430,9 +405,6 @@ export const SettingsDialog = memo(function SettingsDialog({
     },
     onError: () => {
       setConfirmDeleteAccount(false);
-      toast.error(
-        "Your account could not be deleted right now. Please try again."
-      );
     },
   });
 
@@ -525,18 +497,6 @@ export const SettingsDialog = memo(function SettingsDialog({
               )}
               {activeTab === "security" && <SecuritySection user={user} />}
               {activeTab === "appearance" && <AppearanceSection />}
-              {activeTab === "shortcuts" && (
-                <ShortcutsSection
-                  onTryFocusComposer={() => {
-                    onOpenChange(false);
-                    setTimeout(() => {
-                      document
-                        .getElementById("ksemo-composer-textarea")
-                        ?.focus();
-                    }, 150);
-                  }}
-                />
-              )}
               {activeTab === "data" && (
                 <DataSection
                   onOpenArchived={() => setArchivedOpen(true)}
@@ -612,7 +572,6 @@ function AccountSection({
     },
     onError: () => {
       setSaveState("idle");
-      toast.error("Could not save your name.");
     },
   });
   useEffect(() => {
@@ -730,7 +689,6 @@ function SecuritySection({ user }: { user: User }) {
 
   const changePasswordMutation = trpc.auth.changePassword.useMutation({
     onSuccess: () => {
-      toast.success("Password updated. Use it the next time you sign in.");
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
@@ -738,7 +696,6 @@ function SecuritySection({ user }: { user: User }) {
     },
     onError: error => {
       setFormError(error.message);
-      toast.error(error.message);
     },
   });
 
@@ -751,12 +708,10 @@ function SecuritySection({ user }: { user: User }) {
   const handleSubmitPassword = () => {
     if (newPassword !== confirmPassword) {
       setFormError("The new password and its confirmation don't match.");
-      toast.error("The new password and its confirmation don't match.");
       return;
     }
     if (newPassword === currentPassword) {
       setFormError("New password must be different from your current one.");
-      toast.error("New password must be different from your current one.");
       return;
     }
     setFormError(null);
@@ -1416,19 +1371,16 @@ function DataSection({
         link.click();
         link.remove();
         URL.revokeObjectURL(url);
-        toast.success("Your data export is ready to download.");
-      } else {
-        toast.error("Could not export your data right now.");
       }
     } catch {
-      toast.error("Could not export your data right now.");
+      // silent
     } finally {
       setExportBusy(false);
     }
   };
 
   const manageButtonClass =
-    "shrink-0 rounded-lg bg-foreground px-3 py-1.5 text-[11px] font-semibold text-background transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
+    "shrink-0 rounded-lg bg-foreground px-3 py-1.5 text-[11px] font-semibold text-background transition-opacity hover:opacity-90 focus-visible:outline-none";
 
   return (
     <div className="space-y-4">
@@ -1486,7 +1438,7 @@ function DataSection({
             type="button"
             disabled={exportBusy}
             onClick={() => void handleExport()}
-            className="shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-foreground px-3 py-1.5 text-[11px] font-semibold text-background transition-opacity hover:opacity-90 disabled:pointer-events-none disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            className="shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-foreground px-3 py-1.5 text-[11px] font-semibold text-background transition-opacity hover:opacity-90 disabled:pointer-events-none disabled:opacity-60 focus-visible:outline-none"
           >
             {exportBusy ? "Exporting…" : "Export"}
           </button>
@@ -1505,7 +1457,7 @@ function DataSection({
         <button
           type="button"
           onClick={onDeleteAll}
-          className="shrink-0 rounded-lg bg-destructive px-3 py-1.5 text-[11px] font-semibold text-destructive-foreground transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          className="shrink-0 rounded-lg bg-destructive px-3 py-1.5 text-[11px] font-semibold text-destructive-foreground transition-opacity hover:opacity-90 focus-visible:outline-none"
         >
           Delete all
         </button>
@@ -1530,14 +1482,11 @@ function FeedbackSection() {
 
   const sendFeedback = trpc.feedback.send.useMutation({
     onSuccess: () => {
-      toast.success("Thanks for your feedback!");
       setCategory("");
       setFeedbackText("");
       setSubmitted(true);
     },
-    onError: error => {
-      toast.error(error.message || "Could not send your feedback.");
-    },
+    onError: () => {},
   });
 
   const handleSubmit = () => {
@@ -1657,17 +1606,15 @@ function ManagedChatsDialog({
   const restoreMutation = trpc.conversation.setArchived.useMutation({
     onSuccess: () => {
       utils.conversation.list.invalidate();
-      toast.success("Chat restored to your sidebar");
     },
-    onError: () => toast.error("Could not restore chat."),
+    onError: () => {},
   });
   const deleteMutation = trpc.conversation.remove.useMutation({
     onSuccess: () => {
       utils.conversation.list.invalidate();
       if (deleteTarget) setDeleteTarget(null);
-      toast.success("Chat deleted permanently");
     },
-    onError: () => toast.error("Could not delete chat."),
+    onError: () => {},
   });
   const conversations = (chatsQuery.data ?? []) as Array<{
     id: string;
@@ -1804,17 +1751,15 @@ function SharedChatsDialog({
   const unpublishMutation = trpc.conversation.configurePublicShare.useMutation({
     onSuccess: () => {
       utils.conversation.list.invalidate();
-      toast.success("Chat is no longer shared");
     },
-    onError: () => toast.error("Could not stop sharing this chat."),
+    onError: () => {},
   });
   const deleteMutation = trpc.conversation.remove.useMutation({
     onSuccess: () => {
       utils.conversation.list.invalidate();
       if (deleteTarget) setDeleteTarget(null);
-      toast.success("Chat deleted permanently");
     },
-    onError: () => toast.error("Could not delete chat."),
+    onError: () => {},
   });
   const conversations = (chatsQuery.data ?? []) as Array<{
     id: string;
@@ -1836,9 +1781,8 @@ function SharedChatsDialog({
       await navigator.clipboard.writeText(
         createPublicConversationUrl(window.location.origin, shareToken)
       );
-      toast.success("Link copied to clipboard");
     } catch {
-      toast.error("Could not copy the link");
+      // silent
     } finally {
       setCopyPending(false);
     }
@@ -1957,150 +1901,5 @@ function SharedChatsDialog({
         }}
       />
     </>
-  );
-}
-
-function ShortcutsSection({
-  onTryFocusComposer,
-}: {
-  onTryFocusComposer?: () => void;
-}) {
-  const isMac =
-    typeof navigator !== "undefined" &&
-    navigator.platform.toUpperCase().indexOf("MAC") >= 0;
-  const modKey = isMac ? "⌘" : "Ctrl";
-
-  const categories = [
-    {
-      title: "Core Navigation & Input",
-      items: [
-        {
-          label: "Focus Search / Chat Input",
-          keys: [modKey, "K"],
-          description:
-            "Instantly jump to the message input or active search bar from anywhere.",
-          badge: "Most Used",
-        },
-        {
-          label: "Open Keyboard Shortcuts",
-          keys: [modKey, "/"],
-          description: "Open this keyboard shortcuts reference guide instantly.",
-        },
-        {
-          label: "Open Settings",
-          keys: [modKey, ","],
-          description:
-            "Open the account, appearance, and system settings dialog.",
-        },
-        {
-          label: "Toggle Sidebar",
-          keys: [modKey, "B"],
-          description: "Expand or collapse the conversation history sidebar.",
-        },
-        {
-          label: "New Conversation",
-          keys: [modKey, "Shift", "O"],
-          description: "Start a fresh chat conversation.",
-        },
-      ],
-    },
-    {
-      title: "Studio File Creation Modes",
-      items: [
-        {
-          label: "PDF Document Studio",
-          keys: [modKey, "Shift", "P"],
-          description:
-            "Switch composer to generate styled, print-ready PDF documents.",
-        },
-        {
-          label: "Word (.docx) Studio",
-          keys: [modKey, "Shift", "D"],
-          description:
-            "Switch composer to create Microsoft Word editable documents.",
-        },
-        {
-          label: "Excel (.xlsx) Studio",
-          keys: [modKey, "Shift", "X"],
-          description:
-            "Switch composer to build structured multi-sheet workbooks.",
-        },
-        {
-          label: "PowerPoint (.pptx) Studio",
-          keys: [modKey, "Shift", "S"],
-          description:
-            "Switch composer to craft professional slide presentation decks.",
-        },
-      ],
-    },
-  ];
-
-  return (
-    <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h3 className="text-base font-semibold tracking-[-0.02em]">
-            Keyboard Shortcuts
-          </h3>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Speed up your workflow and navigate KSEMO with global hotkeys.
-          </p>
-        </div>
-        {onTryFocusComposer && (
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={onTryFocusComposer}
-            className="shrink-0 text-xs"
-          >
-            Try {modKey}+K Now
-          </Button>
-        )}
-      </div>
-
-      <div className="space-y-6">
-        {categories.map(cat => (
-          <div key={cat.title} className="space-y-2.5">
-            <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              {cat.title}
-            </h4>
-            <div className="divide-y divide-border/60 rounded-xl border border-border/80 bg-muted/20">
-              {cat.items.map(item => (
-                <div
-                  key={item.label}
-                  className="flex items-center justify-between gap-3 px-3.5 py-2.5"
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-foreground">
-                        {item.label}
-                      </span>
-                      {item.badge && (
-                        <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
-                          {item.badge}
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      {item.description}
-                    </p>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-1">
-                    {item.keys.map((k, i) => (
-                      <kbd
-                        key={i}
-                        className="inline-flex min-w-6 items-center justify-center rounded-md border border-border/80 bg-background px-1.5 py-0.5 font-mono text-[11px] font-semibold text-foreground shadow-2xs"
-                      >
-                        {k}
-                      </kbd>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
   );
 }

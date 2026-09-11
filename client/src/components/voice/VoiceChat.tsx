@@ -108,7 +108,7 @@ export function VoiceChat({
   const captionText = voice.error
     ? voice.error
     : mutedHint
-      ? "Microphone muted — tap the microphone to unmute and talk."
+      ? "Microphone muted — tap to unmute."
       : voice.state === "speaking"
         ? getSmoothCaption(voice.subtitle, previousSubtitle)
         : "";

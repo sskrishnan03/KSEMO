@@ -1,4 +1,3 @@
-import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
 import AuthStage from "@/pages/AuthStage";
@@ -40,7 +39,6 @@ function App() {
     <ErrorBoundary>
       <ThemeProvider defaultTheme="dark" switchable>
         <TooltipProvider>
-          <Toaster position="top-right" />
           <Router />
         </TooltipProvider>
       </ThemeProvider>

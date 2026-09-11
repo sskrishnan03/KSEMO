@@ -1,5 +1,4 @@
 import { useEffect } from "react";
-import { toast } from "sonner";
 import type { CapabilityMode } from "@shared/capabilities";
 
 export type GlobalShortcutsOptions = {
@@ -50,47 +49,35 @@ export function useGlobalShortcuts({
         return;
       }
 
-      // 3. Open Shortcuts Guide (Cmd+/ / Ctrl+/)
-      if (modifier && (e.key === "/" || e.key === "?") && !e.altKey) {
-        e.preventDefault();
-        onOpenSettings?.("shortcuts");
-        return;
-      }
-
-      // 4. Toggle Sidebar (Cmd+B / Ctrl+B)
+      // 3. Toggle Sidebar (Cmd+B / Ctrl+B)
       if (modifier && (e.key === "b" || e.key === "B") && !e.shiftKey) {
         e.preventDefault();
         onToggleSidebar?.();
         return;
       }
 
-      // 5. New Conversation (Cmd+Shift+O / Ctrl+Shift+O)
+      // 4. New Conversation (Cmd+Shift+O / Ctrl+Shift+O)
       if (modifier && e.shiftKey && (e.key === "o" || e.key === "O")) {
         e.preventDefault();
         onNewChat?.();
-        toast.info("Started new conversation");
         return;
       }
 
-      // 6. Capability Mode Switching Shortcuts
+      // 5. Capability Mode Switching Shortcuts
       if (modifier && e.shiftKey && onModeChange) {
         const key = e.key.toLowerCase();
         if (key === "p") {
           e.preventDefault();
           onModeChange("pdf");
-          toast.info("Switched to PDF Creation mode");
         } else if (key === "d") {
           e.preventDefault();
           onModeChange("docx");
-          toast.info("Switched to Word Document mode");
         } else if (key === "x") {
           e.preventDefault();
           onModeChange("xlsx");
-          toast.info("Switched to Excel Spreadsheet mode");
         } else if (key === "s") {
           e.preventDefault();
           onModeChange("pptx");
-          toast.info("Switched to PowerPoint Presentation mode");
         }
       }
     };

@@ -1,9 +1,8 @@
 import { Loading } from "@/components/ui/loading";
 import { Switch } from "@/components/ui/switch";
 import { trpc } from "@/lib/trpc";
-import { toast } from "sonner";
 import { useState } from "react";
-import { Brain, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 export function MemorySection() {
   const utils = trpc.useUtils();
@@ -20,7 +19,6 @@ export function MemorySection() {
   const settingsMutation = trpc.memory.settings.update.useMutation({
     onError: () => {
       setOptimisticEnabled(null);
-      toast.error("Could not update memory settings.");
     },
     onSettled: () => {
       setOptimisticEnabled(null);
@@ -53,17 +51,14 @@ export function MemorySection() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h3 className="text-base font-semibold tracking-[-0.02em]">Memory</h3>
-          <p className="mt-1 text-sm text-muted-foreground">
-            KSEMO automatically analyzes your conversations, remembers the
-            facts, preferences, and context that matter, and uses them to give
-            you consistent, personal answers. Everything is saved automatically
-            and stays in your account.
-          </p>
-        </div>
-        <Brain className="mt-1 size-5 shrink-0 text-muted-foreground" />
+      <div>
+        <h3 className="text-base font-semibold tracking-[-0.02em]">Memory</h3>
+        <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+          KSEMO automatically analyzes your conversations, remembers the
+          facts, preferences, and context that matter, and uses them to give
+          you consistent, personal answers. Everything is saved automatically
+          and stays in your account.
+        </p>
       </div>
 
       {loadFailed && (

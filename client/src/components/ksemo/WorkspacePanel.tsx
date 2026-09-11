@@ -22,7 +22,6 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { toast } from "sonner";
 import { ConfirmDeleteDialog } from "./ConfirmDeleteDialog";
 
 export type WorkspaceSection = "files";
@@ -84,16 +83,14 @@ export const WorkspacePanel = memo(function WorkspacePanel({
     onSuccess: () => {
       utils.workspace.files.list.invalidate();
     },
-    onError: error =>
-      toast.error(error.message || "File could not be uploaded."),
+    onError: () => {},
   });
   const fileRemove = trpc.workspace.files.remove.useMutation({
     onSuccess: () => utils.workspace.files.list.invalidate(),
   });
   const fileAttach = trpc.workspace.files.attachToConversation.useMutation({
     onSuccess: () => {},
-    onError: () =>
-      toast.error("File could not be attached to this conversation."),
+    onError: () => {},
   });
 
   async function uploadFile(event: ChangeEvent<HTMLInputElement>) {
@@ -101,13 +98,9 @@ export const WorkspacePanel = memo(function WorkspacePanel({
     event.target.value = "";
     if (!file) return;
     if (file.size > 25 * 1024 * 1024) {
-      toast.error("Files must be smaller than 25 MB.");
       return;
     }
     if (!isSupportedUpload(file)) {
-      toast.error(
-        "Supported: PDF, Word, Excel, PowerPoint, text, data, and image files."
-      );
       return;
     }
     try {
@@ -117,7 +110,7 @@ export const WorkspacePanel = memo(function WorkspacePanel({
         dataBase64: await fileToBase64(file),
       });
     } catch {
-      toast.error("KSEMO could not read that file.");
+      // ignore read failures
     }
   }
 

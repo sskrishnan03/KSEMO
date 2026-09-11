@@ -163,7 +163,7 @@ function CopyCodeButton({ code }: { code: string }) {
           variant="ghost"
           size="icon"
           className={cn(
-            "size-7 rounded-md transition-colors focus-visible:ring-1",
+            "size-7 rounded-md transition-colors",
             copied
               ? "text-foreground"
               : "text-muted-foreground hover:bg-accent hover:text-foreground"
@@ -215,7 +215,7 @@ function DownloadCodeButton({
           type="button"
           variant="ghost"
           size="icon"
-          className="size-7 rounded-md text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:ring-1"
+          className="size-7 rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
           onClick={download}
           disabled={!code}
           aria-label="Download code"

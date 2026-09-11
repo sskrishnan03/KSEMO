@@ -77,14 +77,13 @@ describe("MessageContent speech controls", () => {
         speechState: "idle",
         onShare: () => undefined,
         onEdit: () => undefined,
-        onViewHistory: () => undefined,
         onDelete: () => undefined,
       })
     );
     expect(markup).toContain('aria-label="Copy message"');
     expect(markup).toContain('aria-label="Share message"');
     expect(markup).toContain('aria-label="Edit message"');
-    expect(markup).toContain('aria-label="View version history"');
+    expect(markup).not.toContain('aria-label="View version history"');
     expect(markup).not.toContain('aria-label="Delete message"');
     expect(markup).not.toContain("lucide-user-round");
   });

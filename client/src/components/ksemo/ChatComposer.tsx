@@ -492,15 +492,7 @@ export const ChatComposer = memo(function ChatComposer({
                 setLibraryOpen(false);
                 setLibraryQuery("");
               }}
-              listMaxHeightClass={
-                menuPlacement === "below"
-                  ? isCentered
-                    ? "max-h-32"
-                    : "max-h-64"
-                  : isCentered
-                    ? "max-h-16"
-                    : "max-h-32"
-              }
+              visibleCount={isCentered ? 2 : 4}
             />
           </div>
         )}
@@ -1125,7 +1117,7 @@ export function LibraryPickerContent({
   onQueryChange,
   onSelect,
   onCancel,
-  listMaxHeightClass = "max-h-32",
+  visibleCount = 3,
 }: {
   files: Array<{
     id: string;
@@ -1145,7 +1137,7 @@ export function LibraryPickerContent({
     }>
   ) => void;
   onCancel?: () => void;
-  listMaxHeightClass?: string;
+  visibleCount?: number;
 }) {
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
 
@@ -1169,10 +1161,15 @@ export function LibraryPickerContent({
     }
   };
 
+  const listMaxHeightStyle =
+    files.length > visibleCount
+      ? { maxHeight: `${visibleCount * 68 - 4}px` }
+      : undefined;
+
   return (
     <div className="space-y-2 p-2">
       <div className="flex items-center gap-2 px-1">
-        <Library className="size-3.5 text-muted-foreground" />
+        <Library className="size-4 text-muted-foreground" />
         <p className="flex-1 text-sm font-medium">Browse Library</p>
         {onCancel && (
           <Button
@@ -1203,7 +1200,10 @@ export function LibraryPickerContent({
           </Button>
         )}
       </div>
-      <div className={cn("overflow-y-auto", listMaxHeightClass)}>
+      <div
+        className="overflow-y-auto"
+        style={listMaxHeightStyle}
+      >
         {files.length === 0 ? (
           <div className="py-8 text-center text-sm text-muted-foreground">
             {query ? "No files match your search" : "No files in library"}
@@ -1238,7 +1238,7 @@ export function LibraryPickerContent({
                     <span
                       className={`flex size-12 shrink-0 items-center justify-center rounded-md ${kind.colorClass}`}
                     >
-                      <kind.icon className="size-6" />
+                      <kind.icon className="size-7" />
                     </span>
                   )}
                   <div className="flex min-w-0 flex-1 flex-col">

@@ -175,13 +175,14 @@ export type KsemoFile = {
   filename: string;
   mimeType: string;
   sizeBytes: number;
+  contentText: string | null;
   status: "ready" | "failed";
   createdAt: Date;
   updatedAt: Date;
 };
 
 export type InsertKsemoFile = Partial<
-  Omit<KsemoFile, "id" | "createdAt" | "updatedAt">
+  Omit<KsemoFile, "id" | "createdAt" | "updatedAt" | "contentText">
 > & {
   id: string;
   userId: number;

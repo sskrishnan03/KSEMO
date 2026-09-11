@@ -184,9 +184,8 @@ export function SearchWorkspace({
                 Search
               </h1>
             </div>
-            <p className="mt-1.5 max-w-xl text-sm leading-6 text-muted-foreground">
-              Search across your conversations and messages. Find specific chats
-              or message content quickly.
+            <p className="mt-1.5 max-w-xl text-sm text-muted-foreground">
+              Find anything across your conversations and messages.
             </p>
           </div>
         </header>

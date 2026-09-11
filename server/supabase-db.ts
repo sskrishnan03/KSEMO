@@ -403,6 +403,34 @@ export async function listMessageFilesForUser(
   messageId: string,
   userId: number
 ): Promise<any[]> {
+  if (isSupabaseConfigured) {
+    const { data, error } = await supabase
+      .from("files")
+      .select(
+        "id, filename, mime_type, size_bytes, url, storage_key, content_text, user_id"
+      )
+      .eq("user_id", userId)
+      .in(
+        "id",
+        (
+          await supabase
+            .from("attachments")
+            .select("file_id")
+            .eq("message_id", messageId)
+        ).data?.map((a: any) => a.file_id) ?? []
+      );
+
+    if (error) return [];
+    return (data ?? []).map((row: any) => ({
+      id: row.id,
+      filename: row.filename,
+      mimeType: row.mime_type,
+      sizeBytes: row.size_bytes,
+      url: row.url,
+      storageKey: row.storage_key,
+      contentText: row.content_text ?? null,
+    }));
+  }
   return inMemoryStore.listMessageFilesForUser(messageId, userId);
 }
 
@@ -412,6 +440,19 @@ export async function attachFileToMessageForUser(input: {
   messageId: string;
   userId: number;
 }): Promise<any> {
+  if (isSupabaseConfigured) {
+    const { error } = await supabase.from("attachments").insert({
+      id: input.id,
+      file_id: input.fileId,
+      conversation_id: null,
+      message_id: input.messageId,
+    });
+    if (error) {
+      console.warn("[Attach] Failed to insert attachment:", error.message);
+      return null;
+    }
+    return { id: input.id, fileId: input.fileId, messageId: input.messageId };
+  }
   return inMemoryStore.attachFileToMessageForUser(input);
 }
 
