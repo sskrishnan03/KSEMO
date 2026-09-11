@@ -12,19 +12,25 @@ import { trpc } from "@/lib/trpc";
 import {
   CalendarDays,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   MessageCircle,
   Search,
   Pin,
 } from "lucide-react";
 import { memo, useEffect, useMemo, useState } from "react";
 import {
-  formatDistanceToNow,
   format,
   isToday,
   isYesterday,
-  isThisWeek,
   isThisYear,
   isSameDay,
+  addMonths,
+  addYears,
+  startOfMonth,
+  startOfWeek,
+  addDays,
+  isSameMonth,
 } from "date-fns";
 
 type DateFilter = "all" | "today" | "yesterday" | "custom";
@@ -99,6 +105,195 @@ function groupConversationsByDate(
   return groups;
 }
 
+const WEEKDAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+const MONTHS = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
+type CalendarView = "days" | "months" | "years";
+
+function SearchCalendar({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (date: string) => void;
+}) {
+  const [view, setView] = useState<CalendarView>("days");
+  const [viewDate, setViewDate] = useState(() =>
+    value ? new Date(value + "T00:00:00") : new Date()
+  );
+  const [viewYear, setViewYear] = useState(() =>
+    value
+      ? new Date(value + "T00:00:00").getFullYear()
+      : new Date().getFullYear()
+  );
+
+  const selected = value ? new Date(value + "T00:00:00") : undefined;
+  const year = useMemo(() => viewDate.getFullYear(), [viewDate]);
+  const month = useMemo(() => viewDate.getMonth(), [viewDate]);
+
+  // days grid
+  const monthStart = startOfMonth(viewDate);
+  const weekStart = startOfWeek(monthStart, { weekStartsOn: 0 });
+  const days = Array.from({ length: 42 }, (_, i) => addDays(weekStart, i));
+
+  // years grid (12 +/- around viewYear)
+  const yearStart = Math.floor(viewYear / 10) * 10;
+  const yearsGrid = Array.from({ length: 12 }, (_, i) => yearStart - 2 + i);
+
+  const goPrevUnit = () => {
+    if (view === "days") setViewDate(addMonths(viewDate, -1));
+    else if (view === "months") setViewDate(addYears(viewDate, -1));
+    else setViewYear(yearStart - 10);
+  };
+
+  const goNextUnit = () => {
+    if (view === "days") setViewDate(addMonths(viewDate, 1));
+    else if (view === "months") setViewDate(addYears(viewDate, 1));
+    else setViewYear(yearStart + 10);
+  };
+
+  const headerLabel =
+    view === "days"
+      ? `${MONTHS[month]} ${year}`
+      : view === "months"
+        ? String(year)
+        : `${yearStart - 2} – ${yearStart + 9}`;
+
+  const openHeader = () => {
+    if (view === "days") setView("months");
+    else if (view === "months") setView("years");
+  };
+
+  const pickMonth = (index: number) => {
+    const next = new Date(year, index, 1);
+    setViewDate(next);
+    setView("days");
+  };
+
+  const pickYear = (y: number) => {
+    setViewDate(new Date(y, month, 1));
+    setViewYear(y);
+    setView("months");
+  };
+
+  return (
+    <div className="w-64 p-1.5">
+      <div className="mb-1 flex items-center justify-between px-1">
+        <button
+          type="button"
+          onClick={goPrevUnit}
+          className="flex size-7 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          aria-label={view === "years" ? "Previous decade" : "Previous"}
+        >
+          <ChevronLeft className="size-4" />
+        </button>
+        <button
+          type="button"
+          onClick={openHeader}
+          className="rounded-lg px-2 py-1 text-sm font-medium text-foreground transition-colors hover:bg-accent hover:text-foreground"
+          aria-label="Open month and year picker"
+        >
+          {headerLabel}
+        </button>
+        <button
+          type="button"
+          onClick={goNextUnit}
+          className="flex size-7 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          aria-label={view === "years" ? "Next decade" : "Next"}
+        >
+          <ChevronRight className="size-4" />
+        </button>
+      </div>
+
+      {view === "days" && (
+        <div className="grid grid-cols-7 gap-y-1">
+          {WEEKDAYS.map(day => (
+            <div
+              key={day}
+              className="flex h-7 items-center justify-center text-[11px] font-medium text-muted-foreground"
+            >
+              {day}
+            </div>
+          ))}
+          {days.map(date => {
+            const dateKey = format(date, "yyyy-MM-dd");
+            return (
+              <button
+                key={dateKey}
+                type="button"
+                onClick={() => onChange(dateKey)}
+                className={cn(
+                  "flex size-8 items-center justify-center rounded-full text-sm transition-colors",
+                  selected && isSameDay(date, selected)
+                    ? "bg-primary font-medium text-primary-foreground"
+                    : isSameMonth(date, viewDate)
+                      ? "text-foreground hover:bg-accent hover:text-foreground"
+                      : "text-muted-foreground/40 hover:bg-accent hover:text-foreground"
+                )}
+              >
+                {format(date, "d")}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {view === "months" && (
+        <div className="grid grid-cols-3 gap-y-1">
+          {MONTHS.map((name, index) => (
+            <button
+              key={name}
+              type="button"
+              onClick={() => pickMonth(index)}
+              className={cn(
+                "flex h-9 items-center justify-center rounded-lg text-sm transition-colors",
+                index === month
+                  ? "bg-primary font-medium text-primary-foreground"
+                  : "text-foreground hover:bg-accent hover:text-foreground"
+              )}
+            >
+              {name.slice(0, 3)}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {view === "years" && (
+        <div className="grid grid-cols-3 gap-y-1">
+          {yearsGrid.map(y => (
+            <button
+              key={y}
+              type="button"
+              onClick={() => pickYear(y)}
+              className={cn(
+                "flex h-9 items-center justify-center rounded-lg text-sm transition-colors",
+                y === year
+                  ? "bg-primary font-medium text-primary-foreground"
+                  : "text-foreground hover:bg-accent hover:text-foreground"
+              )}
+            >
+              {y}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function SearchWorkspace({
   onBackToChat,
   conversations,
@@ -116,6 +311,7 @@ export function SearchWorkspace({
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [dateFilter, setDateFilter] = useState<DateFilter>("all");
   const [customDate, setCustomDate] = useState("");
+  const [filterMenuOpen, setFilterMenuOpen] = useState(false);
   const trimmed = query.trim().toLowerCase();
 
   useEffect(() => {
@@ -275,7 +471,7 @@ export function SearchWorkspace({
               aria-label="Search conversations and messages"
             />
           </div>
-          <DropdownMenu>
+          <DropdownMenu open={filterMenuOpen} onOpenChange={setFilterMenuOpen}>
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
@@ -286,31 +482,38 @@ export function SearchWorkspace({
                 <ChevronDown className="size-3.5" />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuRadioGroup
-                value={dateFilter}
-                onValueChange={value => setDateFilter(value as DateFilter)}
-              >
-                <DropdownMenuRadioItem value="all">
-                  All time
-                </DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="today">
-                  Today
-                </DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="yesterday">
-                  Yesterday
-                </DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="custom">
-                  Specific date
-                </DropdownMenuRadioItem>
-              </DropdownMenuRadioGroup>
+            <DropdownMenuContent
+              side="bottom"
+              align="end"
+              className="flex min-w-0 items-start gap-2 border-0 bg-transparent p-0 shadow-none"
+            >
+              <div className="w-48 shrink-0 rounded-xl border border-border bg-popover p-1 shadow-md">
+                <DropdownMenuRadioGroup
+                  value={dateFilter}
+                  onValueChange={value => setDateFilter(value as DateFilter)}
+                >
+                  <DropdownMenuRadioItem value="all">
+                    All time
+                  </DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="today">
+                    Today
+                  </DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="yesterday">
+                    Yesterday
+                  </DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem
+                    value="custom"
+                    onSelect={event => event.preventDefault()}
+                  >
+                    Specific date
+                  </DropdownMenuRadioItem>
+                </DropdownMenuRadioGroup>
+              </div>
               {dateFilter === "custom" && (
-                <div className="border-t border-border p-2">
-                  <input
-                    type="date"
+                <div className="shrink-0 rounded-xl border border-border bg-popover p-1.5 shadow-md">
+                  <SearchCalendar
                     value={customDate}
-                    onChange={event => setCustomDate(event.target.value)}
-                    className="h-9 w-full rounded-lg bg-background px-2 text-sm text-foreground"
+                    onChange={date => setCustomDate(date)}
                   />
                 </div>
               )}
