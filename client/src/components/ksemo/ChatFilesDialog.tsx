@@ -1,6 +1,6 @@
 import { getFileKind, IMAGE_EXT } from "@/lib/fileKinds";
 import { cn } from "@/lib/utils";
-import { ExternalLink, Files, X } from "lucide-react";
+import { ExternalLink, FolderOpen, X } from "lucide-react";
 import { memo, useEffect, useMemo, useRef } from "react";
 
 export type ChatFile = {
@@ -61,7 +61,7 @@ export const ChatFilesDialog = memo(function ChatFilesDialog({
       <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border px-3.5 py-3">
         <div className="flex items-center gap-2">
           <span className="flex size-8 items-center justify-center rounded-lg bg-muted">
-            <Files className="size-4" />
+            <FolderOpen className="size-4" />
           </span>
           <p className="text-[13px] font-semibold leading-tight">
             Files in this chat

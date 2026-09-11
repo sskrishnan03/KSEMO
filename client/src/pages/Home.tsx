@@ -19,7 +19,7 @@ import {
 import { startLogin } from "@/const";
 import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
-import { Files, Menu, MoreHorizontal, Pin, Trash2 } from "lucide-react";
+import { FolderOpen, Menu, MoreHorizontal, Pin, Trash2 } from "lucide-react";
 import { ShareIcon } from "../components/ksemo/icons";
 import React, { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { memo } from "react";
@@ -2079,8 +2079,8 @@ export default function Home() {
                       Share
                     </DropdownMenuItem>
                     <DropdownMenuItem onSelect={() => setChatFilesOpen(true)}>
-                      <Files className="mr-2 size-4" />
-                      View files in this chat
+                      <FolderOpen className="mr-2 size-4" />
+                      View files
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
