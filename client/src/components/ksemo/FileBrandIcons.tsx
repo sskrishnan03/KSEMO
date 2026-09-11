@@ -1,4 +1,4 @@
-import { memo, useId } from "react";
+import React, { memo, useId } from "react";
 import type { ComponentType } from "react";
 import {
   ExcelLogo,

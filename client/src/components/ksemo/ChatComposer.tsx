@@ -59,7 +59,7 @@ const COMPACT_INPUT_MAX_HEIGHT = 192;
 const EXPANDED_INPUT_MAX_HEIGHT = 320;
 const MIN_INPUT_HEIGHT = 40;
 
-const MENU_TITLE = "Create";
+const MENU_TITLE = "Attach";
 
 const MODE_TOKEN_COLORS: Record<string, string> = {
   pdf: "#ef4444",
@@ -701,7 +701,7 @@ export const ChatComposer = memo(function ChatComposer({
                         variant="ghost"
                         size="icon"
                         className="size-10 rounded-full bg-transparent text-foreground hover:bg-accent hover:text-foreground transition-colors"
-                        aria-label="Open composer tools"
+                        aria-label="Attach"
                       >
                         <Plus className="size-5" />
                       </Button>
@@ -837,13 +837,13 @@ export const ChatComposer = memo(function ChatComposer({
                                 size="icon"
                                 onClick={onCancelRecording}
                                 className="size-6 rounded-full text-foreground/80 hover:bg-accent hover:text-foreground transition-colors"
-                                aria-label="Cancel recording"
+                                aria-label="Discard"
                               >
                                 <X className="size-3" />
                               </Button>
                             </TooltipTrigger>
                             <TooltipContent side="bottom">
-                              Discard recording
+                              Discard
                             </TooltipContent>
                           </Tooltip>
                           <Tooltip>
@@ -852,13 +852,13 @@ export const ChatComposer = memo(function ChatComposer({
                                 size="icon"
                                 onClick={onVoice}
                                 className="size-6 rounded-full bg-foreground text-background hover:bg-foreground/90 transition-colors"
-                                aria-label="Finish recording"
+                                aria-label="Transcribe"
                               >
                                 <Check className="size-3" />
                               </Button>
                             </TooltipTrigger>
                             <TooltipContent side="bottom">
-                              Transcribe recording
+                              Transcribe
                             </TooltipContent>
                           </Tooltip>
                         </div>
@@ -876,7 +876,7 @@ export const ChatComposer = memo(function ChatComposer({
                             </Button>
                           </TooltipTrigger>
                           <TooltipContent side="bottom">
-                            Converting speech to text…
+                            Transcribing…
                           </TooltipContent>
                         </Tooltip>
                       ) : (
@@ -888,13 +888,13 @@ export const ChatComposer = memo(function ChatComposer({
                               onClick={onVoice}
                               disabled={isTranscribing}
                               className="size-10 rounded-full bg-transparent text-foreground hover:bg-accent hover:text-foreground transition-colors"
-                              aria-label="Use voice input"
+                              aria-label="Dictate"
                             >
                               <Mic className="size-4.5" />
                             </Button>
                           </TooltipTrigger>
                           <TooltipContent side="bottom">
-                            Record a voice message
+                            Dictate
                           </TooltipContent>
                         </Tooltip>
                       )}

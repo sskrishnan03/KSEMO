@@ -228,7 +228,12 @@ export const MessageContent = memo(function MessageContent({
           className={cn(
             "min-w-0",
             isUser
-              ? "flex w-fit max-w-[84%] flex-col items-end sm:max-w-[68%]"
+              ? cn(
+                  "flex flex-col items-end",
+                  isEditing
+                    ? "w-full max-w-[92%] sm:max-w-[85%]"
+                    : "w-fit max-w-[84%] sm:max-w-[68%]"
+                )
               : "w-full"
           )}
         >
@@ -310,13 +315,16 @@ export const MessageContent = memo(function MessageContent({
             className={cn(
               "text-[15px] leading-6",
               isUser
-                ? "flex w-fit max-w-full flex-col items-end rounded-2xl rounded-tr-md border border-border bg-muted px-3.5 py-2.5 text-[15px] leading-6 text-foreground shadow-sm"
+                ? cn(
+                    "flex flex-col items-end rounded-2xl rounded-tr-md border border-border bg-muted px-3.5 py-2.5 text-[15px] leading-6 text-foreground shadow-sm",
+                    isEditing ? "w-full min-w-[280px] sm:min-w-[480px]" : "w-fit max-w-full"
+                  )
                 : "max-w-none rounded-tl-md bg-transparent px-0 py-0 text-foreground"
             )}
           >
             {isUser ? (
               isEditing ? (
-                <div className="w-full min-w-[280px] sm:min-w-[400px] text-left">
+                <div className="w-full text-left">
                   <textarea
                     autoFocus
                     value={editValue}
@@ -335,17 +343,17 @@ export const MessageContent = memo(function MessageContent({
                         if (editValue.trim()) onSaveEdit?.();
                       }
                     }}
-                    rows={Math.max(2, Math.min(10, editValue.split("\n").length + 1))}
-                    className="w-full resize-none rounded-xl border border-border bg-background px-3 py-2 text-[15px] leading-6 text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:ring-1 focus:ring-ring"
+                    rows={Math.max(2, Math.min(12, editValue.split("\n").length + 1))}
+                    className="w-full resize-none border-0 bg-transparent p-0 text-[15px] leading-6 text-foreground outline-none shadow-none ring-0 focus:outline-none focus:ring-0 placeholder:text-muted-foreground"
                     placeholder="Edit your message…"
                   />
-                  <div className="mt-2.5 flex items-center justify-end gap-2">
+                  <div className="mt-3 flex items-center justify-end gap-2 border-t border-border/40 pt-2.5">
                     <Button
                       type="button"
-                      variant="ghost"
+                      variant="outline"
                       size="sm"
                       onClick={onCancelEdit}
-                      className="h-8 rounded-lg px-3 text-xs"
+                      className="h-8 rounded-lg border border-border/80 bg-background/80 px-3.5 text-xs font-medium text-foreground shadow-sm transition-all hover:bg-accent hover:text-foreground active:scale-[0.98]"
                     >
                       Cancel
                     </Button>

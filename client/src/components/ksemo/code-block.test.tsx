@@ -1,12 +1,17 @@
-import { createElement } from "react";
+import { createElement, type ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import {
   KsemoCodeBlock,
   KsemoMarkdownCode,
   codeBlockDownloadName,
   codeBlockLanguageLabel,
 } from "./code-block";
+
+function renderWithTooltip(element: ReactElement) {
+  return renderToStaticMarkup(createElement(TooltipProvider, null, element));
+}
 
 function blockNodePosition(startLine: number, endLine: number) {
   // The `node` prop is what the markdown renderer passes to components.
@@ -45,7 +50,7 @@ describe("codeBlockDownloadName", () => {
 
 describe("KsemoMarkdownCode inline vs fenced detection", () => {
   it("renders single-line code without a language class as inline", () => {
-    const markup = renderToStaticMarkup(
+    const markup = renderWithTooltip(
       createElement(KsemoMarkdownCode, {
         ...blockNodePosition(2, 2),
         children: "keep this value",
@@ -57,7 +62,7 @@ describe("KsemoMarkdownCode inline vs fenced detection", () => {
   });
 
   it("renders a language-fenced block even without ast position info", () => {
-    const markup = renderToStaticMarkup(
+    const markup = renderWithTooltip(
       createElement(KsemoMarkdownCode, {
         className: "language-tsx",
         children: "const x = 1;",
@@ -69,7 +74,7 @@ describe("KsemoMarkdownCode inline vs fenced detection", () => {
   });
 
   it("renders a multiline bare fence as a block with a Code label", () => {
-    const markup = renderToStaticMarkup(
+    const markup = renderWithTooltip(
       createElement(KsemoMarkdownCode, {
         ...blockNodePosition(1, 3),
         children: "line one\nline two",
@@ -83,7 +88,7 @@ describe("KsemoMarkdownCode inline vs fenced detection", () => {
 
 describe("KsemoCodeBlock", () => {
   it("exposes the language label, copy control, and the code text", () => {
-    const markup = renderToStaticMarkup(
+    const markup = renderWithTooltip(
       createElement(KsemoCodeBlock, {
         code: "console.log('hi');",
         rawLanguage: "javascript",
@@ -97,7 +102,7 @@ describe("KsemoCodeBlock", () => {
 
   it("preserves multiline formatting and indentation exactly", () => {
     const code = 'function greet(name) {\n  return `hello ${name}`;\n}';
-    const markup = renderToStaticMarkup(
+    const markup = renderWithTooltip(
       createElement(KsemoCodeBlock, { code, rawLanguage: "js" })
     );
     expect(markup).toContain("return `hello ${name}`;");
@@ -107,7 +112,7 @@ describe("KsemoCodeBlock", () => {
   it("keeps long lines intact and never becomes a vertical scroll trap", () => {
     const longLine =
       "const payload = { id: 1, name: 'a very long value that will overflow the block width on most screens', tags: ['x','y','z'], nested: { deep: true } };";
-    const markup = renderToStaticMarkup(
+    const markup = renderWithTooltip(
       createElement(KsemoCodeBlock, { code: longLine, rawLanguage: "ts" })
     );
     // The whole line must survive (horizontal scroll, not wrapping/truncation).

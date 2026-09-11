@@ -113,6 +113,8 @@ describe("MessageContent speech controls", () => {
     expect(markup).toContain("Updated prompt text");
     expect(markup).toContain("Cancel");
     expect(markup).toContain("Save");
+    expect(markup).toContain("border-border/80");
+    expect(markup).toContain("bg-background/80");
     expect(markup).not.toContain('aria-label="Edit message"');
   });
 

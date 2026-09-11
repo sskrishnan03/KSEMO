@@ -1,11 +1,16 @@
-import { createElement } from "react";
+import { createElement, type ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import {
   ChatComposer,
   getLibrarySubmenuClass,
   LibraryPickerContent,
 } from "./ChatComposer";
+
+function renderWithTooltip(element: ReactElement) {
+  return renderToStaticMarkup(createElement(TooltipProvider, null, element));
+}
 
 const baseProps = {
   onSend: () => undefined,
@@ -45,7 +50,7 @@ describe("ChatComposer", () => {
   });
 
   it("shows a clear cancel action for a selected chat upload notice", () => {
-    const markup = renderToStaticMarkup(
+    const markup = renderWithTooltip(
       createElement(ChatComposer, {
         ...baseProps,
         attachmentNotice: { name: "brief.pdf", linked: true },
@@ -61,7 +66,7 @@ describe("ChatComposer", () => {
   });
 
   it("renders every selected Library item as an individually removable chat attachment", () => {
-    const markup = renderToStaticMarkup(
+    const markup = renderWithTooltip(
       createElement(ChatComposer, {
         ...baseProps,
         attachmentNotices: [
@@ -86,9 +91,36 @@ describe("ChatComposer", () => {
   });
 
   it("does not render the stale safety/disclaimer note in any composer variant", () => {
-    const centeredMarkup = renderToStaticMarkup(
+    const centeredMarkup = renderWithTooltip(
       createElement(ChatComposer, { ...baseProps })
     );
     expect(centeredMarkup).not.toContain("KSEMO can make mistakes");
+  });
+
+  it("renders single-word Dictate tooltip and aria-label for voice input", () => {
+    const markup = renderWithTooltip(
+      createElement(ChatComposer, { ...baseProps })
+    );
+    expect(markup).toContain('aria-label="Dictate"');
+    expect(markup).toContain("Dictate");
+  });
+
+  it("renders single-word Discard and Transcribe tooltips when recording", () => {
+    const markup = renderWithTooltip(
+      createElement(ChatComposer, { ...baseProps, isRecording: true })
+    );
+    expect(markup).toContain("Discard");
+    expect(markup).toContain("Transcribe");
+    expect(markup).not.toContain("Discard recording");
+    expect(markup).not.toContain("Transcribe recording");
+  });
+
+  it("renders single-word Attach tooltip and aria-label for the composer plus button", () => {
+    const markup = renderWithTooltip(
+      createElement(ChatComposer, { ...baseProps })
+    );
+    expect(markup).toContain('aria-label="Attach"');
+    expect(markup).not.toContain('aria-label="Open composer tools"');
+    expect(markup).not.toContain("Create");
   });
 });
