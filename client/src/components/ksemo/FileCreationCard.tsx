@@ -1,10 +1,5 @@
 import type { DocFormat } from "@/lib/docFormats";
-import {
-  ArrowUpRight,
-  Download,
-  ExternalLink,
-  RotateCw,
-} from "lucide-react";
+import { ArrowUpRight, Download, ExternalLink, RotateCw } from "lucide-react";
 import { memo } from "react";
 import {
   FileBrandMark,
@@ -46,7 +41,13 @@ export type FileMetrics = {
 
 const FORMAT_CONFIGS: Record<
   DocFormat,
-  { creating: string; ready: string; short: string; ext: string; mdLabel: string }
+  {
+    creating: string;
+    ready: string;
+    short: string;
+    ext: string;
+    mdLabel: string;
+  }
 > = {
   pdf: {
     creating: "Creating PDF",
@@ -126,7 +127,8 @@ const STATUS_LINES: Partial<Record<FileCreationStage, string>> = {
 const FORMATTING_LINE = "Writing and formatting";
 
 function formatFileSize(bytes?: number): string | null {
-  if (typeof bytes !== "number" || Number.isNaN(bytes) || bytes < 0) return null;
+  if (typeof bytes !== "number" || Number.isNaN(bytes) || bytes < 0)
+    return null;
   const units = ["B", "KB", "MB", "GB"];
   let value = bytes;
   let unit = 0;
@@ -187,7 +189,7 @@ const SourceChips = memo(function SourceChips({
                     "border border-border/60 bg-muted/40 px-2 py-0.5",
                     "text-[11px] leading-5 text-muted-foreground",
                     "transition-all duration-150",
-                    "hover:border-border hover:bg-muted/70 hover:text-foreground"
+                    "hover:bg-muted/70 hover:text-foreground"
                   )}
                 >
                   <span className="truncate">{domain}</span>
@@ -266,10 +268,7 @@ export const FileCreationCard = memo(function FileCreationCard({
     return (
       <div className="my-1 w-full max-w-2xl">
         <div className="flex items-center gap-3 rounded-xl border border-border/50 bg-card/60 px-3.5 py-3">
-          <FileBrandMark
-            variant={variant}
-            className="size-10 shrink-0"
-          />
+          <FileBrandMark variant={variant} className="size-10 shrink-0" />
           <div className="min-w-0 flex-1">
             <p className="text-[13px] font-medium text-foreground">
               {config.creating}
@@ -295,10 +294,7 @@ export const FileCreationCard = memo(function FileCreationCard({
       <div className="rounded-xl border border-border/50 bg-card/60 transition-shadow duration-200 hover:shadow-[0_2px_8px_rgba(0,0,0,0.06)]">
         {/* File row */}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3.5 py-3 sm:flex-nowrap">
-          <FileBrandMark
-            variant={variant}
-            className="size-10 shrink-0"
-          />
+          <FileBrandMark variant={variant} className="size-10 shrink-0" />
           <div className="min-w-0 flex-1">
             <p className="text-[13px] font-medium text-foreground leading-tight">
               {displayName}

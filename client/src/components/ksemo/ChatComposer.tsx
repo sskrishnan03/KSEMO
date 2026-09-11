@@ -18,10 +18,7 @@ import {
 } from "@/components/ui/tooltip";
 import { filterLibraryItems } from "@/lib/ksemoInteraction";
 import { getFileKind, IMAGE_EXT } from "@/lib/fileKinds";
-import {
-  CAPABILITY_SECTIONS,
-  getCapabilityOption,
-} from "@/lib/capabilities";
+import { CAPABILITY_SECTIONS, getCapabilityOption } from "@/lib/capabilities";
 import { type CapabilityMode } from "@shared/capabilities";
 import {
   ArrowUp,
@@ -56,8 +53,7 @@ export const getLibrarySubmenuClass = (isCentered: boolean) =>
 
 const CHAT_PLACEHOLDER = "Ask KSEMO anything you need...";
 
-const VOICE_PLACEHOLDER =
-  "Ask me out loud or type your question here...";
+const VOICE_PLACEHOLDER = "Ask me out loud or type your question here...";
 
 const COMPACT_INPUT_MAX_HEIGHT = 192;
 const EXPANDED_INPUT_MAX_HEIGHT = 320;
@@ -222,10 +218,11 @@ export const ChatComposer = memo(function ChatComposer({
     if (!isSlashActive) return [];
     const q = slashQuery.trim().toLowerCase();
     if (!q) return slashCreateOptions;
-    return slashCreateOptions.filter(o =>
-      o.title.toLowerCase().includes(q) ||
-      o.mode.toLowerCase().includes(q) ||
-      o.description.toLowerCase().includes(q)
+    return slashCreateOptions.filter(
+      o =>
+        o.title.toLowerCase().includes(q) ||
+        o.mode.toLowerCase().includes(q) ||
+        o.description.toLowerCase().includes(q)
     );
   }, [isSlashActive, slashQuery, slashCreateOptions]);
 
@@ -236,7 +233,9 @@ export const ChatComposer = memo(function ChatComposer({
   useEffect(() => {
     if (!isSlashActive) return;
     const closeSlash = (event: PointerEvent) => {
-      const clickedInPanel = slashPanelRef.current?.contains(event.target as Node);
+      const clickedInPanel = slashPanelRef.current?.contains(
+        event.target as Node
+      );
       const clickedInEditor = editorRef.current?.contains(event.target as Node);
       if (!clickedInPanel && !clickedInEditor) {
         onValueChange("");
@@ -295,7 +294,8 @@ export const ChatComposer = memo(function ChatComposer({
     const range = selection.getRangeAt(0);
     const container = range.startContainer;
     const token = editor.querySelector("[data-mode]") as HTMLElement | null;
-    if (token && (container === token || token.contains(container))) return true;
+    if (token && (container === token || token.contains(container)))
+      return true;
     if (nextValue === "") return true;
     const question = editor.lastChild;
     if (question && container === question && range.startOffset === 0)
@@ -332,8 +332,7 @@ export const ChatComposer = memo(function ChatComposer({
     if (!editor) return;
     const mode = activeMode ?? "chat";
     const changed =
-      editorModeRef.current !== mode ||
-      lastSyncedValueRef.current !== value;
+      editorModeRef.current !== mode || lastSyncedValueRef.current !== value;
     if (changed) {
       renderEditorDom(mode, value);
       if (mode !== "chat" || value !== "") {
@@ -462,7 +461,10 @@ export const ChatComposer = memo(function ChatComposer({
         compactBottomSpacing ? "pb-5" : "pb-4"
       )}
     >
-      <div className="relative rounded-[20px] p-1.5 shadow-sm transition-shadow focus-within:shadow-md" style={{ backgroundColor: "#20201F", border: "1px solid #353534" }}>
+      <div
+        className="relative rounded-[20px] p-1.5 shadow-sm"
+        style={{ backgroundColor: "#20201F", border: "1px solid #353534" }}
+      >
         {isDragActive && (
           <div className="pointer-events-none fixed inset-0 z-[100] flex items-center justify-center bg-card/80 backdrop-blur-sm">
             <div className="rounded-2xl border-2 border-dashed border-primary/60 bg-card px-10 py-8 shadow-xl">
@@ -537,11 +539,11 @@ export const ChatComposer = memo(function ChatComposer({
                   key={item.fileId}
                   className="group flex h-16 shrink-0 items-center gap-3 rounded-xl border border-border bg-muted py-2 pl-2 pr-3 shadow-sm transition-colors hover:bg-accent"
                 >
-<span
-                className={`flex size-11 shrink-0 items-center justify-center rounded-lg ${kind.colorClass}`}
-              >
-                <kind.icon className="size-6" />
-              </span>
+                  <span
+                    className={`flex size-11 shrink-0 items-center justify-center rounded-lg ${kind.colorClass}`}
+                  >
+                    <kind.icon className="size-6" />
+                  </span>
                   <span className="flex min-w-0 flex-col">
                     <span className="max-w-[150px] truncate text-[13px] font-semibold text-foreground">
                       {item.name}
@@ -565,7 +567,6 @@ export const ChatComposer = memo(function ChatComposer({
             })}
           </div>
         )}
-
 
         {/* Main Composer Content */}
         <div className="flex flex-col">
@@ -624,10 +625,7 @@ export const ChatComposer = memo(function ChatComposer({
                   activeMode &&
                   activeMode !== "chat" &&
                   editorRef.current &&
-                  isBackspaceTargetingModeToken(
-                    editorRef.current,
-                    value
-                  )
+                  isBackspaceTargetingModeToken(editorRef.current, value)
                 ) {
                   event.preventDefault();
                   onModeChange?.(null);
@@ -709,11 +707,9 @@ export const ChatComposer = memo(function ChatComposer({
                       </Button>
                     </DropdownMenuTrigger>
                   </TooltipTrigger>
-                  <TooltipContent side="bottom">
-                    {MENU_TITLE}
-                  </TooltipContent>
+                  <TooltipContent side="bottom">{MENU_TITLE}</TooltipContent>
                 </Tooltip>
-<DropdownMenuContent
+                <DropdownMenuContent
                   align="start"
                   side={menuPlacement === "below" ? "bottom" : "top"}
                   sideOffset={8}
@@ -721,7 +717,9 @@ export const ChatComposer = memo(function ChatComposer({
                   collisionPadding={12}
                   className="ksemo-thin-scroll w-48 rounded-xl max-h-[16rem] overflow-y-auto"
                 >
-                  <DropdownMenuItem onClick={() => fileInputRef.current?.click()}>
+                  <DropdownMenuItem
+                    onClick={() => fileInputRef.current?.click()}
+                  >
                     <Paperclip className="mr-2 size-4" /> Upload files
                   </DropdownMenuItem>
                   {onTakeScreenshot && (
@@ -757,7 +755,9 @@ export const ChatComposer = memo(function ChatComposer({
                           collisionPadding={16}
                           className="ksemo-thin-scroll w-44 rounded-xl max-h-[16rem] overflow-y-auto shadow-md"
                         >
-                          {CAPABILITY_SECTIONS.find(s => s.id === "create")?.options.map(option => {
+                          {CAPABILITY_SECTIONS.find(
+                            s => s.id === "create"
+                          )?.options.map(option => {
                             const Icon = option.icon;
                             const isActive = activeMode === option.mode;
                             return (
@@ -804,151 +804,168 @@ export const ChatComposer = memo(function ChatComposer({
                 />
               ) : (
                 <>
-              {/* Recording / Transcribing / Mic — opens in place of the mic when clicked */}
-              {!hideVoiceInput && (
-                <>
-                  {isRecording ? (
-                <div className="flex items-center gap-2 overflow-hidden rounded-full border border-border bg-muted px-3 py-1.5 shadow-sm">
-                  <div className="flex items-end gap-0.5 overflow-hidden">
-                    {[4, 8, 12, 7, 15, 9, 5, 11].map((height, index) => (
-                      <span
-                        key={index}
-                        className="w-1 animate-pulse rounded-full bg-muted-foreground/80"
-                        style={{ height, animationDelay: `${index * 70}ms` }}
-                      />
-                    ))}
-                  </div>
-                  <span className="text-[12px] font-medium tabular-nums text-foreground">
-                    {String(Math.floor(recordingSeconds / 60)).padStart(2, "0")}:
-                    {String(recordingSeconds % 60).padStart(2, "0")}
-                  </span>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={onCancelRecording}
-                        className="size-6 rounded-full text-foreground/80 hover:bg-accent hover:text-foreground transition-colors"
-                        aria-label="Cancel recording"
-                      >
-                        <X className="size-3" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom">
-                      Discard recording
-                    </TooltipContent>
-                  </Tooltip>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        size="icon"
-                        onClick={onVoice}
-                        className="size-6 rounded-full bg-foreground text-background hover:bg-foreground/90 transition-colors"
-                        aria-label="Finish recording"
-                      >
-                        <Check className="size-3" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom">
-                      Transcribe recording
-                    </TooltipContent>
-                  </Tooltip>
-                </div>
-              ) : isTranscribing ? (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      disabled
-                      className="size-10 rounded-full bg-transparent text-muted-foreground transition-colors"
-                      aria-label="Converting speech to text"
-                    >
-                      <Loader2 className="size-4.5 animate-spin" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom">
-                    Converting speech to text…
-                  </TooltipContent>
-                </Tooltip>
-              ) : (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={onVoice}
-                      disabled={isTranscribing}
-                      className="size-10 rounded-full bg-transparent text-foreground hover:bg-accent hover:text-foreground transition-colors"
-                      aria-label="Use voice input"
-                    >
-                      <Mic className="size-4.5" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom">
-                    Record a voice message
-                  </TooltipContent>
-                </Tooltip>
-                )}
-                </>
-              )}
-              {/* Send / Voice / Stop Button */}
-              {isGenerating ? (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      onClick={onCancel}
-                      size="icon"
-                      className="size-10 rounded-full bg-foreground text-background hover:bg-foreground/90 transition-colors"
-                      aria-label="Stop generating"
-                    >
-                      <Square className="size-4 fill-current" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom">Stop generating</TooltipContent>
-                </Tooltip>
-              ) : !value.trim() && !visibleAttachmentNotices.length && !isRecording && !isTranscribing ? (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      onClick={onVoiceChat}
-                      disabled={isRecording || isTranscribing}
-                      size="icon"
-                      className="size-10 rounded-full bg-muted text-foreground hover:bg-[#333333] transition-colors"
-                      aria-label="Start voice chat"
-                    >
-                      <span className="flex items-center justify-center gap-[3px]">
-                        {[0, 1, 2, 3].map(i => (
-                          <span
-                            key={i}
-                            className="ksemo-voice-bar w-[3px] rounded-full bg-foreground/70"
-                            style={{
-                              height: 4,
-                              animation: `ksemo-voice-bar 1s ease-in-out ${i * 0.15}s infinite`,
-                            }}
-                          />
-                        ))}
-                      </span>
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom">Start voice chat</TooltipContent>
-                </Tooltip>
-              ) : !isRecording && !isTranscribing ? (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      onClick={submit}
-                      disabled={isRecording || isTranscribing}
-                      size="icon"
-                      className="size-10 rounded-full bg-foreground text-background hover:bg-foreground/90 disabled:bg-muted disabled:text-muted-foreground transition-colors"
-                      aria-label="Send message"
-                    >
-                      <ArrowUp className="size-4.5" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom">Send message</TooltipContent>
-                </Tooltip>
-              ) : null}
+                  {/* Recording / Transcribing / Mic — opens in place of the mic when clicked */}
+                  {!hideVoiceInput && (
+                    <>
+                      {isRecording ? (
+                        <div className="flex items-center gap-2 overflow-hidden rounded-full border border-border bg-muted px-3 py-1.5 shadow-sm">
+                          <div className="flex items-end gap-0.5 overflow-hidden">
+                            {[4, 8, 12, 7, 15, 9, 5, 11].map(
+                              (height, index) => (
+                                <span
+                                  key={index}
+                                  className="w-1 animate-pulse rounded-full bg-muted-foreground/80"
+                                  style={{
+                                    height,
+                                    animationDelay: `${index * 70}ms`,
+                                  }}
+                                />
+                              )
+                            )}
+                          </div>
+                          <span className="text-[12px] font-medium tabular-nums text-foreground">
+                            {String(Math.floor(recordingSeconds / 60)).padStart(
+                              2,
+                              "0"
+                            )}
+                            :{String(recordingSeconds % 60).padStart(2, "0")}
+                          </span>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={onCancelRecording}
+                                className="size-6 rounded-full text-foreground/80 hover:bg-accent hover:text-foreground transition-colors"
+                                aria-label="Cancel recording"
+                              >
+                                <X className="size-3" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom">
+                              Discard recording
+                            </TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                size="icon"
+                                onClick={onVoice}
+                                className="size-6 rounded-full bg-foreground text-background hover:bg-foreground/90 transition-colors"
+                                aria-label="Finish recording"
+                              >
+                                <Check className="size-3" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom">
+                              Transcribe recording
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
+                      ) : isTranscribing ? (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              disabled
+                              className="size-10 rounded-full bg-transparent text-muted-foreground transition-colors"
+                              aria-label="Converting speech to text"
+                            >
+                              <Loader2 className="size-4.5 animate-spin" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom">
+                            Converting speech to text…
+                          </TooltipContent>
+                        </Tooltip>
+                      ) : (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={onVoice}
+                              disabled={isTranscribing}
+                              className="size-10 rounded-full bg-transparent text-foreground hover:bg-accent hover:text-foreground transition-colors"
+                              aria-label="Use voice input"
+                            >
+                              <Mic className="size-4.5" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom">
+                            Record a voice message
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+                    </>
+                  )}
+                  {/* Send / Voice / Stop Button */}
+                  {isGenerating ? (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          onClick={onCancel}
+                          size="icon"
+                          className="size-10 rounded-full bg-foreground text-background hover:bg-foreground/90 transition-colors"
+                          aria-label="Stop generating"
+                        >
+                          <Square className="size-4 fill-current" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom">
+                        Stop generating
+                      </TooltipContent>
+                    </Tooltip>
+                  ) : !value.trim() &&
+                    !visibleAttachmentNotices.length &&
+                    !isRecording &&
+                    !isTranscribing ? (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          onClick={onVoiceChat}
+                          disabled={isRecording || isTranscribing}
+                          size="icon"
+                          className="size-10 rounded-full bg-muted text-foreground hover:bg-[#333333] transition-colors"
+                          aria-label="Start voice chat"
+                        >
+                          <span className="flex items-center justify-center gap-[3px]">
+                            {[0, 1, 2, 3].map(i => (
+                              <span
+                                key={i}
+                                className="ksemo-voice-bar w-[3px] rounded-full bg-foreground/70"
+                                style={{
+                                  height: 4,
+                                  animation: `ksemo-voice-bar 1s ease-in-out ${i * 0.15}s infinite`,
+                                }}
+                              />
+                            ))}
+                          </span>
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom">
+                        Start voice chat
+                      </TooltipContent>
+                    </Tooltip>
+                  ) : !isRecording && !isTranscribing ? (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          onClick={submit}
+                          disabled={isRecording || isTranscribing}
+                          size="icon"
+                          className="size-10 rounded-full bg-foreground text-background hover:bg-foreground/90 disabled:bg-muted disabled:text-muted-foreground transition-colors"
+                          aria-label="Send message"
+                        >
+                          <ArrowUp className="size-4.5" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom">
+                        Send message
+                      </TooltipContent>
+                    </Tooltip>
+                  ) : null}
                 </>
               )}
             </div>
@@ -1024,10 +1041,14 @@ function VoiceChatInlineControls({
     voice.lang.toLowerCase().startsWith("en")
   );
   const displayVoices =
-    englishVoices && englishVoices.length > 0 ? englishVoices : voices ?? [];
+    englishVoices && englishVoices.length > 0 ? englishVoices : (voices ?? []);
 
   return (
-    <div className="flex items-center gap-1.5" role="group" aria-label="Voice chat controls">
+    <div
+      className="flex items-center gap-1.5"
+      role="group"
+      aria-label="Voice chat controls"
+    >
       <DropdownMenu open={voiceMenuOpen} onOpenChange={setVoiceMenuOpen}>
         <DropdownMenuTrigger asChild>
           <Button
@@ -1045,14 +1066,14 @@ function VoiceChatInlineControls({
             />
           </Button>
         </DropdownMenuTrigger>
-<DropdownMenuContent
-            align="end"
-            side="top"
-            sideOffset={10}
-            collisionPadding={12}
-            className="ksemo-thin-scroll w-60 max-h-72 overflow-y-auto"
-          >
-            {displayVoices.length > 0 ? (
+        <DropdownMenuContent
+          align="end"
+          side="top"
+          sideOffset={10}
+          collisionPadding={12}
+          className="ksemo-thin-scroll w-60 max-h-72 overflow-y-auto"
+        >
+          {displayVoices.length > 0 ? (
             displayVoices.map(voice => (
               <DropdownMenuItem
                 key={voice.name}
@@ -1206,10 +1227,7 @@ export function LibraryPickerContent({
           </Button>
         )}
       </div>
-      <div
-        className="overflow-y-auto"
-        style={listMaxHeightStyle}
-      >
+      <div className="overflow-y-auto" style={listMaxHeightStyle}>
         {files.length === 0 ? (
           <div className="py-8 text-center text-sm text-muted-foreground">
             {query ? "No files match your search" : "No files in library"}

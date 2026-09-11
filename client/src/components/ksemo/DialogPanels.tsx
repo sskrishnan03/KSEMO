@@ -37,7 +37,7 @@ export function KsemoTextDialogPanel({
             id="ksemo-dialog-value"
             value={value}
             onChange={event => onValueChange(event.target.value)}
-            className="min-h-32 w-full resize-none rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:border-foreground/70"
+            className="min-h-32 w-full resize-none rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none"
           />
         ) : (
           <Input

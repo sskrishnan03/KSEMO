@@ -1,14 +1,33 @@
 import { Input } from "@/components/ui/input";
 import { Loading } from "@/components/ui/loading";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { trpc } from "@/lib/trpc";
 import {
+  CalendarDays,
+  ChevronDown,
   MessageCircle,
   Search,
   Pin,
 } from "lucide-react";
 import { memo, useEffect, useMemo, useState } from "react";
-import { formatDistanceToNow, format, isToday, isYesterday, isThisWeek, isThisYear } from "date-fns";
+import {
+  formatDistanceToNow,
+  format,
+  isToday,
+  isYesterday,
+  isThisWeek,
+  isThisYear,
+  isSameDay,
+} from "date-fns";
+
+type DateFilter = "all" | "today" | "yesterday" | "custom";
 
 type SearchResult = {
   conversationId: string;
@@ -25,20 +44,37 @@ function snippetFromContent(content: string, maxLen = 80): string {
   return clean.slice(0, maxLen) + "…";
 }
 
-function formatRelativeDate(date: Date): string {
-  if (isToday(date)) {
-    return 'Today';
+function matchesDateFilter(
+  date: Date | undefined,
+  filter: DateFilter,
+  customDate: string
+): boolean {
+  if (!date) return filter === "all";
+  if (filter === "today") return isToday(date);
+  if (filter === "yesterday") return isYesterday(date);
+  if (filter === "custom") {
+    if (!customDate) return true;
+    return isSameDay(date, new Date(customDate + "T00:00:00"));
   }
-  if (isYesterday(date)) {
-    return 'Yesterday';
-  }
-  if (isThisYear(date)) {
-    return format(date, 'MMM d');
-  }
-  return format(date, 'MMM d, yyyy');
+  return true;
 }
 
-function groupConversationsByDate(conversations: SearchResult[]): Record<string, SearchResult[]> {
+function formatRelativeDate(date: Date): string {
+  if (isToday(date)) {
+    return "Today";
+  }
+  if (isYesterday(date)) {
+    return "Yesterday";
+  }
+  if (isThisYear(date)) {
+    return format(date, "MMM d");
+  }
+  return format(date, "MMM d, yyyy");
+}
+
+function groupConversationsByDate(
+  conversations: SearchResult[]
+): Record<string, SearchResult[]> {
   const groups: Record<string, SearchResult[]> = {
     today: [],
     yesterday: [],
@@ -50,7 +86,7 @@ function groupConversationsByDate(conversations: SearchResult[]): Record<string,
       groups.older.push(conv);
       return;
     }
-    
+
     if (isToday(conv.createdAt)) {
       groups.today.push(conv);
     } else if (isYesterday(conv.createdAt)) {
@@ -78,6 +114,8 @@ export function SearchWorkspace({
 }) {
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
+  const [dateFilter, setDateFilter] = useState<DateFilter>("all");
+  const [customDate, setCustomDate] = useState("");
   const trimmed = query.trim().toLowerCase();
 
   useEffect(() => {
@@ -91,10 +129,10 @@ export function SearchWorkspace({
       { enabled: debouncedQuery.trim().length >= 1 }
     );
 
-  const { data: allConversations, isLoading: isLoadingAll } = trpc.conversation.getAllConversations.useQuery(
-    undefined,
-    { enabled: true }
-  );
+  const { data: allConversations, isLoading: isLoadingAll } =
+    trpc.conversation.getAllConversations.useQuery(undefined, {
+      enabled: true,
+    });
 
   const titleMatches = useMemo(() => {
     if (!trimmed) return [];
@@ -133,7 +171,9 @@ export function SearchWorkspace({
 
     // Add message previews for title matches from server data
     const titleResultsWithPreviews = titleResults.map(result => {
-      const serverChat = serverData?.chats.find(c => c.conversationId === result.conversationId);
+      const serverChat = serverData?.chats.find(
+        c => c.conversationId === result.conversationId
+      );
       if (serverChat?.messagePreview) {
         return {
           ...result,
@@ -146,7 +186,7 @@ export function SearchWorkspace({
     });
 
     const combined = [...titleResultsWithPreviews, ...messageMatches];
-    
+
     // Sort pinned items first
     return combined.sort((a, b) => {
       if (a.isPinned && !b.isPinned) return -1;
@@ -162,7 +202,9 @@ export function SearchWorkspace({
       conversationId: conv.conversationId,
       title: conv.conversationTitle,
       isPinned: conv.isPinned,
-      snippet: conv.messagePreview ? snippetFromContent(conv.messagePreview.content) : undefined,
+      snippet: conv.messagePreview
+        ? snippetFromContent(conv.messagePreview.content)
+        : undefined,
       role: conv.messagePreview?.role,
       createdAt: conv.createdAt,
     }));
@@ -172,6 +214,38 @@ export function SearchWorkspace({
     onSelectConversation(id);
     onBackToChat();
   };
+
+  const filteredResults = useMemo(
+    () =>
+      results.filter(result =>
+        matchesDateFilter(result.createdAt, dateFilter, customDate)
+      ),
+    [results, dateFilter, customDate]
+  );
+
+  const filteredAllResults = useMemo(
+    () =>
+      allResults.filter(result =>
+        matchesDateFilter(result.createdAt, dateFilter, customDate)
+      ),
+    [allResults, dateFilter, customDate]
+  );
+
+  const dateFilterLabel =
+    dateFilter === "all"
+      ? "All time"
+      : dateFilter === "today"
+        ? "Today"
+        : dateFilter === "yesterday"
+          ? "Yesterday"
+          : customDate
+            ? format(new Date(customDate + "T00:00:00"), "MMM d, yyyy")
+            : "Specific date";
+
+  const filteredAllGroups = useMemo(
+    () => groupConversationsByDate(filteredAllResults),
+    [filteredAllResults]
+  );
 
   return (
     <main className="flex min-h-0 flex-1 flex-col bg-background">
@@ -190,7 +264,7 @@ export function SearchWorkspace({
           </div>
         </header>
 
-        <section className="mt-6">
+        <section className="mt-6 flex items-center gap-2.5">
           <div className="relative w-full max-w-md">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -201,15 +275,56 @@ export function SearchWorkspace({
               aria-label="Search conversations and messages"
             />
           </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="flex h-10 shrink-0 items-center gap-1.5 rounded-xl border border-border bg-card px-3 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              >
+                <CalendarDays className="size-4" />
+                {dateFilterLabel}
+                <ChevronDown className="size-3.5" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuRadioGroup
+                value={dateFilter}
+                onValueChange={value => setDateFilter(value as DateFilter)}
+              >
+                <DropdownMenuRadioItem value="all">
+                  All time
+                </DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="today">
+                  Today
+                </DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="yesterday">
+                  Yesterday
+                </DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="custom">
+                  Specific date
+                </DropdownMenuRadioItem>
+              </DropdownMenuRadioGroup>
+              {dateFilter === "custom" && (
+                <div className="border-t border-border p-2">
+                  <input
+                    type="date"
+                    value={customDate}
+                    onChange={event => setCustomDate(event.target.value)}
+                    className="h-9 w-full rounded-lg bg-background px-2 text-sm text-foreground"
+                  />
+                </div>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </section>
 
         <div className="mt-5 min-h-0 flex-1 overflow-y-auto pb-10">
           {trimmed ? (
             searchLoading && titleMatches.length === 0 ? (
               <Loading className="min-h-64" />
-            ) : results.length > 0 ? (
+            ) : filteredResults.length > 0 ? (
               <div className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card">
-                {results.map((result) => (
+                {filteredResults.map(result => (
                   <button
                     key={result.conversationId}
                     onClick={() => handleSelect(result.conversationId)}
@@ -248,8 +363,8 @@ export function SearchWorkspace({
                     No results found
                   </h2>
                   <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-muted-foreground">
-                    No conversations or messages match "{query.trim()}".
-                    Try different keywords.
+                    No conversations or messages match "{query.trim()}". Try
+                    different keywords.
                   </p>
                 </div>
               </div>
@@ -258,19 +373,23 @@ export function SearchWorkspace({
             <div className="space-y-6">
               {isLoadingAll ? (
                 <Loading className="min-h-64" />
-              ) : allResults.length > 0 ? (
+              ) : filteredAllResults.length > 0 ? (
                 (() => {
-                  const grouped = groupConversationsByDate(allResults);
+                  const grouped = filteredAllGroups;
                   return (
                     <>
                       {grouped.today.length > 0 && (
                         <div>
-                          <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Today</h3>
+                          <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                            Today
+                          </h3>
                           <div className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card">
-                            {grouped.today.map((result) => (
+                            {grouped.today.map(result => (
                               <button
                                 key={result.conversationId}
-                                onClick={() => handleSelect(result.conversationId)}
+                                onClick={() =>
+                                  handleSelect(result.conversationId)
+                                }
                                 className="flex w-full items-center gap-4 px-5 py-4 text-left transition-colors hover:bg-accent"
                               >
                                 <MessageCircle className="size-5 shrink-0 text-foreground/70" />
@@ -302,12 +421,16 @@ export function SearchWorkspace({
                       )}
                       {grouped.yesterday.length > 0 && (
                         <div>
-                          <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Yesterday</h3>
+                          <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                            Yesterday
+                          </h3>
                           <div className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card">
-                            {grouped.yesterday.map((result) => (
+                            {grouped.yesterday.map(result => (
                               <button
                                 key={result.conversationId}
-                                onClick={() => handleSelect(result.conversationId)}
+                                onClick={() =>
+                                  handleSelect(result.conversationId)
+                                }
                                 className="flex w-full items-center gap-4 px-5 py-4 text-left transition-colors hover:bg-accent"
                               >
                                 <MessageCircle className="size-5 shrink-0 text-foreground/70" />
@@ -339,12 +462,16 @@ export function SearchWorkspace({
                       )}
                       {grouped.older.length > 0 && (
                         <div>
-                          <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Older</h3>
+                          <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                            Older
+                          </h3>
                           <div className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card">
-                            {grouped.older.map((result) => (
+                            {grouped.older.map(result => (
                               <button
                                 key={result.conversationId}
-                                onClick={() => handleSelect(result.conversationId)}
+                                onClick={() =>
+                                  handleSelect(result.conversationId)
+                                }
                                 className="flex w-full items-center gap-4 px-5 py-4 text-left transition-colors hover:bg-accent"
                               >
                                 <MessageCircle className="size-5 shrink-0 text-foreground/70" />

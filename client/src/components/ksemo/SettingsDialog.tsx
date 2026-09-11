@@ -77,12 +77,7 @@ type User = {
 };
 
 type SettingsTab =
-  | "account"
-  | "security"
-  | "appearance"
-  | "data"
-  | "memory"
-  | "feedback";
+  "account" | "security" | "appearance" | "data" | "memory" | "feedback";
 
 export const settingsSections: Array<{
   id: string;
@@ -232,9 +227,7 @@ function SettingsSearch({
         rank: settingsNavItems.findIndex(item => item.id === entry.tab),
       }))
       .filter(({ entry }) =>
-        `${entry.label} ${entry.hint}`
-          .toLocaleLowerCase()
-          .includes(trimmed)
+        `${entry.label} ${entry.hint}`.toLocaleLowerCase().includes(trimmed)
       )
       .sort(
         (a, b) => a.rank - b.rank || a.entry.label.localeCompare(b.entry.label)
@@ -300,7 +293,7 @@ function SettingsSearch({
           onKeyDown={onKeyDown}
           placeholder="Search settings…"
           aria-label="Search settings"
-          className="h-10 w-full rounded-xl border border-border bg-muted/40 pr-9 pl-9 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-foreground/70"
+          className="h-10 w-full rounded-xl border border-border bg-muted/40 pr-9 pl-9 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground"
         />
         {query && (
           <button
@@ -376,7 +369,9 @@ export const SettingsDialog = memo(function SettingsDialog({
   onOpenConversation?: (conversationId: string) => void;
   initialTab?: SettingsTab;
 }) {
-  const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab || "account");
+  const [activeTab, setActiveTab] = useState<SettingsTab>(
+    initialTab || "account"
+  );
 
   useEffect(() => {
     if (initialTab && open) {
@@ -1343,7 +1338,8 @@ function AppearanceSection() {
 function DataSection({
   onOpenArchived,
   onOpenShared,
-  onDeleteAll,}: {
+  onDeleteAll,
+}: {
   onOpenArchived: () => void;
   onOpenShared: () => void;
   onDeleteAll: () => void;
@@ -1571,7 +1567,9 @@ function FeedbackSection() {
             <Button
               size="sm"
               onClick={handleSubmit}
-              disabled={!feedbackText.trim() || !category || sendFeedback.isPending}
+              disabled={
+                !feedbackText.trim() || !category || sendFeedback.isPending
+              }
               className="rounded-lg bg-foreground text-background hover:bg-foreground/90"
             >
               {sendFeedback.isPending ? "Sending…" : "Send feedback"}

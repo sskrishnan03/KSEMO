@@ -19,13 +19,7 @@ import {
 import { startLogin } from "@/const";
 import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
-import {
-  Files,
-  Menu,
-  MoreHorizontal,
-  Pin,
-  Trash2,
-} from "lucide-react";
+import { Files, Menu, MoreHorizontal, Pin, Trash2 } from "lucide-react";
 import { ShareIcon } from "../components/ksemo/icons";
 import React, { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { memo } from "react";
@@ -44,7 +38,10 @@ import {
 import type { DocFormat } from "@/lib/docFormats";
 import AuthStage from "./AuthStage";
 import { ConversationSidebar } from "../components/ksemo/ConversationSidebar";
-import { MessageContent, type KsemoMessage } from "../components/ksemo/MessageContent";
+import {
+  MessageContent,
+  type KsemoMessage,
+} from "../components/ksemo/MessageContent";
 import { getAuthHeaders } from "@/lib/authHeaders";
 
 import { SettingsDialog } from "../components/ksemo/SettingsDialog";
@@ -242,9 +239,9 @@ export default function Home() {
   const [speechState, setSpeechState] = useState<"idle" | "playing" | "paused">(
     "idle"
   );
-  const [primaryWorkspace, setPrimaryWorkspace] = useState<"library" | "search" | null>(
-    null
-  );
+  const [primaryWorkspace, setPrimaryWorkspace] = useState<
+    "library" | "search" | null
+  >(null);
   const [chatFilesOpen, setChatFilesOpen] = useState(false);
   const [voiceChatOpen, setVoiceChatOpen] = useState(false);
   const activePrimaryWorkspace = primaryWorkspace ?? inlineWorkspaceSection;
@@ -348,10 +345,10 @@ export default function Home() {
   // true for both chat and file streams).
   const isFileGenerating = Boolean(
     activeMode !== "chat" &&
-      fileGeneration &&
-      fileGeneration.status === "processing" &&
-      activeStream &&
-      fileGeneration.messageId === generatingMessageId
+    fileGeneration &&
+    fileGeneration.status === "processing" &&
+    activeStream &&
+    fileGeneration.messageId === generatingMessageId
   );
   // isChatGenerating: true only when a stream is active but we are NOT in
   // file generation — i.e. the normal typing/streaming UI should appear.
@@ -522,9 +519,8 @@ export default function Home() {
         (message.role === "assistant" &&
           message.status === "completed" &&
           (message.attachments ?? []).length > 0);
-      const fileGeneration = (
-        message as Record<string, unknown>
-      ).fileGeneration as
+      const fileGeneration = (message as Record<string, unknown>)
+        .fileGeneration as
         | {
             stage: string;
             format: string;
@@ -793,7 +789,8 @@ export default function Home() {
 
   useEffect(
     () => () => {
-      if (deltaFlushRafRef.current) cancelAnimationFrame(deltaFlushRafRef.current);
+      if (deltaFlushRafRef.current)
+        cancelAnimationFrame(deltaFlushRafRef.current);
       for (const stream of streamsRef.current) stream.controller.abort();
       window.speechSynthesis?.cancel();
     },
@@ -888,7 +885,8 @@ export default function Home() {
       turnId: turnSequence,
       conversationId,
       userMessageId: null as string | null,
-      assistantMessageId: options.regenerateAssistantMessageId ?? `local-assistant-${draftNow}`,
+      assistantMessageId:
+        options.regenerateAssistantMessageId ?? `local-assistant-${draftNow}`,
       controller,
       active: true,
     };
@@ -944,7 +942,9 @@ export default function Home() {
           const errData = await response.json();
           serverError = errData?.error || "";
         } catch {}
-        throw new Error(serverError || "The response stream could not be started.");
+        throw new Error(
+          serverError || "The response stream could not be started."
+        );
       }
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
@@ -983,7 +983,8 @@ export default function Home() {
               // Stay on this (fresh) conversation so the optimistic drafts keep
               // rendering here with their real server ids.
               setActiveConversationId(conv.conversationId);
-              if (user?.id) storeActiveConversationId(user.id, conv.conversationId);
+              if (user?.id)
+                storeActiveConversationId(user.id, conv.conversationId);
               // The local drafts below are authoritative, so the seed effect
               // must not overwrite them with a mid-stream database snapshot.
               seededConversationIdRef.current = conv.conversationId;
@@ -1030,9 +1031,13 @@ export default function Home() {
             lastProgressAt = Date.now();
             const progressStage = str(data.stage) || "analyzing";
             const progressMessage = str(data.message ?? "") || undefined;
-            const researchSourceCount = typeof data.researchSourceCount === "number" ? data.researchSourceCount : undefined;
+            const researchSourceCount =
+              typeof data.researchSourceCount === "number"
+                ? data.researchSourceCount
+                : undefined;
             setFileGeneration(current => {
-              const progressFormat = str(data.format ?? "") || current?.format || "";
+              const progressFormat =
+                str(data.format ?? "") || current?.format || "";
               return {
                 messageId: str(data.messageId),
                 stage: progressStage,
@@ -1040,7 +1045,8 @@ export default function Home() {
                 status: "processing",
                 createdAt: current?.createdAt ?? Date.now(),
                 message: progressMessage,
-                researchSourceCount: researchSourceCount ?? current?.researchSourceCount,
+                researchSourceCount:
+                  researchSourceCount ?? current?.researchSourceCount,
               };
             });
             if (isViewingThisStream()) {
@@ -1128,7 +1134,8 @@ export default function Home() {
                           stage: "completed",
                           format: fileGeneration?.format || "",
                           status: "created" as const,
-                          researchSourceCount: fileGeneration?.researchSourceCount,
+                          researchSourceCount:
+                            fileGeneration?.researchSourceCount,
                           sources: fileSources ?? fileGeneration?.sources,
                           metrics: fileMetrics ?? fileGeneration?.metrics,
                         },
@@ -1228,7 +1235,10 @@ export default function Home() {
       flushPendingDeltas();
       if (!completedConversation) {
         setComposerValue(current => (current ? current : content));
-        if (options.regenerateAssistantMessageId || options.replaceUserMessageId) {
+        if (
+          options.regenerateAssistantMessageId ||
+          options.replaceUserMessageId
+        ) {
           // The turn ids are already server-recognized; keep the layout intact
           // and mark the in-flight bubble as failed so Retry is available.
           setChatMessages(current =>
@@ -1301,7 +1311,7 @@ export default function Home() {
         );
       }
     }
-    
+
     // Clear active mode when stopping generation
     setActiveMode("chat");
   }
@@ -1481,8 +1491,6 @@ export default function Home() {
     });
   }
 
-
-
   async function attachFromComposer(file: File) {
     if (file.size > 25 * 1024 * 1024 || !file.type) {
       return;
@@ -1575,18 +1583,15 @@ export default function Home() {
         return;
       }
       const timestamp = Date.now();
-      const file = new File(
-        [blob],
-        `ksemo-screenshot-${timestamp}.png`,
-        { type: "image/png" }
-      );
+      const file = new File([blob], `ksemo-screenshot-${timestamp}.png`, {
+        type: "image/png",
+      });
       await attachFromComposer(file);
     } catch (error: unknown) {
       if (stream) {
         for (const track of stream.getVideoTracks()) track.stop();
       }
-      const name =
-        error instanceof Error ? error.name : String(error);
+      const name = error instanceof Error ? error.name : String(error);
       if (name === "NotAllowedError") return;
       if (name === "NotReadableError") {
         return;
@@ -1723,8 +1728,8 @@ export default function Home() {
   // these, useMemo/React.memo boundaries would be defeated because Home
   // recreates plain function declarations on each render.
   const stableSendMessage = usePersistFn(sendMessage);
-  const stableComposerSend = usePersistFn((content: string) =>
-    void sendMessage(content)
+  const stableComposerSend = usePersistFn(
+    (content: string) => void sendMessage(content)
   );
   const stableStopGeneration = usePersistFn(stopGeneration);
   const stableNewChat = usePersistFn(newChat);
@@ -1760,11 +1765,10 @@ export default function Home() {
     (messageId: string, value: "up" | "down") =>
       messageFeedbackMutation.mutate({ messageId, value })
   );
-  const stableOnClearAttachment = usePersistFn(
-    (fileId?: string) =>
-      setAttachmentNotices(current =>
-        fileId ? current.filter(file => file.fileId !== fileId) : []
-      )
+  const stableOnClearAttachment = usePersistFn((fileId?: string) =>
+    setAttachmentNotices(current =>
+      fileId ? current.filter(file => file.fileId !== fileId) : []
+    )
   );
   const stableOnCloseSidebar = usePersistFn(() => setSidebarOpen(false));
   const stableOnToggleCollapsed = usePersistFn(() =>
@@ -1779,13 +1783,11 @@ export default function Home() {
   const stableRenameSubmit = usePersistFn((id: string, title: string) => {
     renameMutation.mutate({ id, title });
   });
-  const stableOnDuplicate = usePersistFn(
-    (conversation: { id: string }) =>
-      duplicateMutation.mutate({ id: conversation.id })
+  const stableOnDuplicate = usePersistFn((conversation: { id: string }) =>
+    duplicateMutation.mutate({ id: conversation.id })
   );
-  const stableOnArchive = usePersistFn(
-    (conversation: { id: string }) =>
-      archiveMutation.mutate({ id: conversation.id, isArchived: true })
+  const stableOnArchive = usePersistFn((conversation: { id: string }) =>
+    archiveMutation.mutate({ id: conversation.id, isArchived: true })
   );
   const stableOnPin = usePersistFn(
     (conversation: { id: string; isPinned: boolean }) =>
@@ -1841,11 +1843,11 @@ export default function Home() {
         stableOnToggleCollapsed();
       }
     },
-    onOpenSettings: (tab) => {
+    onOpenSettings: tab => {
       if (tab) setSettingsInitialTab(tab as any);
       setSettingsOpen(true);
     },
-    onModeChange: (mode) => setActiveMode(mode),
+    onModeChange: mode => setActiveMode(mode),
     focusTargetId: "ksemo-composer-textarea",
   });
   const stableOnSupport = usePersistFn((topic: "faq" | "privacy" | "terms") =>
@@ -1878,14 +1880,14 @@ export default function Home() {
   const stableShareOnOpenChange = usePersistFn((next: boolean) => {
     if (!next) setShareTarget(null);
   });
-  const stableShareOnCopy = usePersistFn(() => void copyConversationShareLink());
-  const stableShareOnEmail = usePersistFn(openEmailShare);
-  const stableShareOnSetPublic = usePersistFn(
-    (isPublic: boolean) => {
-      if (shareTarget)
-        publicShareMutation.mutate({ id: shareTarget.id, isPublic });
-    }
+  const stableShareOnCopy = usePersistFn(
+    () => void copyConversationShareLink()
   );
+  const stableShareOnEmail = usePersistFn(openEmailShare);
+  const stableShareOnSetPublic = usePersistFn((isPublic: boolean) => {
+    if (shareTarget)
+      publicShareMutation.mutate({ id: shareTarget.id, isPublic });
+  });
   const stableWorkspaceOnOpenChange = usePersistFn((next: boolean) => {
     if (!next && isWorkspaceDeletePreview)
       window.history.replaceState({}, "", "/");
@@ -1967,10 +1969,7 @@ export default function Home() {
   const composerElement = renderComposer();
   const voiceComposerElement = renderComposer({ hideVoiceInput: true });
 
-  if (loading)
-    return (
-      <Loading fullScreen />
-    );
+  if (loading) return <Loading fullScreen />;
 
   if (!user || isSignedOutPreview) return <AuthStage />;
 
@@ -2004,9 +2003,7 @@ export default function Home() {
 
       <main className="relative flex min-w-0 flex-1 flex-col">
         {activePrimaryWorkspace === "library" ? (
-          <LibraryWorkspace
-            onChatWithFiles={startChatWithLibraryFiles}
-          />
+          <LibraryWorkspace onChatWithFiles={startChatWithLibraryFiles} />
         ) : activePrimaryWorkspace === "search" ? (
           <SearchWorkspace
             onBackToChat={() => setPrimaryWorkspace(null)}
@@ -2053,7 +2050,9 @@ export default function Home() {
                       }}
                     >
                       <Pin className="mr-2 size-4" />
-                      {activeQuery.data?.conversation?.isPinned ? "Unpin" : "Pin"}
+                      {activeQuery.data?.conversation?.isPinned
+                        ? "Unpin"
+                        : "Pin"}
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       disabled={!activeConversationId}
@@ -2077,7 +2076,7 @@ export default function Home() {
                       }}
                     >
                       <ShareIcon className="mr-2 size-4" />
-                        Share
+                      Share
                     </DropdownMenuItem>
                     <DropdownMenuItem onSelect={() => setChatFilesOpen(true)}>
                       <Files className="mr-2 size-4" />
@@ -2127,73 +2126,83 @@ export default function Home() {
                   {visibleMessages.map(message => {
                     return (
                       <Fragment key={message.id}>
-                  {(() => {
-const activeFileGen =
-                      fileGeneration && fileGeneration.messageId === message.id
-                        ? fileGeneration
-                        : message.fileGeneration
-                            ? {
-                                messageId: message.id,
-                                stage: message.fileGeneration.stage,
-                                format: message.fileGeneration.format,
-                                status: message.fileGeneration.status,
-                                createdAt: 0,
-                                message: message.fileGeneration.message,
-                                researchSourceCount: message.fileGeneration.researchSourceCount,
-                                sources: message.fileGeneration.sources,
-                                metrics: message.fileGeneration.metrics,
-                              }
-                            : null;
-                    return activeFileGen ? (
-                      <div className="mb-2 animate-in fade-in-0 duration-150">
-                        <FileCreationCard
-                          stage={
-                            activeFileGen.status === "created"
-                              ? "completed"
-                              : activeFileGen.status === "error"
-                                ? "error"
-                                : (activeFileGen.stage as FileCreationStage)
+                        {(() => {
+                          const activeFileGen =
+                            fileGeneration &&
+                            fileGeneration.messageId === message.id
+                              ? fileGeneration
+                              : message.fileGeneration
+                                ? {
+                                    messageId: message.id,
+                                    stage: message.fileGeneration.stage,
+                                    format: message.fileGeneration.format,
+                                    status: message.fileGeneration.status,
+                                    createdAt: 0,
+                                    message: message.fileGeneration.message,
+                                    researchSourceCount:
+                                      message.fileGeneration
+                                        .researchSourceCount,
+                                    sources: message.fileGeneration.sources,
+                                    metrics: message.fileGeneration.metrics,
+                                  }
+                                : null;
+                          return activeFileGen ? (
+                            <div className="mb-2 animate-in fade-in-0 duration-150">
+                              <FileCreationCard
+                                stage={
+                                  activeFileGen.status === "created"
+                                    ? "completed"
+                                    : activeFileGen.status === "error"
+                                      ? "error"
+                                      : (activeFileGen.stage as FileCreationStage)
+                                }
+                                format={
+                                  (activeFileGen.format as DocFormat) ||
+                                  undefined
+                                }
+                                filename={message.attachments?.[0]?.filename}
+                                fileUrl={message.attachments?.[0]?.url}
+                                fileSizeBytes={
+                                  message.attachments?.[0]?.sizeBytes
+                                }
+                                researchSourceCount={
+                                  activeFileGen.researchSourceCount
+                                }
+                                sources={activeFileGen.sources}
+                                metrics={activeFileGen.metrics}
+                                onRetry={() => regenerateMessage(message)}
+                              />
+                            </div>
+                          ) : null;
+                        })()}
+                        <MessageContent
+                          key={message.id}
+                          message={message}
+                          onSpeak={stableSpeak}
+                          onPause={stablePauseSpeech}
+                          onResume={stableResumeSpeech}
+                          onStop={stableStopSpeech}
+                          isSpeaking={speakingMessageId === message.id}
+                          speechState={speechState}
+                          isCurrentGeneration={
+                            isGenerating && generatingMessageId === message.id
                           }
-                          format={
-                            (activeFileGen.format as DocFormat) || undefined
-                          }
-                          filename={message.attachments?.[0]?.filename}
-                          fileUrl={message.attachments?.[0]?.url}
-                          fileSizeBytes={message.attachments?.[0]?.sizeBytes}
-                          researchSourceCount={activeFileGen.researchSourceCount}
-                          sources={activeFileGen.sources}
-                          metrics={activeFileGen.metrics}
-                          onRetry={() => regenerateMessage(message)}
+                          hideTypingIndicator={isFileGenerating}
+                          onEdit={stableEditMessage}
+                          onRegenerate={stableRegenerateMessage}
+                          onRetry={stableRegenerateMessage}
+                          onShare={stableShareMessage}
+                          onDelete={stableDeleteMessage}
+                          onFeedback={stableOnFeedback}
                         />
-                      </div>
-                    ) : null;
-                  })()}
-                      <MessageContent
-                        key={message.id}
-                        message={message}
-                        onSpeak={stableSpeak}
-                        onPause={stablePauseSpeech}
-                        onResume={stableResumeSpeech}
-                        onStop={stableStopSpeech}
-                        isSpeaking={speakingMessageId === message.id}
-                        speechState={speechState}
-                        isCurrentGeneration={
-                          isGenerating && generatingMessageId === message.id
-                        }
-                        hideTypingIndicator={isFileGenerating}
-                        onEdit={stableEditMessage}
-                        onRegenerate={stableRegenerateMessage}
-                        onRetry={stableRegenerateMessage}
-                        onShare={stableShareMessage}
-                        onDelete={stableDeleteMessage}
-                        onFeedback={stableOnFeedback}
-                      />
                       </Fragment>
                     );
                   })}
                   <div ref={messagesEndRef} />
                 </div>
-              ) : activeQuery.isLoading && activeConversationId && !isGenerating ? (
+              ) : activeQuery.isLoading &&
+                activeConversationId &&
+                !isGenerating ? (
                 <Loading />
               ) : (
                 <EmptyState
@@ -2399,7 +2408,9 @@ const KsemoTextDialog = memo(function KsemoTextDialog({
       <DialogContent className="rounded-2xl border bg-background sm:max-w-sm">
         <div className="py-1">
           <div className="space-y-1">
-            <h2 className="text-lg font-semibold tracking-[-0.02em]">{title}</h2>
+            <h2 className="text-lg font-semibold tracking-[-0.02em]">
+              {title}
+            </h2>
             {description && (
               <p className="text-sm leading-relaxed text-muted-foreground">
                 {description}
@@ -2413,7 +2424,7 @@ const KsemoTextDialog = memo(function KsemoTextDialog({
                 value={value}
                 onChange={event => onValueChange(event.target.value)}
                 autoFocus
-                className="min-h-32 w-full resize-none rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:border-foreground/70 transition-colors"
+                className="min-h-32 w-full resize-none rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none transition-colors"
               />
             ) : (
               <input
@@ -2429,7 +2440,7 @@ const KsemoTextDialog = memo(function KsemoTextDialog({
                     if (value.trim()) onAction();
                   }
                 }}
-                className="h-11 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none focus-visible:border-foreground/70 transition-colors"
+                className="h-11 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition-colors"
               />
             )}
           </div>

@@ -144,7 +144,9 @@ export function LibraryWorkspace({
   const filesQuery = trpc.workspace.files.list.useQuery();
   useEffect(() => {
     if (!initialFileId || initialOpenedRef.current) return;
-    const file = (filesQuery.data ?? []).find(item => item.id === initialFileId);
+    const file = (filesQuery.data ?? []).find(
+      item => item.id === initialFileId
+    );
     if (file) {
       initialOpenedRef.current = true;
       setSelectedIds(current => new Set(current).add(file.id));
@@ -343,7 +345,7 @@ export function LibraryWorkspace({
       />
       {isDragging && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
-          <div className="rounded-2xl border-2 border-dashed border-foreground/30 bg-card p-8 text-center">
+          <div className="rounded-2xl border-2 border-dashed border-muted-foreground/40 bg-card p-8 text-center">
             <Upload className="mx-auto size-12 text-muted-foreground" />
             <p className="mt-4 text-lg font-medium">Drop files to upload</p>
             <p className="mt-2 text-sm text-muted-foreground">
@@ -439,7 +441,7 @@ export function LibraryWorkspace({
 
         {selectedFiles.length > 0 && (
           <section
-            className="sticky top-3 z-20 mt-4 flex flex-col gap-3 rounded-2xl border border-foreground/15 bg-card/95 p-3 shadow-lg backdrop-blur sm:flex-row sm:items-center sm:justify-between"
+            className="sticky top-3 z-20 mt-4 flex flex-col gap-3 rounded-2xl border border-muted-foreground/20 bg-card/95 p-3 shadow-lg backdrop-blur sm:flex-row sm:items-center sm:justify-between"
             aria-label="Selected Library actions"
           >
             <div className="flex items-center gap-2">
@@ -567,7 +569,12 @@ export function LibraryWorkspace({
         }}
       >
         <DialogContent className="rounded-2xl sm:max-w-md">
-          {shareTarget && <ShareFilePanel file={shareTarget} onClose={() => setShareTarget(null)} />}
+          {shareTarget && (
+            <ShareFilePanel
+              file={shareTarget}
+              onClose={() => setShareTarget(null)}
+            />
+          )}
         </DialogContent>
       </Dialog>
 
@@ -656,8 +663,8 @@ function SelectionCircle({ selected }: { selected: boolean }) {
       className={cn(
         "flex size-5 items-center justify-center rounded-full border transition-colors",
         selected
-          ? "border-foreground bg-foreground text-background"
-          : "border-foreground/40 bg-foreground/5 text-transparent"
+          ? "border-muted-foreground bg-muted-foreground text-background"
+          : "border-muted-foreground/40 bg-muted-foreground/5 text-transparent"
       )}
     >
       <Check className="size-3" />
@@ -715,11 +722,7 @@ function FilePreview({
       />
     );
   if (compact)
-    return (
-      <visual.Icon
-        className={cn("size-10 shrink-0", visual.className)}
-      />
-    );
+    return <visual.Icon className={cn("size-10 shrink-0", visual.className)} />;
   return (
     <span className="flex size-full items-center justify-center bg-muted/45">
       <visual.Icon className={cn("size-12", visual.className)} />
@@ -744,6 +747,7 @@ const LibraryGridCard = memo(function LibraryGridCard({
   onShare: (file: LibraryWorkspaceFile) => void;
   onDelete: (file: LibraryWorkspaceFile) => void;
 }) {
+  const [menuOpen, setMenuOpen] = useState(false);
   const isFavorite = Boolean(file.isFavorite);
   const selectWithKeyboard = (event: React.KeyboardEvent<HTMLElement>) => {
     if (event.key === "Enter" || event.key === " ") {
@@ -760,10 +764,10 @@ const LibraryGridCard = memo(function LibraryGridCard({
       aria-label={`${selected ? "Deselect" : "Select"} ${file.filename}`}
       aria-pressed={selected}
       className={cn(
-"group relative cursor-pointer overflow-hidden rounded-2xl border bg-card transition-colors focus-visible:outline-none",
-          selected
-            ? "border-foreground ring-1 ring-foreground/40"
-            : "border-border hover:border-foreground/60"
+        "group relative cursor-pointer overflow-hidden rounded-2xl border bg-card transition-colors focus-visible:outline-none",
+        selected
+          ? "border-muted-foreground/60 ring-1 ring-muted-foreground/40"
+          : "border-border"
       )}
     >
       <button
@@ -774,7 +778,7 @@ const LibraryGridCard = memo(function LibraryGridCard({
         }}
         className={cn(
           "pointer-events-none absolute left-2.5 top-2.5 z-10 rounded-full p-0.5 transition-[opacity,transform] duration-150 group-hover:pointer-events-auto group-hover:scale-100 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:scale-100 group-focus-within:opacity-100 group-active:pointer-events-auto group-active:scale-100 group-active:opacity-100 focus-visible:pointer-events-auto focus-visible:scale-100 focus-visible:opacity-100 max-lg:pointer-events-auto max-lg:scale-100 max-lg:opacity-100",
-          selected ? "scale-100 opacity-100" : "scale-90 opacity-0"
+          selected || menuOpen ? "scale-100 opacity-100" : "scale-90 opacity-0"
         )}
         aria-label={`${selected ? "Deselect" : "Select"} ${file.filename}`}
         aria-pressed={selected}
@@ -782,8 +786,13 @@ const LibraryGridCard = memo(function LibraryGridCard({
         <SelectionCircle selected={selected} />
       </button>
       {!selected && (
-        <div className="pointer-events-none absolute right-2.5 top-2.5 z-10 scale-90 opacity-0 transition-[opacity,transform] duration-150 group-hover:pointer-events-auto group-hover:scale-100 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:scale-100 group-focus-within:opacity-100 group-active:pointer-events-auto group-active:scale-100 group-active:opacity-100 focus-visible:pointer-events-auto focus-visible:scale-100 focus-visible:opacity-100 max-lg:pointer-events-auto max-lg:scale-100 max-lg:opacity-100 [&:has([data-state=open])]:pointer-events-auto [&:has([data-state=open])]:scale-100 [&:has([data-state=open])]:opacity-100">
-          <DropdownMenu>
+        <div
+          className={cn(
+            "pointer-events-none absolute right-2.5 top-2.5 z-10 scale-90 opacity-0 transition-[opacity,transform] duration-150 group-hover:pointer-events-auto group-hover:scale-100 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:scale-100 group-focus-within:opacity-100 group-active:pointer-events-auto group-active:scale-100 group-active:opacity-100 focus-visible:pointer-events-auto focus-visible:scale-100 focus-visible:opacity-100 max-lg:pointer-events-auto max-lg:scale-100 max-lg:opacity-100",
+            menuOpen && "pointer-events-auto scale-100 opacity-100"
+          )}
+        >
+          <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
@@ -829,7 +838,9 @@ const LibraryGridCard = memo(function LibraryGridCard({
                   onToggleFavorite(file);
                 }}
               >
-                <Star className={cn("mr-2 size-4", isFavorite && "fill-current")} />
+                <Star
+                  className={cn("mr-2 size-4", isFavorite && "fill-current")}
+                />
                 {isFavorite ? "Remove from favorites" : "Add to favorites"}
               </DropdownMenuItem>
               <DropdownMenuItem
@@ -892,6 +903,7 @@ const LibraryListRow = memo(function LibraryListRow({
   onShare: (file: LibraryWorkspaceFile) => void;
   onDelete: (file: LibraryWorkspaceFile) => void;
 }) {
+  const [menuOpen, setMenuOpen] = useState(false);
   const isFavorite = Boolean(file.isFavorite);
   const selectWithKeyboard = (event: React.KeyboardEvent<HTMLElement>) => {
     if (event.key === "Enter" || event.key === " ") {
@@ -920,7 +932,7 @@ const LibraryListRow = memo(function LibraryListRow({
         }}
         className={cn(
           "pointer-events-none rounded-full p-0.5 transition-[opacity,transform] duration-150 group-hover:pointer-events-auto group-hover:scale-100 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:scale-100 group-focus-within:opacity-100 group-active:pointer-events-auto group-active:scale-100 group-active:opacity-100 focus-visible:pointer-events-auto focus-visible:scale-100 focus-visible:opacity-100 max-lg:pointer-events-auto max-lg:scale-100 max-lg:opacity-100",
-          selected ? "scale-100 opacity-100" : "scale-90 opacity-0"
+          selected || menuOpen ? "scale-100 opacity-100" : "scale-90 opacity-0"
         )}
         aria-label={`${selected ? "Deselect" : "Select"} ${file.filename}`}
         aria-pressed={selected}
@@ -951,8 +963,13 @@ const LibraryListRow = memo(function LibraryListRow({
         </p>
       </a>
       {!selected && (
-        <div className="pointer-events-none scale-90 opacity-0 transition-[opacity,transform] duration-150 group-hover:pointer-events-auto group-hover:scale-100 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:scale-100 group-focus-within:opacity-100 group-active:pointer-events-auto group-active:scale-100 group-active:opacity-100 focus-visible:pointer-events-auto focus-visible:scale-100 focus-visible:opacity-100 max-lg:pointer-events-auto max-lg:scale-100 max-lg:opacity-100 [&:has([data-state=open])]:pointer-events-auto [&:has([data-state=open])]:scale-100 [&:has([data-state=open])]:opacity-100">
-          <DropdownMenu>
+        <div
+          className={cn(
+            "pointer-events-none scale-90 opacity-0 transition-[opacity,transform] duration-150 group-hover:pointer-events-auto group-hover:scale-100 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:scale-100 group-focus-within:opacity-100 group-active:pointer-events-auto group-active:scale-100 group-active:opacity-100 focus-visible:pointer-events-auto focus-visible:scale-100 focus-visible:opacity-100 max-lg:pointer-events-auto max-lg:scale-100 max-lg:opacity-100",
+            menuOpen && "pointer-events-auto scale-100 opacity-100"
+          )}
+        >
+          <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
@@ -998,7 +1015,9 @@ const LibraryListRow = memo(function LibraryListRow({
                   onToggleFavorite(file);
                 }}
               >
-                <Star className={cn("mr-2 size-4", isFavorite && "fill-current")} />
+                <Star
+                  className={cn("mr-2 size-4", isFavorite && "fill-current")}
+                />
                 {isFavorite ? "Remove from favorites" : "Add to favorites"}
               </DropdownMenuItem>
               <DropdownMenuItem
@@ -1128,8 +1147,8 @@ function ShareFilePanel({
       <div className="rounded-xl border border-border bg-muted/60 p-3">
         <p className="text-sm font-medium">File link</p>
         <p className="mt-1 text-xs leading-5 text-muted-foreground">
-          Anyone with this link can open the file. Only you can delete or
-          rename it.
+          Anyone with this link can open the file. Only you can delete or rename
+          it.
         </p>
         <div className="mt-3 flex gap-2">
           <Input
@@ -1148,8 +1167,8 @@ function ShareFilePanel({
           Email
         </Label>
         <p className="mt-1 text-xs leading-5 text-muted-foreground">
-          Open your email app with the link included. Sending remains under
-          your control.
+          Open your email app with the link included. Sending remains under your
+          control.
         </p>
         <div className="mt-3 flex gap-2">
           <Input
