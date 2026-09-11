@@ -59,7 +59,7 @@ const CHAT_PLACEHOLDER = "Ask KSEMO anything you need...";
 const VOICE_PLACEHOLDER =
   "Ask me out loud or type your question here...";
 
-const COMPACT_INPUT_MAX_HEIGHT = 112;
+const COMPACT_INPUT_MAX_HEIGHT = 192;
 const EXPANDED_INPUT_MAX_HEIGHT = 320;
 const MIN_INPUT_HEIGHT = 40;
 
@@ -635,11 +635,17 @@ export const ChatComposer = memo(function ChatComposer({
               }}
               className={cn(
                 "min-h-10 min-w-0 flex-1 overflow-y-auto whitespace-pre-wrap border-0 !bg-transparent pl-2.5 py-1 text-[15px] leading-6 md:text-[15px] shadow-none focus-visible:ring-0 outline-none dark:!bg-transparent",
-                expanded ? "max-h-80" : "max-h-28",
+                expanded ? "max-h-80" : "max-h-48",
                 canExpand ? "pr-10" : "pr-1"
               )}
               style={{ height: "40px" }}
             />
+            {canExpand && (
+              <div
+                className="pointer-events-none absolute inset-x-0 -bottom-1 h-9 bg-gradient-to-t from-[#20201F] to-transparent"
+                aria-hidden="true"
+              />
+            )}
             {canExpand && (
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -648,7 +654,7 @@ export const ChatComposer = memo(function ChatComposer({
                     tabIndex={-1}
                     onClick={() => setExpanded(current => !current)}
                     className="absolute right-1.5 top-1.5 z-10 flex size-8 items-center justify-center rounded-full bg-transparent text-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-0 focus-visible:outline-none"
-                    aria-label={expanded ? "Collapse input" : "Expand input"}
+                    aria-label={expanded ? "Collapse" : "Expand"}
                     aria-pressed={expanded}
                   >
                     <ChevronDown
@@ -660,7 +666,7 @@ export const ChatComposer = memo(function ChatComposer({
                   </button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom">
-                  {expanded ? "Collapse input" : "Expand input"}
+                  {expanded ? "Collapse" : "Expand"}
                 </TooltipContent>
               </Tooltip>
             )}

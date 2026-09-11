@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { getFileKind } from "@/lib/fileKinds";
 import {
   Check,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Copy,
@@ -30,7 +31,7 @@ import {
   X,
 } from "lucide-react";
 import { ShareIcon } from "./icons";
-import React, { memo, useEffect, useState } from "react";
+import React, { memo, useEffect, useRef, useState } from "react";
 import { Streamdown } from "streamdown";
 import { KsemoMarkdownCode } from "./code-block";
 import { sanitizeAssistantText } from "@/lib/sanitizeAssistant";
@@ -140,6 +141,9 @@ export const MessageContent = memo(function MessageContent({
   const [copied, setCopied] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [previewFile, setPreviewFile] = useState<KsemoFile | null>(null);
+  const [userExpanded, setUserExpanded] = useState(false);
+  const [userLong, setUserLong] = useState(false);
+  const userTextRef = useRef<HTMLParagraphElement | null>(null);
   const isUser = message.role === "user";
   const images = (message.attachments ?? []).filter(f =>
     f.mimeType?.startsWith("image/")
@@ -172,6 +176,13 @@ export const MessageContent = memo(function MessageContent({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [previewFile]);
+
+  useEffect(() => {
+    if (!isUser || !userTextRef.current) return;
+    const el = userTextRef.current;
+    const overflows = el.scrollHeight > el.clientHeight + 1;
+    setUserLong(overflows);
+  }, [isUser, message.content]);
 
   async function copyMessage() {
     await navigator.clipboard.writeText(cleanContent);
@@ -288,12 +299,70 @@ export const MessageContent = memo(function MessageContent({
           className={cn(
             "text-[15px] leading-6",
             isUser
-              ? "w-fit rounded-2xl rounded-tr-md border border-border bg-muted px-3.5 py-2.5 text-[15px] leading-6 text-foreground shadow-sm"
+              ? "flex w-fit max-w-full flex-col items-end rounded-2xl rounded-tr-md border border-border bg-muted px-3.5 py-2.5 text-[15px] leading-6 text-foreground shadow-sm"
               : "max-w-none rounded-tl-md bg-transparent px-0 py-0 text-foreground"
           )}
         >
           {isUser ? (
-            <p className="whitespace-pre-wrap">{message.content}</p>
+            !userExpanded ? (
+              <div
+                role={userLong ? "button" : undefined}
+                tabIndex={userLong ? 0 : undefined}
+                aria-expanded={userLong ? false : undefined}
+                onClick={
+                  userLong ? () => setUserExpanded(true) : undefined
+                }
+                onKeyDown={
+                  userLong
+                    ? e => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          setUserExpanded(true);
+                        }
+                      }
+                    : undefined
+                }
+                className="relative w-full cursor-pointer text-left"
+              >
+                <p
+                  ref={userTextRef}
+                  className="w-full whitespace-pre-wrap text-left line-clamp-8"
+                >
+                  {message.content}
+                </p>
+                {userLong && (
+                  <>
+                    <div
+                      className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-muted to-transparent"
+                      aria-hidden="true"
+                    />
+                    <span className="pointer-events-none absolute bottom-1 right-0 flex items-center gap-1 rounded-full bg-foreground px-3 py-1 text-[13px] font-semibold text-background shadow-sm">
+                      Show more
+                      <ChevronDown className="size-3.5" />
+                    </span>
+                  </>
+                )}
+              </div>
+            ) : (
+              <>
+                <p
+                  ref={userTextRef}
+                  className="w-full whitespace-pre-wrap text-left"
+                >
+                  {message.content}
+                </p>
+                {userLong && (
+                  <button
+                    type="button"
+                    onClick={() => setUserExpanded(false)}
+                    className="mt-1 flex items-center gap-1 self-end rounded-full bg-foreground px-3 py-1 text-[13px] font-semibold text-background shadow-sm transition-colors hover:bg-foreground/90"
+                  >
+                    Show less
+                    <ChevronDown className="size-3.5 rotate-180 transition-transform" />
+                  </button>
+                )}
+              </>
+            )
           ) : cleanContent ? (
             <div className="ksemo-markdown prose prose-neutral max-w-none text-[15px] leading-6 dark:prose-invert">
               <Streamdown
