@@ -13,11 +13,11 @@ import { trpc } from "@/lib/trpc";
 import { ConfirmDeleteDialog } from "./ConfirmDeleteDialog";
 import { KsemoFilePreviewOverlay } from "./KsemoFilePreviewOverlay";
 import {
-  extensionOfFilename,
   fileVisualFor,
   guessMimeType,
   isSupportedUpload,
 } from "@/lib/fileIcons";
+import { format, isToday, isYesterday, isThisYear } from "date-fns";
 import { cn } from "@/lib/utils";
 import {
   Check,
@@ -744,7 +744,6 @@ const LibraryGridCard = memo(function LibraryGridCard({
   onShare: (file: LibraryWorkspaceFile) => void;
   onDelete: (file: LibraryWorkspaceFile) => void;
 }) {
-  const image = file.mimeType?.startsWith("image/");
   const isFavorite = Boolean(file.isFavorite);
   const selectWithKeyboard = (event: React.KeyboardEvent<HTMLElement>) => {
     if (event.key === "Enter" || event.key === " ") {
@@ -868,7 +867,7 @@ const LibraryGridCard = memo(function LibraryGridCard({
             {file.filename}
           </p>
           <p className="mt-0.5 text-[11px] text-muted-foreground">
-            {image ? "Image" : kindLabel(file.filename)}
+            {formatDateLabel(file.createdAt)}
           </p>
         </a>
       </div>
@@ -893,7 +892,6 @@ const LibraryListRow = memo(function LibraryListRow({
   onShare: (file: LibraryWorkspaceFile) => void;
   onDelete: (file: LibraryWorkspaceFile) => void;
 }) {
-  const image = file.mimeType?.startsWith("image/");
   const isFavorite = Boolean(file.isFavorite);
   const selectWithKeyboard = (event: React.KeyboardEvent<HTMLElement>) => {
     if (event.key === "Enter" || event.key === " ") {
@@ -949,7 +947,7 @@ const LibraryListRow = memo(function LibraryListRow({
           {file.filename}
         </p>
         <p className="mt-0.5 text-xs text-muted-foreground">
-          {image ? "Image" : kindLabel(file.filename)} · {file.mimeType}
+          {formatDateLabel(file.createdAt)}
         </p>
       </a>
       {!selected && (
@@ -1021,28 +1019,12 @@ const LibraryListRow = memo(function LibraryListRow({
   );
 });
 
-const KIND_LABELS: Record<string, string> = {
-  pdf: "PDF",
-  doc: "Document",
-  docx: "Document",
-  xls: "Spreadsheet",
-  xlsx: "Spreadsheet",
-  csv: "Data",
-  tsv: "Data",
-  ppt: "Presentation",
-  pptx: "Presentation",
-  json: "JSON",
-  xml: "XML",
-  yml: "Config",
-  yaml: "Config",
-  txt: "Text",
-  md: "Markdown",
-  markdown: "Markdown",
-  log: "Log",
-};
-
-function kindLabel(filename: string) {
-  return KIND_LABELS[extensionOfFilename(filename)] ?? "File";
+function formatDateLabel(date: Date | undefined): string {
+  if (!date) return "";
+  if (isToday(date)) return "Today";
+  if (isYesterday(date)) return "Yesterday";
+  if (isThisYear(date)) return format(date, "MMM d");
+  return format(date, "MMM d, yyyy");
 }
 
 function RenameFilePanel({
