@@ -260,6 +260,7 @@ export default function Home() {
   const [editingMessage, setEditingMessage] = useState<KsemoMessage | null>(
     null
   );
+  const savedComposerDraftRef = useRef("");
   const [editValue, setEditValue] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<{
     kind: "conversation" | "message";
@@ -422,6 +423,7 @@ export default function Home() {
     initialSelectionUserIdRef.current = null;
     setChatMessages([]);
     setActiveConversationId(null);
+    activeConversationIdRef.current = null;
     setAttachmentNotices([]);
   }, [user]);
   const renameMutation = trpc.conversation.rename.useMutation({
@@ -465,6 +467,7 @@ export default function Home() {
     onSuccess: conversation => {
       utils.conversation.list.invalidate();
       setActiveConversationId(conversation.id);
+      activeConversationIdRef.current = conversation.id;
     },
   });
   const messageEditMutation = trpc.message.edit.useMutation({
@@ -684,12 +687,15 @@ export default function Home() {
         .fetch({ id: sharedConversationId })
         .then(() => {
           setActiveConversationId(sharedConversationId);
+          activeConversationIdRef.current = sharedConversationId;
           window.history.replaceState({}, "", window.location.pathname);
         })
         .catch(() => {
           window.history.replaceState({}, "", window.location.pathname);
-          if (conversationQuery.data.length)
+          if (conversationQuery.data.length) {
             setActiveConversationId(conversationQuery.data[0].id);
+            activeConversationIdRef.current = conversationQuery.data[0].id;
+          }
         });
       return;
     }
@@ -703,6 +709,7 @@ export default function Home() {
       conversationQuery.data.some(item => item.id === stored.conversationId)
     ) {
       setActiveConversationId(stored.conversationId);
+      activeConversationIdRef.current = stored.conversationId;
       return;
     }
     if (activeConversationId === null) rememberNewChatIntent(user.id);
@@ -809,7 +816,15 @@ export default function Home() {
     setChatMessages(current => {
       let changed = false;
       const next = current.map(message => {
-        const delta = deltas.get(message.id);
+        let delta = deltas.get(message.id);
+        if (
+          delta === undefined &&
+          message.role === "assistant" &&
+          message.status === "streaming" &&
+          deltas.size === 1
+        ) {
+          delta = deltas.values().next().value;
+        }
         if (delta === undefined) return message;
         changed = true;
         return { ...message, content: message.content + delta };
@@ -984,6 +999,7 @@ export default function Home() {
               // Stay on this (fresh) conversation so the optimistic drafts keep
               // rendering here with their real server ids.
               setActiveConversationId(conv.conversationId);
+              activeConversationIdRef.current = conv.conversationId;
               if (user?.id)
                 storeActiveConversationId(user.id, conv.conversationId);
               // The local drafts below are authoritative, so the seed effect
@@ -1336,6 +1352,7 @@ export default function Home() {
     pendingOpenScrollRef.current = true;
     setChatMessages([]);
     setActiveConversationId(null);
+    activeConversationIdRef.current = null;
     if (user?.id) rememberNewChatIntent(user.id);
     setPrimaryWorkspace(null);
     if (typeof window !== "undefined" && window.location.search.includes("workspace=")) {
@@ -1345,6 +1362,9 @@ export default function Home() {
     }
     setAttachmentNotices([]);
     setActiveMode("chat");
+    setEditingMessage(null);
+    setComposerValue("");
+    savedComposerDraftRef.current = "";
     window.speechSynthesis?.cancel();
     setSpeakingMessageId(null);
     setSpeechState("idle");
@@ -1429,15 +1449,28 @@ export default function Home() {
   }
 
   function editMessage(message: KsemoMessage) {
+    if (!editingMessage) {
+      savedComposerDraftRef.current = composerValue;
+    }
     setEditingMessage(message);
-    setEditValue(message.content);
+    setComposerValue(message.content);
+  }
+
+  function cancelEdit() {
+    setEditingMessage(null);
+    setComposerValue(savedComposerDraftRef.current);
+    savedComposerDraftRef.current = "";
   }
 
   async function saveEditedMessage() {
     const message = editingMessage;
-    const content = editValue.trim();
-    if (!message || !content || content === message.content) {
-      setEditingMessage(null);
+    const content = composerValue.trim();
+    if (!message || !content) {
+      cancelEdit();
+      return;
+    }
+    if (content === message.content) {
+      cancelEdit();
       return;
     }
     try {
@@ -1452,6 +1485,8 @@ export default function Home() {
           }),
         regenerate: (editedContent, assistantMessageId) => {
           setEditingMessage(null);
+          setComposerValue(savedComposerDraftRef.current);
+          savedComposerDraftRef.current = "";
           void sendMessage(editedContent, {
             regenerateAssistantMessageId: assistantMessageId,
             replaceUserMessageId: message.id,
@@ -1460,6 +1495,8 @@ export default function Home() {
         },
       });
       setEditingMessage(null);
+      setComposerValue(savedComposerDraftRef.current);
+      savedComposerDraftRef.current = "";
       setChatMessages(current =>
         current.map(item =>
           item.id === message.id ? { ...item, content } : item
@@ -1700,8 +1737,11 @@ export default function Home() {
     isNearBottomRef.current = true;
     pendingOpenScrollRef.current = true;
     setActiveConversationId(id);
+    activeConversationIdRef.current = id;
     if (user?.id) storeActiveConversationId(user.id, id);
     setAttachmentNotices([]);
+    setEditingMessage(null);
+    savedComposerDraftRef.current = "";
   }
 
   function speak(text: string, messageId: string) {
@@ -1946,10 +1986,7 @@ export default function Home() {
     if (!open) setEditingMessage(null);
   });
   const stableEditAction = usePersistFn(() => void saveEditedMessage());
-  const stableCancelEdit = usePersistFn(() => {
-    setEditingMessage(null);
-    setEditValue("");
-  });
+  const stableCancelEdit = usePersistFn(cancelEdit);
   const stableDeleteDialogOpen = usePersistFn((open: boolean) => {
     if (!open) setDeleteTarget(null);
   });
@@ -2008,6 +2045,9 @@ export default function Home() {
       compactBottomSpacing
       onTakeScreenshot={stableCaptureScreenshot}
       hideVoiceInput={options.hideVoiceInput}
+      isEditingMessage={Boolean(editingMessage)}
+      onSaveEdit={stableEditAction}
+      onCancelEdit={stableCancelEdit}
     />
   );
   const composerElement = renderComposer();

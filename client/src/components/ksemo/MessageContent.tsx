@@ -228,12 +228,7 @@ export const MessageContent = memo(function MessageContent({
           className={cn(
             "min-w-0",
             isUser
-              ? cn(
-                  "flex flex-col items-end",
-                  isEditing
-                    ? "w-full max-w-[92%] sm:max-w-[85%]"
-                    : "w-fit max-w-[84%] sm:max-w-[68%]"
-                )
+              ? "flex flex-col items-end w-fit max-w-[84%] sm:max-w-[68%]"
               : "w-full"
           )}
         >
@@ -317,58 +312,13 @@ export const MessageContent = memo(function MessageContent({
               isUser
                 ? cn(
                     "flex flex-col items-end rounded-2xl rounded-tr-md border border-border bg-muted px-3.5 py-2.5 text-[15px] leading-6 text-foreground shadow-sm",
-                    isEditing ? "w-full min-w-[280px] sm:min-w-[480px]" : "w-fit max-w-full"
+                    isEditing && "ring-1 ring-primary/40 border-primary/40"
                   )
                 : "max-w-none rounded-tl-md bg-transparent px-0 py-0 text-foreground"
             )}
           >
             {isUser ? (
-              isEditing ? (
-                <div className="w-full text-left">
-                  <textarea
-                    autoFocus
-                    value={editValue}
-                    onChange={e => onEditValueChange?.(e.target.value)}
-                    onFocus={e => {
-                      const el = e.currentTarget;
-                      const len = el.value.length;
-                      el.setSelectionRange(len, len);
-                    }}
-                    onKeyDown={e => {
-                      if (e.key === "Escape") {
-                        e.preventDefault();
-                        onCancelEdit?.();
-                      } else if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-                        e.preventDefault();
-                        if (editValue.trim()) onSaveEdit?.();
-                      }
-                    }}
-                    rows={Math.max(2, Math.min(12, editValue.split("\n").length + 1))}
-                    className="w-full resize-none border-0 bg-transparent p-0 text-[15px] leading-6 text-foreground outline-none shadow-none ring-0 focus:outline-none focus:ring-0 placeholder:text-muted-foreground"
-                    placeholder="Edit your message…"
-                  />
-                  <div className="mt-3 flex items-center justify-end gap-2 border-t border-border/40 pt-2.5">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={onCancelEdit}
-                      className="h-8 rounded-lg border border-border/80 bg-background/80 px-3.5 text-xs font-medium text-foreground shadow-sm transition-all hover:bg-accent hover:text-foreground active:scale-[0.98]"
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      onClick={onSaveEdit}
-                      disabled={!editValue.trim()}
-                      className="h-8 rounded-lg bg-foreground px-4 text-xs font-medium text-background hover:bg-foreground/90 disabled:opacity-50"
-                    >
-                      Save
-                    </Button>
-                  </div>
-                </div>
-              ) : !userExpanded ? (
+              !userExpanded ? (
                 <div
                   role={userLong ? "button" : undefined}
                   tabIndex={userLong ? 0 : undefined}
@@ -538,7 +488,7 @@ export const MessageContent = memo(function MessageContent({
               })}
             </div>
           ) : null}
-          {isUser && message.content && !isEditing && (
+          {isUser && message.content && (
             <div className="mt-1.5 flex items-center gap-1 max-lg:opacity-100 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
               {action(
                 "Copy message",
@@ -553,7 +503,7 @@ export const MessageContent = memo(function MessageContent({
                 action("Share message", <ShareIcon className="size-4" />, () =>
                   onShare(message)
                 )}
-              {onEdit &&
+              {onEdit && !isEditing &&
                 action("Edit message", <Pencil className="size-4" />, () =>
                   onEdit(message)
                 )}

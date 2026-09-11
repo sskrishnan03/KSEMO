@@ -115,6 +115,9 @@ export const ChatComposer = memo(function ChatComposer({
   voices,
   selectedVoiceName,
   onVoiceChatVoiceSelect,
+  isEditingMessage = false,
+  onSaveEdit,
+  onCancelEdit,
 }: {
   onSend: (content: string) => void;
   onCancel: () => void;
@@ -173,6 +176,9 @@ export const ChatComposer = memo(function ChatComposer({
   voices?: Array<{ name: string; lang: string; default: boolean }>;
   selectedVoiceName?: string | null;
   onVoiceChatVoiceSelect?: (name: string) => void;
+  isEditingMessage?: boolean;
+  onSaveEdit?: () => void;
+  onCancelEdit?: () => void;
 }) {
   const editorRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -196,10 +202,20 @@ export const ChatComposer = memo(function ChatComposer({
     [libraryFiles, libraryQuery]
   );
   const visibleAttachmentNotices =
-    attachmentNotices ??
-    (attachmentNotice
-      ? [{ fileId: attachmentNotice.name, ...attachmentNotice }]
-      : []);
+    isEditingMessage
+      ? []
+      : attachmentNotices ??
+        (attachmentNotice
+          ? [{ fileId: attachmentNotice.name, ...attachmentNotice }]
+          : []);
+
+  useEffect(() => {
+    if (isEditingMessage) {
+      requestAnimationFrame(() => {
+        placeCaretAtEnd();
+      });
+    }
+  }, [isEditingMessage]);
 
   // ---- Slash command ("/") menu state ----
   const slashPanelRef = useRef<HTMLDivElement>(null);
@@ -209,6 +225,7 @@ export const ChatComposer = memo(function ChatComposer({
     []
   );
   const isSlashActive =
+    !isEditingMessage &&
     !voiceChatActive &&
     activeMode === "chat" &&
     value.startsWith("/") &&
@@ -376,6 +393,12 @@ export const ChatComposer = memo(function ChatComposer({
   }, [libraryOpen]);
 
   function submit() {
+    if (isEditingMessage) {
+      if (value.trim() && !isRecording && !isTranscribing) {
+        onSaveEdit?.();
+      }
+      return;
+    }
     const content = value.trim();
     if ((!content && !visibleAttachmentNotices.length) || isGenerating) return;
     const payload =
@@ -582,10 +605,15 @@ export const ChatComposer = memo(function ChatComposer({
               autoCapitalize="off"
               role="textbox"
               aria-multiline="true"
-              aria-label="Message KSEMO"
+              aria-label={isEditingMessage ? "Edit your message" : "Message KSEMO"}
               onInput={handleEditorInput}
               onPaste={handlePaste}
               onKeyDown={event => {
+                if (isEditingMessage && event.key === "Escape") {
+                  event.preventDefault();
+                  onCancelEdit?.();
+                  return;
+                }
                 if (isSlashActive) {
                   if (event.key === "Escape") {
                     event.preventDefault();
@@ -671,16 +699,22 @@ export const ChatComposer = memo(function ChatComposer({
             {value.length === 0 && !activeModeOption && (
               <span
                 key={
-                  voiceChatActive
-                    ? "voice"
-                    : activeMode && activeMode !== "chat"
-                      ? activeMode
-                      : "chat"
+                  isEditingMessage
+                    ? "edit"
+                    : voiceChatActive
+                      ? "voice"
+                      : activeMode && activeMode !== "chat"
+                        ? activeMode
+                        : "chat"
                 }
                 className="pointer-events-none absolute left-2.5 top-[7px] text-[15px] leading-6 text-muted-foreground animate-[ksemo-placeholder-rise_800ms_ease-out]"
                 aria-hidden="true"
               >
-                {voiceChatActive ? VOICE_PLACEHOLDER : CHAT_PLACEHOLDER}
+                {isEditingMessage
+                  ? "Edit your message…"
+                  : voiceChatActive
+                    ? VOICE_PLACEHOLDER
+                    : CHAT_PLACEHOLDER}
               </span>
             )}
           </div>
@@ -689,111 +723,250 @@ export const ChatComposer = memo(function ChatComposer({
           <div className="flex items-center justify-between pt-1">
             {/* Left Side Controls */}
             <div className="flex items-center gap-1.5">
-              {/* Plus Button */}
-              <DropdownMenu
-                open={toolsOpen && !libraryOpen}
-                onOpenChange={setToolsOpen}
-              >
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="size-10 rounded-full bg-transparent text-foreground hover:bg-accent hover:text-foreground transition-colors"
-                        aria-label="Attach"
-                      >
-                        <Plus className="size-5" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom">{MENU_TITLE}</TooltipContent>
-                </Tooltip>
-                <DropdownMenuContent
-                  align="start"
-                  side={menuPlacement === "below" ? "bottom" : "top"}
-                  sideOffset={8}
-                  alignOffset={-8}
-                  collisionPadding={12}
-                  className="ksemo-thin-scroll w-48 rounded-xl max-h-[16rem] overflow-y-auto"
+              {!isEditingMessage && (
+                <DropdownMenu
+                  open={toolsOpen && !libraryOpen}
+                  onOpenChange={setToolsOpen}
                 >
-                  <DropdownMenuItem
-                    onClick={() => fileInputRef.current?.click()}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="size-10 rounded-full bg-transparent text-foreground hover:bg-accent hover:text-foreground transition-colors"
+                          aria-label="Attach"
+                        >
+                          <Plus className="size-5" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">{MENU_TITLE}</TooltipContent>
+                  </Tooltip>
+                  <DropdownMenuContent
+                    align="start"
+                    side={menuPlacement === "below" ? "bottom" : "top"}
+                    sideOffset={8}
+                    alignOffset={-8}
+                    collisionPadding={12}
+                    className="ksemo-thin-scroll w-48 rounded-xl max-h-[16rem] overflow-y-auto"
                   >
-                    <Paperclip className="mr-2 size-4" /> Upload files
-                  </DropdownMenuItem>
-                  {onTakeScreenshot && (
+                    <DropdownMenuItem
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <Paperclip className="mr-2 size-4" /> Upload files
+                    </DropdownMenuItem>
+                    {onTakeScreenshot && (
+                      <DropdownMenuItem
+                        onSelect={() => {
+                          setToolsOpen(false);
+                          onTakeScreenshot();
+                        }}
+                      >
+                        <Camera className="mr-2 size-4" />
+                        Take Screenshot
+                      </DropdownMenuItem>
+                    )}
                     <DropdownMenuItem
                       onSelect={() => {
+                        setLibraryOpen(true);
                         setToolsOpen(false);
-                        onTakeScreenshot();
                       }}
                     >
-                      <Camera className="mr-2 size-4" />
-                      Take Screenshot
+                      <Library className="mr-2 size-4" />
+                      Browse Library
                     </DropdownMenuItem>
-                  )}
-                  <DropdownMenuItem
-                    onSelect={() => {
-                      setLibraryOpen(true);
-                      setToolsOpen(false);
-                    }}
-                  >
-                    <Library className="mr-2 size-4" />
-                    Browse Library
-                  </DropdownMenuItem>
-                  {!voiceChatActive && (
-                    <>
-                      <DropdownMenuSub>
-                        <DropdownMenuSubTrigger>
-                          <FilePlus2 className="mr-2 size-4" />
-                          Create Files
-                        </DropdownMenuSubTrigger>
-                        <DropdownMenuSubContent
-                          sideOffset={6}
-                          alignOffset={-84}
-                          collisionPadding={16}
-                          className="ksemo-thin-scroll w-44 rounded-xl max-h-[16rem] overflow-y-auto shadow-md"
-                        >
-                          {CAPABILITY_SECTIONS.find(
-                            s => s.id === "create"
-                          )?.options.map(option => {
-                            const Icon = option.icon;
-                            const isActive = activeMode === option.mode;
-                            return (
-                              <DropdownMenuItem
-                                key={option.mode}
-                                onSelect={() => {
-                                  if (isActive) {
-                                    onModeChange?.(null);
-                                  } else {
-                                    onModeChange?.(option.mode);
-                                    requestAnimationFrame(() => {
-                                      placeCaretAtEnd();
-                                    });
-                                  }
-                                  setToolsOpen(false);
-                                }}
-                              >
-                                <Icon className="mr-2 size-5" />
-                                {option.title}
-                                {isActive && (
-                                  <Check className="ml-auto size-4 text-foreground" />
-                                )}
-                              </DropdownMenuItem>
-                            );
-                          })}
-                        </DropdownMenuSubContent>
-                      </DropdownMenuSub>
-                    </>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
+                    {!voiceChatActive && (
+                      <>
+                        <DropdownMenuSub>
+                          <DropdownMenuSubTrigger>
+                            <FilePlus2 className="mr-2 size-4" />
+                            Create Files
+                          </DropdownMenuSubTrigger>
+                          <DropdownMenuSubContent
+                            sideOffset={6}
+                            alignOffset={-84}
+                            collisionPadding={16}
+                            className="ksemo-thin-scroll w-44 rounded-xl max-h-[16rem] overflow-y-auto shadow-md"
+                          >
+                            {CAPABILITY_SECTIONS.find(
+                              s => s.id === "create"
+                            )?.options.map(option => {
+                              const Icon = option.icon;
+                              const isActive = activeMode === option.mode;
+                              return (
+                                <DropdownMenuItem
+                                  key={option.mode}
+                                  onSelect={() => {
+                                    if (isActive) {
+                                      onModeChange?.(null);
+                                    } else {
+                                      onModeChange?.(option.mode);
+                                      requestAnimationFrame(() => {
+                                        placeCaretAtEnd();
+                                      });
+                                    }
+                                    setToolsOpen(false);
+                                  }}
+                                >
+                                  <Icon className="mr-2 size-5" />
+                                  {option.title}
+                                  {isActive && (
+                                    <Check className="ml-auto size-4 text-foreground" />
+                                  )}
+                                </DropdownMenuItem>
+                              );
+                            })}
+                          </DropdownMenuSubContent>
+                        </DropdownMenuSub>
+                      </>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
             </div>
 
             {/* Right Side Controls */}
             <div className="flex items-center gap-1.5">
-              {voiceChatActive ? (
+              {isEditingMessage ? (
+                <>
+                  {/* Recorded audio / Mic button */}
+                  {!hideVoiceInput && (
+                    <>
+                      {isRecording ? (
+                        <div className="flex items-center gap-2 overflow-hidden rounded-full border border-border bg-muted px-3 py-1.5 shadow-sm">
+                          <div className="flex items-end gap-0.5 overflow-hidden">
+                            {[4, 8, 12, 7, 15, 9, 5, 11].map(
+                              (height, index) => (
+                                <span
+                                  key={index}
+                                  className="w-1 animate-pulse rounded-full bg-muted-foreground/80"
+                                  style={{
+                                    height,
+                                    animationDelay: `${index * 70}ms`,
+                                  }}
+                                />
+                              )
+                            )}
+                          </div>
+                          <span className="text-[12px] font-medium tabular-nums text-foreground">
+                            {String(Math.floor(recordingSeconds / 60)).padStart(
+                              2,
+                              "0"
+                            )}
+                            :{String(recordingSeconds % 60).padStart(2, "0")}
+                          </span>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={onCancelRecording}
+                                className="size-6 rounded-full text-foreground/80 hover:bg-accent hover:text-foreground transition-colors"
+                                aria-label="Discard"
+                              >
+                                <X className="size-3" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom">
+                              Discard
+                            </TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                size="icon"
+                                onClick={onVoice}
+                                className="size-6 rounded-full bg-foreground text-background hover:bg-foreground/90 transition-colors"
+                                aria-label="Transcribe"
+                              >
+                                <Check className="size-3" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom">
+                              Transcribe
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
+                      ) : isTranscribing ? (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              disabled
+                              className="size-10 rounded-full bg-transparent text-muted-foreground transition-colors"
+                              aria-label="Converting speech to text"
+                            >
+                              <Loader2 className="size-4.5 animate-spin" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom">
+                            Transcribing…
+                          </TooltipContent>
+                        </Tooltip>
+                      ) : (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={onVoice}
+                              disabled={isTranscribing}
+                              className="size-10 rounded-full bg-transparent text-foreground hover:bg-accent hover:text-foreground transition-colors"
+                              aria-label="Dictate"
+                            >
+                              <Mic className="size-4.5" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom">
+                            Dictate
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+                    </>
+                  )}
+
+                  {/* Cancel Button */}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={onCancelEdit}
+                        disabled={isRecording || isTranscribing}
+                        className="size-10 rounded-full bg-transparent text-foreground hover:bg-accent hover:text-foreground transition-colors"
+                        aria-label="Cancel edit"
+                      >
+                        <X className="size-4.5" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">
+                      Cancel edit
+                    </TooltipContent>
+                  </Tooltip>
+
+                  {/* Save Button (Tick mark) */}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        size="icon"
+                        onClick={onSaveEdit}
+                        disabled={!value.trim() || isRecording || isTranscribing}
+                        className="size-10 rounded-full bg-foreground text-background hover:bg-foreground/90 disabled:bg-muted disabled:text-muted-foreground transition-colors"
+                        aria-label="Save edit"
+                      >
+                        <Check className="size-4.5" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">
+                      Save edit
+                    </TooltipContent>
+                  </Tooltip>
+                </>
+              ) : voiceChatActive ? (
                 <VoiceChatInlineControls
                   muted={voiceChatMuted ?? false}
                   onMicToggle={onVoiceChatMicToggle ?? (() => undefined)}

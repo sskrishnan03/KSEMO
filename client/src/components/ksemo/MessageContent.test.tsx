@@ -93,7 +93,7 @@ describe("MessageContent speech controls", () => {
     expect(markup).not.toContain("lucide-user-round");
   });
 
-  it("renders an inline editor with Cancel and Save buttons when isEditing is true", () => {
+  it("renders user message normally in workspace without inline editor when isEditing is true", () => {
     const markup = renderWithTooltip(
       createElement(MessageContent, {
         message: {
@@ -110,11 +110,10 @@ describe("MessageContent speech controls", () => {
         onEdit: () => undefined,
       })
     );
-    expect(markup).toContain("Updated prompt text");
-    expect(markup).toContain("Cancel");
-    expect(markup).toContain("Save");
-    expect(markup).toContain("border-border/80");
-    expect(markup).toContain("bg-background/80");
+    expect(markup).toContain("Original prompt");
+    expect(markup).not.toContain("<textarea");
+    expect(markup).not.toContain("Cancel");
+    expect(markup).not.toContain("Save");
     expect(markup).not.toContain('aria-label="Edit message"');
   });
 

@@ -123,4 +123,38 @@ describe("ChatComposer", () => {
     expect(markup).not.toContain('aria-label="Open composer tools"');
     expect(markup).not.toContain("Create");
   });
+
+  it("renders Cancel icon and Save tick mark inside the chat box when editing user message", () => {
+    const markup = renderWithTooltip(
+      createElement(ChatComposer, {
+        ...baseProps,
+        isEditingMessage: true,
+        value: "Editing my previous message",
+        onSaveEdit: () => undefined,
+        onCancelEdit: () => undefined,
+      })
+    );
+    expect(markup).toContain('aria-label="Cancel edit"');
+    expect(markup).toContain('aria-label="Save edit"');
+    expect(markup).toContain('aria-label="Dictate"');
+    expect(markup).not.toContain('aria-label="Attach"');
+    expect(markup).not.toContain('aria-label="Send message"');
+    expect(markup).not.toContain('aria-label="Start voice chat"');
+    expect(markup).toContain('aria-label="Edit your message"');
+  });
+
+  it("renders Edit your message placeholder when editing and value is empty", () => {
+    const markup = renderWithTooltip(
+      createElement(ChatComposer, {
+        ...baseProps,
+        isEditingMessage: true,
+        value: "",
+        onSaveEdit: () => undefined,
+        onCancelEdit: () => undefined,
+      })
+    );
+    expect(markup).toContain("Edit your message…");
+    expect(markup).toContain('aria-label="Cancel edit"');
+    expect(markup).toContain('aria-label="Save edit"');
+  });
 });
