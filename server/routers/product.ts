@@ -3,7 +3,16 @@ import { z } from "zod";
 import { storagePut } from "../storage";
 import { extractFileText, extensionOf } from "../fileExtract";
 import { protectedProcedure, router } from "../_core/trpc";
-import { supabase } from "../supabase-db";
+import {
+  createFileForUser,
+  listFilesForUser,
+  getFileForUser,
+  updateFileForUser,
+  deleteFileForUser,
+  attachFileToConversationForUser,
+  supabase,
+} from "../supabase-db";
+import type { KsemoFile } from "../../supabase-schema/04-types";
 
 const entityId = z.string().min(8).max(36);
 const projectInput = z.object({
@@ -64,14 +73,41 @@ async function ensureLiteSchema(): Promise<boolean> {
 const allowedMimeTypes = new Set([
   "application/pdf",
   "text/plain",
+  "text/csv",
+  "text/markdown",
+  "text/html",
+  "text/css",
+  "text/javascript",
+  "application/csv",
+  "application/x-csv",
   "application/json",
+  "application/xml",
+  "text/xml",
   "image/png",
   "image/jpeg",
   "image/webp",
   "image/gif",
+  "image/bmp",
+  "image/svg+xml",
+  "audio/mpeg",
+  "audio/mp3",
+  "audio/wav",
+  "audio/x-wav",
+  "audio/m4a",
+  "audio/aac",
+  "audio/ogg",
+  "audio/webm",
+  "audio/flac",
+  "video/mp4",
+  "video/webm",
+  "video/quicktime",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "application/msword",
+  "application/vnd.ms-excel",
+  "application/vnd.ms-powerpoint",
+  "application/octet-stream",
 ]);
 
 // Browsers often send octet-stream or generic Office MIME types, so the
@@ -79,22 +115,51 @@ const allowedMimeTypes = new Set([
 // text-bearing formats additionally get content extraction for chat.
 const allowedExtensions = new Set([
   "pdf",
-  "txt",
+  "doc",
+  "docx",
+  "xls",
+  "xlsx",
+  "csv",
   "tsv",
+  "ppt",
+  "pptx",
+  "txt",
+  "text",
+  "md",
+  "markdown",
   "json",
-  "log",
   "xml",
   "yml",
   "yaml",
+  "log",
+  "sql",
+  "py",
+  "js",
+  "ts",
+  "tsx",
+  "jsx",
+  "html",
+  "htm",
+  "css",
+  "sh",
+  "env",
   "png",
   "jpg",
   "jpeg",
   "webp",
   "gif",
-  "docx",
-  "xlsx",
-  "xls",
-  "pptx",
+  "bmp",
+  "svg",
+  "mp3",
+  "wav",
+  "m4a",
+  "aac",
+  "ogg",
+  "webm",
+  "flac",
+  "mp4",
+  "mov",
+  "zip",
 ]);
 
 export const workspaceRouter = router({
@@ -242,46 +307,20 @@ export const workspaceRouter = router({
   }),
   files: router({
     list: protectedProcedure.query(async ({ ctx }) => {
-      // Exclude content_text from listings — it can be large and is only
-      // needed server-side when chatting with files.
-      const ready = await ensureLiteSchema();
-      const columns = ready
-        ? "id,user_id,project_id,storage_key,url,filename,mime_type,size_bytes,status,created_at,updated_at,is_favorite"
-        : "id,user_id,project_id,storage_key,url,filename,mime_type,size_bytes,status,created_at,updated_at";
-      const { data, error } = await supabase
-        .from("files")
-        .select(columns)
-        .eq("user_id", ctx.user.id)
-        .order("created_at", { ascending: false });
-
-      if (error)
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Failed to fetch files",
-        });
-      // Map to plain objects with a stable shape — the raw Supabase builder
-      // types don't play well with conditional select columns + tRPC.
-      const rows = (data || []) as unknown as Array<Record<string, unknown>>;
-      return rows.map(row => ({
-        id: String(row.id),
-        userId: Number(row.user_id),
-        projectId: (row.project_id as string | null) ?? null,
-        storageKey: String(row.storage_key),
-        url: String(row.url),
-        filename: String(row.filename),
-        mimeType: String(row.mime_type),
-        sizeBytes: Number(row.size_bytes),
-        status:
-          String(row.status) === "failed"
-            ? ("failed" as const)
-            : ("ready" as const),
-        createdAt: row.created_at
-          ? new Date(String(row.created_at))
-          : new Date(),
-        updatedAt: row.updated_at
-          ? new Date(String(row.updated_at))
-          : new Date(),
-        isFavorite: ready ? Boolean(row.is_favorite) : false,
+      const files = await listFilesForUser(ctx.user.id);
+      return files.map(row => ({
+        id: row.id,
+        userId: row.userId,
+        projectId: row.projectId ?? null,
+        storageKey: row.storageKey,
+        url: row.url,
+        filename: row.filename,
+        mimeType: row.mimeType,
+        sizeBytes: row.sizeBytes,
+        status: row.status === "failed" ? ("failed" as const) : ("ready" as const),
+        createdAt: row.createdAt ? new Date(row.createdAt) : new Date(),
+        updatedAt: row.updatedAt ? new Date(row.updatedAt) : new Date(),
+        isFavorite: false,
       }));
     }),
     setFavorite: protectedProcedure
@@ -314,30 +353,14 @@ export const workspaceRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        const { data: existing, error: fetchError } = await supabase
-          .from("files")
-          .select("id")
-          .eq("id", input.id)
-          .eq("user_id", ctx.user.id)
-          .single();
-
-        if (fetchError || !existing)
+        const existing = await getFileForUser(input.id, ctx.user.id);
+        if (!existing)
           throw new TRPCError({
             code: "NOT_FOUND",
             message: "File not found.",
           });
 
-        const { error } = await supabase
-          .from("files")
-          .update({ filename: input.filename })
-          .eq("id", input.id)
-          .eq("user_id", ctx.user.id);
-
-        if (error)
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: "Failed to rename file",
-          });
+        await updateFileForUser(input.id, ctx.user.id, { filename: input.filename });
         return { success: true } as const;
       }),
     upload: protectedProcedure
@@ -358,7 +381,7 @@ export const workspaceRouter = router({
           throw new TRPCError({
             code: "BAD_REQUEST",
             message:
-              "This file type is not supported in the KSEMO library. Supported: PDF, Word, Excel, PowerPoint, text, data files, and images.",
+              "This file type is not supported in the KSEMO library. Supported: PDF, Word, Excel, PowerPoint, text, data files, images, and audio.",
           });
         const buffer = Buffer.from(input.dataBase64, "base64");
         if (!buffer.length || buffer.length > MAX_UPLOAD_BYTES)
@@ -373,108 +396,71 @@ export const workspaceRouter = router({
           buffer,
           input.mimeType
         );
-        // Best-effort text extraction so the file can be chatted with later.
-        // A failure never blocks the upload itself.
+        // Best-effort text extraction so the file can be chatted with directly.
+        // Extraction is never skipped — any failures simply return null without blocking the upload.
         let contentText: string | null = null;
-        if (await ensureLiteSchema()) {
+        try {
           contentText = await extractFileText(
             input.filename,
             input.mimeType,
             buffer
           );
+        } catch (extractErr) {
+          console.warn("[upload] extraction error:", extractErr);
         }
-        const { data, error } = await supabase
-          .from("files")
-          .insert({
-            id,
-            user_id: ctx.user.id,
-            project_id: input.projectId ?? null,
-            storage_key: saved.key,
-            url: saved.url,
-            filename: input.filename,
-            mime_type: input.mimeType,
-            size_bytes: buffer.length,
-            status: "ready",
-            ...(contentText ? { content_text: contentText } : {}),
-          })
-          .select()
-          .single();
 
-        if (error)
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: "Failed to upload file",
-          });
-        return data;
+        const fileRecord: KsemoFile = {
+          id,
+          userId: ctx.user.id,
+          projectId: input.projectId ?? null,
+          storageKey: saved.key,
+          url: saved.url,
+          filename: input.filename,
+          mimeType: input.mimeType,
+          sizeBytes: buffer.length,
+          status: "ready",
+          contentText: contentText ?? null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+
+        const created = await createFileForUser(fileRecord);
+        return {
+          id: created.id,
+          userId: created.userId,
+          projectId: created.projectId,
+          storageKey: created.storageKey,
+          url: created.url,
+          filename: created.filename,
+          mimeType: created.mimeType,
+          sizeBytes: created.sizeBytes,
+          status: created.status,
+          createdAt: created.createdAt,
+          updatedAt: created.updatedAt,
+        };
       }),
     remove: protectedProcedure
       .input(z.object({ id: entityId }))
       .mutation(async ({ ctx, input }) => {
-        const { error } = await supabase
-          .from("files")
-          .delete()
-          .eq("id", input.id)
-          .eq("user_id", ctx.user.id);
-
-        if (error)
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: "Failed to delete file",
-          });
+        await deleteFileForUser(input.id, ctx.user.id);
         return { success: true } as const;
       }),
     attachToConversation: protectedProcedure
       .input(z.object({ fileId: entityId, conversationId: entityId }))
       .mutation(async ({ ctx, input }) => {
-        const { data: file, error: fileError } = await supabase
-          .from("files")
-          .select("*")
-          .eq("id", input.fileId)
-          .eq("user_id", ctx.user.id)
-          .single();
-
-        if (fileError || !file)
+        const file = await getFileForUser(input.fileId, ctx.user.id);
+        if (!file)
           throw new TRPCError({
             code: "NOT_FOUND",
             message: "File not found.",
           });
 
-        const { data: conversation, error: convError } = await supabase
-          .from("conversations")
-          .select("*")
-          .eq("id", input.conversationId)
-          .eq("user_id", ctx.user.id)
-          .single();
-
-        if (convError || !conversation)
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Conversation not found.",
-          });
-
-        const { data: existing } = await supabase
-          .from("attachments")
-          .select("*")
-          .eq("file_id", file.id)
-          .eq("conversation_id", conversation.id)
-          .single();
-
-        if (!existing) {
-          const { error: insertError } = await supabase
-            .from("attachments")
-            .insert({
-              id: crypto.randomUUID(),
-              file_id: file.id,
-              conversation_id: conversation.id,
-              message_id: null,
-            });
-
-          if (insertError)
-            throw new TRPCError({
-              code: "INTERNAL_SERVER_ERROR",
-              message: "Failed to attach file",
-            });
-        }
+        await attachFileToConversationForUser({
+          id: crypto.randomUUID(),
+          fileId: file.id,
+          conversationId: input.conversationId,
+          userId: ctx.user.id,
+        });
 
         return { success: true } as const;
       }),

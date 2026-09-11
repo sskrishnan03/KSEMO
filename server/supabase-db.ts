@@ -399,61 +399,233 @@ export async function createProjectForUser(input: {
   return inMemoryStore.createProjectForUser(input);
 }
 
+export async function createFileForUser(file: KsemoFile): Promise<KsemoFile> {
+  await inMemoryStore.createFileForUser(file);
+  if (isSupabaseConfigured) {
+    try {
+      if (file.userId > 0) {
+        const { error } = await supabase.from("files").upsert({
+          id: file.id,
+          user_id: file.userId,
+          project_id: file.projectId,
+          storage_key: file.storageKey,
+          url: file.url,
+          filename: file.filename,
+          mime_type: file.mimeType,
+          size_bytes: file.sizeBytes,
+          status: file.status,
+          content_text: file.contentText,
+          created_at: file.createdAt.toISOString(),
+          updated_at: file.updatedAt.toISOString(),
+        });
+        if (error) {
+          console.warn("[supabase-db] Supabase file sync warning:", error.message);
+        }
+      }
+    } catch (err) {
+      console.warn("[supabase-db] Supabase file sync caught error:", err);
+    }
+  }
+  return file;
+}
+
+export async function getFileForUser(
+  id: string,
+  userId?: number
+): Promise<KsemoFile | undefined> {
+  const local = await inMemoryStore.getFileForUser(id, userId);
+  if (local) return local;
+  if (isSupabaseConfigured && userId !== undefined && userId > 0) {
+    try {
+      const { data } = await supabase
+        .from("files")
+        .select("*")
+        .eq("id", id)
+        .eq("user_id", userId)
+        .single();
+      if (data) {
+        const file: KsemoFile = {
+          id: data.id,
+          userId: data.user_id,
+          projectId: data.project_id ?? null,
+          storageKey: data.storage_key,
+          url: data.url,
+          filename: data.filename,
+          mimeType: data.mime_type,
+          sizeBytes: Number(data.size_bytes),
+          status: data.status === "failed" ? "failed" : "ready",
+          contentText: data.content_text ?? null,
+          createdAt: new Date(data.created_at),
+          updatedAt: new Date(data.updated_at),
+        };
+        await inMemoryStore.createFileForUser(file);
+        return file;
+      }
+    } catch {}
+  }
+  return undefined;
+}
+
+export async function listFilesForUser(userId: number): Promise<KsemoFile[]> {
+  const localFiles = await inMemoryStore.listFilesForUser(userId);
+  if (!isSupabaseConfigured || userId <= 0) {
+    return localFiles;
+  }
+  try {
+    const { data } = await supabase
+      .from("files")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false });
+    if (data && Array.isArray(data)) {
+      const localIds = new Set(localFiles.map(f => f.id));
+      for (const row of data) {
+        if (!localIds.has(row.id)) {
+          const file: KsemoFile = {
+            id: row.id,
+            userId: row.user_id,
+            projectId: row.project_id ?? null,
+            storageKey: row.storage_key,
+            url: row.url,
+            filename: row.filename,
+            mimeType: row.mime_type,
+            sizeBytes: Number(row.size_bytes),
+            status: row.status === "failed" ? "failed" : "ready",
+            contentText: row.content_text ?? null,
+            createdAt: new Date(row.created_at),
+            updatedAt: new Date(row.updated_at),
+          };
+          localFiles.push(file);
+          void inMemoryStore.createFileForUser(file);
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("[supabase-db] Supabase file listing fallback to memory:", err);
+  }
+  return localFiles.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+}
+
+export async function updateFileForUser(
+  id: string,
+  userId: number,
+  values: Partial<KsemoFile>
+): Promise<void> {
+  await inMemoryStore.updateFile(id, values);
+  if (isSupabaseConfigured && userId > 0) {
+    try {
+      const updateData: Record<string, any> = {};
+      if (values.filename !== undefined) updateData.filename = values.filename;
+      if (values.contentText !== undefined) updateData.content_text = values.contentText;
+      if (values.status !== undefined) updateData.status = values.status;
+      if (Object.keys(updateData).length > 0) {
+        await supabase.from("files").update(updateData).eq("id", id).eq("user_id", userId);
+      }
+    } catch {}
+  }
+}
+
+export async function deleteFileForUser(id: string, userId: number): Promise<boolean> {
+  const deleted = await inMemoryStore.deleteFile(id, userId);
+  if (isSupabaseConfigured && userId > 0) {
+    try {
+      await supabase.from("files").delete().eq("id", id).eq("user_id", userId);
+    } catch {}
+  }
+  return deleted;
+}
+
 export async function listMessageFilesForUser(
   messageId: string,
   userId: number
 ): Promise<any[]> {
-  if (isSupabaseConfigured) {
-    const { data, error } = await supabase
-      .from("files")
-      .select(
-        "id, filename, mime_type, size_bytes, url, storage_key, content_text, user_id"
-      )
-      .eq("user_id", userId)
-      .in(
-        "id",
-        (
-          await supabase
-            .from("attachments")
-            .select("file_id")
-            .eq("message_id", messageId)
-        ).data?.map((a: any) => a.file_id) ?? []
-      );
+  const localResults = await inMemoryStore.listMessageFilesForUser(messageId, userId);
+  if (localResults.length > 0) return localResults;
 
-    if (error) return [];
-    return (data ?? []).map((row: any) => ({
-      id: row.id,
-      filename: row.filename,
-      mimeType: row.mime_type,
-      sizeBytes: row.size_bytes,
-      url: row.url,
-      storageKey: row.storage_key,
-      contentText: row.content_text ?? null,
-    }));
+  if (isSupabaseConfigured) {
+    try {
+      const { data, error } = await supabase
+        .from("files")
+        .select(
+          "id, filename, mime_type, size_bytes, url, storage_key, content_text, user_id"
+        )
+        .in(
+          "id",
+          (
+            await supabase
+              .from("attachments")
+              .select("file_id")
+              .eq("message_id", messageId)
+          ).data?.map((a: any) => a.file_id) ?? []
+        );
+
+      if (!error && data?.length) {
+        return data.map((row: any) => ({
+          id: row.id,
+          filename: row.filename,
+          mimeType: row.mime_type,
+          sizeBytes: row.size_bytes,
+          url: row.url,
+          storageKey: row.storage_key,
+          contentText: row.content_text ?? null,
+        }));
+      }
+    } catch {}
   }
-  return inMemoryStore.listMessageFilesForUser(messageId, userId);
+  return localResults;
+}
+
+export async function listConversationFilesForUser(
+  conversationId: string,
+  userId: number
+): Promise<any[]> {
+  return inMemoryStore.listConversationFiles(conversationId, userId);
 }
 
 export async function attachFileToMessageForUser(input: {
   id: string;
   fileId: string;
   messageId: string;
+  conversationId?: string | null;
   userId: number;
 }): Promise<any> {
-  if (isSupabaseConfigured) {
-    const { error } = await supabase.from("attachments").insert({
-      id: input.id,
-      file_id: input.fileId,
-      conversation_id: null,
-      message_id: input.messageId,
-    });
-    if (error) {
-      console.warn("[Attach] Failed to insert attachment:", error.message);
-      return null;
+  const att = await inMemoryStore.attachFileToMessageForUser(input);
+  if (isSupabaseConfigured && input.userId > 0) {
+    try {
+      await supabase.from("attachments").insert({
+        id: input.id,
+        file_id: input.fileId,
+        conversation_id: input.conversationId ?? null,
+        message_id: input.messageId,
+      });
+    } catch (error: any) {
+      // Non-critical background sync warning - memory store already guarantees turn success
+      console.warn("[Attach] Supabase sync notice:", error?.message || error);
     }
-    return { id: input.id, fileId: input.fileId, messageId: input.messageId };
   }
-  return inMemoryStore.attachFileToMessageForUser(input);
+  return att;
+}
+
+export async function attachFileToConversationForUser(input: {
+  id: string;
+  fileId: string;
+  conversationId: string;
+  userId: number;
+}): Promise<any> {
+  const att = await inMemoryStore.attachFileToConversationForUser(input);
+  if (isSupabaseConfigured && input.userId > 0) {
+    try {
+      await supabase.from("attachments").insert({
+        id: input.id,
+        file_id: input.fileId,
+        conversation_id: input.conversationId,
+        message_id: null,
+      });
+    } catch (error: any) {
+      console.warn("[Attach] Supabase conversation sync notice:", error?.message || error);
+    }
+  }
+  return att;
 }
 
 // Tasks & activities

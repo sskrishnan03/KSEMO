@@ -4,31 +4,22 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  Archive,
-  CopyPlus,
-  Download,
   FolderOpen,
   Menu,
   MoreHorizontal,
-  Pencil,
   Pin,
   Trash2,
 } from "lucide-react";
 import { ShareIcon } from "./icons";
-import { PdfFileIcon, WordFileIcon } from "./FileBrandIcons";
 import React, { memo } from "react";
 
 export type MobileChatNavBarConversation = {
   id: string;
   title: string;
   isPinned?: boolean;
-  isArchived?: boolean;
   isPublic?: boolean;
   shareToken?: string | null;
 };
@@ -37,7 +28,6 @@ export type MobileChatNavBarProps = {
   conversation: MobileChatNavBarConversation | null;
   activeConversationId: string | null;
   onOpenSidebar: () => void;
-  onRename: (conversation: { id: string; title: string }) => void;
   onPin: (conversation: { id: string; isPinned: boolean }) => void;
   onShare: (conversation: {
     id: string;
@@ -45,9 +35,6 @@ export type MobileChatNavBarProps = {
     isPublic?: boolean;
     shareToken?: string | null;
   }) => void;
-  onArchive: (conversation: { id: string }) => void;
-  onDuplicate: (conversation: { id: string }) => void;
-  onExport: (conversation: { id: string }, format: "pdf" | "word") => void;
   onViewFiles: () => void;
   onDelete: (conversation: { id: string; title: string }) => void;
 };
@@ -56,16 +43,12 @@ export const MobileChatNavBar = memo(function MobileChatNavBar({
   conversation,
   activeConversationId,
   onOpenSidebar,
-  onRename,
   onPin,
   onShare,
-  onArchive,
-  onDuplicate,
-  onExport,
   onViewFiles,
   onDelete,
 }: MobileChatNavBarProps) {
-  const isRecentChat = Boolean(activeConversationId && conversation);
+  const isPinned = Boolean(conversation?.isPinned);
 
   return (
     <header
@@ -83,123 +66,94 @@ export const MobileChatNavBar = memo(function MobileChatNavBar({
         <Menu className="size-5" />
       </Button>
 
-      <div className="flex min-w-0 flex-1 items-center justify-center px-2">
-        <span
-          data-testid="mobile-chat-title"
-          className="truncate text-center text-sm font-semibold tracking-[-0.01em] text-foreground"
-        >
-          {isRecentChat ? conversation?.title : "New chat"}
-        </span>
-      </div>
+      {/* Center is clean without title or name */}
+      <div className="flex-1" />
 
       <div className="flex size-9 shrink-0 items-center justify-center">
-        {isRecentChat && conversation ? (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-9 rounded-xl text-foreground hover:bg-accent focus-visible:ring-0"
-                aria-label={`Actions for ${conversation.title}`}
-                data-testid="mobile-chat-actions-trigger"
-              >
-                <MoreHorizontal className="size-5" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="end"
-              sideOffset={6}
-              collisionPadding={8}
-              className="w-48 rounded-xl shadow-lg"
-              data-testid="mobile-chat-actions-content"
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-9 rounded-xl text-foreground hover:bg-accent focus-visible:ring-0"
+              aria-label="Chat actions"
+              data-testid="mobile-chat-actions-trigger"
             >
-              <DropdownMenuItem
-                onClick={() => onRename(conversation)}
-                data-testid="mobile-action-rename"
-              >
-                <Pencil className="mr-2 size-4" />
-                Rename
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() =>
+              <MoreHorizontal className="size-5" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            align="end"
+            sideOffset={6}
+            collisionPadding={8}
+            className="w-44 rounded-xl shadow-lg"
+            data-testid="mobile-chat-actions-content"
+          >
+            <DropdownMenuItem
+              disabled={!activeConversationId}
+              onClick={() => {
+                if (activeConversationId) {
                   onPin({
-                    id: conversation.id,
-                    isPinned: Boolean(conversation.isPinned),
-                  })
+                    id: activeConversationId,
+                    isPinned,
+                  });
                 }
-                data-testid="mobile-action-pin"
-              >
-                <Pin className="mr-2 size-4" />
-                {conversation.isPinned ? "Unpin" : "Pin"}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => onShare(conversation)}
-                data-testid="mobile-action-share"
-              >
-                <ShareIcon className="mr-2 size-4" />
-                Share
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => onArchive(conversation)}
-                data-testid="mobile-action-archive"
-              >
-                <Archive className="mr-2 size-4" />
-                Archive
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => onDuplicate(conversation)}
-                data-testid="mobile-action-duplicate"
-              >
-                <CopyPlus className="mr-2 size-4" />
-                Duplicate
-              </DropdownMenuItem>
-              <DropdownMenuSub>
-                <DropdownMenuSubTrigger data-testid="mobile-action-export">
-                  <Download className="mr-2 size-4" />
-                  Export
-                </DropdownMenuSubTrigger>
-                <DropdownMenuSubContent
-                  sideOffset={6}
-                  collisionPadding={12}
-                  className="w-44 rounded-xl"
-                >
-                  <DropdownMenuItem
-                    onClick={() => onExport(conversation, "pdf")}
-                    data-testid="mobile-action-export-pdf"
-                  >
-                    <PdfFileIcon className="mr-2 size-5" />
-                    Download PDF
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => onExport(conversation, "word")}
-                    data-testid="mobile-action-export-word"
-                  >
-                    <WordFileIcon className="mr-2 size-5" />
-                    Download Word
-                  </DropdownMenuItem>
-                </DropdownMenuSubContent>
-              </DropdownMenuSub>
-              <DropdownMenuItem
-                onClick={onViewFiles}
-                data-testid="mobile-action-files"
-              >
-                <FolderOpen className="mr-2 size-4" />
-                View files
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                variant="destructive"
-                onClick={() =>
-                  onDelete({ id: conversation.id, title: conversation.title })
+              }}
+              data-testid="mobile-action-pin"
+            >
+              <Pin className="mr-2 size-4" />
+              {isPinned ? "Unpin" : "Pin"}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              disabled={!activeConversationId}
+              onClick={() => {
+                if (activeConversationId) {
+                  onShare(
+                    conversation
+                      ? {
+                          id: activeConversationId,
+                          title: conversation.title,
+                          isPublic: conversation.isPublic,
+                          shareToken: conversation.shareToken,
+                        }
+                      : {
+                          id: activeConversationId,
+                          title: "this conversation",
+                        }
+                  );
                 }
-                data-testid="mobile-action-delete"
-              >
-                <Trash2 className="mr-2 size-4" />
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        ) : null}
+              }}
+              data-testid="mobile-action-share"
+            >
+              <ShareIcon className="mr-2 size-4" />
+              Share
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={onViewFiles}
+              data-testid="mobile-action-files"
+            >
+              <FolderOpen className="mr-2 size-4" />
+              View files
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              disabled={!activeConversationId}
+              variant="destructive"
+              onClick={() => {
+                if (activeConversationId) {
+                  onDelete({
+                    id: activeConversationId,
+                    title: conversation?.title ?? "this conversation",
+                  });
+                }
+              }}
+              data-testid="mobile-action-delete"
+            >
+              <Trash2 className="mr-2 size-4" />
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </header>
   );

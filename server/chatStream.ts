@@ -24,12 +24,13 @@ import {
   type PipelineProgressEvent,
 } from "./docgen/service";
 import type { CapabilityMode } from "@shared/capabilities";
+import { ensureExtractedContent } from "./fileExtract";
 
 const BASE_SYSTEM_INSTRUCTION =
   "You are KSEMO, a thoughtful and reliable AI assistant. Be clear, accurate, respectful, and practical. Use Markdown when it improves readability. Never claim to have completed work you cannot verify. You can perform math, logic, code analysis, and general reasoning directly — do not refuse calculation or analysis questions. When asked about the current time or date, state that you do not have access to a real-time clock but you can help with time-zone conversions, date math, and scheduling if the user provides a reference time or zone.";
 
 // Per-file cap on extracted document text injected into the model context.
-const FILE_TEXT_PER_FILE_CHARS = 12_000;
+const FILE_TEXT_PER_FILE_CHARS = 150_000;
 
 const VOICE_STYLE_INSTRUCTION =
   "Your reply will be spoken aloud in a live voice conversation. Answer exactly and completely, with the same full detail you would give in a written reply — but in plain natural spoken language. No markdown formatting, no bullet or numbered lists, no tables, no headings, no filler, and do not repeat the question back.";
@@ -433,6 +434,7 @@ export function registerChatStream(app: Express) {
             fileId,
             messageId: userMessageId,
             userId: user.id,
+            conversationId: conversation.id,
           });
           if (!attached) {
             res.status(400).json({
@@ -575,12 +577,11 @@ export function registerChatStream(app: Express) {
                         });
                       }
                     } else if (file.mimeType === "application/pdf") {
-                      // The model cannot fetch a private/localhost PDF URL, so
-                      // only the extracted text is sent for analysis.
-                      if (file.contentText) {
+                      const text = await ensureExtractedContent(file);
+                      if (text) {
                         contentParts.push({
                           type: "text",
-                          text: `Extracted text of ${file.filename}:\n\n${file.contentText.slice(0, FILE_TEXT_PER_FILE_CHARS)}`,
+                          text: `Extracted text of ${file.filename}:\n\n${text.slice(0, FILE_TEXT_PER_FILE_CHARS)}`,
                         });
                       } else {
                         contentParts.push({
@@ -588,19 +589,26 @@ export function registerChatStream(app: Express) {
                           text: `Attached PDF: ${file.filename}. Its text could not be extracted; it is stored in your private library.`,
                         });
                       }
-                    } else if (file.contentText) {
-                      // Office/data/text files: the model reads the extracted
-                      // text directly instead of the raw bytes.
-                      contentParts.push({
-                        type: "text",
-                        text: `Attached file: ${file.filename} (${file.mimeType}). Content:\n\n${file.contentText.slice(0, FILE_TEXT_PER_FILE_CHARS)}`,
-                      });
                     } else {
-                      contentParts.push({
-                        type: "text",
-                        text: `Attached file: ${file.filename} (${file.mimeType}). Its bytes are stored privately; describe or analyze it only when the selected model supports that file type.`,
-                      });
+                      const text = await ensureExtractedContent(file);
+                      if (text) {
+                        contentParts.push({
+                          type: "text",
+                          text: `Attached file: ${file.filename} (${file.mimeType}). Content:\n\n${text.slice(0, FILE_TEXT_PER_FILE_CHARS)}`,
+                        });
+                      } else {
+                        contentParts.push({
+                          type: "text",
+                          text: `Attached file: ${file.filename} (${file.mimeType}). Its bytes are stored privately; describe or analyze it only when the selected model supports that file type.`,
+                        });
+                      }
                     }
+                  }
+                  if (!message.content?.trim() && contentParts.length > 0) {
+                    contentParts.unshift({
+                      type: "text",
+                      text: "Please analyze and explain what is shown or contained in the attached file(s) / image(s) in detail. Answer any questions or details visible.",
+                    });
                   }
                   return { role: "user" as const, content: contentParts };
                 })

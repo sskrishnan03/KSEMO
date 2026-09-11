@@ -330,17 +330,18 @@ export const MessageContent = memo(function MessageContent({
                 );
               })()
             : null}
-          <div
-            className={cn(
-              "text-[15px] leading-6",
-              isUser
-                ? cn(
-                    "flex flex-col items-end rounded-2xl rounded-tr-md border border-border bg-muted px-3.5 py-2.5 text-[15px] leading-6 text-foreground shadow-sm",
-                    isEditing && "ring-1 ring-primary/40 border-primary/40"
-                  )
-                : "max-w-none rounded-tl-md bg-transparent px-0 py-0 text-foreground"
-            )}
-          >
+          {(!isUser || message.content.trim().length > 0) && (
+            <div
+              className={cn(
+                "text-[15px] leading-6",
+                isUser
+                  ? cn(
+                      "flex flex-col items-end rounded-2xl rounded-tr-md border border-border bg-muted px-3.5 py-2.5 text-[15px] leading-6 text-foreground shadow-sm",
+                      isEditing && "ring-1 ring-primary/40 border-primary/40"
+                    )
+                  : "max-w-none rounded-tl-md bg-transparent px-0 py-0 text-foreground"
+              )}
+            >
             {isUser ? (
               !userExpanded ? (
                 <div
@@ -423,6 +424,7 @@ export const MessageContent = memo(function MessageContent({
               </div>
             ) : null}
           </div>
+          )}
 
           {/* Attachments (e.g. images, uploaded files; generated document is presented via primary FileCreationCard) */}
           {!isUser && message.attachments?.length && !message.fileGeneration ? (

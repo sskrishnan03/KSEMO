@@ -892,12 +892,95 @@ class InMemoryStore {
     return project;
   }
 
+  async createFileForUser(input: Partial<KsemoFile> & { userId: number; filename: string; mimeType: string; storageKey: string; url: string; sizeBytes: number }): Promise<KsemoFile> {
+    const file: KsemoFile = {
+      id: input.id || crypto.randomUUID(),
+      userId: input.userId,
+      projectId: input.projectId ?? null,
+      storageKey: input.storageKey,
+      url: input.url,
+      filename: input.filename,
+      mimeType: input.mimeType,
+      sizeBytes: input.sizeBytes,
+      status: input.status || "ready",
+      contentText: input.contentText ?? null,
+      createdAt: input.createdAt instanceof Date ? input.createdAt : new Date(),
+      updatedAt: input.updatedAt instanceof Date ? input.updatedAt : new Date(),
+    };
+    this.files.set(file.id, file);
+    this.requestPersist();
+    return file;
+  }
+
+  async getFileForUser(id: string, userId?: number): Promise<KsemoFile | undefined> {
+    const file = this.files.get(id);
+    if (!file) return undefined;
+    if (userId !== undefined && userId !== -1 && file.userId !== -1 && file.userId !== userId) {
+      return undefined;
+    }
+    return file;
+  }
+
+  async listFilesForUser(userId: number): Promise<KsemoFile[]> {
+    const list: KsemoFile[] = [];
+    for (const file of this.files.values()) {
+      if (userId === -1 || file.userId === -1 || file.userId === userId) {
+        list.push(file);
+      }
+    }
+    return list.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  }
+
+  async updateFile(id: string, values: Partial<KsemoFile>): Promise<void> {
+    const file = this.files.get(id);
+    if (!file) return;
+    Object.assign(file, values, { updatedAt: new Date() });
+    this.requestPersist();
+  }
+
+  async deleteFile(id: string, userId: number): Promise<boolean> {
+    const file = this.files.get(id);
+    if (!file) return false;
+    if (userId !== -1 && file.userId !== -1 && file.userId !== userId) return false;
+    this.files.delete(id);
+    // Remove attachments referencing this file
+    for (const [attId, att] of this.attachments.entries()) {
+      if (att.fileId === id) this.attachments.delete(attId);
+    }
+    this.requestPersist();
+    return true;
+  }
+
   async listMessageFilesForUser(messageId: string, userId: number): Promise<any[]> {
     const results: any[] = [];
     for (const att of this.attachments.values()) {
       if (att.messageId === messageId) {
         const file = this.files.get(att.fileId);
-        if (file && file.userId === userId) {
+        if (file && (userId === -1 || file.userId === -1 || file.userId === userId)) {
+          results.push({
+            id: file.id,
+            filename: file.filename,
+            mimeType: file.mimeType,
+            sizeBytes: file.sizeBytes,
+            url: file.url,
+            storageKey: file.storageKey,
+            contentText: file.contentText ?? null,
+          });
+        }
+      }
+    }
+    return results;
+  }
+
+  async listConversationFiles(conversationId: string, userId: number): Promise<any[]> {
+    const results: any[] = [];
+    const seenIds = new Set<string>();
+    for (const att of this.attachments.values()) {
+      if (att.conversationId === conversationId) {
+        if (seenIds.has(att.fileId)) continue;
+        const file = this.files.get(att.fileId);
+        if (file && (userId === -1 || file.userId === -1 || file.userId === userId)) {
+          seenIds.add(att.fileId);
           results.push({
             id: file.id,
             filename: file.filename,
@@ -917,13 +1000,32 @@ class InMemoryStore {
     id: string;
     fileId: string;
     messageId: string;
+    conversationId?: string | null;
     userId: number;
   }): Promise<any> {
     const att: Attachment = {
       id: input.id,
       fileId: input.fileId,
-      conversationId: null,
+      conversationId: input.conversationId ?? null,
       messageId: input.messageId,
+      createdAt: new Date(),
+    };
+    this.attachments.set(att.id, att);
+    this.requestPersist();
+    return att;
+  }
+
+  async attachFileToConversationForUser(input: {
+    id: string;
+    fileId: string;
+    conversationId: string;
+    userId: number;
+  }): Promise<any> {
+    const att: Attachment = {
+      id: input.id,
+      fileId: input.fileId,
+      conversationId: input.conversationId,
+      messageId: null,
       createdAt: new Date(),
     };
     this.attachments.set(att.id, att);

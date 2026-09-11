@@ -44,6 +44,7 @@ import {
   type KsemoMessage,
 } from "../components/ksemo/MessageContent";
 import { getAuthHeaders } from "@/lib/authHeaders";
+import { toast } from "sonner";
 
 import { SettingsDialog } from "../components/ksemo/SettingsDialog";
 import { useGlobalShortcuts } from "../hooks/useGlobalShortcuts";
@@ -1297,6 +1298,12 @@ export default function Home() {
           return;
         }
         setComposerValue(current => (current ? current : content));
+        if (selectedAttachments.length) {
+          setAttachmentNotices(selectedAttachments);
+        }
+        if (failureMessage) {
+          toast.error(failureMessage);
+        }
         if (
           options.regenerateAssistantMessageId ||
           options.replaceUserMessageId
@@ -1579,10 +1586,57 @@ export default function Home() {
     });
   }
 
+  function resolveMimeType(file: File): string {
+    if (file.type && file.type.trim()) return file.type;
+    const ext = file.name.split(".").pop()?.toLowerCase() || "";
+    const mimeMap: Record<string, string> = {
+      pdf: "application/pdf",
+      docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      doc: "application/msword",
+      xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      xls: "application/vnd.ms-excel",
+      pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+      ppt: "application/vnd.ms-powerpoint",
+      csv: "text/csv",
+      tsv: "text/tab-separated-values",
+      txt: "text/plain",
+      md: "text/markdown",
+      markdown: "text/markdown",
+      json: "application/json",
+      png: "image/png",
+      jpg: "image/jpeg",
+      jpeg: "image/jpeg",
+      webp: "image/webp",
+      gif: "image/gif",
+      svg: "image/svg+xml",
+      mp3: "audio/mp3",
+      wav: "audio/wav",
+      m4a: "audio/m4a",
+      ogg: "audio/ogg",
+      webm: "audio/webm",
+      mp4: "video/mp4",
+      mov: "video/quicktime",
+      ts: "text/plain",
+      tsx: "text/plain",
+      js: "text/javascript",
+      jsx: "text/javascript",
+      py: "text/plain",
+      sql: "text/plain",
+      html: "text/html",
+      css: "text/css",
+      xml: "text/xml",
+      yaml: "text/yaml",
+      yml: "text/yaml",
+    };
+    return mimeMap[ext] || "application/octet-stream";
+  }
+
   async function attachFromComposer(file: File) {
-    if (file.size > 25 * 1024 * 1024 || !file.type) {
+    if (file.size > 25 * 1024 * 1024) {
+      toast.error(`"${file.name}" exceeds the 25MB limit.`);
       return;
     }
+    const resolvedMime = resolveMimeType(file);
     if (hasDuplicateAttachment(attachmentNotices, file.name)) {
       return;
     }
@@ -1597,7 +1651,7 @@ export default function Home() {
         );
       const uploaded = await composerFileUpload.mutateAsync({
         filename: file.name,
-        mimeType: file.type,
+        mimeType: resolvedMime,
         dataBase64: window.btoa(binary),
       });
       if (activeConversationId) {
@@ -1610,7 +1664,7 @@ export default function Home() {
           {
             fileId: uploaded.id,
             name: file.name,
-            mimeType: file.type,
+            mimeType: resolvedMime,
             url: uploaded.url,
             linked: true,
           },
@@ -1621,17 +1675,21 @@ export default function Home() {
           {
             fileId: uploaded.id,
             name: file.name,
-            mimeType: file.type,
+            mimeType: resolvedMime,
             url: uploaded.url,
             linked: false,
           },
         ]);
       }
-    } catch {}
+    } catch (err) {
+      console.error("[attachFromComposer] upload failed:", err);
+      toast.error(`Failed to upload "${file.name}". Please try again.`);
+    }
   }
 
   async function captureScreenshot() {
     if (!navigator.mediaDevices?.getDisplayMedia) {
+      toast.info("Screen capture is supported on desktop browsers. Use Take photo or upload files on mobile.");
       return;
     }
     let stream: MediaStream | null = null;
@@ -2144,19 +2202,27 @@ export default function Home() {
           />
         ) : (
           <>
-            <MobileChatNavBar
-              conversation={activeConversation}
-              activeConversationId={activeConversationId}
-              onOpenSidebar={() => setSidebarOpen(true)}
-              onRename={stableOnRename}
-              onPin={stableOnPin}
-              onShare={stableOnShareConversation}
-              onArchive={stableOnArchive}
-              onDuplicate={stableOnDuplicate}
-              onExport={stableOnExport}
-              onViewFiles={() => setChatFilesOpen(true)}
-              onDelete={stableOnDelete}
-            />
+            {visibleMessages.length > 0 ? (
+              <MobileChatNavBar
+                conversation={activeConversation}
+                activeConversationId={activeConversationId}
+                onOpenSidebar={() => setSidebarOpen(true)}
+                onPin={stableOnPin}
+                onShare={stableOnShareConversation}
+                onViewFiles={() => setChatFilesOpen(true)}
+                onDelete={stableOnDelete}
+              />
+            ) : (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setSidebarOpen(true)}
+                className="absolute left-3 top-3 z-10 size-9 rounded-xl lg:hidden"
+                aria-label="Open conversations"
+              >
+                <Menu className="size-4" />
+              </Button>
+            )}
 
             {visibleMessages.length > 0 && (
               <div className="absolute right-2 top-2 z-10 hidden lg:block">

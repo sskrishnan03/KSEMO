@@ -44,8 +44,11 @@ export const ChatFilesDialog = memo(function ChatFilesDialog({
       }
     };
     window.addEventListener("keydown", onKey);
-    window.addEventListener("pointerdown", onPointerDown);
+    const timer = setTimeout(() => {
+      window.addEventListener("pointerdown", onPointerDown);
+    }, 50);
     return () => {
+      clearTimeout(timer);
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("pointerdown", onPointerDown);
     };
@@ -56,7 +59,9 @@ export const ChatFilesDialog = memo(function ChatFilesDialog({
   return (
     <div
       ref={panelRef}
-      className="absolute right-0 top-full z-50 mt-2 flex h-[min(calc(100vh-9rem),44rem)] w-80 flex-col overflow-hidden rounded-2xl border border-border bg-popover text-popover-foreground shadow-xl"
+      role="dialog"
+      aria-label="Files in this chat"
+      className="fixed right-3 top-14 z-50 flex h-[min(calc(100vh-5rem),40rem)] w-[min(calc(100vw-1.5rem),22rem)] flex-col overflow-hidden rounded-2xl border border-border bg-popover text-popover-foreground shadow-2xl animate-in fade-in-0 zoom-in-95 duration-150"
     >
       <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border px-3.5 py-3">
         <div className="flex items-center gap-2">

@@ -1,6 +1,7 @@
 import type { ComponentType } from "react";
 import {
   ArchiveFileIcon,
+  AudioFileIcon,
   CodeFileIcon,
   ExcelFileIcon,
   GenericFileIcon,
@@ -8,6 +9,7 @@ import {
   PdfFileIcon,
   PowerPointFileIcon,
   TextFileIcon,
+  VideoFileIcon,
   WordFileIcon,
 } from "@/components/ksemo/FileBrandIcons";
 
@@ -25,8 +27,8 @@ export function getFileKind(name: string, mimeType?: string): FileKind {
     return { label: "PDF", icon: PdfFileIcon, colorClass: "" };
   }
   if (
-    /(spreadsheetml\.sheet$|excel$|officedocument\.spreadsheetml)/.test(mime) ||
-    /\.(xlsx|xls|tsv)$/i.test(name)
+    /(spreadsheetml\.sheet$|excel$|officedocument\.spreadsheetml|csv|tab-separated-values)/.test(mime) ||
+    /\.(xlsx|xls|csv|tsv)$/i.test(name)
   ) {
     return { label: "Sheet", icon: ExcelFileIcon, colorClass: "" };
   }
@@ -45,17 +47,26 @@ export function getFileKind(name: string, mimeType?: string): FileKind {
   if (/^image\//.test(mime) || IMAGE_EXT.test(name)) {
     return { label: "Image", icon: ImageFileIcon, colorClass: "" };
   }
-  if (
-    /text\//.test(mime) ||
-    /\.(txt|json|log|xml|yml|yaml)$/i.test(name)
-  ) {
-    return { label: "Text", icon: TextFileIcon, colorClass: "" };
+  if (/^audio\//.test(mime) || /\.(mp3|wav|m4a|ogg|webm|aac|flac)$/i.test(name)) {
+    return { label: "Audio", icon: AudioFileIcon, colorClass: "" };
+  }
+  if (/^video\//.test(mime) || /\.(mp4|mov|avi|mkv)$/i.test(name)) {
+    return { label: "Video", icon: VideoFileIcon, colorClass: "" };
+  }
+  if (/\.(md|markdown)$/i.test(name) || /markdown/.test(mime)) {
+    return { label: "Markdown", icon: TextFileIcon, colorClass: "" };
   }
   if (
-    /\.(ts|tsx|js|jsx|py|go|rs|java|c|cpp|html|css|sql)$/i.test(name) ||
+    /\.(ts|tsx|js|jsx|py|go|rs|java|c|cpp|h|hpp|cs|rb|php|sql|sh|html|css|json|xml|yml|yaml)$/i.test(name) ||
     /json$/.test(mime)
   ) {
     return { label: "Code", icon: CodeFileIcon, colorClass: "" };
+  }
+  if (
+    /text\//.test(mime) ||
+    /\.(txt|log|ini|env|conf|toml)$/i.test(name)
+  ) {
+    return { label: "Text", icon: TextFileIcon, colorClass: "" };
   }
   return { label: "File", icon: GenericFileIcon, colorClass: "" };
 }

@@ -22,6 +22,8 @@ export type FileBrandVariant =
   | "image"
   | "code"
   | "archive"
+  | "audio"
+  | "video"
   | "generic";
 
 const BRAND_LOGOS: Partial<Record<FileBrandVariant, ComponentType<{ className?: string }>>> = {
@@ -49,6 +51,8 @@ export const FILE_BRAND_STYLES: Record<FileBrandVariant, BrandStyle> = {
   image: { from: "#38BDF8", to: "#0369A1", label: "IMG", fontSize: 17 },
   code: { from: "#A78BFA", to: "#6D28D9", label: "{}", fontSize: 23 },
   archive: { from: "#FBBF24", to: "#B45309", label: "ZIP", fontSize: 17 },
+  audio: { from: "#EC4899", to: "#BE185D", label: "AUDIO", fontSize: 12 },
+  video: { from: "#8B5CF6", to: "#6D28D9", label: "VIDEO", fontSize: 12 },
   generic: { from: "#64748B", to: "#334155", label: "FILE", fontSize: 17 },
 };
 
@@ -61,6 +65,8 @@ const SVG_LABEL_WIDTHS: Record<FileBrandVariant, number> = {
   image: 28,
   code: 30,
   archive: 28,
+  audio: 34,
+  video: 34,
   generic: 28,
 };
 
@@ -152,16 +158,18 @@ export const TextFileIcon = brandIcon("text", "TextFileIcon");
 export const ImageFileIcon = brandIcon("image", "ImageFileIcon");
 export const CodeFileIcon = brandIcon("code", "CodeFileIcon");
 export const ArchiveFileIcon = brandIcon("archive", "ArchiveFileIcon");
+export const AudioFileIcon = brandIcon("audio", "AudioFileIcon");
+export const VideoFileIcon = brandIcon("video", "VideoFileIcon");
 export const GenericFileIcon = brandIcon("generic", "GenericFileIcon");
 
 export function brandVariantForExt(ext: string): FileBrandVariant {
   const e = ext.toLowerCase();
   if (e === "pdf") return "pdf";
   if (e === "doc" || e === "docx") return "word";
-  if (e === "xls" || e === "xlsx") return "excel";
+  if (e === "xls" || e === "xlsx" || e === "csv" || e === "tsv") return "excel";
   if (e === "ppt" || e === "pptx") return "powerpoint";
-  if (e === "txt" || e === "log") return "text";
-  if (e === "json" || e === "xml" || e === "yml" || e === "yaml" || e === "tsv")
+  if (e === "txt" || e === "log" || e === "md" || e === "markdown") return "text";
+  if (e === "json" || e === "xml" || e === "yml" || e === "yaml")
     return "code";
   if (
     /^(png|jpe?g|webp|gif|bmp|svg|avif)$/.test(e) ||
@@ -169,5 +177,7 @@ export function brandVariantForExt(ext: string): FileBrandVariant {
   )
     return "image";
   if (/^(zip|rar|7z|tar|gz)$/.test(e)) return "archive";
+  if (/^(mp3|wav|m4a|ogg|webm|aac|flac)$/.test(e)) return "audio";
+  if (/^(mp4|mov|avi|mkv)$/.test(e)) return "video";
   return "generic";
 }
