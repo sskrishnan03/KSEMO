@@ -139,11 +139,16 @@ export function LibraryWorkspace({
   const [openedFile, setOpenedFile] = useState<LibraryWorkspaceFile | null>(
     null
   );
+  const [openMenuFileId, setOpenMenuFileId] = useState<string | null>(null);
   const initialOpenedRef = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const utils = trpc.useUtils();
   const invalidateFiles = () => utils.workspace.files.list.invalidate();
   const filesQuery = trpc.workspace.files.list.useQuery();
+
+  useEffect(() => {
+    setOpenMenuFileId(null);
+  }, [query, filter, view]);
   useEffect(() => {
     if (!initialFileId || initialOpenedRef.current) return;
     const file = (filesQuery.data ?? []).find(
@@ -544,6 +549,10 @@ export function LibraryWorkspace({
                     key={file.id}
                     file={file}
                     selected={selectedIds.has(file.id)}
+                    isMenuOpen={openMenuFileId === file.id}
+                    onMenuOpenChange={open =>
+                      setOpenMenuFileId(open ? file.id : null)
+                    }
                     onToggle={toggleFile}
                     onToggleFavorite={toggleFavorite}
                     onRename={requestRename}
@@ -559,6 +568,10 @@ export function LibraryWorkspace({
                     key={file.id}
                     file={file}
                     selected={selectedIds.has(file.id)}
+                    isMenuOpen={openMenuFileId === file.id}
+                    onMenuOpenChange={open =>
+                      setOpenMenuFileId(open ? file.id : null)
+                    }
                     onToggle={toggleFile}
                     onToggleFavorite={toggleFavorite}
                     onRename={requestRename}
@@ -771,6 +784,8 @@ function FilePreview({
 const LibraryGridCard = memo(function LibraryGridCard({
   file,
   selected,
+  isMenuOpen = false,
+  onMenuOpenChange,
   onToggle,
   onToggleFavorite,
   onRename,
@@ -779,13 +794,14 @@ const LibraryGridCard = memo(function LibraryGridCard({
 }: {
   file: LibraryWorkspaceFile;
   selected: boolean;
+  isMenuOpen?: boolean;
+  onMenuOpenChange?: (open: boolean) => void;
   onToggle: (id: string) => void;
   onToggleFavorite: (file: LibraryWorkspaceFile) => void;
   onRename: (file: LibraryWorkspaceFile) => void;
   onShare: (file: LibraryWorkspaceFile) => void;
   onDelete: (file: LibraryWorkspaceFile) => void;
 }) {
-  const [menuOpen, setMenuOpen] = useState(false);
   const isFavorite = Boolean(file.isFavorite);
   const selectWithKeyboard = (event: React.KeyboardEvent<HTMLElement>) => {
     if (event.key === "Enter" || event.key === " ") {
@@ -816,7 +832,7 @@ const LibraryGridCard = memo(function LibraryGridCard({
         }}
         className={cn(
           "pointer-events-none absolute left-2.5 top-2.5 z-10 rounded-full p-0.5 transition-[opacity,transform] duration-150 group-hover:pointer-events-auto group-hover:scale-100 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:scale-100 group-focus-within:opacity-100 group-active:pointer-events-auto group-active:scale-100 group-active:opacity-100 focus-visible:pointer-events-auto focus-visible:scale-100 focus-visible:opacity-100 max-lg:pointer-events-auto max-lg:scale-100 max-lg:opacity-100",
-          selected || menuOpen ? "scale-100 opacity-100" : "scale-90 opacity-0"
+          selected || isMenuOpen ? "scale-100 opacity-100" : "scale-90 opacity-0"
         )}
         aria-label={`${selected ? "Deselect" : "Select"} ${file.filename}`}
         aria-pressed={selected}
@@ -827,10 +843,10 @@ const LibraryGridCard = memo(function LibraryGridCard({
         <div
           className={cn(
             "pointer-events-none absolute right-2.5 top-2.5 z-10 scale-90 opacity-0 transition-[opacity,transform] duration-150 group-hover:pointer-events-auto group-hover:scale-100 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:scale-100 group-focus-within:opacity-100 group-active:pointer-events-auto group-active:scale-100 group-active:opacity-100 focus-visible:pointer-events-auto focus-visible:scale-100 focus-visible:opacity-100 max-lg:pointer-events-auto max-lg:scale-100 max-lg:opacity-100",
-            menuOpen && "pointer-events-auto scale-100 opacity-100"
+            isMenuOpen && "pointer-events-auto scale-100 opacity-100"
           )}
         >
-          <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+          <DropdownMenu open={isMenuOpen} onOpenChange={onMenuOpenChange}>
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
@@ -927,6 +943,8 @@ const LibraryGridCard = memo(function LibraryGridCard({
 const LibraryListRow = memo(function LibraryListRow({
   file,
   selected,
+  isMenuOpen = false,
+  onMenuOpenChange,
   onToggle,
   onToggleFavorite,
   onRename,
@@ -935,13 +953,14 @@ const LibraryListRow = memo(function LibraryListRow({
 }: {
   file: LibraryWorkspaceFile;
   selected: boolean;
+  isMenuOpen?: boolean;
+  onMenuOpenChange?: (open: boolean) => void;
   onToggle: (id: string) => void;
   onToggleFavorite: (file: LibraryWorkspaceFile) => void;
   onRename: (file: LibraryWorkspaceFile) => void;
   onShare: (file: LibraryWorkspaceFile) => void;
   onDelete: (file: LibraryWorkspaceFile) => void;
 }) {
-  const [menuOpen, setMenuOpen] = useState(false);
   const isFavorite = Boolean(file.isFavorite);
   const selectWithKeyboard = (event: React.KeyboardEvent<HTMLElement>) => {
     if (event.key === "Enter" || event.key === " ") {
@@ -970,7 +989,7 @@ const LibraryListRow = memo(function LibraryListRow({
         }}
         className={cn(
           "pointer-events-none rounded-full p-0.5 transition-[opacity,transform] duration-150 group-hover:pointer-events-auto group-hover:scale-100 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:scale-100 group-focus-within:opacity-100 group-active:pointer-events-auto group-active:scale-100 group-active:opacity-100 focus-visible:pointer-events-auto focus-visible:scale-100 focus-visible:opacity-100 max-lg:pointer-events-auto max-lg:scale-100 max-lg:opacity-100",
-          selected || menuOpen ? "scale-100 opacity-100" : "scale-90 opacity-0"
+          selected || isMenuOpen ? "scale-100 opacity-100" : "scale-90 opacity-0"
         )}
         aria-label={`${selected ? "Deselect" : "Select"} ${file.filename}`}
         aria-pressed={selected}
@@ -1004,10 +1023,10 @@ const LibraryListRow = memo(function LibraryListRow({
         <div
           className={cn(
             "pointer-events-none scale-90 opacity-0 transition-[opacity,transform] duration-150 group-hover:pointer-events-auto group-hover:scale-100 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:scale-100 group-focus-within:opacity-100 group-active:pointer-events-auto group-active:scale-100 group-active:opacity-100 focus-visible:pointer-events-auto focus-visible:scale-100 focus-visible:opacity-100 max-lg:pointer-events-auto max-lg:scale-100 max-lg:opacity-100",
-            menuOpen && "pointer-events-auto scale-100 opacity-100"
+            isMenuOpen && "pointer-events-auto scale-100 opacity-100"
           )}
         >
-          <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+          <DropdownMenu open={isMenuOpen} onOpenChange={onMenuOpenChange}>
             <DropdownMenuTrigger asChild>
               <button
                 type="button"

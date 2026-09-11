@@ -1,11 +1,16 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { ConversationSidebar } from "./ConversationSidebar";
+
+function renderWithTooltip(element: React.ReactElement) {
+  return renderToStaticMarkup(createElement(TooltipProvider, null, element));
+}
 
 describe("KSEMO conversation sidebar disclosure", () => {
   it("renders label-adjacent Pinned and Recent disclosure controls without conversation counts", () => {
-    const markup = renderToStaticMarkup(
+    const markup = renderWithTooltip(
       createElement(ConversationSidebar, {
         conversations: [
           {
@@ -55,7 +60,7 @@ describe("KSEMO conversation sidebar disclosure", () => {
   });
 
   it("renders an accessible expand control inside the collapsed brand exchange", () => {
-    const markup = renderToStaticMarkup(
+    const markup = renderWithTooltip(
       createElement(ConversationSidebar, {
         conversations: [],
         activeConversationId: null,

@@ -207,7 +207,7 @@ const settingsSearchIndex: Array<{
   },
 ];
 
-function SettingsSearch({
+export function SettingsSearch({
   onSelect,
 }: {
   onSelect: (tab: SettingsTab) => void;
@@ -240,12 +240,16 @@ function SettingsSearch({
 
   // Close when focus leaves the whole component (input or results).
   useEffect(() => {
-    function onPointerDown(event: MouseEvent) {
+    function onPointerDown(event: Event) {
       if (rootRef.current?.contains(event.target as Node)) return;
       setOpen(false);
     }
+    document.addEventListener("pointerdown", onPointerDown);
     document.addEventListener("mousedown", onPointerDown);
-    return () => document.removeEventListener("mousedown", onPointerDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("mousedown", onPointerDown);
+    };
   }, []);
 
   const select = (tab: SettingsTab) => {
@@ -308,7 +312,7 @@ function SettingsSearch({
       </div>
 
       {open && trimmed && (
-        <div className="absolute inset-x-0 top-full z-30 mt-1.5 overflow-hidden rounded-xl border border-border bg-popover shadow-xl">
+        <div className="absolute inset-x-0 top-full z-50 mt-1.5 overflow-hidden rounded-xl border border-border bg-popover shadow-xl">
           {results.length === 0 ? (
             <p className="px-3.5 py-3 text-xs text-muted-foreground">
               No matching settings for “{query.trim()}”.
@@ -460,26 +464,31 @@ export const SettingsDialog = memo(function SettingsDialog({
             </div>
           </aside>
 
-          <nav className="flex md:hidden overflow-x-auto border-b border-border bg-sidebar px-2 py-1.5">
-            {settingsNavItems.map(item => {
-              const Icon = item.icon;
-              const active = activeTab === item.id;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => setActiveTab(item.id)}
-                  className={`flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs transition-colors outline-none focus-visible:ring-0 focus-visible:outline-none ${
-                    active
-                      ? "bg-accent font-medium text-foreground"
-                      : "text-muted-foreground hover:bg-accent hover:text-foreground"
-                  }`}
-                >
-                  <Icon className="size-3.5 shrink-0" />
-                  {item.label}
-                </button>
-              );
-            })}
-          </nav>
+          <div className="flex flex-col border-b border-border bg-sidebar md:hidden">
+            <div className="px-3 pt-3 pb-1">
+              <SettingsSearch onSelect={setActiveTab} />
+            </div>
+            <nav className="flex overflow-x-auto px-2 pb-2">
+              {settingsNavItems.map(item => {
+                const Icon = item.icon;
+                const active = activeTab === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => setActiveTab(item.id)}
+                    className={`flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs transition-colors outline-none focus-visible:ring-0 focus-visible:outline-none ${
+                      active
+                        ? "bg-accent font-medium text-foreground"
+                        : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                    }`}
+                  >
+                    <Icon className="size-3.5 shrink-0" />
+                    {item.label}
+                  </button>
+                );
+              })}
+            </nav>
+          </div>
 
           <div className="flex min-h-0 flex-1 flex-col">
             <div className="min-h-0 flex-1 overflow-y-auto p-4 md:p-5">

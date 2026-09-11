@@ -4,7 +4,12 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("streamdown", () => ({ Streamdown: () => null }));
 
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { MessageContent } from "./MessageContent";
+
+function renderWithTooltip(element: React.ReactElement) {
+  return renderToStaticMarkup(createElement(TooltipProvider, null, element));
+}
 
 const assistantMessage = {
   id: "assistant-1",
@@ -22,7 +27,7 @@ const callbacks = {
 
 describe("MessageContent speech controls", () => {
   it("renders a compact overflow entry for idle assistant read-aloud", () => {
-    const markup = renderToStaticMarkup(
+    const markup = renderWithTooltip(
       createElement(MessageContent, {
         message: assistantMessage,
         ...callbacks,
@@ -34,7 +39,7 @@ describe("MessageContent speech controls", () => {
   });
 
   it("keeps active speech controls available through the assistant overflow", () => {
-    const markup = renderToStaticMarkup(
+    const markup = renderWithTooltip(
       createElement(MessageContent, {
         message: assistantMessage,
         ...callbacks,
@@ -46,7 +51,7 @@ describe("MessageContent speech controls", () => {
   });
 
   it("renders share, regenerate, and compact overflow entry points when those real handlers are available", () => {
-    const markup = renderToStaticMarkup(
+    const markup = renderWithTooltip(
       createElement(MessageContent, {
         message: assistantMessage,
         ...callbacks,
@@ -64,7 +69,7 @@ describe("MessageContent speech controls", () => {
   });
 
   it("keeps user actions hover-oriented with direct version history and without an avatar or delete control", () => {
-    const markup = renderToStaticMarkup(
+    const markup = renderWithTooltip(
       createElement(MessageContent, {
         message: {
           id: "user-1",
@@ -88,8 +93,31 @@ describe("MessageContent speech controls", () => {
     expect(markup).not.toContain("lucide-user-round");
   });
 
+  it("renders an inline editor with Cancel and Save buttons when isEditing is true", () => {
+    const markup = renderWithTooltip(
+      createElement(MessageContent, {
+        message: {
+          id: "user-1",
+          role: "user",
+          content: "Original prompt",
+          status: "completed",
+        },
+        ...callbacks,
+        isSpeaking: false,
+        speechState: "idle",
+        isEditing: true,
+        editValue: "Updated prompt text",
+        onEdit: () => undefined,
+      })
+    );
+    expect(markup).toContain("Updated prompt text");
+    expect(markup).toContain("Cancel");
+    expect(markup).toContain("Save");
+    expect(markup).not.toContain('aria-label="Edit message"');
+  });
+
   it("uses matched readable response typography with deliberately spaced compact action rows", () => {
-    const markup = renderToStaticMarkup(
+    const markup = renderWithTooltip(
       createElement(MessageContent, {
         message: assistantMessage,
         ...callbacks,
@@ -102,7 +130,7 @@ describe("MessageContent speech controls", () => {
   });
 
   it("renders nothing for a failed assistant response with no content", () => {
-    const markup = renderToStaticMarkup(
+    const markup = renderWithTooltip(
       createElement(MessageContent, {
         message: { ...assistantMessage, status: "failed", content: "" },
         ...callbacks,
@@ -117,7 +145,7 @@ describe("MessageContent speech controls", () => {
   });
 
   it("renders linked user media before the associated message text", () => {
-    const markup = renderToStaticMarkup(
+    const markup = renderWithTooltip(
       createElement(MessageContent, {
         message: {
           id: "user-media",

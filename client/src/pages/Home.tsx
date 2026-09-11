@@ -1946,6 +1946,10 @@ export default function Home() {
     if (!open) setEditingMessage(null);
   });
   const stableEditAction = usePersistFn(() => void saveEditedMessage());
+  const stableCancelEdit = usePersistFn(() => {
+    setEditingMessage(null);
+    setEditValue("");
+  });
   const stableDeleteDialogOpen = usePersistFn((open: boolean) => {
     if (!open) setDeleteTarget(null);
   });
@@ -2232,6 +2236,11 @@ export default function Home() {
                           }
                           hideTypingIndicator={isFileGenerating}
                           onEdit={stableEditMessage}
+                          isEditing={editingMessage?.id === message.id}
+                          editValue={editValue}
+                          onEditValueChange={setEditValue}
+                          onSaveEdit={stableEditAction}
+                          onCancelEdit={stableCancelEdit}
                           onRegenerate={stableRegenerateMessage}
                           onRetry={stableRegenerateMessage}
                           onShare={stableShareMessage}
@@ -2352,7 +2361,7 @@ export default function Home() {
         onAction={stableRenameAction}
       />
       <KsemoTextDialog
-        open={Boolean(editingMessage) || isEditPreview}
+        open={isEditPreview}
         onOpenChange={stableEditDialogOpen}
         title="Edit message"
         description="Your earlier version stays safely recorded."

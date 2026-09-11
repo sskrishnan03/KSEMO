@@ -115,6 +115,7 @@ export const ConversationSidebar = memo(function ConversationSidebar({
 
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
   const startRename = (conversation: Conversation) => {
     setRenamingId(conversation.id);
@@ -307,6 +308,8 @@ export const ConversationSidebar = memo(function ConversationSidebar({
                   label="Pinned"
                   conversations={pinned}
                   activeConversationId={activeConversationId}
+                  openMenuId={openMenuId}
+                  onMenuOpenChange={setOpenMenuId}
                   onSelect={onSelect}
                   onRename={onRename}
                   renamingId={renamingId}
@@ -327,6 +330,8 @@ export const ConversationSidebar = memo(function ConversationSidebar({
                 label="Recent"
                 conversations={recent}
                 activeConversationId={activeConversationId}
+                openMenuId={openMenuId}
+                onMenuOpenChange={setOpenMenuId}
                 onSelect={onSelect}
                 onRename={onRename}
                 renamingId={renamingId}
@@ -454,6 +459,8 @@ const ConversationGroup = memo(function ConversationGroup({
   onExport,
   onDelete,
   emptyText,
+  openMenuId,
+  onMenuOpenChange,
 }: {
   label: string;
   conversations: Conversation[];
@@ -473,10 +480,15 @@ const ConversationGroup = memo(function ConversationGroup({
   onExport: (conversation: Conversation, format: "pdf" | "word") => void;
   onDelete: (conversation: Conversation) => void;
   emptyText?: string;
+  openMenuId?: string | null;
+  onMenuOpenChange?: (id: string | null) => void;
 }) {
   const [expanded, setExpanded] = useState(true);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
-  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [localOpenMenuId, setLocalOpenMenuId] = useState<string | null>(null);
+  const currentOpenMenuId =
+    openMenuId !== undefined ? openMenuId : localOpenMenuId;
+  const handleMenuOpenChange = onMenuOpenChange ?? setLocalOpenMenuId;
   return (
     <section className="mb-5">
       <button
@@ -499,7 +511,7 @@ const ConversationGroup = memo(function ConversationGroup({
           {conversations.map(conversation => {
             const isRowActive = activeConversationId === conversation.id;
             const isHovered = hoveredId === conversation.id;
-            const isMenuOpen = openMenuId === conversation.id;
+            const isMenuOpen = currentOpenMenuId === conversation.id;
             const isRenaming = renamingId === conversation.id;
             return (
               <div
@@ -533,7 +545,7 @@ const ConversationGroup = memo(function ConversationGroup({
                       conversation={conversation}
                       isMenuOpen={isMenuOpen}
                       onMenuOpenChange={open =>
-                        setOpenMenuId(open ? conversation.id : null)
+                        handleMenuOpenChange(open ? conversation.id : null)
                       }
                       onRename={() => onStartRename(conversation)}
                       onPin={onPin}

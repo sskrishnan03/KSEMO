@@ -122,6 +122,11 @@ export const MessageContent = memo(function MessageContent({
   onFeedback,
   onShare,
   onDelete,
+  isEditing = false,
+  editValue = "",
+  onEditValueChange,
+  onSaveEdit,
+  onCancelEdit,
 }: {
   message: KsemoMessage;
   onSpeak: (text: string, messageId: string) => void;
@@ -138,6 +143,11 @@ export const MessageContent = memo(function MessageContent({
   onFeedback?: (messageId: string, value: "up" | "down") => void;
   onShare?: (message: KsemoMessage) => void;
   onDelete?: (message: KsemoMessage) => void;
+  isEditing?: boolean;
+  editValue?: string;
+  onEditValueChange?: (value: string) => void;
+  onSaveEdit?: () => void;
+  onCancelEdit?: () => void;
 }) {
   const [copied, setCopied] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
@@ -305,7 +315,52 @@ export const MessageContent = memo(function MessageContent({
             )}
           >
             {isUser ? (
-              !userExpanded ? (
+              isEditing ? (
+                <div className="w-full min-w-[280px] sm:min-w-[400px] text-left">
+                  <textarea
+                    autoFocus
+                    value={editValue}
+                    onChange={e => onEditValueChange?.(e.target.value)}
+                    onFocus={e => {
+                      const el = e.currentTarget;
+                      const len = el.value.length;
+                      el.setSelectionRange(len, len);
+                    }}
+                    onKeyDown={e => {
+                      if (e.key === "Escape") {
+                        e.preventDefault();
+                        onCancelEdit?.();
+                      } else if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                        e.preventDefault();
+                        if (editValue.trim()) onSaveEdit?.();
+                      }
+                    }}
+                    rows={Math.max(2, Math.min(10, editValue.split("\n").length + 1))}
+                    className="w-full resize-none rounded-xl border border-border bg-background px-3 py-2 text-[15px] leading-6 text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:ring-1 focus:ring-ring"
+                    placeholder="Edit your message…"
+                  />
+                  <div className="mt-2.5 flex items-center justify-end gap-2">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={onCancelEdit}
+                      className="h-8 rounded-lg px-3 text-xs"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={onSaveEdit}
+                      disabled={!editValue.trim()}
+                      className="h-8 rounded-lg bg-foreground px-4 text-xs font-medium text-background hover:bg-foreground/90 disabled:opacity-50"
+                    >
+                      Save
+                    </Button>
+                  </div>
+                </div>
+              ) : !userExpanded ? (
                 <div
                   role={userLong ? "button" : undefined}
                   tabIndex={userLong ? 0 : undefined}
@@ -475,7 +530,7 @@ export const MessageContent = memo(function MessageContent({
               })}
             </div>
           ) : null}
-          {isUser && message.content && (
+          {isUser && message.content && !isEditing && (
             <div className="mt-1.5 flex items-center gap-1 max-lg:opacity-100 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
               {action(
                 "Copy message",
