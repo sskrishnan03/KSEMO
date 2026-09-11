@@ -827,8 +827,9 @@ export function registerChatStream(app: Express) {
         } else {
           const cancelled = controller.signal.aborted;
           await updateMessage(assistantMessageId, {
-            content:
-              responseText || "I’m sorry, I couldn’t generate a response.",
+            content: cancelled
+              ? responseText
+              : (responseText || "I’m sorry, I couldn’t generate a response."),
             model: usedFallbackModel
               ? QUOTA_FALLBACK_MODEL
               : (preferences?.selectedModel ?? null),

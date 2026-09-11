@@ -38,6 +38,7 @@ import {
 import type { DocFormat } from "@/lib/docFormats";
 import AuthStage from "./AuthStage";
 import { ConversationSidebar } from "../components/ksemo/ConversationSidebar";
+import { MobileChatNavBar } from "../components/ksemo/MobileChatNavBar";
 import {
   MessageContent,
   type KsemoMessage,
@@ -369,6 +370,34 @@ export default function Home() {
     { id: activeConversationId ?? "unselected" },
     { enabled: Boolean(activeConversationId) }
   );
+  const activeConversation = useMemo(() => {
+    if (!activeConversationId) return null;
+    const fromActive = activeQuery.data?.conversation;
+    if (fromActive) return fromActive;
+    const fromList = conversationQuery.data?.find(
+      c => c.id === activeConversationId
+    );
+    if (fromList) {
+      return {
+        id: fromList.id,
+        title: fromList.title,
+        isPinned: fromList.isPinned,
+        isArchived: fromList.isArchived,
+        isPublic: fromList.isPublic,
+        shareToken: fromList.shareToken,
+      };
+    }
+    return {
+      id: activeConversationId,
+      title: "Chat",
+      isPinned: false,
+      isArchived: false,
+    };
+  }, [
+    activeConversationId,
+    activeQuery.data?.conversation,
+    conversationQuery.data,
+  ]);
   const preferencesQuery = trpc.preferences.get.useQuery(undefined, {
     enabled: Boolean(user),
   });
@@ -536,7 +565,13 @@ export default function Home() {
       return {
         id: message.id,
         role: message.role,
-        content: message.content,
+        content:
+          message.status === "cancelled" &&
+          /^I[’']m sorry, I couldn[’']t generate a response\.?$/i.test(
+            message.content.trim()
+          )
+            ? ""
+            : message.content,
         status: message.status,
         attachments: message.attachments,
         // The server does not persist the fileGeneration envelope, so after a
@@ -1251,6 +1286,16 @@ export default function Home() {
       // below is complete and idempotent.
       flushPendingDeltas();
       if (!completedConversation) {
+        if (userStopped) {
+          setChatMessages(current =>
+            current.map(message =>
+              message.role === "assistant" && message.status === "streaming"
+                ? { ...message, content: "", status: "cancelled" }
+                : message
+            )
+          );
+          return;
+        }
         setComposerValue(current => (current ? current : content));
         if (
           options.regenerateAssistantMessageId ||
@@ -2099,18 +2144,22 @@ export default function Home() {
           />
         ) : (
           <>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setSidebarOpen(true)}
-              className="absolute left-3 top-3 z-10 size-9 rounded-xl lg:hidden"
-              aria-label="Open conversations"
-            >
-              <Menu className="size-4" />
-            </Button>
+            <MobileChatNavBar
+              conversation={activeConversation}
+              activeConversationId={activeConversationId}
+              onOpenSidebar={() => setSidebarOpen(true)}
+              onRename={stableOnRename}
+              onPin={stableOnPin}
+              onShare={stableOnShareConversation}
+              onArchive={stableOnArchive}
+              onDuplicate={stableOnDuplicate}
+              onExport={stableOnExport}
+              onViewFiles={() => setChatFilesOpen(true)}
+              onDelete={stableOnDelete}
+            />
 
             {visibleMessages.length > 0 && (
-              <div className="absolute right-2 top-2 z-10">
+              <div className="absolute right-2 top-2 z-10 hidden lg:block">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
@@ -2122,13 +2171,13 @@ export default function Home() {
                       <MoreHorizontal className="size-4" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuContent align="end" className="w-40 rounded-xl">
                     <DropdownMenuItem
                       disabled={!activeConversationId}
                       onSelect={() => {
                         if (activeConversationId) {
                           const pinned =
-                            activeQuery.data?.conversation?.isPinned ?? false;
+                            activeConversation?.isPinned ?? false;
                           stableOnPin({
                             id: activeConversationId,
                             isPinned: pinned,
@@ -2137,7 +2186,7 @@ export default function Home() {
                       }}
                     >
                       <Pin className="mr-2 size-4" />
-                      {activeQuery.data?.conversation?.isPinned
+                      {activeConversation?.isPinned
                         ? "Unpin"
                         : "Pin"}
                     </DropdownMenuItem>
@@ -2145,14 +2194,13 @@ export default function Home() {
                       disabled={!activeConversationId}
                       onSelect={() => {
                         if (activeConversationId) {
-                          const conv = activeQuery.data?.conversation;
                           stableOnShareConversation(
-                            conv
+                            activeConversation
                               ? {
                                   id: activeConversationId,
-                                  title: conv.title,
-                                  isPublic: conv.isPublic,
-                                  shareToken: conv.shareToken,
+                                  title: activeConversation.title,
+                                  isPublic: activeConversation.isPublic,
+                                  shareToken: activeConversation.shareToken,
                                 }
                               : {
                                   id: activeConversationId,
@@ -2178,7 +2226,7 @@ export default function Home() {
                           stableOnDelete({
                             id: activeConversationId,
                             title:
-                              activeQuery.data?.conversation?.title ??
+                              activeConversation?.title ??
                               "this conversation",
                           });
                       }}
@@ -2188,13 +2236,13 @@ export default function Home() {
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
-                <ChatFilesDialog
-                  open={chatFilesOpen}
-                  onOpenChange={setChatFilesOpen}
-                  files={chatFiles}
-                />
               </div>
             )}
+            <ChatFilesDialog
+              open={chatFilesOpen}
+              onOpenChange={setChatFilesOpen}
+              files={chatFiles}
+            />
 
             <section
               ref={messagesContainerRef}

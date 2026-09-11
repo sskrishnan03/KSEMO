@@ -161,7 +161,13 @@ export const MessageContent = memo(function MessageContent({
   );
 
   // Sanitize assistant content
-  const cleanContent = sanitizeAssistantText(message.content);
+  const rawClean = sanitizeAssistantText(message.content);
+  // Interrupted/cancelled responses must not display default fallback errors
+  const cleanContent =
+    message.status === "cancelled" &&
+    /^I[’']m sorry, I couldn[’']t generate a response\.?$/i.test(rawClean.trim())
+      ? ""
+      : rawClean;
 
   useEffect(() => {
     if (lightboxIndex === null) return;
@@ -217,6 +223,24 @@ export const MessageContent = memo(function MessageContent({
       </TooltipTrigger>
       <TooltipContent side="bottom">{label}</TooltipContent>
     </Tooltip>
+  );
+
+  const isCancelled = !isUser && message.status === "cancelled";
+
+  const renderStoppedNotice = () => (
+    <div
+      data-testid="stopped-response-notice"
+      className={cn(
+        "flex items-center gap-3 py-2.5 select-none",
+        cleanContent ? "mt-3 mb-1.5" : "my-1.5"
+      )}
+    >
+      <div className="h-px flex-1 bg-border/70" />
+      <span className="shrink-0 text-sm font-medium text-muted-foreground/90">
+        Response generation was interrupted
+      </span>
+      <div className="h-px flex-1 bg-border/70" />
+    </div>
   );
 
   return (
@@ -376,11 +400,16 @@ export const MessageContent = memo(function MessageContent({
                 </div>
               )
             ) : cleanContent ? (
-              <div className="ksemo-markdown prose prose-neutral max-w-none text-[15px] leading-6 dark:prose-invert">
-                <Streamdown components={KSEMO_MARKDOWN_COMPONENTS}>
-                  {cleanContent}
-                </Streamdown>
-              </div>
+              <>
+                <div className="ksemo-markdown prose prose-neutral max-w-none text-[15px] leading-6 dark:prose-invert">
+                  <Streamdown components={KSEMO_MARKDOWN_COMPONENTS}>
+                    {cleanContent}
+                  </Streamdown>
+                </div>
+                {isCancelled && renderStoppedNotice()}
+              </>
+            ) : isCancelled ? (
+              renderStoppedNotice()
             ) : message.status === "streaming" &&
               isCurrentGeneration &&
               !hideTypingIndicator ? (
@@ -499,17 +528,13 @@ export const MessageContent = memo(function MessageContent({
                 ),
                 copyMessage
               )}
-              {onShare &&
-                action("Share message", <ShareIcon className="size-4" />, () =>
-                  onShare(message)
-                )}
               {onEdit && !isEditing &&
                 action("Edit message", <Pencil className="size-4" />, () =>
                   onEdit(message)
                 )}
             </div>
           )}
-          {!isUser && (message.content || message.status === "failed") && (
+          {!isUser && (message.content || message.status === "failed" || message.status === "cancelled") && (
             <div className="mt-1.5 flex items-center gap-1">
               {message.content &&
                 action(
@@ -526,22 +551,21 @@ export const MessageContent = memo(function MessageContent({
                 action("Share response", <ShareIcon className="size-4" />, () =>
                   onShare(message)
                 )}
-              {message.status !== "failed" &&
-                onRegenerate &&
+              {(onRegenerate || onRetry) &&
                 action(
-                  "Regenerate response",
+                  message.status === "failed" ? "Retry response" : "Regenerate response",
                   <RotateCcw className="size-4" />,
-                  () => onRegenerate(message)
+                  () => (onRegenerate ? onRegenerate(message) : onRetry?.(message))
                 )}
-              {onFeedback && (
+              {onFeedback && message.content && (
                 <>
                   {action(
-                    "Helpful response",
+                    "Good response",
                     <ThumbsUp className="size-4" />,
                     () => onFeedback(message.id, "up")
                   )}
                   {action(
-                    "Unhelpful response",
+                    "Bad response",
                     <ThumbsDown className="size-4" />,
                     () => onFeedback(message.id, "down")
                   )}

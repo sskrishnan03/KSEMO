@@ -86,11 +86,55 @@ describe("MessageContent speech controls", () => {
       })
     );
     expect(markup).toContain('aria-label="Copy message"');
-    expect(markup).toContain('aria-label="Share message"');
+    expect(markup).not.toContain('aria-label="Share message"');
     expect(markup).toContain('aria-label="Edit message"');
     expect(markup).not.toContain('aria-label="View version history"');
     expect(markup).not.toContain('aria-label="Delete message"');
     expect(markup).not.toContain("lucide-user-round");
+  });
+
+  it("renders a centered interrupted divider line and action bar regenerate when assistant response is stopped with partial content", () => {
+    const markup = renderWithTooltip(
+      createElement(MessageContent, {
+        message: {
+          id: "assistant-stopped",
+          role: "assistant",
+          content: "Partial answer before stopping...",
+          status: "cancelled",
+        },
+        ...callbacks,
+        isSpeaking: false,
+        speechState: "idle",
+        onRegenerate: () => undefined,
+        onShare: () => undefined,
+        onDelete: () => undefined,
+      })
+    );
+    expect(markup).toContain("Response generation was interrupted");
+    expect(markup).toContain('data-testid="stopped-response-notice"');
+    expect(markup).toContain('aria-label="Regenerate response"');
+    expect(markup).toContain('aria-label="Copy response"');
+    expect(markup).toContain('aria-label="Share response"');
+  });
+
+  it("renders centered interrupted divider line and action bar regenerate when assistant response is stopped with no content", () => {
+    const markup = renderWithTooltip(
+      createElement(MessageContent, {
+        message: {
+          id: "assistant-stopped-empty",
+          role: "assistant",
+          content: "",
+          status: "cancelled",
+        },
+        ...callbacks,
+        isSpeaking: false,
+        speechState: "idle",
+        onRegenerate: () => undefined,
+      })
+    );
+    expect(markup).toContain("Response generation was interrupted");
+    expect(markup).toContain('data-testid="stopped-response-notice"');
+    expect(markup).toContain('aria-label="Regenerate response"');
   });
 
   it("renders user message normally in workspace without inline editor when isEditing is true", () => {
