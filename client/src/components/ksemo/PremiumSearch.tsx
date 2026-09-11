@@ -174,8 +174,8 @@ export function SearchWorkspace({
   };
 
   return (
-    <main className="min-h-0 flex-1 overflow-y-auto bg-background">
-      <div className="mx-auto w-full max-w-5xl px-5 py-6 sm:px-8 sm:py-8">
+    <main className="flex min-h-0 flex-1 flex-col bg-background">
+      <div className="mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col px-5 pt-6 sm:px-8 sm:pt-8">
         <header className="flex flex-col gap-4 border-b border-border pb-5 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <div className="flex items-center gap-3">
@@ -203,7 +203,7 @@ export function SearchWorkspace({
           </div>
         </section>
 
-        <div className="mt-5 pb-10">
+        <div className="mt-5 min-h-0 flex-1 overflow-y-auto pb-10">
           {trimmed ? (
             searchLoading && titleMatches.length === 0 ? (
               <Loading className="min-h-64" />

@@ -336,7 +336,7 @@ export const MessageContent = memo(function MessageContent({
                       className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-muted to-transparent"
                       aria-hidden="true"
                     />
-                    <span className="pointer-events-none absolute bottom-1 right-0 flex items-center gap-1 rounded-full bg-foreground px-3 py-1 text-[13px] font-semibold text-background shadow-sm">
+                    <span className="absolute bottom-0 right-0 flex items-center gap-1 rounded-full px-3 py-1 text-[13px] font-semibold text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
                       Show more
                       <ChevronDown className="size-3.5" />
                     </span>
@@ -355,7 +355,7 @@ export const MessageContent = memo(function MessageContent({
                   <button
                     type="button"
                     onClick={() => setUserExpanded(false)}
-                    className="mt-1 flex items-center gap-1 self-end rounded-full bg-foreground px-3 py-1 text-[13px] font-semibold text-background shadow-sm transition-colors hover:bg-foreground/90"
+                    className="mt-1 flex items-center gap-1 self-end rounded-full px-3 py-1 text-[13px] font-semibold text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                   >
                     Show less
                     <ChevronDown className="size-3.5 rotate-180 transition-transform" />

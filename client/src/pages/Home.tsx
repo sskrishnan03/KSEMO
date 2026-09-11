@@ -436,7 +436,12 @@ export default function Home() {
     },
   });
   const pinMutation = trpc.conversation.setPinned.useMutation({
-    onSuccess: () => utils.conversation.list.invalidate(),
+    onSuccess: () => {
+      utils.conversation.list.invalidate();
+      if (activeConversationId) {
+        utils.conversation.get.invalidate({ id: activeConversationId });
+      }
+    },
   });
   const publicShareMutation =
     trpc.conversation.configurePublicShare.useMutation({
