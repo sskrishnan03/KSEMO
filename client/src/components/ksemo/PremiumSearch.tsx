@@ -314,7 +314,14 @@ export function SearchWorkspace({
   const [dateFilter, setDateFilter] = useState<DateFilter>("all");
   const [customDate, setCustomDate] = useState("");
   const [filterMenuOpen, setFilterMenuOpen] = useState(false);
+  const [mobileDateView, setMobileDateView] = useState<"menu" | "calendar">("menu");
   const trimmed = query.trim().toLowerCase();
+
+  useEffect(() => {
+    if (filterMenuOpen) {
+      setMobileDateView(dateFilter === "custom" ? "calendar" : "menu");
+    }
+  }, [filterMenuOpen, dateFilter]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedQuery(query), 250);
@@ -464,21 +471,20 @@ export function SearchWorkspace({
             {onBackToChat && (
               <Button
                 variant="outline"
-                size="sm"
+                size="icon"
                 onClick={onBackToChat}
-                className="flex shrink-0 items-center gap-1.5 rounded-xl border-border bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground shadow-xs transition-colors hover:bg-accent hover:text-foreground active:scale-95 lg:hidden"
+                className="size-9 shrink-0 rounded-xl border-border bg-card text-muted-foreground shadow-xs transition-colors hover:bg-accent hover:text-foreground active:scale-95 lg:hidden"
                 aria-label="Close search and return to chat"
-                title="Cancel"
+                title="Close"
               >
-                <X className="size-4" />
-                <span>Cancel</span>
+                <X className="size-5" />
               </Button>
             )}
           </div>
         </header>
 
-        <section className="mt-6 flex items-center gap-2.5">
-          <div className="relative w-full max-w-md">
+        <section className="mt-6 flex items-center gap-2">
+          <div className="relative min-w-0 flex-1 max-w-md">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={query}
@@ -504,20 +510,33 @@ export function SearchWorkspace({
                 type="button"
                 className="flex h-10 shrink-0 items-center gap-1.5 rounded-xl border border-border bg-card px-3 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
               >
-                <CalendarDays className="size-4" />
-                {dateFilterLabel}
-                <ChevronDown className="size-3.5" />
+                <CalendarDays className="size-4 shrink-0" />
+                <span className="max-w-[110px] truncate sm:max-w-none">
+                  {dateFilterLabel}
+                </span>
+                <ChevronDown className="size-3.5 shrink-0" />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent
               side="bottom"
               align="end"
+              collisionPadding={12}
               className="flex min-w-0 items-start gap-2 border-0 bg-transparent p-0 shadow-none"
             >
-              <div className="w-48 shrink-0 rounded-xl border border-border bg-popover p-1 shadow-md">
+              <div
+                className={cn(
+                  "w-48 shrink-0 rounded-xl border border-border bg-popover p-1 shadow-md",
+                  mobileDateView === "calendar" ? "hidden sm:block" : "block"
+                )}
+              >
                 <DropdownMenuRadioGroup
                   value={dateFilter}
-                  onValueChange={value => setDateFilter(value as DateFilter)}
+                  onValueChange={value => {
+                    setDateFilter(value as DateFilter);
+                    if (value !== "custom") {
+                      setFilterMenuOpen(false);
+                    }
+                  }}
                 >
                   <DropdownMenuRadioItem value="all">
                     All time
@@ -530,14 +549,47 @@ export function SearchWorkspace({
                   </DropdownMenuRadioItem>
                   <DropdownMenuRadioItem
                     value="custom"
-                    onSelect={event => event.preventDefault()}
+                    onSelect={event => {
+                      event.preventDefault();
+                      setDateFilter("custom");
+                      setMobileDateView("calendar");
+                    }}
                   >
-                    Specific date
+                    <div className="flex w-full items-center justify-between">
+                      <span>Specific date</span>
+                      <ChevronRight className="size-3.5 text-muted-foreground sm:hidden" />
+                    </div>
                   </DropdownMenuRadioItem>
                 </DropdownMenuRadioGroup>
               </div>
               {dateFilter === "custom" && (
-                <div className="shrink-0 rounded-xl border border-border bg-popover p-1.5 shadow-md">
+                <div
+                  className={cn(
+                    "shrink-0 rounded-xl border border-border bg-popover p-1.5 shadow-md",
+                    mobileDateView === "menu" ? "hidden sm:block" : "block"
+                  )}
+                >
+                  <div className="flex items-center justify-between border-b border-border px-1 pb-1.5 pt-0.5 sm:hidden">
+                    <button
+                      type="button"
+                      onClick={() => setMobileDateView("menu")}
+                      className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                      aria-label="Back to filter options"
+                    >
+                      <ChevronLeft className="size-3.5" />
+                      <span>Options</span>
+                    </button>
+                    <span className="text-xs font-medium text-foreground">
+                      Specific date
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setFilterMenuOpen(false)}
+                      className="rounded-md px-1.5 py-0.5 text-xs font-medium text-primary transition-colors hover:bg-accent"
+                    >
+                      Done
+                    </button>
+                  </div>
                   <SearchCalendar
                     value={customDate}
                     onChange={date => setCustomDate(date)}

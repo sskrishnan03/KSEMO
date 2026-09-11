@@ -374,14 +374,13 @@ export function LibraryWorkspace({
             {onClose && (
               <Button
                 variant="outline"
-                size="sm"
+                size="icon"
                 onClick={onClose}
-                className="flex shrink-0 items-center gap-1.5 rounded-xl border-border bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground shadow-xs transition-colors hover:bg-accent hover:text-foreground active:scale-95 sm:hidden"
+                className="size-9 shrink-0 rounded-xl border-border bg-card text-muted-foreground shadow-xs transition-colors hover:bg-accent hover:text-foreground active:scale-95 sm:hidden"
                 aria-label="Close library and return to chat"
-                title="Cancel"
+                title="Close"
               >
-                <X className="size-4" />
-                <span>Cancel</span>
+                <X className="size-5" />
               </Button>
             )}
           </div>
@@ -389,14 +388,13 @@ export function LibraryWorkspace({
             {onClose && (
               <Button
                 variant="outline"
-                size="sm"
+                size="icon"
                 onClick={onClose}
-                className="hidden shrink-0 items-center gap-1.5 rounded-xl border-border bg-card px-3 py-2 text-xs font-medium text-muted-foreground shadow-xs transition-colors hover:bg-accent hover:text-foreground active:scale-95 sm:inline-flex lg:hidden"
+                className="hidden size-9 shrink-0 rounded-xl border-border bg-card text-muted-foreground shadow-xs transition-colors hover:bg-accent hover:text-foreground active:scale-95 sm:inline-flex lg:hidden"
                 aria-label="Close library and return to chat"
-                title="Cancel"
+                title="Close"
               >
-                <X className="size-4" />
-                <span>Cancel</span>
+                <X className="size-5" />
               </Button>
             )}
             <Button
