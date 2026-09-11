@@ -116,9 +116,11 @@ async function fileToBase64(file: File) {
 export function LibraryWorkspace({
   onChatWithFiles,
   initialFileId,
+  onClose,
 }: {
   onChatWithFiles?: (files: LibraryWorkspaceFile[]) => void;
   initialFileId?: string | null;
+  onClose?: () => void;
 }) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<LibraryFilter>("all");
@@ -357,18 +359,46 @@ export function LibraryWorkspace({
       )}
       <div className="mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col px-5 pt-6 sm:px-8 sm:pt-8">
         <header className="flex flex-col gap-4 border-b border-border pb-5 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <div className="flex items-center gap-3">
-              <Library className="size-6 text-muted-foreground" />
-              <h1 className="text-2xl font-semibold tracking-[-0.03em]">
-                Library
-              </h1>
+          <div className="flex w-full items-start justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-3">
+                <Library className="size-6 text-muted-foreground" />
+                <h1 className="text-2xl font-semibold tracking-[-0.03em]">
+                  Library
+                </h1>
+              </div>
+              <p className="mt-1.5 max-w-xl text-sm text-muted-foreground">
+                Your private space for files and images you can chat about.
+              </p>
             </div>
-            <p className="mt-1.5 max-w-xl text-sm text-muted-foreground">
-              Your private space for files and images you can chat about.
-            </p>
+            {onClose && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onClose}
+                className="flex shrink-0 items-center gap-1.5 rounded-xl border-border bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground shadow-xs transition-colors hover:bg-accent hover:text-foreground active:scale-95 sm:hidden"
+                aria-label="Close library and return to chat"
+                title="Cancel"
+              >
+                <X className="size-4" />
+                <span>Cancel</span>
+              </Button>
+            )}
           </div>
-          <div className="flex shrink-0 flex-wrap gap-2">
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            {onClose && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onClose}
+                className="hidden shrink-0 items-center gap-1.5 rounded-xl border-border bg-card px-3 py-2 text-xs font-medium text-muted-foreground shadow-xs transition-colors hover:bg-accent hover:text-foreground active:scale-95 sm:inline-flex lg:hidden"
+                aria-label="Close library and return to chat"
+                title="Cancel"
+              >
+                <X className="size-4" />
+                <span>Cancel</span>
+              </Button>
+            )}
             <Button
               className="rounded-xl bg-foreground text-background hover:bg-foreground/90"
               onClick={() => fileInputRef.current?.click()}
@@ -386,10 +416,20 @@ export function LibraryWorkspace({
             <Input
               value={query}
               onChange={event => setQuery(event.target.value)}
-              className="h-10 rounded-xl pl-9"
+              className={cn("h-10 rounded-xl pl-9", query && "pr-9")}
               placeholder="Search your Library"
               aria-label="Search your Library"
             />
+            {query && (
+              <button
+                type="button"
+                onClick={() => setQuery("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground transition-colors hover:text-foreground"
+                aria-label="Clear search query"
+              >
+                <X className="size-4" />
+              </button>
+            )}
           </div>
           <div className="flex flex-wrap gap-2">
             <div

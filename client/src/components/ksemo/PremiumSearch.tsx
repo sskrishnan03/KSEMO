@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Loading } from "@/components/ui/loading";
 import {
@@ -17,6 +18,7 @@ import {
   MessageCircle,
   Search,
   Pin,
+  X,
 } from "lucide-react";
 import { memo, useEffect, useMemo, useState } from "react";
 import {
@@ -447,16 +449,31 @@ export function SearchWorkspace({
     <main className="flex min-h-0 flex-1 flex-col bg-background">
       <div className="mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col px-5 pt-6 sm:px-8 sm:pt-8">
         <header className="flex flex-col gap-4 border-b border-border pb-5 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <div className="flex items-center gap-3">
-              <Search className="size-6 text-muted-foreground" />
-              <h1 className="text-2xl font-semibold tracking-[-0.03em]">
-                Search
-              </h1>
+          <div className="flex w-full items-start justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-3">
+                <Search className="size-6 text-muted-foreground" />
+                <h1 className="text-2xl font-semibold tracking-[-0.03em]">
+                  Search
+                </h1>
+              </div>
+              <p className="mt-1.5 max-w-xl text-sm text-muted-foreground">
+                Find anything across your conversations and messages.
+              </p>
             </div>
-            <p className="mt-1.5 max-w-xl text-sm text-muted-foreground">
-              Find anything across your conversations and messages.
-            </p>
+            {onBackToChat && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onBackToChat}
+                className="flex shrink-0 items-center gap-1.5 rounded-xl border-border bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground shadow-xs transition-colors hover:bg-accent hover:text-foreground active:scale-95 lg:hidden"
+                aria-label="Close search and return to chat"
+                title="Cancel"
+              >
+                <X className="size-4" />
+                <span>Cancel</span>
+              </Button>
+            )}
           </div>
         </header>
 
@@ -466,10 +483,20 @@ export function SearchWorkspace({
             <Input
               value={query}
               onChange={event => setQuery(event.target.value)}
-              className="h-10 rounded-xl pl-9"
+              className={cn("h-10 rounded-xl pl-9", query && "pr-9")}
               placeholder="Search conversations and messages"
               aria-label="Search conversations and messages"
             />
+            {query && (
+              <button
+                type="button"
+                onClick={() => setQuery("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground transition-colors hover:text-foreground"
+                aria-label="Clear search"
+              >
+                <X className="size-3.5" />
+              </button>
+            )}
           </div>
           <DropdownMenu open={filterMenuOpen} onOpenChange={setFilterMenuOpen}>
             <DropdownMenuTrigger asChild>

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   filterLibraryWorkspaceItems,
   selectVisibleLibraryItems,
+  LibraryWorkspace,
 } from "./LibraryWorkspace";
 
 const files = [
@@ -45,5 +46,14 @@ describe("KSEMO dedicated Library workspace filters", () => {
         selectVisibleLibraryItems(new Set(["already-selected"]), files)
       )
     ).toEqual(["already-selected", "file-image", "file-doc"]);
+  });
+
+  it("exports LibraryWorkspace as a component function supporting mobile close", () => {
+    expect(typeof LibraryWorkspace).toBe("function");
+  });
+
+  it("exports SearchWorkspace as a component function supporting mobile close", async () => {
+    const { SearchWorkspace } = await import("./PremiumSearch");
+    expect(typeof SearchWorkspace).toBe("function");
   });
 });

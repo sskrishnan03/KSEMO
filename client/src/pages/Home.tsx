@@ -1832,7 +1832,21 @@ export default function Home() {
     setPrimaryWorkspace("library");
     setSidebarOpen(false);
   });
+  const stableCloseWorkspace = usePersistFn(() => {
+    setPrimaryWorkspace(null);
+  });
   const stableOnSettings = usePersistFn(() => setSettingsOpen(true));
+
+  useEffect(() => {
+    if (!activePrimaryWorkspace) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setPrimaryWorkspace(null);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [activePrimaryWorkspace]);
 
   useGlobalShortcuts({
     onNewChat: stableNewChat,
@@ -2003,10 +2017,13 @@ export default function Home() {
 
       <main className="relative flex min-w-0 flex-1 flex-col">
         {activePrimaryWorkspace === "library" ? (
-          <LibraryWorkspace onChatWithFiles={startChatWithLibraryFiles} />
+          <LibraryWorkspace
+            onClose={stableCloseWorkspace}
+            onChatWithFiles={startChatWithLibraryFiles}
+          />
         ) : activePrimaryWorkspace === "search" ? (
           <SearchWorkspace
-            onBackToChat={() => setPrimaryWorkspace(null)}
+            onBackToChat={stableCloseWorkspace}
             conversations={conversationQuery.data ?? []}
             onSelectConversation={stableOnSearchSelect}
           />
