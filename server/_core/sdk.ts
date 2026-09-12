@@ -297,22 +297,11 @@ class SDKServer {
     const signedInAt = new Date();
     let user = await db.getUserByOpenId(sessionUserId);
 
-    // No database configured (local dev): trust the signed session and
-    // synthesize the user so sign-in works without MySQL.
-    if (!user && !process.env.DATABASE_URL) {
-      const now = new Date();
-      return {
-        id: -1,
-        openId: session.openId,
-        name: session.name || "User",
-        email: null,
-        loginMethod: session.openId.startsWith("google_") ? "google" : null,
-        role: "user",
-        createdAt: now,
-        updatedAt: now,
-        lastSignedIn: now,
-      } as AuthenticatedUser;
-    }
+    // A signed session whose account no longer exists (e.g. the account was
+    // deleted or the local store was reset) must NOT be turned into a phantom
+    // user: doing so leaves the client "signed in" with an invalid id (-1),
+    // which silently breaks signing in, profile updates, and account deletion.
+    // Fall through so an unknown user is treated as logged out instead.
 
     // If user not in DB, sync from OAuth server automatically
     if (!user) {
