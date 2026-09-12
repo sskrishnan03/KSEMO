@@ -12,6 +12,7 @@ import { Loading } from "@/components/ui/loading";
 import { trpc } from "@/lib/trpc";
 import { ConfirmDeleteDialog } from "./ConfirmDeleteDialog";
 import { KsemoFilePreviewOverlay } from "./KsemoFilePreviewOverlay";
+import { usePdfViewer, isViewableDocument } from "@/contexts/PdfViewerContext";
 import {
   fileVisualFor,
   guessMimeType,
@@ -45,6 +46,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ShareIcon } from "./icons";
+import { downloadFile } from "@/lib/downloadFile";
 import React, {
   memo,
   useCallback,
@@ -136,6 +138,7 @@ export function LibraryWorkspace({
     null
   );
   const [isDragging, setIsDragging] = useState(false);
+  const { openPdf } = usePdfViewer();
   const [openedFile, setOpenedFile] = useState<LibraryWorkspaceFile | null>(
     null
   );
@@ -157,9 +160,17 @@ export function LibraryWorkspace({
     if (file) {
       initialOpenedRef.current = true;
       setSelectedIds(current => new Set(current).add(file.id));
-      setOpenedFile(file);
+      if (isViewableDocument(file.filename, file.mimeType)) {
+        openPdf({
+          url: file.url,
+          filename: file.filename,
+          sizeBytes: file.sizeBytes,
+        });
+      } else {
+        setOpenedFile(file);
+      }
     }
-  }, [initialFileId, filesQuery.data]);
+  }, [initialFileId, filesQuery.data, openPdf]);
   const uploadMutation = trpc.workspace.files.upload.useMutation({
     onSuccess: invalidateFiles,
     onError: () => {},
@@ -718,7 +729,7 @@ function SelectionCircle({ selected }: { selected: boolean }) {
           : "border-muted-foreground/40 bg-muted-foreground/5 text-transparent"
       )}
     >
-      <Check className="size-3" />
+      <Check className="size-3.5 stroke-[3]" />
     </span>
   );
 }
@@ -803,6 +814,8 @@ const LibraryGridCard = memo(function LibraryGridCard({
   onDelete: (file: LibraryWorkspaceFile) => void;
 }) {
   const isFavorite = Boolean(file.isFavorite);
+  const { openPdf } = usePdfViewer();
+  const isPdfFile = isViewableDocument(file.filename, file.mimeType);
   const selectWithKeyboard = (event: React.KeyboardEvent<HTMLElement>) => {
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
@@ -820,7 +833,7 @@ const LibraryGridCard = memo(function LibraryGridCard({
       className={cn(
         "group relative cursor-pointer overflow-hidden rounded-2xl border bg-card transition-colors focus-visible:outline-none",
         selected
-          ? "border-muted-foreground/60 ring-1 ring-muted-foreground/40"
+          ? "border-muted-foreground"
           : "border-border"
       )}
     >
@@ -861,7 +874,7 @@ const LibraryGridCard = memo(function LibraryGridCard({
               <DropdownMenuItem
                 onClick={event => {
                   event.stopPropagation();
-                  window.open(file.url, "_blank");
+                  void downloadFile(file.url, file.filename);
                 }}
               >
                 <Download className="mr-2 size-4" />
@@ -913,9 +926,19 @@ const LibraryGridCard = memo(function LibraryGridCard({
       )}
       <a
         href={file.url}
-        target="_blank"
-        rel="noreferrer"
-        onClick={event => event.stopPropagation()}
+        target={isPdfFile ? undefined : "_blank"}
+        rel={isPdfFile ? undefined : "noreferrer"}
+        onClick={event => {
+          event.stopPropagation();
+          if (isPdfFile) {
+            event.preventDefault();
+            openPdf({
+              url: file.url,
+              filename: file.filename,
+              sizeBytes: file.sizeBytes,
+            });
+          }
+        }}
         className="block aspect-[4/3] bg-muted"
       >
         <FilePreview file={file} />
@@ -923,9 +946,19 @@ const LibraryGridCard = memo(function LibraryGridCard({
       <div className="p-3">
         <a
           href={file.url}
-          target="_blank"
-          rel="noreferrer"
-          onClick={event => event.stopPropagation()}
+          target={isPdfFile ? undefined : "_blank"}
+          rel={isPdfFile ? undefined : "noreferrer"}
+          onClick={event => {
+            event.stopPropagation();
+            if (isPdfFile) {
+              event.preventDefault();
+              openPdf({
+                url: file.url,
+                filename: file.filename,
+                sizeBytes: file.sizeBytes,
+              });
+            }
+          }}
           className="block"
         >
           <p className="truncate text-sm font-medium hover:underline">
@@ -962,6 +995,8 @@ const LibraryListRow = memo(function LibraryListRow({
   onDelete: (file: LibraryWorkspaceFile) => void;
 }) {
   const isFavorite = Boolean(file.isFavorite);
+  const { openPdf } = usePdfViewer();
+  const isPdfFile = isViewableDocument(file.filename, file.mimeType);
   const selectWithKeyboard = (event: React.KeyboardEvent<HTMLElement>) => {
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
@@ -998,18 +1033,38 @@ const LibraryListRow = memo(function LibraryListRow({
       </button>
       <a
         href={file.url}
-        target="_blank"
-        rel="noreferrer"
-        onClick={event => event.stopPropagation()}
+        target={isPdfFile ? undefined : "_blank"}
+        rel={isPdfFile ? undefined : "noreferrer"}
+        onClick={event => {
+          event.stopPropagation();
+          if (isPdfFile) {
+            event.preventDefault();
+            openPdf({
+              url: file.url,
+              filename: file.filename,
+              sizeBytes: file.sizeBytes,
+            });
+          }
+        }}
         className="shrink-0"
       >
         <FilePreview file={file} compact />
       </a>
       <a
         href={file.url}
-        target="_blank"
-        rel="noreferrer"
-        onClick={event => event.stopPropagation()}
+        target={isPdfFile ? undefined : "_blank"}
+        rel={isPdfFile ? undefined : "noreferrer"}
+        onClick={event => {
+          event.stopPropagation();
+          if (isPdfFile) {
+            event.preventDefault();
+            openPdf({
+              url: file.url,
+              filename: file.filename,
+              sizeBytes: file.sizeBytes,
+            });
+          }
+        }}
         className="min-w-0 flex-1"
       >
         <p className="truncate text-sm font-medium hover:underline">
@@ -1041,7 +1096,7 @@ const LibraryListRow = memo(function LibraryListRow({
               <DropdownMenuItem
                 onClick={event => {
                   event.stopPropagation();
-                  window.open(file.url, "_blank");
+                  void downloadFile(file.url, file.filename);
                 }}
               >
                 <Download className="mr-2 size-4" />

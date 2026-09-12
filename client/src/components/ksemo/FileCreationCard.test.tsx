@@ -84,6 +84,58 @@ describe("FileCreationCard", () => {
       });
       expect(validatingMarkup).toContain("Validating document integrity");
     });
+
+    it("renders stage-specific icons before each step label inside the expanded process dropdown", () => {
+      const docxMarkup = renderCard({
+        stage: "generating",
+        format: "docx",
+        defaultExpanded: true,
+        researchSourceCount: 3,
+      });
+
+      // Must render process list
+      expect(docxMarkup).toContain('data-testid="file-creation-process-list"');
+
+      // Check each step's icon (lucide icons generate class names like lucide-sparkles, etc.)
+      expect(docxMarkup).toContain("lucide-sparkles");
+      expect(docxMarkup).toContain("Analyzing the request");
+
+      expect(docxMarkup).toContain("lucide-globe");
+      expect(docxMarkup).toContain("Gathering verified research (3 sources)");
+
+      expect(docxMarkup).toContain("lucide-layout-list");
+      expect(docxMarkup).toContain("Structuring the content");
+
+      expect(docxMarkup).toContain("lucide-pen-line");
+      expect(docxMarkup).toContain("Writing the document");
+
+      expect(docxMarkup).toContain("lucide-palette");
+      expect(docxMarkup).toContain("Formatting the layout");
+
+      expect(docxMarkup).toContain("lucide-cpu");
+      expect(docxMarkup).toContain("Compiling the file");
+
+      expect(docxMarkup).toContain("lucide-shield-check");
+      expect(docxMarkup).toContain("Validating document integrity");
+    });
+
+    it("renders format-tailored icons for spreadsheet and presentation steps", () => {
+      const xlsxMarkup = renderCard({
+        stage: "content_generated",
+        format: "xlsx",
+        defaultExpanded: true,
+      });
+      expect(xlsxMarkup).toContain("lucide-table");
+      expect(xlsxMarkup).toContain("Writing the spreadsheet");
+
+      const pptxMarkup = renderCard({
+        stage: "content_generated",
+        format: "pptx",
+        defaultExpanded: true,
+      });
+      expect(pptxMarkup).toContain("lucide-presentation");
+      expect(pptxMarkup).toContain("Writing the presentation");
+    });
   });
 
   describe("Completed State (Refined KSEMO Design)", () => {
@@ -95,6 +147,7 @@ describe("FileCreationCard", () => {
         fileUrl: "https://example.com/Quarterly_Report.pdf",
         fileSizeBytes: 245_760, // 240 KB
         metrics: { pages: 6, words: 1420 },
+        initialShowReady: true,
       });
 
       expect(markup).toContain('data-testid="file-creation-completed"');
@@ -114,13 +167,13 @@ describe("FileCreationCard", () => {
       // No native browser system tooltip attribute on link
       expect(markup).not.toContain('title="Open');
 
-      // Auto width and elevated height per user request
-      expect(markup).toContain("max-w-lg");
-      expect(markup).toContain("min-h-[64px]");
+      // Balanced elegant width and refined height per user request
+      expect(markup).toContain("max-w-[340px]");
+      expect(markup).toContain("min-h-[58px]");
       // Card is clickable to open
       expect(markup).toContain('href="https://example.com/Quarterly_Report.pdf"');
       expect(markup).toContain('target="_blank"');
-      // Ready status indicator
+      // Ready status indicator when freshly created
       expect(markup).toContain("Ready");
 
       // Single download button: transparent, only visible on hover, stationary without jumping
@@ -151,6 +204,20 @@ describe("FileCreationCard", () => {
       expect(markup).not.toContain("Referenced Sources");
       expect(markup).not.toContain("iea.org");
       expect(markup).not.toContain("nature.com");
+    });
+
+    it("does not show 'Ready' indicator when opening a completed file from history (initialShowReady is false by default)", () => {
+      const markup = renderCard({
+        stage: "completed",
+        format: "pdf",
+        filename: "Quarterly_Report.pdf",
+        fileUrl: "https://example.com/Quarterly_Report.pdf",
+      });
+
+      expect(markup).toContain('data-testid="file-creation-completed"');
+      expect(markup).toContain("Quarterly_Report.pdf");
+      // Must NOT contain Ready when loaded from history
+      expect(markup).not.toContain("Ready");
     });
   });
 

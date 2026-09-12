@@ -2,20 +2,27 @@ import type { DocFormat } from "@/lib/docFormats";
 import {
   Check,
   ChevronDown,
+  Cpu,
   Download,
+  Globe,
+  LayoutList,
+  Palette,
+  PenLine,
+  Presentation,
   RotateCw,
+  ShieldCheck,
+  Sparkles,
+  Table,
 } from "lucide-react";
-import React, { memo, useEffect, useState } from "react";
+import React, { memo, useEffect, useRef, useState } from "react";
 import {
   FileBrandMark,
   type FileBrandVariant,
 } from "@/components/ksemo/FileBrandIcons";
 import { cn } from "@/lib/utils";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { downloadFile } from "@/lib/downloadFile";
+import { usePdfViewer, isViewableDocument } from "@/contexts/PdfViewerContext";
 
 export type FileCreationStage =
   | "analyzing"
@@ -212,6 +219,8 @@ export type FileCreationCardProps = {
   researchSourceCount?: number;
   sources?: FileSource[];
   metrics?: FileMetrics;
+  defaultExpanded?: boolean;
+  initialShowReady?: boolean;
 };
 
 // ── Main card ──────────────────────────────────────────────────────────────
@@ -224,17 +233,41 @@ export const FileCreationCard = memo(function FileCreationCard({
   onRetry,
   researchSourceCount,
   metrics,
+  defaultExpanded = false,
+  initialShowReady = false,
 }: FileCreationCardProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
-  const [showReady, setShowReady] = useState(true);
+  const { openPdf } = usePdfViewer();
+  const [isExpanded, setIsExpanded] = useState(defaultExpanded);
+  const [showReady, setShowReady] = useState(initialShowReady);
+  const prevStageRef = useRef<FileCreationStage | null>(stage);
 
   useEffect(() => {
-    if (stage === "completed") {
+    if (initialShowReady && stage === "completed") {
       const timer = setTimeout(() => {
         setShowReady(false);
-      }, 15000);
+      }, 3500);
       return () => clearTimeout(timer);
     }
+  }, [initialShowReady, stage]);
+
+  useEffect(() => {
+    // Only show "Ready" if it just completed in this active session
+    // (i.e. transitioned from an in-progress stage to "completed").
+    // When opening an existing chat from history, stage is already "completed" on mount,
+    // so showReady remains false.
+    if (
+      prevStageRef.current &&
+      prevStageRef.current !== "completed" &&
+      prevStageRef.current !== "error" &&
+      stage === "completed"
+    ) {
+      setShowReady(true);
+      const timer = setTimeout(() => {
+        setShowReady(false);
+      }, 3500);
+      return () => clearTimeout(timer);
+    }
+    prevStageRef.current = stage;
   }, [stage]);
 
   const config = FORMAT_CONFIGS[format] || FORMAT_CONFIGS.pdf;
@@ -294,6 +327,7 @@ export const FileCreationCard = memo(function FileCreationCard({
         id: "analyzing",
         order: 1,
         label: "Analyzing the request",
+        icon: Sparkles,
       },
       ...(hasResearch
         ? [
@@ -304,6 +338,7 @@ export const FileCreationCard = memo(function FileCreationCard({
                 researchSourceCount && researchSourceCount > 0
                   ? `Gathering verified research (${researchSourceCount} sources)`
                   : "Gathering verified research",
+              icon: Globe,
             },
           ]
         : []),
@@ -311,6 +346,7 @@ export const FileCreationCard = memo(function FileCreationCard({
         id: "planning",
         order: 3,
         label: "Structuring the content",
+        icon: LayoutList,
       },
       {
         id: "content",
@@ -321,21 +357,30 @@ export const FileCreationCard = memo(function FileCreationCard({
             : format === "pptx"
               ? "Writing the presentation"
               : "Writing the document",
+        icon:
+          format === "xlsx" || format === "csv"
+            ? Table
+            : format === "pptx"
+              ? Presentation
+              : PenLine,
       },
       {
         id: "designing",
         order: 5,
         label: "Formatting the layout",
+        icon: Palette,
       },
       {
         id: "generating",
         order: 6,
         label: "Compiling the file",
+        icon: Cpu,
       },
       {
         id: "validating",
         order: 7,
         label: "Validating document integrity",
+        icon: ShieldCheck,
       },
     ];
 
@@ -364,18 +409,32 @@ export const FileCreationCard = memo(function FileCreationCard({
           />
         </button>
 
-        {/* Minimal text-based process dropdown (no green lines, checkmarks, spinners, or circles) */}
+        {/* Process dropdown with step icons before each word */}
         {isExpanded && (
           <div
             data-testid="file-creation-process-list"
             className="mt-2 space-y-2 pl-8 animate-in fade-in slide-in-from-top-1 duration-150"
           >
             {steps.map(step => {
+              const StepIcon = step.icon;
               const isCompleted = currentOrder > step.order;
               const isActive = currentOrder === step.order;
 
               return (
-                <div key={step.id} className="text-[13.5px] leading-snug">
+                <div
+                  key={step.id}
+                  className="flex items-center gap-2 text-[13.5px] leading-snug"
+                >
+                  <StepIcon
+                    className={cn(
+                      "size-3.5 shrink-0 transition-colors duration-200",
+                      isActive
+                        ? "text-foreground"
+                        : isCompleted
+                          ? "text-muted-foreground"
+                          : "text-muted-foreground/40"
+                    )}
+                  />
                   <span
                     className={cn(
                       "transition-colors duration-200 select-none",
@@ -397,19 +456,36 @@ export const FileCreationCard = memo(function FileCreationCard({
     );
   }
 
-  // ── Completed state (ELEVATED HEIGHT, AUTO-WIDTH, CLICK TO OPEN, HOVER DOWNLOAD) ───
+  const canOpenInDrawer =
+    format === "pdf" ||
+    format === "docx" ||
+    format === "xlsx" ||
+    format === "pptx" ||
+    isViewableDocument(displayName);
+
+  // ── Completed state (BALANCED ELEGANT WIDTH, CLICK TO OPEN, HOVER DOWNLOAD) ───
   return (
     <div
       data-testid="file-creation-completed"
-      className="my-2 w-fit min-w-[280px] sm:min-w-[320px] max-w-lg animate-in fade-in duration-200"
+      className="my-2 w-fit min-w-[220px] max-w-[340px] sm:max-w-[360px] animate-in fade-in duration-200"
     >
       <a
         href={fileUrl}
         target="_blank"
         rel="noreferrer"
+        onClick={e => {
+          if (canOpenInDrawer && fileUrl) {
+            e.preventDefault();
+            openPdf({
+              url: fileUrl,
+              filename: displayName,
+              sizeBytes: fileSizeBytes,
+            });
+          }
+        }}
         className={cn(
-          "group/file relative flex min-h-[64px] items-center gap-3.5 rounded-2xl",
-          "border border-border/80 bg-card/90 px-4 py-3.5 shadow-sm backdrop-blur-sm",
+          "group/file relative flex min-h-[58px] items-center gap-3.5 rounded-2xl",
+          "border border-border/80 bg-card/90 px-4 py-3 shadow-sm backdrop-blur-sm",
           "transition-all duration-200 hover:border-border hover:bg-accent/60 hover:shadow-md",
           "dark:bg-card/60 dark:hover:bg-card/90 cursor-pointer"
         )}
@@ -419,12 +495,12 @@ export const FileCreationCard = memo(function FileCreationCard({
 
         {/* Title & auto-dismissing Ready status (no duplicate format badge) */}
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[14.5px] font-medium leading-snug text-foreground group-hover/file:text-primary transition-colors">
+          <p className="truncate text-[14px] font-medium leading-snug text-foreground group-hover/file:text-primary transition-colors">
             {displayName}
           </p>
 
           {showReady && (
-            <p className="mt-1 flex items-center gap-1 text-[11.5px] font-medium text-emerald-600 dark:text-emerald-400 animate-in fade-in duration-200">
+            <p className="mt-0.5 flex items-center gap-1 text-[11.5px] font-medium text-emerald-600 dark:text-emerald-400 animate-in fade-in duration-200">
               <Check className="size-3 stroke-[2.5]" />
               <span>Ready</span>
             </p>
@@ -440,12 +516,7 @@ export const FileCreationCard = memo(function FileCreationCard({
                 onClick={e => {
                   e.preventDefault();
                   e.stopPropagation();
-                  const a = document.createElement("a");
-                  a.href = fileUrl;
-                  a.download = displayName;
-                  document.body.appendChild(a);
-                  a.click();
-                  document.body.removeChild(a);
+                  void downloadFile(fileUrl, displayName);
                 }}
                 aria-label={`Download ${displayName}`}
                 className={cn(

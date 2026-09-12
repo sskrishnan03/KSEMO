@@ -4,8 +4,10 @@
 
 import { Button } from "@/components/ui/button";
 import { getFileKind } from "@/lib/fileKinds";
+import { downloadFile } from "@/lib/downloadFile";
 import { Download, ExternalLink, FolderOpen, X } from "lucide-react";
 import { memo, useEffect } from "react";
+import { usePdfViewer, isPdf, isViewableDocument } from "@/contexts/PdfViewerContext";
 
 export type PreviewFile = {
   id: string;
@@ -50,7 +52,20 @@ export const KsemoFilePreviewOverlay = memo(function KsemoFilePreviewOverlay({
   onClose,
   onOpenInLibrary,
 }: KsemoFilePreviewOverlayProps) {
+  const { openPdf } = usePdfViewer();
   const kind = getFileKind(file.filename, file.mimeType);
+
+  useEffect(() => {
+    if (isViewableDocument(file.filename, file.mimeType)) {
+      openPdf({
+        url: file.url,
+        filename: file.filename,
+        sizeBytes: file.sizeBytes,
+        mimeType: file.mimeType,
+      });
+      onClose();
+    }
+  }, [file, onClose, openPdf]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -61,9 +76,8 @@ export const KsemoFilePreviewOverlay = memo(function KsemoFilePreviewOverlay({
   }, [onClose]);
 
   const isImage = file.mimeType?.startsWith("image/");
-  const isPdf =
-    file.mimeType === "application/pdf" || /\.pdf$/i.test(file.filename);
-  const showInline = isImage || isPdf || isTextLike(file);
+  const isPdfDoc = isPdf(file.filename, file.mimeType);
+  const showInline = isImage || isPdfDoc || isTextLike(file);
 
   return (
     <div
@@ -121,12 +135,10 @@ export const KsemoFilePreviewOverlay = memo(function KsemoFilePreviewOverlay({
             <Button
               variant="ghost"
               size="icon"
-              aria-label="Download file"
-              asChild
+              aria-label={`Download ${file.filename}`}
+              onClick={() => void downloadFile(file.url, file.filename)}
             >
-              <a href={file.url} target="_blank" rel="noreferrer" download>
-                <Download className="size-4" />
-              </a>
+              <Download className="size-4" />
             </Button>
             <Button
               variant="ghost"
@@ -145,7 +157,7 @@ export const KsemoFilePreviewOverlay = memo(function KsemoFilePreviewOverlay({
               alt={file.filename}
               className="mx-auto h-full max-h-[70vh] w-auto object-contain"
             />
-          ) : isPdf ? (
+          ) : isPdfDoc ? (
             <iframe src={file.url} title={file.filename} className="h-[70vh] w-full" />
           ) : showInline ? (
             <iframe

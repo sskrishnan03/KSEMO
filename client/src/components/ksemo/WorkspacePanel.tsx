@@ -23,6 +23,7 @@ import React, {
   useState,
 } from "react";
 import { ConfirmDeleteDialog } from "./ConfirmDeleteDialog";
+import { usePdfViewer, isViewableDocument } from "@/contexts/PdfViewerContext";
 
 export type WorkspaceSection = "files";
 
@@ -56,6 +57,7 @@ export const WorkspacePanel = memo(function WorkspacePanel({
   activeConversationId?: string | null;
   initialDeletePreview?: boolean;
 }) {
+  const { openPdf } = usePdfViewer();
   const [libraryQuery, setLibraryQuery] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<{
     kind: "file";
@@ -182,19 +184,34 @@ export const WorkspacePanel = memo(function WorkspacePanel({
                           />
                         );
                       })()}
-                      <a
-                        href={file.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="min-w-0 flex-1"
-                      >
-                        <p className="truncate text-sm font-medium hover:underline">
-                          {file.filename}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {file.mimeType}
-                        </p>
-                      </a>
+                      {(() => {
+                        const isPdfFile = isViewableDocument(file.filename, file.mimeType);
+                        return (
+                          <a
+                            href={file.url}
+                            target={isPdfFile ? undefined : "_blank"}
+                            rel={isPdfFile ? undefined : "noreferrer"}
+                            onClick={e => {
+                              if (isPdfFile) {
+                                e.preventDefault();
+                                openPdf({
+                                  url: file.url,
+                                  filename: file.filename,
+                                });
+                                onOpenChange(false);
+                              }
+                            }}
+                            className="min-w-0 flex-1"
+                          >
+                            <p className="truncate text-sm font-medium hover:underline">
+                              {file.filename}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {file.mimeType}
+                            </p>
+                          </a>
+                        );
+                      })()}
                       {activeConversationId && (
                         <Button
                           variant="ghost"

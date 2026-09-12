@@ -35,6 +35,7 @@ import React, { memo, useEffect, useRef, useState } from "react";
 import { Streamdown } from "streamdown";
 import { KsemoMarkdownCode } from "./code-block";
 import { sanitizeAssistantText } from "@/lib/sanitizeAssistant";
+import { usePdfViewer, isViewableDocument } from "@/contexts/PdfViewerContext";
 
 type KsemoMessage = {
   id: string;
@@ -189,6 +190,7 @@ export const MessageContent = memo(function MessageContent({
   const [copied, setCopied] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [previewFile, setPreviewFile] = useState<KsemoFile | null>(null);
+  const { openPdf } = usePdfViewer();
   const [userExpanded, setUserExpanded] = useState(false);
   const [userLong, setUserLong] = useState(false);
   const userTextRef = useRef<HTMLParagraphElement | null>(null);
@@ -562,7 +564,17 @@ export const MessageContent = memo(function MessageContent({
                   >
                     <button
                       type="button"
-                      onClick={() => setPreviewFile(file)}
+                      onClick={() => {
+                        if (isViewableDocument(file.filename, file.mimeType)) {
+                          openPdf({
+                            url: file.url,
+                            filename: file.filename,
+                            sizeBytes: file.sizeBytes,
+                          });
+                        } else {
+                          setPreviewFile(file);
+                        }
+                      }}
                       className="flex min-w-0 flex-1 items-center gap-3 overflow-hidden rounded-lg text-left"
                       aria-label={`Preview ${file.filename}`}
                     >

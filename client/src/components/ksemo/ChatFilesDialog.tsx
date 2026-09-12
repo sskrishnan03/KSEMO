@@ -2,6 +2,7 @@ import { getFileKind, IMAGE_EXT } from "@/lib/fileKinds";
 import { cn } from "@/lib/utils";
 import { ExternalLink, FolderOpen, X } from "lucide-react";
 import React, { memo, useEffect, useMemo, useRef } from "react";
+import { usePdfViewer, isViewableDocument } from "@/contexts/PdfViewerContext";
 
 export type ChatFile = {
   id: string;
@@ -27,6 +28,7 @@ export const ChatFilesDialog = memo(function ChatFilesDialog({
   onOpenChange,
   files,
 }: Props) {
+  const { openPdf } = usePdfViewer();
   const rows = useMemo(() => files, [files]);
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -100,12 +102,23 @@ export const ChatFilesDialog = memo(function ChatFilesDialog({
             {rows.map(file => {
               const kind = getFileKind(file.filename, file.mimeType);
               const image = isImage(file);
+              const isPdfFile = isViewableDocument(file.filename, file.mimeType);
               return (
                 <li key={file.id}>
                   <a
                     href={file.url}
-                    target="_blank"
-                    rel="noreferrer"
+                    target={isPdfFile ? undefined : "_blank"}
+                    rel={isPdfFile ? undefined : "noreferrer"}
+                    onClick={e => {
+                      if (isPdfFile) {
+                        e.preventDefault();
+                        openPdf({
+                          url: file.url,
+                          filename: file.filename,
+                        });
+                        onOpenChange(false);
+                      }
+                    }}
                     className="group flex items-center gap-3 rounded-xl border border-transparent p-2 transition-all hover:border-border/50 hover:bg-accent/60"
                   >
                     {image ? (

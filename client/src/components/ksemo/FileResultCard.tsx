@@ -23,6 +23,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { type FileFormat } from "@shared/capabilities";
+import { usePdfViewer, isViewableDocument } from "@/contexts/PdfViewerContext";
 
 export interface FileResult {
   filename: string;
@@ -61,14 +62,32 @@ function getFileFormat(filename: string): FileFormat {
 }
 
 export function FileResultCard({ file, onDownload, className }: FileResultCardProps) {
+  const { openPdf } = usePdfViewer();
   const format = getFileFormat(file.filename);
+  const isViewableDoc =
+    format === "pdf" ||
+    format === "docx" ||
+    isViewableDocument(file.filename, file.mimeType);
+  const isCompleted = file.status === "completed";
   const config = FILE_TYPE_CONFIG[format];
   const Icon = config.icon;
 
+  const handleCardClick = () => {
+    if (isViewableDoc && isCompleted && file.downloadUrl) {
+      openPdf({
+        url: file.downloadUrl,
+        filename: file.filename,
+        sizeBytes: file.size,
+      });
+    }
+  };
+
   return (
     <div
+      onClick={isViewableDoc && isCompleted && file.downloadUrl ? handleCardClick : undefined}
       className={cn(
         "group flex items-center gap-4 rounded-xl border border-border bg-card p-4 shadow-sm transition-all hover:shadow-md",
+        isViewableDoc && isCompleted && file.downloadUrl && "cursor-pointer hover:border-primary/50",
         className
       )}
     >
@@ -80,7 +99,7 @@ export function FileResultCard({ file, onDownload, className }: FileResultCardPr
       {/* File Info */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <h3 className="text-sm font-semibold text-foreground truncate">
+          <h3 className={cn("text-sm font-semibold text-foreground truncate", isViewableDoc && isCompleted && "group-hover:text-primary transition-colors")}>
             {file.filename}
           </h3>
           <span className="shrink-0 text-xs font-medium uppercase tracking-wide text-muted-foreground">

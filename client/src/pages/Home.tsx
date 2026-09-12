@@ -35,6 +35,7 @@ import {
   type FileMetrics,
   type FileSource,
 } from "../components/ksemo/FileCreationCard";
+import { PdfDrawer } from "../components/ksemo/PdfDrawer";
 import type { DocFormat } from "@/lib/docFormats";
 import AuthStage from "./AuthStage";
 import { ConversationSidebar } from "../components/ksemo/ConversationSidebar";
@@ -2535,6 +2536,7 @@ export default function Home() {
             )}
           </>
         )}
+        <PdfDrawer />
       </main>
 
       <SettingsDialog

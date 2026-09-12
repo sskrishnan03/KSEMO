@@ -4,6 +4,7 @@ import AuthStage from "@/pages/AuthStage";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import { PdfViewerProvider } from "./contexts/PdfViewerContext";
 import Home from "./pages/Home";
 import ResetPassword from "@/pages/ResetPassword";
 import SharedConversation from "./pages/SharedConversation";
@@ -39,7 +40,9 @@ function App() {
     <ErrorBoundary>
       <ThemeProvider defaultTheme="dark" switchable>
         <TooltipProvider>
-          <Router />
+          <PdfViewerProvider>
+            <Router />
+          </PdfViewerProvider>
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>
