@@ -46,9 +46,11 @@ export function getSessionCookieOptions(
     httpOnly: true,
     path: "/",
     domain,
-    // SameSite=None + Secure + partitioned allows cookies to work in cross-origin iframes
+    // SameSite=None + Secure + partitioned allows cookies to work in cross-origin
+    // iframes. Partitioned is only valid on secure (https) connections, so it is
+    // enabled purely when `secure` is true to avoid Chrome rejecting the cookie.
     sameSite: secure ? "none" : "lax",
     secure,
-    partitioned: true,
+    partitioned: secure,
   } as CookieOptions;
 }

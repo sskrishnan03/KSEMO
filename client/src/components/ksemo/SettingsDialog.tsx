@@ -33,6 +33,7 @@ import {
   ArchiveRestore,
   Brain,
   Bug,
+  Check,
   Copy,
   ExternalLink,
   HelpCircle,
@@ -1537,12 +1538,15 @@ function FeedbackSection() {
                     onClick={() => setCategory(cat.id)}
                     className={`flex items-center gap-2 rounded-xl border p-2.5 text-left text-sm transition-colors ${
                       active
-                        ? "border-primary bg-primary/5 font-medium text-foreground"
+                        ? "border-transparent bg-accent font-medium text-foreground"
                         : "border-border text-muted-foreground hover:bg-accent hover:text-foreground"
                     }`}
                   >
                     <Icon className="size-4 shrink-0" />
                     {cat.label}
+                    {active && (
+                      <Check className="ml-auto size-4 shrink-0 text-foreground" />
+                    )}
                   </button>
                 );
               })}

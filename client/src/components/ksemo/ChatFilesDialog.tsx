@@ -86,16 +86,9 @@ export const ChatFilesDialog = memo(function ChatFilesDialog({
 
       <div className="min-h-0 flex-1 overflow-y-auto p-2">
         {!rows.length ? (
-          <div className="flex h-full min-h-36 flex-col items-center justify-center px-4 text-center">
-            <span className="mb-2.5 flex size-12 items-center justify-center rounded-2xl bg-muted/50 text-muted-foreground/80">
-              <FolderOpen className="size-6" />
-            </span>
+          <div className="flex h-full min-h-36 items-center justify-center px-4 text-center">
             <p className="text-sm font-medium text-foreground">
               No files in this chat
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground max-w-[15rem] leading-relaxed">
-              Files generated or attached in this conversation will appear here
-              for quick access.
             </p>
           </div>
         ) : (

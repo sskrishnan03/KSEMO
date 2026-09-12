@@ -683,7 +683,7 @@ function FilterButton({
     <button
       onClick={onClick}
       className={cn(
-        "rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
+        "rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
         active
           ? "bg-foreground text-background"
           : "text-muted-foreground hover:bg-accent hover:text-foreground"
@@ -708,7 +708,7 @@ function ViewButton({
     <button
       onClick={onClick}
       className={cn(
-        "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
+        "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
         active
           ? "bg-foreground text-background"
           : "text-muted-foreground hover:bg-accent hover:text-foreground"

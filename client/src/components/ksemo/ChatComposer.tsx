@@ -578,10 +578,7 @@ export const ChatComposer = memo(function ChatComposer({
         compactBottomSpacing ? "pb-5" : "pb-4"
       )}
     >
-      <div
-        className="relative rounded-[20px] p-1.5 shadow-sm"
-        style={{ backgroundColor: "#20201F", border: "1px solid #353534" }}
-      >
+      <div className="relative rounded-[20px] border border-border bg-popover p-1.5 shadow-sm text-popover-foreground">
         {isDragActive && (
           <div className="pointer-events-none fixed inset-0 z-[100] flex items-center justify-center bg-card/80 backdrop-blur-sm">
             <div className="rounded-2xl border-2 border-dashed border-primary/60 bg-card px-10 py-8 shadow-xl">
@@ -764,7 +761,7 @@ export const ChatComposer = memo(function ChatComposer({
             />
             {canExpand && (
               <div
-                className="pointer-events-none absolute inset-x-0 -bottom-1 h-9 bg-gradient-to-t from-[#20201F] to-transparent"
+                className="pointer-events-none absolute inset-x-0 -bottom-1 h-9 bg-gradient-to-t from-popover to-transparent"
                 aria-hidden="true"
               />
             )}
@@ -1103,7 +1100,7 @@ export const ChatComposer = memo(function ChatComposer({
                           onClick={onVoiceChat}
                           disabled={isRecording || isTranscribing}
                           size="icon"
-                          className="size-10 rounded-full bg-muted text-foreground hover:bg-[#333333] transition-colors"
+                          className="size-10 rounded-full bg-muted text-foreground hover:bg-accent transition-colors"
                           aria-label="Start voice chat"
                         >
                           <span className="flex items-center justify-center gap-[3px]">

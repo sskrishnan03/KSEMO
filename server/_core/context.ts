@@ -20,7 +20,7 @@ export async function createContext(
   } catch {
     try {
       const cookieOptions = getSessionCookieOptions(opts.req);
-      opts.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
+      opts.res.clearCookie(COOKIE_NAME, cookieOptions);
     } catch {}
     user = null;
   }
