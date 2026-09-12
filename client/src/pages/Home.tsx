@@ -45,6 +45,7 @@ import {
 } from "../components/ksemo/MessageContent";
 import { getAuthHeaders } from "@/lib/authHeaders";
 import { toast } from "sonner";
+import { detectFileRequest } from "@shared/docDetect";
 
 import { SettingsDialog } from "../components/ksemo/SettingsDialog";
 import { useGlobalShortcuts } from "../hooks/useGlobalShortcuts";
@@ -911,15 +912,21 @@ export default function Home() {
         : undefined,
       now: draftNow,
     }) as KsemoMessage[];
-    // In file creation mode the backend is guaranteed to run the document
-    // pipeline, so seed the generation card immediately on the optimistic
-    // assistant draft — no blank wait while the first progress event travels.
-    if (activeMode !== "chat") {
+    // Resolve mode: either explicit activeMode from UI or auto-detected from natural language query
+    const detected = detectFileRequest(content);
+    const resolvedMode =
+      activeMode !== "chat"
+        ? activeMode
+        : (detected.isFileRequest && detected.format ? detected.format : null);
+
+    // In file creation mode the backend runs the document pipeline,
+    // so seed the generation card immediately on the optimistic assistant draft.
+    if (resolvedMode) {
       for (const message of drafts) {
         if (message.role === "assistant" && message.status === "streaming") {
           message.fileGeneration = {
             stage: "analyzing",
-            format: activeMode,
+            format: resolvedMode,
             status: "processing" as const,
           };
         }
@@ -984,8 +991,8 @@ export default function Home() {
           attachmentFileIds: selectedAttachments.length
             ? selectedAttachments.map(file => file.fileId)
             : undefined,
-          mode: activeMode ?? "chat",
-          activeMode: activeMode ?? "chat",
+          mode: resolvedMode ?? "chat",
+          activeMode: resolvedMode ?? "chat",
         }),
       });
       if (!response.ok || !response.body) {

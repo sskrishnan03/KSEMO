@@ -228,17 +228,22 @@ function buildForcedSystemPrompt(
 
   return `You are an elite, specialized document generation AI.
 CRITICAL DIRECTIVE:
-The user has explicitly activated ${formatUpper} FILE CREATION MODE.
-Whatever the user's prompt or question is:
+The user has requested a ${formatUpper} file to be created.
+User query / prompt:
 "${userMessage.slice(0, 400)}"
 
-You MUST generate a complete, extensive, professional ${formatUpper} file answering and addressing this prompt in rich, exhaustive detail!
-- NEVER set createFile to false. You MUST set "createFile": true.
-- Set "format": "${format}".
-- Set "filename": a clear, clean snake_case filename without extension (e.g., "artificial_intelligence_overview").
-- Set "title": a polished, professional title for the document.
-- Set "summary": a clear statement explaining the document created and its contents.
-- Generate EXTENSIVE, THOROUGH CONTENT — this is the most important directive.
+CONTEXT & SUBJECT INSTRUCTIONS:
+1. If the user's prompt says "I want this in ${formatUpper}", "give me this in ${formatUpper}", "make this into a ${formatUpper}", or refers to "this", "that", "the above", or previous conversation:
+   You MUST base the document directly on the preceding conversation history and assistant messages above!
+   Extract all key topics, analysis, facts, figures, tables, and explanations from the chat history and structure them into a complete, professional, multi-page ${formatUpper} document.
+2. If the user provided a specific topic, task, or question (e.g. "Explain photosynthesis, I want this in ${formatUpper}"):
+   Answer and cover that topic comprehensively and exhaustively within the document.
+3. NEVER set createFile to false. You MUST set "createFile": true.
+4. Set "format": "${format}".
+5. Set "filename": a clear, clean snake_case filename without extension representing the actual topic (e.g. "photosynthesis_comprehensive_guide" or "quarterly_financial_report"). NEVER name it "i_want_this_in_${format}" or "create_file".
+6. Set "title": a polished, professional title representing the document's actual subject matter (e.g. "Photosynthesis: Biological Mechanisms and Energy Conversion").
+7. Set "summary": a clear statement explaining the document created and its contents.
+8. Generate EXTENSIVE, THOROUGH CONTENT — this is the most important directive.
   The document MUST be complete and multi-page (or rich and multi-sheet/slide).
   Never return a short stub:
   ${format === "xlsx" ? "Generate at least 3 detailed spreadsheets with rich realistic data, headers, numbers, and categories, including an overview sheet and a detailed breakdown sheet." : format === "pptx" ? "Generate at least 8 comprehensive slides covering every facet of the prompt: title, agenda, concepts, analysis, comparative data, key findings, risks, and a roadmap/conclusion." : "Generate 6-10 detailed sections with Level 1/2 headings. Every section must contain 2-3 substantial paragraphs of 100-200 words each, plus bullet lists and at least one structured data table. Include an Executive Summary, an In-Depth Analysis, a Comparative Data/Metrics section, and a Recommendations/Conclusion section."}
@@ -289,13 +294,13 @@ export async function planDocument(
 
       const parsed = parsePlanJson(text);
       if (parsed) {
-        return buildPlanFromParsed(parsed, forced, userMessage, research);
+        return buildPlanFromParsed(parsed, forced, userMessage, research, history);
       }
 
-      return synthesizeFallbackPlan(userMessage, forced, text, research);
+      return synthesizeFallbackPlan(userMessage, forced, text, research, history);
     } catch (error) {
       console.warn(`[DocGen] planning call with forced ${forced} failed; synthesizing document.`, error);
-      return synthesizeFallbackPlan(userMessage, forced, undefined, research);
+      return synthesizeFallbackPlan(userMessage, forced, undefined, research, history);
     }
   }
 
@@ -327,7 +332,7 @@ export async function planDocument(
     if (parsed.createFile !== true) return { kind: "none" };
     const format = normalizeFormat(parsed.format);
     if (!format) return { kind: "none" };
-    return buildPlanFromParsed(parsed, format, userMessage, research);
+    return buildPlanFromParsed(parsed, format, userMessage, research, history);
   } catch (error) {
     console.warn("[DocGen] planning call failed; no file generated.", error);
     return { kind: "none" };
@@ -338,9 +343,10 @@ function buildPlanFromParsed(
   parsed: Record<string, any>,
   format: DocFormat,
   userMessage: string,
-  research?: ResearchResult
+  research?: ResearchResult,
+  history?: Message[]
 ): DocumentPlan & { kind: "file" } {
-  const title = String(parsed.title ?? cleanTitleFromMessage(userMessage)).slice(0, 160);
+  const title = String(parsed.title ?? cleanTitleFromMessage(userMessage, history)).slice(0, 160);
   const filename = String(parsed.filename ?? sanitizeTitle(title)).slice(0, 120);
   const summary = String(
     parsed.summary ?? `I created your comprehensive ${format.toUpperCase()} document: "${title}".`
@@ -403,13 +409,30 @@ function buildPlanFromParsed(
   };
 }
 
-function cleanTitleFromMessage(message: string): string {
+function cleanTitleFromMessage(message: string, history?: Message[]): string {
   const cleaned = message
+    .replace(/^\/?(pdf|docx|word|xlsx|excel|pptx|powerpoint|ppt|txt|text)\s*[:\s-]?/i, "")
+    .replace(/^(can you\s+)?(i\s+want|i\s+need|give\s+me|can\s+you\s+give\s+me|can\s+you\s+provide|please\s+)?(this|that|it)?\s*(in|into|to|as\s+a|as)?\s*(pdf|word|docx|excel|xlsx|powerpoint|pptx|text|txt)?\s*/i, "")
     .replace(/^(create|generate|write|make|build|give me|can you make|please make)\s+(a|an|the)?\s*/i, "")
     .replace(/(pdf|word document|docx|excel|spreadsheet|xlsx|powerpoint|presentation|pptx|text file|txt|file)\s*/gi, "")
     .replace(/[^\w\s-]/g, "")
     .trim();
-  if (!cleaned) return "Comprehensive Document";
+
+  // If the user's prompt was "I want this in PDF" or "give me this in Word",
+  // derive the title from the previous user turn in history if available.
+  if (!cleaned || /^(this|that|it|everything|the above)$/i.test(cleaned)) {
+    if (history && history.length > 0) {
+      const priorUser = [...history].reverse().find(m => m.role === "user" && m.content);
+      if (priorUser && typeof priorUser.content === "string") {
+        const priorTitle = cleanTitleFromMessage(priorUser.content);
+        if (priorTitle && priorTitle !== "Comprehensive Document") {
+          return priorTitle;
+        }
+      }
+    }
+    return "Comprehensive Document";
+  }
+
   return cleaned
     .split(/\s+/)
     .slice(0, 7)
@@ -464,9 +487,10 @@ function synthesizeFallbackPlan(
   userMessage: string,
   format: DocFormat,
   rawText?: string,
-  research?: ResearchResult
+  research?: ResearchResult,
+  history?: Message[]
 ): DocumentPlan & { kind: "file" } {
-  const title = cleanTitleFromMessage(userMessage);
+  const title = cleanTitleFromMessage(userMessage, history);
   const filename = sanitizeTitle(title);
 
   const sources = research?.sources?.map(s => ({

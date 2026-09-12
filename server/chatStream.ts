@@ -17,7 +17,12 @@ import { resolveStoragePath } from "./storage";
 import fs from "fs";
 import { buildUserMemoryContext } from "./memory/retrieval";
 import { memorizeConversation } from "./memory/autoMemorize";
-import { likelyFormatHint, looksLikeFileRequest } from "./docgen/detect";
+import {
+  detectFileRequest,
+  likelyFormatHint,
+  looksLikeFileRequest,
+  cleanPromptText,
+} from "./docgen/detect";
 import {
   runDocumentPipeline,
   type GeneratedFileResult,
@@ -656,24 +661,16 @@ export function registerChatStream(app: Express) {
 
         // ------------------------------------------------------------------
         // AI File Creation & Document Generation
-        // --------------------------------------------------------------
-        // File creation is an explicit, separate mode. It activates ONLY
-        // when the user has selected a file type through the Create File UI
-        // (which sends `documentFormat`). Auto-detection from natural language
-        // is intentionally disabled: typing "create a PDF" alone must NOT
-        // create a file. The selected format is the single source of truth
-        // that drives the whole pipeline.
-        //
-        // When File Creation Mode is active (forcedFormat is set) and the
-        // generation fails, the server does NOT fall back to normal chat.
-        // The file.error event is emitted and the assistant message is
-        // settled as failed. The two modes must never bleed into each other.
+        // ------------------------------------------------------------------
+        // Supports two seamless pathways:
+        // 1. Explicit capability mode selected from UI (+ menu -> Create Files)
+        // 2. Natural language detection from user message ("I want this in PDF",
+        //    "give me this in Word", "create an excel sheet...", etc.)
         let deliveredFile: GeneratedFileResult | null = null;
         let fileModeFailed = false;
-        const isRegenerationTurn = Boolean(body.regenerateAssistantMessageId);
         // Resolve the active capability mode (moves Normal Chat -> a specific
-        // file format). `mode` is the source of
-        // truth; `documentFormat` is kept for backward compatibility.
+        // file format). `mode` is the source of truth; `documentFormat` is kept
+        // for backward compatibility.
         const requestedMode = resolveCapabilityMode(
           body.mode ?? body.activeMode ?? body.documentFormat ?? "chat"
         );
@@ -688,9 +685,17 @@ export function registerChatStream(app: Express) {
           ? (requestedMode as GeneratedFileResult["format"])
           : null;
 
+        // Auto-detect file creation from natural language if not explicitly selected from UI
+        // e.g. "I want this in PDF", "give me this in Word", "create a spreadsheet of...", etc.
+        const detected = (!forcedFormat && content) ? detectFileRequest(content) : null;
+        const targetFormat: GeneratedFileResult["format"] | null =
+          forcedFormat ?? (detected?.isFileRequest && detected.format && FILE_FORMATS.has(detected.format) ? (detected.format as GeneratedFileResult["format"]) : null);
 
-        if (!isRegenerationTurn && forcedFormat) {
+        if (targetFormat) {
           try {
+            // Clean command prefixes if present while preserving core prompt
+            const cleanUserMessage = detected?.cleanedPrompt || cleanPromptText(content ?? "", targetFormat);
+
             // Run the full intelligent document generation pipeline.
             // Each pipeline stage emits real progress events that the
             // client renders as meaningful live stages.
@@ -698,8 +703,8 @@ export function registerChatStream(app: Express) {
               userId: user.id,
               assistantMessageId,
               conversationId: conversation.id,
-              userMessage: content ?? "",
-              format: forcedFormat,
+              userMessage: cleanUserMessage || content || "",
+              format: targetFormat,
               history: filteredAssistantContext,
               onProgress: (event: PipelineProgressEvent) => {
                 writeEvent(res, "file.progress", {
@@ -745,13 +750,13 @@ export function registerChatStream(app: Express) {
 
         // ------------------------------------------------------------------
         // Normal Chat — only runs when NOT in file creation mode.
-        // When a special mode was active and completed (or failed), this block
+        // When a file mode was active and completed (or failed), this block
         // is skipped entirely so the modes never bleed into each other.
         // ------------------------------------------------------------------
         if (
           !deliveredFile &&
           !fileModeFailed &&
-          !forcedFormat
+          !targetFormat
         ) {
           try {
             responseText = await runGeneration(

@@ -400,11 +400,23 @@ export const ChatComposer = memo(function ChatComposer({
       return;
     }
     const content = value.trim();
-    if ((!content && !visibleAttachmentNotices.length) || isGenerating) return;
+    if (
+      (!content &&
+        !visibleAttachmentNotices.length &&
+        (!activeMode || activeMode === "chat")) ||
+      isGenerating
+    )
+      return;
+    const finalContent =
+      content ||
+      (activeMode && activeMode !== "chat"
+        ? `Create this in ${getModeToken(activeMode)}`
+        : "");
+    if (!finalContent && !visibleAttachmentNotices.length) return;
     const payload =
       activeMode && activeMode !== "chat"
-        ? `${getModeToken(activeMode)} ${content}`
-        : content;
+        ? `${getModeToken(activeMode)} ${finalContent}`
+        : finalContent;
     onSend(payload.trim());
     onValueChange("");
     onModeChange?.(null);
@@ -1092,6 +1104,7 @@ export const ChatComposer = memo(function ChatComposer({
                     </Tooltip>
                   ) : !value.trim() &&
                     !visibleAttachmentNotices.length &&
+                    (!activeMode || activeMode === "chat") &&
                     !isRecording &&
                     !isTranscribing ? (
                     <Tooltip>
