@@ -561,11 +561,12 @@ export const ChatComposer = memo(function ChatComposer({
                   />
                   {onClearAttachment && (
                     <button
+                      type="button"
                       onClick={() => onClearAttachment(item.fileId)}
-                      className="absolute -right-2 -top-2 flex size-5 items-center justify-center rounded-full border border-border bg-card text-foreground opacity-0 shadow-md outline-none transition-opacity hover:bg-muted focus-visible:ring-0 group-hover:opacity-100"
+                      className="absolute -right-1.5 -top-1.5 z-10 flex size-5 items-center justify-center rounded-full bg-white text-black shadow-md border border-neutral-300/80 outline-none opacity-0 scale-90 transition-all duration-150 group-hover:opacity-100 group-hover:scale-100 group-focus-within:opacity-100 group-focus-within:scale-100 focus-visible:opacity-100 focus-visible:scale-100 hover:scale-110 hover:bg-neutral-100 focus-visible:ring-2 focus-visible:ring-primary"
                       aria-label="Remove screenshot"
                     >
-                      <X className="size-3" />
+                      <X className="size-3 stroke-[2.5]" />
                     </button>
                   )}
                 </div>
@@ -590,11 +591,12 @@ export const ChatComposer = memo(function ChatComposer({
                   </span>
                   {onClearAttachment && (
                     <button
+                      type="button"
                       onClick={() => onClearAttachment(item.fileId)}
-                      className="ml-1.5 flex size-6 shrink-0 items-center justify-center rounded-full text-muted-foreground opacity-0 outline-none transition-all hover:bg-accent hover:text-foreground focus-visible:ring-0 group-hover:opacity-100"
+                      className="ml-auto flex size-5 shrink-0 items-center justify-center rounded-full bg-white text-black shadow-md border border-neutral-300/80 outline-none opacity-0 scale-90 transition-all duration-150 group-hover:opacity-100 group-hover:scale-100 group-focus-within:opacity-100 group-focus-within:scale-100 focus-visible:opacity-100 focus-visible:scale-100 hover:scale-110 hover:bg-neutral-100 focus-visible:ring-2 focus-visible:ring-primary"
                       aria-label="Remove screenshot"
                     >
-                      <X className="size-3.5" />
+                      <X className="size-3 stroke-[2.5]" />
                     </button>
                   )}
                 </div>

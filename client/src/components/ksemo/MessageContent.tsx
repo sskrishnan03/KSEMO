@@ -263,17 +263,21 @@ export const MessageContent = memo(function MessageContent({
                 );
                 const extra = images.length - 4;
                 return (
-                  <div className="mb-2 flex max-w-full flex-wrap items-end gap-2">
+                  <div className="mb-2 flex max-w-full flex-wrap items-end gap-2.5">
                     {images.length > 0 && (
-                      <div className="flex flex-wrap gap-1.5">
+                      <div className="flex flex-wrap gap-2">
                         {images.slice(0, 4).map((file, i) => {
                           const isLastShown = i === 3;
+                          const isSingle = images.length === 1;
                           return (
                             <button
                               key={file.id}
                               type="button"
                               onClick={() => setLightboxIndex(i)}
-                              className="group relative size-16 shrink-0 overflow-hidden rounded-lg border border-border bg-muted/50"
+                              className={cn(
+                                "group relative shrink-0 overflow-hidden rounded-xl border border-border/80 bg-muted/50 shadow-sm transition-all hover:border-border hover:shadow-md",
+                                isSingle ? "size-28 sm:size-32" : "size-24 sm:size-28"
+                              )}
                               aria-label={`View ${file.filename}`}
                             >
                               <img
@@ -282,7 +286,7 @@ export const MessageContent = memo(function MessageContent({
                                 className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
                               />
                               {isLastShown && extra > 0 && (
-                                <span className="absolute inset-0 flex items-center justify-center bg-black/55 text-base font-semibold text-white">
+                                <span className="absolute inset-0 flex items-center justify-center bg-black/55 text-lg font-semibold text-white">
                                   +{extra}
                                 </span>
                               )}
@@ -292,33 +296,31 @@ export const MessageContent = memo(function MessageContent({
                       </div>
                     )}
                     {documents.length > 0 && (
-                      <div className="flex max-w-full flex-wrap justify-end gap-2">
+                      <div className="flex max-w-full flex-wrap justify-end gap-2.5">
                         {documents.map(file => {
                           const kind = getFileKind(
                             file.filename,
                             file.mimeType
                           );
+                          const size = formatBytes(file.sizeBytes);
                           return (
                             <a
                               key={file.id}
                               href={file.url}
                               target="_blank"
                               rel="noreferrer"
-                              className="overflow-hidden rounded-xl border border-border bg-muted/50 text-left shadow-sm"
+                              className="group/file flex h-16 min-w-56 max-w-xs items-center gap-3 rounded-2xl border border-border/80 bg-muted/70 py-2.5 pl-2.5 pr-4 text-left shadow-sm transition-all hover:border-border hover:bg-accent/80 hover:shadow-md"
                             >
-                              <span className="flex min-w-44 items-center gap-2 p-2.5">
-                                <span
-                                  className={`flex size-8 shrink-0 items-center justify-center rounded-lg ${kind.colorClass}`}
-                                >
-                                  <kind.icon className="size-4" />
+                              <kind.icon className="size-10 shrink-0" />
+                              <span className="min-w-0 flex-1">
+                                <span className="block truncate text-[13px] font-semibold text-foreground group-hover/file:text-primary transition-colors">
+                                  {file.filename}
                                 </span>
-                                <span className="min-w-0">
-                                  <span className="block truncate text-xs font-medium">
-                                    {file.filename}
-                                  </span>
-                                  <span className="mt-0.5 block text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                                    {kind.label}
-                                  </span>
+                                <span className="mt-0.5 flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                                  <span>{kind.label}</span>
+                                  {size ? (
+                                    <span className="opacity-80">· {size}</span>
+                                  ) : null}
                                 </span>
                               </span>
                             </a>
@@ -474,24 +476,20 @@ export const MessageContent = memo(function MessageContent({
                 return (
                   <div
                     key={file.id}
-                    className="group/card flex h-14 w-72 max-w-full items-center gap-1 rounded-xl border border-border bg-muted/50 p-2 pr-1 shadow-sm transition-colors hover:bg-accent"
+                    className="group/card flex h-16 w-80 max-w-full items-center gap-2 rounded-2xl border border-border/80 bg-muted/60 p-2.5 pr-2 shadow-sm transition-colors hover:bg-accent"
                   >
                     <button
                       type="button"
                       onClick={() => setPreviewFile(file)}
-                      className="flex min-w-0 flex-1 items-center gap-2.5 overflow-hidden rounded-lg text-left"
+                      className="flex min-w-0 flex-1 items-center gap-3 overflow-hidden rounded-lg text-left"
                       aria-label={`Preview ${file.filename}`}
                     >
-                      <span
-                        className={`flex size-9 shrink-0 items-center justify-center rounded-lg ${kind.colorClass}`}
-                      >
-                        <kind.icon className="size-4" />
-                      </span>
+                      <kind.icon className="size-10 shrink-0" />
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-xs font-medium leading-snug text-foreground">
+                        <span className="block truncate text-[13px] font-semibold leading-snug text-foreground">
                           {file.filename}
                         </span>
-                        <span className="mt-0.5 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                        <span className="mt-0.5 flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                           <span>{kind.label}</span>
                           {size ? (
                             <span className="opacity-80">· {size}</span>
