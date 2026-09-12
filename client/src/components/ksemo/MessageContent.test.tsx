@@ -217,4 +217,84 @@ describe("MessageContent speech controls", () => {
       markup.indexOf("What is in this image?")
     );
   });
+
+  it("renders fileCreationNode before assistant message action buttons", () => {
+    const markup = renderWithTooltip(
+      createElement(MessageContent, {
+        message: assistantMessage,
+        ...callbacks,
+        isSpeaking: false,
+        speechState: "idle",
+        fileCreationNode: createElement("div", { "data-testid": "test-file-card" }, "FileCardContent"),
+        onRegenerate: () => undefined,
+      })
+    );
+    expect(markup).toContain('data-testid="test-file-card"');
+    expect(markup).toContain('aria-label="Regenerate response"');
+    expect(markup.indexOf('data-testid="test-file-card"')).toBeLessThan(
+      markup.indexOf('aria-label="Regenerate response"')
+    );
+  });
+
+  it("completely suppresses assistant action buttons while file generation is in progress", () => {
+    const markup = renderWithTooltip(
+      createElement(MessageContent, {
+        message: {
+          ...assistantMessage,
+          fileGeneration: {
+            stage: "generating",
+            format: "pdf",
+            status: "processing",
+          },
+        },
+        ...callbacks,
+        isSpeaking: false,
+        speechState: "idle",
+        isFileGenerating: true,
+        fileCreationNode: createElement("div", { "data-testid": "drafting-card" }, "Drafting"),
+        onRegenerate: () => undefined,
+        onShare: () => undefined,
+        onFeedback: () => undefined,
+      })
+    );
+
+    // Drafting node is rendered
+    expect(markup).toContain('data-testid="drafting-card"');
+
+    // Assistant action bar must be completely hidden while generating
+    expect(markup).not.toContain('aria-label="Copy response"');
+    expect(markup).not.toContain('aria-label="Share response"');
+    expect(markup).not.toContain('aria-label="Regenerate response"');
+    expect(markup).not.toContain('aria-label="Good response"');
+    expect(markup).not.toContain('aria-label="Bad response"');
+    expect(markup).not.toContain('aria-label="More message actions"');
+  });
+
+  it("renders assistant action buttons once file generation completes", () => {
+    const markup = renderWithTooltip(
+      createElement(MessageContent, {
+        message: {
+          ...assistantMessage,
+          fileGeneration: {
+            stage: "completed",
+            format: "pdf",
+            status: "created",
+          },
+        },
+        ...callbacks,
+        isSpeaking: false,
+        speechState: "idle",
+        isFileGenerating: false,
+        fileCreationNode: createElement("div", { "data-testid": "completed-card" }, "Completed"),
+        onRegenerate: () => undefined,
+        onShare: () => undefined,
+      })
+    );
+
+    // Both completed card and action buttons are present
+    expect(markup).toContain('data-testid="completed-card"');
+    expect(markup).toContain('aria-label="Copy response"');
+    expect(markup).toContain('aria-label="Share response"');
+    expect(markup).toContain('aria-label="Regenerate response"');
+  });
 });

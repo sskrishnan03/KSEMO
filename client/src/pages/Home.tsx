@@ -348,7 +348,6 @@ export default function Home() {
   // conversation. This is completely separate from isGenerating (which is
   // true for both chat and file streams).
   const isFileGenerating = Boolean(
-    activeMode !== "chat" &&
     fileGeneration &&
     fileGeneration.status === "processing" &&
     activeStream &&
@@ -544,7 +543,7 @@ export default function Home() {
     pendingOpenScrollRef.current = true;
     isNearBottomRef.current = true;
     const serverMessages = activeQuery.data.messages.map(message => {
-      const firstAttachment = message.attachments?.[0];
+      const firstAttachment = message.attachments?.[0] as any;
       const rawExt = firstAttachment?.filename
         ? (firstAttachment.filename.split(".").pop() ?? "").toLowerCase()
         : "";
@@ -562,8 +561,42 @@ export default function Home() {
             status: "processing" | "created" | "error";
             message?: string;
             researchSourceCount?: number;
+            sources?: FileSource[];
+            metrics?: FileMetrics;
           }
         | undefined;
+
+      let persistedSources: FileSource[] | undefined = fileGeneration?.sources;
+      let persistedMetrics: FileMetrics | undefined = fileGeneration?.metrics;
+      let persistedFormat: string | undefined = fileGeneration?.format;
+
+      if (firstAttachment?.metadata && typeof firstAttachment.metadata === "object") {
+        if (Array.isArray(firstAttachment.metadata.sources) && firstAttachment.metadata.sources.length > 0) {
+          persistedSources = firstAttachment.metadata.sources;
+        }
+        if (firstAttachment.metadata.metrics) {
+          persistedMetrics = firstAttachment.metadata.metrics;
+        }
+        if (firstAttachment.metadata.format) {
+          persistedFormat = firstAttachment.metadata.format;
+        }
+      } else if (firstAttachment?.contentText && typeof firstAttachment.contentText === "string") {
+        try {
+          const parsed = JSON.parse(firstAttachment.contentText);
+          if (parsed && typeof parsed === "object") {
+            if (Array.isArray(parsed.sources) && parsed.sources.length > 0) {
+              persistedSources = parsed.sources;
+            }
+            if (parsed.metrics) {
+              persistedMetrics = parsed.metrics;
+            }
+            if (parsed.format) {
+              persistedFormat = parsed.format;
+            }
+          }
+        } catch {}
+      }
+
       return {
         id: message.id,
         role: message.role,
@@ -576,17 +609,16 @@ export default function Home() {
             : message.content,
         status: message.status,
         attachments: message.attachments,
-        // The server does not persist the fileGeneration envelope, so after a
-        // refresh we rebuild a completed card from the generated-file
-        // attachment (assistant messages only carry attachments from the
-        // document pipeline). This keeps the card identical across reloads.
+        // Rebuild completed fileGeneration with durable sources and metrics restored from attachment metadata
         fileGeneration:
           fileGeneration ??
           (hasGeneratedFile
             ? {
                 stage: "completed",
-                format: format || "pdf",
+                format: (persistedFormat as DocFormat) || (format as DocFormat) || "pdf",
                 status: "created" as const,
+                sources: persistedSources,
+                metrics: persistedMetrics,
               }
             : undefined),
       };
@@ -1211,6 +1243,8 @@ export default function Home() {
             utils.workspace.files.list.invalidate();
             const assistantId = str(data.messageId);
             if (fileData?.fileId && isViewingThisStream()) {
+              const currentFormat =
+                (data.format as string) || fileGeneration?.format || "";
               setChatMessages(current =>
                 current.map(message =>
                   message.id === assistantId
@@ -1226,7 +1260,17 @@ export default function Home() {
                             mimeType: fileData.mimeType,
                             url: fileData.url ?? "",
                             sizeBytes: fileData.sizeBytes,
-                          },
+                            metadata: {
+                              sources: fileSources,
+                              metrics: fileMetrics,
+                              format: currentFormat,
+                            },
+                            contentText: JSON.stringify({
+                              sources: fileSources,
+                              metrics: fileMetrics,
+                              format: currentFormat,
+                            }),
+                          } as any,
                         ],
                       }
                     : message
@@ -2338,83 +2382,92 @@ export default function Home() {
                   className="mx-auto max-w-3xl space-y-5 px-4 pb-3 pt-4 sm:px-6 sm:pb-4 sm:pt-5"
                 >
                   {visibleMessages.map(message => {
-                    return (
-                      <Fragment key={message.id}>
-                        {(() => {
-                          const activeFileGen =
-                            fileGeneration &&
-                            fileGeneration.messageId === message.id
-                              ? fileGeneration
-                              : message.fileGeneration
-                                ? {
-                                    messageId: message.id,
-                                    stage: message.fileGeneration.stage,
-                                    format: message.fileGeneration.format,
-                                    status: message.fileGeneration.status,
-                                    createdAt: 0,
-                                    message: message.fileGeneration.message,
-                                    researchSourceCount:
-                                      message.fileGeneration
-                                        .researchSourceCount,
-                                    sources: message.fileGeneration.sources,
-                                    metrics: message.fileGeneration.metrics,
-                                  }
-                                : null;
-                          return activeFileGen ? (
-                            <div className="mb-2 animate-in fade-in-0 duration-150">
-                              <FileCreationCard
-                                stage={
-                                  activeFileGen.status === "created"
-                                    ? "completed"
-                                    : activeFileGen.status === "error"
-                                      ? "error"
-                                      : (activeFileGen.stage as FileCreationStage)
-                                }
-                                format={
-                                  (activeFileGen.format as DocFormat) ||
-                                  undefined
-                                }
-                                filename={message.attachments?.[0]?.filename}
-                                fileUrl={message.attachments?.[0]?.url}
-                                fileSizeBytes={
-                                  message.attachments?.[0]?.sizeBytes
-                                }
-                                researchSourceCount={
-                                  activeFileGen.researchSourceCount
-                                }
-                                sources={activeFileGen.sources}
-                                metrics={activeFileGen.metrics}
-                                onRetry={() => regenerateMessage(message)}
-                              />
-                            </div>
-                          ) : null;
-                        })()}
-                        <MessageContent
-                          key={message.id}
-                          message={message}
-                          onSpeak={stableSpeak}
-                          onPause={stablePauseSpeech}
-                          onResume={stableResumeSpeech}
-                          onStop={stableStopSpeech}
-                          isSpeaking={speakingMessageId === message.id}
-                          speechState={speechState}
-                          isCurrentGeneration={
-                            isGenerating && generatingMessageId === message.id
+                    const activeFileGen =
+                      fileGeneration &&
+                      fileGeneration.messageId === message.id
+                        ? fileGeneration
+                        : message.fileGeneration
+                          ? {
+                              messageId: message.id,
+                              stage: message.fileGeneration.stage,
+                              format: message.fileGeneration.format,
+                              status: message.fileGeneration.status,
+                              createdAt: 0,
+                              message: message.fileGeneration.message,
+                              researchSourceCount:
+                                message.fileGeneration
+                                  .researchSourceCount,
+                              sources: message.fileGeneration.sources,
+                              metrics: message.fileGeneration.metrics,
+                            }
+                          : null;
+
+                    const fileCreationNode = activeFileGen ? (
+                      <div className="animate-in fade-in-0 duration-150">
+                        <FileCreationCard
+                          stage={
+                            activeFileGen.status === "created"
+                              ? "completed"
+                              : activeFileGen.status === "error"
+                                ? "error"
+                                : (activeFileGen.stage as FileCreationStage)
                           }
-                          hideTypingIndicator={isFileGenerating}
-                          onEdit={stableEditMessage}
-                          isEditing={editingMessage?.id === message.id}
-                          editValue={editValue}
-                          onEditValueChange={setEditValue}
-                          onSaveEdit={stableEditAction}
-                          onCancelEdit={stableCancelEdit}
-                          onRegenerate={stableRegenerateMessage}
-                          onRetry={stableRegenerateMessage}
-                          onShare={stableShareMessage}
-                          onDelete={stableDeleteMessage}
-                          onFeedback={stableOnFeedback}
+                          format={
+                            (activeFileGen.format as DocFormat) ||
+                            undefined
+                          }
+                          filename={message.attachments?.[0]?.filename}
+                          fileUrl={message.attachments?.[0]?.url}
+                          fileSizeBytes={
+                            message.attachments?.[0]?.sizeBytes
+                          }
+                          researchSourceCount={
+                            activeFileGen.researchSourceCount
+                          }
+                          sources={activeFileGen.sources}
+                          metrics={activeFileGen.metrics}
+                          onRetry={() => regenerateMessage(message)}
                         />
-                      </Fragment>
+                      </div>
+                    ) : null;
+
+                    return (
+                      <MessageContent
+                        key={message.id}
+                        message={message}
+                        fileCreationNode={fileCreationNode}
+                        isFileGenerating={Boolean(
+                          activeFileGen && activeFileGen.status === "processing"
+                        )}
+                        onSpeak={stableSpeak}
+                        onPause={stablePauseSpeech}
+                        onResume={stableResumeSpeech}
+                        onStop={stableStopSpeech}
+                        isSpeaking={speakingMessageId === message.id}
+                        speechState={speechState}
+                        isCurrentGeneration={
+                          isGenerating && generatingMessageId === message.id
+                        }
+                        hideTypingIndicator={Boolean(
+                          isFileGenerating ||
+                          activeFileGen ||
+                          message.fileGeneration ||
+                          (isGenerating &&
+                            generatingMessageId === message.id &&
+                            (activeMode !== "chat" || Boolean(fileGeneration)))
+                        )}
+                        onEdit={stableEditMessage}
+                        isEditing={editingMessage?.id === message.id}
+                        editValue={editValue}
+                        onEditValueChange={setEditValue}
+                        onSaveEdit={stableEditAction}
+                        onCancelEdit={stableCancelEdit}
+                        onRegenerate={stableRegenerateMessage}
+                        onRetry={stableRegenerateMessage}
+                        onShare={stableShareMessage}
+                        onDelete={stableDeleteMessage}
+                        onFeedback={stableOnFeedback}
+                      />
                     );
                   })}
                   <div ref={messagesEndRef} />

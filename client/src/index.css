@@ -428,3 +428,13 @@ html.ksemo-reduce-motion .ksemo-voice-bar {
   scrollbar-width: none;
   -ms-overflow-style: none;
 }
+
+@keyframes fileDraftShimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(300%);
+  }
+}
+

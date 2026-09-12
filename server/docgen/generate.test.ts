@@ -189,3 +189,67 @@ describe("spec helpers", () => {
     expect(FORMAT_MIME.txt).toBe("text/plain");
   });
 });
+
+import { parseUserLengthIntent } from "./plan";
+
+describe("parseUserLengthIntent", () => {
+  it("detects explicit page requests correctly", () => {
+    expect(parseUserLengthIntent("create a 10 page pdf about react")).toMatchObject({
+      targetPages: 10,
+    });
+    expect(parseUserLengthIntent("5-page report on climate change")).toMatchObject({
+      targetPages: 5,
+    });
+    expect(parseUserLengthIntent("generate at least 20 pages comprehensive guide")).toMatchObject({
+      targetPages: 20,
+    });
+  });
+
+  it("detects explicit slide and sheet counts", () => {
+    expect(parseUserLengthIntent("make a 12 slides presentation")).toMatchObject({
+      targetSlides: 12,
+    });
+    expect(parseUserLengthIntent("give me 5 sheets in excel model")).toMatchObject({
+      targetSheets: 5,
+    });
+  });
+
+  it("detects extensive and unlimited intent", () => {
+    expect(parseUserLengthIntent("exhaustive and unlimited guide")).toMatchObject({
+      isExtensive: true,
+    });
+    expect(parseUserLengthIntent("deep dive handbook")).toMatchObject({
+      isExtensive: true,
+    });
+  });
+
+  it("defaults cleanly when no length constraint is present", () => {
+    expect(parseUserLengthIntent("explain photosynthesis in detail")).toEqual({
+      targetPages: undefined,
+      targetSlides: undefined,
+      targetSheets: undefined,
+      isExtensive: false,
+    });
+  });
+
+  it("generates a multi-page PDF containing explicit pageBreak blocks", async () => {
+    const spec: DocumentSpec = {
+      format: "pdf",
+      filename: "multipage.pdf",
+      title: "Multi-page Document",
+      blocks: [
+        { type: "heading", level: 1, text: "Chapter 1" },
+        { type: "paragraph", text: "Page 1 content here." },
+        { type: "pageBreak" },
+        { type: "heading", level: 1, text: "Chapter 2" },
+        { type: "paragraph", text: "Page 2 content here." },
+        { type: "pageBreak" },
+        { type: "heading", level: 1, text: "Chapter 3" },
+        { type: "paragraph", text: "Page 3 content here." },
+      ],
+    };
+    const pdfBuf = await generatePdf(spec);
+    expect(pdfBuf.length).toBeGreaterThan(1000);
+    expect(pdfBuf.toString("ascii", 0, 5)).toBe("%PDF-");
+  });
+});

@@ -965,6 +965,7 @@ class InMemoryStore {
             url: file.url,
             storageKey: file.storageKey,
             contentText: file.contentText ?? null,
+            metadata: (file as any).metadata ?? null,
           });
         }
       }
@@ -989,6 +990,7 @@ class InMemoryStore {
             url: file.url,
             storageKey: file.storageKey,
             contentText: file.contentText ?? null,
+            metadata: (file as any).metadata ?? null,
           });
         }
       }

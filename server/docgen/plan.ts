@@ -49,6 +49,54 @@ IMPORTANT: Ground the document content in these research findings. Use specific 
 `;
 }
 
+export type LengthIntent = {
+  targetPages?: number;
+  targetSlides?: number;
+  targetSheets?: number;
+  isExtensive?: boolean;
+};
+
+export function parseUserLengthIntent(message: string): LengthIntent {
+  const text = message.toLowerCase();
+
+  // Match e.g. "10 pages", "10 page", "10-page", "at least 10 pages", "approx 5 pages"
+  const pageMatch = text.match(/\b(\d{1,3})\s*-?\s*pages?\b/i);
+  // Match e.g. "12 slides", "15 slide"
+  const slideMatch = text.match(/\b(\d{1,3})\s*-?\s*slides?\b/i);
+  // Match e.g. "5 sheets", "4 tabs"
+  const sheetMatch = text.match(/\b(\d{1,3})\s*-?\s*(?:sheets?|tabs?)\b/i);
+
+  const isExtensive =
+    /\b(unlimited|exhaustive|extensive|complete guide|deep dive|full book|long form|in-depth|massive|detailed guide|handbook|full length|maximum length)\b/i.test(
+      text
+    );
+
+  const targetPages = pageMatch ? parseInt(pageMatch[1], 10) : undefined;
+  const targetSlides = slideMatch ? parseInt(slideMatch[1], 10) : undefined;
+  const targetSheets = sheetMatch ? parseInt(sheetMatch[1], 10) : undefined;
+
+  return {
+    targetPages: targetPages && targetPages > 0 ? Math.min(targetPages, 50) : undefined,
+    targetSlides: targetSlides && targetSlides > 0 ? Math.min(targetSlides, 40) : undefined,
+    targetSheets: targetSheets && targetSheets > 0 ? Math.min(targetSheets, 20) : undefined,
+    isExtensive,
+  };
+}
+
+const DIVERSE_ARCHITECTURE_GUIDE = `
+DYNAMIC ARCHITECTURAL DESIGN (CRITICAL):
+Do NOT use the same rigid template (Executive Summary / In-Depth Analysis / Comparative Data / Recommendations) for every topic!
+Instead, adopt the natural, authentic, domain-standard structure tailored to the actual subject matter:
+- Technical & Programming Guides: Title -> Architectural Overview -> System Prerequisites -> Core Language / Framework Concepts -> Step-by-Step Implementation / Code Blocks -> Advanced Patterns -> Error Handling & Edge Cases -> Security & Production Deployment.
+- Scientific & Academic Research: Title -> Abstract -> Introduction & Background -> Literature Review / Related Work -> Proposed Methodology & Formalisms -> Experimental Setup -> Empirical Results & Data Tables -> Discussion & Limitations -> Conclusions & References.
+- Financial Reports & Business Plans: Title -> Executive Briefing -> Market Opportunity & Landscape -> Core Business Model & Revenue Drivers -> Financial Projections & Unit Economics -> Operating Plan & Milestones -> Risk & Sensitivity Analysis.
+- Standard Operating Procedures (SOP): Title -> Purpose & Scope -> Roles & Responsibilities -> Operational Pre-checks -> Step-by-Step Procedure -> Quality Control & Verification -> Incident Protocols & Sign-offs.
+- Educational Explanations & Essays: Title -> Introduction & Foundational Theory -> Historical Evolution -> Core Mechanics & Underlying Principles -> Real-World Case Studies -> Comparative Perspectives -> Summary & Key Takeaways.
+- Creative & Narrative Works: Title -> Prologue & World Setting -> Major Characters / Entities -> Narrative Progression / Act Structure -> Climax & Resolution -> Epilogue.
+
+ADAPT the section titles, content structure, and tables specifically to the user's prompt so that every document feels bespoke, expertly crafted, and domain-appropriate.
+`;
+
 const FORMAT_INSTRUCTIONS = `
 You are part of a document-generation assistant. Decide whether the user's latest
 message is asking to CREATE a file (report, resume, invoice, letter, essay,
@@ -103,14 +151,12 @@ Rules:
 - "sources" is an optional array of source references used in the document.
   Include this when research findings were provided.
 
-COMPLETENESS REQUIREMENT (most important rule): Produce a COMPLETE, MULTI-PAGE
-document — never a stub or short draft. For document formats (pdf/docx/txt)
-generate 6-10 detailed Level 1/2 sections; every section must contain 2-3
-substantial paragraphs of 100-200 words (specific, concrete, and well-written)
-plus bullet or numbered lists and at least one data table where useful. For
-xlsx generate at least 3 sheets with rich, realistic data. For pptx generate
-at least 8 slides with real, substantive content. Do not abbreviate, truncate,
-or summarize away the depth the user asked for — answer the request fully.
+COMPLETENESS & DIVERSITY REQUIREMENT (most important rule): Produce a COMPLETE, MULTI-PAGE
+document — never a stub or short draft.
+- Respect any user-requested page count (e.g., "10 pages", "5 pages"), slide count ("12 slides"), or sheet count ("5 sheets").
+- For document formats (pdf/docx/txt), generate comprehensive sections (6-15+ sections) with 2-3 substantial paragraphs of 100-200 words each plus lists, tables, and explicit {"type":"pageBreak"} blocks between major chapters to reach the requested page count.
+- Adapt the structure dynamically to the topic: use technical guides for code, scientific abstracts for research, financial balance sheets for business, SOPs for workflows, etc. Do not force every document into a corporate Executive Summary template.
+- For xlsx generate at least 3-5 sheets with rich realistic data. For pptx generate at least 8-15 slides with real content.
 `;
 
 function buildForcedSystemPrompt(
@@ -120,6 +166,36 @@ function buildForcedSystemPrompt(
 ): string {
   const formatUpper = format.toUpperCase();
   const researchBlock = buildResearchContextBlock(research);
+  const lengthIntent = parseUserLengthIntent(userMessage);
+
+  let lengthDirective = "";
+  if (format === "xlsx") {
+    const minSheets = lengthIntent.targetSheets ?? (lengthIntent.isExtensive ? 5 : 3);
+    lengthDirective = `GENERATE AT LEAST ${minSheets} DETAILED, REALISTIC SPREADSHEETS with rich data rows, column headers, numbers, formulas, and operational categories (including an Overview sheet and detailed domain-specific breakdown sheets).`;
+  } else if (format === "pptx") {
+    const minSlides = lengthIntent.targetSlides ?? (lengthIntent.isExtensive ? 15 : 8);
+    lengthDirective = `GENERATE AT LEAST ${minSlides} SUBSTANTIVE SLIDES with professional layouts, informative bullet points, tables, and footnotes.`;
+  } else {
+    // pdf, docx, txt
+    if (lengthIntent.targetPages) {
+      const pCount = lengthIntent.targetPages;
+      lengthDirective = `TARGET PAGE COUNT: THE USER EXPLICITLY REQUESTED AT LEAST ${pCount} PAGES.
+You MUST generate an extensive, highly comprehensive document that fills at least ${pCount} pages when rendered:
+- Generate at least ${Math.max(pCount, 8)} distinct, in-depth sections/chapters.
+- Place explicit {"type":"pageBreak"} blocks between major chapters/sections so each major part starts on its own fresh page and cleanly reaches the ${pCount}-page target.
+- Each section must provide deep, rich content: multiple substantial paragraphs (150-250 words each), detailed lists, and structured data tables where applicable.
+- Never abbreviate or summarize. Deliver the complete, exhaustive depth the user asked for.`;
+    } else if (lengthIntent.isExtensive) {
+      lengthDirective = `UNLIMITED / EXHAUSTIVE LENGTH: The user requested an extensive, long-form, or deep-dive document.
+- Generate a massive, authoritative guide spanning 6 to 12+ pages.
+- Generate 8 to 15 comprehensive sections with rich paragraphs, detailed tables, bullet lists, and insert {"type":"pageBreak"} blocks between major parts.`;
+    } else {
+      lengthDirective = `Produce a thorough, multi-page document (at least 3 to 6 pages).
+- Generate 6-10 detailed sections tailored to the topic.
+- Every section must contain 2-3 substantial paragraphs of 100-200 words each, plus bullet lists and structured data tables.
+- Insert {"type":"pageBreak"} blocks between major sections to ensure clean page flow.`;
+    }
+  }
 
   let structureExample = "";
 
@@ -156,13 +232,13 @@ function buildForcedSystemPrompt(
   "slides": [
     {
       "title": "Document Title",
-      "subtitle": "Comprehensive Executive Presentation",
+      "subtitle": "Comprehensive Presentation",
       "bullets": ["Key objectives and executive summary", "Strategic takeaways"]
     },
     {
       "title": "Agenda & Scope",
       "bullets": [
-        "Executive Summary and Background",
+        "Foundational Background",
         "Key Findings & Detailed Analysis",
         "Methodology & Implementation",
         "Risks, Mitigations & Next Steps"
@@ -171,7 +247,7 @@ function buildForcedSystemPrompt(
     {
       "title": "Core Analysis & Insights",
       "bullets": [
-        "Primary factors driving the current dynamics",
+        "Primary factors driving current dynamics",
         "Comparative metrics and qualitative findings",
         "Strategic differentiators and growth levers"
       ],
@@ -203,25 +279,23 @@ function buildForcedSystemPrompt(
     structureExample = `
 "content": {
   "blocks": [
-    { "type": "heading", "level": 1, "text": "Comprehensive Document Title" },
-    { "type": "paragraph", "text": "This comprehensive document provides an exhaustive, highly detailed exploration of the topic requested, addressing all foundational concepts, practical dimensions, and strategic implications in complete depth.", "bold": false },
-    { "type": "heading", "level": 2, "text": "1. Executive Summary" },
-    { "type": "paragraph", "text": "Detailed overview establishing the context, primary objectives, and analytical scope of this report..." },
-    { "type": "heading", "level": 2, "text": "2. In-Depth Analysis & Core Findings" },
-    { "type": "paragraph", "text": "Thorough breakdown of key factors, empirical observations, and mechanistic explanations..." },
+    { "type": "heading", "level": 1, "text": "Document Title" },
+    { "type": "paragraph", "text": "In-depth introductory overview providing thorough context and framing the subject matter..." },
+    { "type": "heading", "level": 2, "text": "1. Foundational Architecture & Concepts" },
+    { "type": "paragraph", "text": "Comprehensive explanation of core principles, mechanisms, and key considerations..." },
     { "type": "bulletList", "items": [
       "Key Factor 1: Substantial impact on core architecture and operational performance",
       "Key Factor 2: Empirical evidence demonstrating high fidelity and sustained efficiency",
       "Key Factor 3: Strategic risk factors and comprehensive mitigation frameworks"
     ]},
-    { "type": "heading", "level": 2, "text": "3. Comparative Data & Metrics" },
+    { "type": "pageBreak" },
+    { "type": "heading", "level": 2, "text": "2. Detailed Analysis & Data Assessment" },
     { "type": "table", "headers": ["Category", "Metric", "Baseline", "Projected", "Impact"], "rows": [
       ["Operational", "Efficiency", "74%", "96%", "High"],
       ["Financial", "ROI", "12%", "34%", "Transformative"],
       ["Reliability", "Uptime", "99.2%", "99.99%", "Critical"]
     ]},
-    { "type": "heading", "level": 2, "text": "4. Strategic Recommendations & Conclusion" },
-    { "type": "paragraph", "text": "Synthesized recommendations with actionable next steps for stakeholders..." }
+    { "type": "paragraph", "text": "In-depth commentary and technical evaluation of empirical metrics and findings..." }
   ]
 }`;
   }
@@ -230,7 +304,7 @@ function buildForcedSystemPrompt(
 CRITICAL DIRECTIVE:
 The user has requested a ${formatUpper} file to be created.
 User query / prompt:
-"${userMessage.slice(0, 400)}"
+"${userMessage.slice(0, 4000)}"
 
 CONTEXT & SUBJECT INSTRUCTIONS:
 1. If the user's prompt says "I want this in ${formatUpper}", "give me this in ${formatUpper}", "make this into a ${formatUpper}", or refers to "this", "that", "the above", or previous conversation:
@@ -243,10 +317,8 @@ CONTEXT & SUBJECT INSTRUCTIONS:
 5. Set "filename": a clear, clean snake_case filename without extension representing the actual topic (e.g. "photosynthesis_comprehensive_guide" or "quarterly_financial_report"). NEVER name it "i_want_this_in_${format}" or "create_file".
 6. Set "title": a polished, professional title representing the document's actual subject matter (e.g. "Photosynthesis: Biological Mechanisms and Energy Conversion").
 7. Set "summary": a clear statement explaining the document created and its contents.
-8. Generate EXTENSIVE, THOROUGH CONTENT — this is the most important directive.
-  The document MUST be complete and multi-page (or rich and multi-sheet/slide).
-  Never return a short stub:
-  ${format === "xlsx" ? "Generate at least 3 detailed spreadsheets with rich realistic data, headers, numbers, and categories, including an overview sheet and a detailed breakdown sheet." : format === "pptx" ? "Generate at least 8 comprehensive slides covering every facet of the prompt: title, agenda, concepts, analysis, comparative data, key findings, risks, and a roadmap/conclusion." : "Generate 6-10 detailed sections with Level 1/2 headings. Every section must contain 2-3 substantial paragraphs of 100-200 words each, plus bullet lists and at least one structured data table. Include an Executive Summary, an In-Depth Analysis, a Comparative Data/Metrics section, and a Recommendations/Conclusion section."}
+8. ${lengthDirective}
+${DIVERSE_ARCHITECTURE_GUIDE}
 ${researchBlock ? `\n${researchBlock}\n` : ""}
 Output VALID JSON ONLY (no markdown code blocks, no backticks):
 {
@@ -284,7 +356,7 @@ export async function planDocument(
           { role: "user", content: userContent },
         ],
         responseFormat: { type: "json_object" },
-        maxTokens: 10000,
+        maxTokens: 16000,
       });
 
       const raw = result.choices?.[0]?.message?.content;
@@ -320,7 +392,7 @@ export async function planDocument(
         { role: "user", content: userContent },
       ],
       responseFormat: { type: "json_object" },
-      maxTokens: 8192,
+      maxTokens: 16000,
     });
     const raw = result.choices?.[0]?.message?.content;
     const text = Array.isArray(raw)
@@ -535,6 +607,9 @@ function synthesizeFallbackPlan(
 }
 
 function buildFallbackBlocks(title: string, userMessage: string, rawText?: string, research?: ResearchResult): DocBlock[] {
+  const lengthIntent = parseUserLengthIntent(userMessage);
+  const targetPages = lengthIntent.targetPages ?? (lengthIntent.isExtensive ? 8 : 4);
+
   const blocks: DocBlock[] = [
     { type: "heading", level: 1, text: title },
     {
@@ -545,7 +620,6 @@ function buildFallbackBlocks(title: string, userMessage: string, rawText?: strin
 
   // If we have research findings, build content from them
   if (research?.needed && research.findings.length > 0) {
-    // Add findings-based sections
     const findingGroups = new Map<string, typeof research.findings>();
     for (const finding of research.findings) {
       const key = finding.topic;
@@ -555,6 +629,9 @@ function buildFallbackBlocks(title: string, userMessage: string, rawText?: strin
 
     let sectionIdx = 1;
     for (const [topic, findings] of findingGroups) {
+      if (sectionIdx > 1) {
+        blocks.push({ type: "pageBreak" });
+      }
       blocks.push({ type: "heading", level: 2, text: `${sectionIdx}. ${topic}` });
       for (const finding of findings) {
         blocks.push({ type: "paragraph", text: finding.content });
@@ -562,7 +639,6 @@ function buildFallbackBlocks(title: string, userMessage: string, rawText?: strin
       sectionIdx++;
     }
 
-    // Add sources section
     if (research.sources.length > 0) {
       blocks.push({ type: "pageBreak" });
       blocks.push({ type: "heading", level: 2, text: "References" });
@@ -578,45 +654,102 @@ function buildFallbackBlocks(title: string, userMessage: string, rawText?: strin
     return blocks;
   }
 
-  // Fallback: generic template content
-  blocks.push(
-    { type: "heading", level: 2, text: "Executive Summary" },
+  // Fallback: substantive sections with page breaks scaled to requested pages
+  const baseSections: Array<{
+    title: string;
+    paragraphs: string[];
+    list?: string[];
+    table?: { headers: string[]; rows: string[][] };
+  }> = [
     {
-      type: "paragraph",
-      text: `Key background, objectives, and foundational concepts regarding ${title}. Modern paradigms emphasize structured methodologies, data-backed insights, and systemic evaluation to deliver optimal outcomes.`,
-    },
-    { type: "heading", level: 2, text: "Core Principles & Framework" },
-    {
-      type: "bulletList",
-      items: [
+      title: "1. Core Context & Foundational Principles",
+      paragraphs: [
+        `Key background, objectives, and foundational principles regarding ${title}. Modern paradigms emphasize structured methodologies, data-backed insights, and systemic evaluation to deliver optimal outcomes.`,
+        `Analyzing ${title} requires an appreciation of underlying structural components, baseline conditions, and operating environments. Establishing clear objectives ensures consistency across subsequent analytical layers.`,
+      ],
+      list: [
         "Architecture & Design: Establishing robust foundational principles and clear structural boundaries.",
         "Analytical Rigor: Applying quantitative metrics and qualitative validation across all operational phases.",
         "Implementation Strategy: Phased rollout focusing on rapid feedback cycles and resilient error handling.",
         "Optimization Levers: Systematic refinement of performance, resource allocation, and scalability.",
       ],
     },
-    { type: "heading", level: 2, text: "Analytical Assessment & Metrics" },
     {
-      type: "table",
-      headers: ["Dimension", "Benchmark", "Observed", "Target", "Strategic Impact"],
-      rows: [
-        ["Efficiency", "75%", "89%", "96%", "High Priority"],
-        ["Reliability", "98.5%", "99.8%", "99.99%", "Critical"],
-        ["Throughput", "Baseline", "+45%", "+80%", "Transformative"],
-        ["Compliance", "Standard", "Exceeded", "Full Compliance", "Essential"],
+      title: "2. Detailed Analysis & Core Mechanisms",
+      paragraphs: [
+        `A rigorous investigation into ${title} reveals multiple interdependent mechanisms that govern overall performance and scalability. Understanding these relationships allows for proactive identification of leverage points and optimization opportunities.`,
+        `Empirical data indicates that adherence to standardized operational models reduces variance while enhancing predictability. Systematic monitoring provides early indicators of deviations, enabling timely interventions.`,
+      ],
+      table: {
+        headers: ["Dimension", "Benchmark", "Observed", "Target", "Strategic Impact"],
+        rows: [
+          ["Efficiency", "75%", "89%", "96%", "High Priority"],
+          ["Reliability", "98.5%", "99.8%", "99.99%", "Critical"],
+          ["Throughput", "Baseline", "+45%", "+80%", "Transformative"],
+          ["Compliance", "Standard", "Exceeded", "Full Compliance", "Essential"],
+        ],
+      },
+    },
+    {
+      title: "3. Comparative Assessment & Empirical Findings",
+      paragraphs: [
+        `Comparing alternative approaches to ${title} highlights trade-offs between execution speed, complexity, and long-term sustainability. Cross-sectional metrics demonstrate significant gains when disciplined execution frameworks are applied.`,
+        `Stakeholder analysis emphasizes the value of transparent reporting and verifiable indicators. Ongoing benchmarking maintains competitive positioning and drives continuous organizational learning.`,
+      ],
+      list: [
+        "Operational Stability: Minimizing service interruptions through automated recovery procedures.",
+        "Resource Utilization: Maximizing output density while keeping overheads within budget boundaries.",
+        "Adaptive Scalability: Dynamic capacity adjustment in response to shifting real-world demands.",
       ],
     },
-    { type: "heading", level: 2, text: "Strategic Recommendations & Next Steps" },
     {
-      type: "numberedList",
-      items: [
-        "Consolidate core operational benchmarks and validate findings with key stakeholders.",
-        "Deploy targeted optimizations to enhance throughput and eliminate identified bottlenecks.",
-        "Establish an ongoing monitoring framework with proactive alerting and telemetry.",
-        "Conduct periodic reviews to ensure continuous alignment with long-term strategic goals.",
+      title: "4. Strategic Recommendations & Action Plan",
+      paragraphs: [
+        `Synthesized recommendations with actionable milestones for executing strategies related to ${title}. Prioritization should balance immediate impact with sustainable long-term value creation.`,
+        `Continuous feedback loops ensure that newly uncovered insights can be rapidly integrated into standard operating procedures, maintaining alignment with broader organizational objectives.`,
       ],
+      list: [
+        "Phase 1: Consolidate core operational benchmarks and validate findings with key stakeholders.",
+        "Phase 2: Deploy targeted optimizations to enhance throughput and eliminate identified bottlenecks.",
+        "Phase 3: Establish an ongoing monitoring framework with proactive alerting and telemetry.",
+        "Phase 4: Conduct periodic reviews to ensure continuous alignment with long-term strategic goals.",
+      ],
+    },
+  ];
+
+  // If user requested more pages (e.g. 5, 8, 10, etc.), add extended topic chapters
+  if (targetPages > 4) {
+    for (let i = 5; i <= targetPages; i++) {
+      baseSections.push({
+        title: `${i}. Extended Domain Deep-Dive & Case Study (Part ${i - 4})`,
+        paragraphs: [
+          `In-depth exploration of advanced operational scenarios, edge cases, and emerging developments pertinent to ${title}. This section addresses technical nuances, architectural variations, and long-term evolutions.`,
+          `Case analysis highlights the practical application of best-in-class methodologies under varied constraints, validating theoretical models with concrete observational evidence.`,
+        ],
+        list: [
+          `Specialized Dimension ${i}.A: Detailed evaluation of edge cases and resilience protocols.`,
+          `Specialized Dimension ${i}.B: Advanced configuration options for high-throughput environments.`,
+          `Specialized Dimension ${i}.C: Quantitative variance modeling across multi-variable conditions.`,
+        ],
+      });
     }
-  );
+  }
+
+  baseSections.forEach((sec, idx) => {
+    if (idx > 0) {
+      blocks.push({ type: "pageBreak" });
+    }
+    blocks.push({ type: "heading", level: 2, text: sec.title });
+    for (const p of sec.paragraphs) {
+      blocks.push({ type: "paragraph", text: p });
+    }
+    if (sec.list) {
+      blocks.push({ type: "bulletList", items: sec.list });
+    }
+    if (sec.table) {
+      blocks.push({ type: "table", headers: sec.table.headers, rows: sec.table.rows });
+    }
+  });
 
   if (rawText && rawText.length > 50) {
     const paragraphs = rawText
@@ -624,6 +757,7 @@ function buildFallbackBlocks(title: string, userMessage: string, rawText?: strin
       .map(p => p.trim())
       .filter(p => p.length > 0 && !p.startsWith("{") && !p.endsWith("}"));
     if (paragraphs.length > 0) {
+      blocks.push({ type: "pageBreak" });
       blocks.push({ type: "heading", level: 2, text: "Extended Topic Discussion" });
       for (const p of paragraphs.slice(0, 5)) {
         blocks.push({ type: "paragraph", text: p });
@@ -635,7 +769,10 @@ function buildFallbackBlocks(title: string, userMessage: string, rawText?: strin
 }
 
 function buildFallbackSheets(title: string, userMessage: string): SheetDefinition[] {
-  return [
+  const lengthIntent = parseUserLengthIntent(userMessage);
+  const targetSheets = lengthIntent.targetSheets ?? (lengthIntent.isExtensive ? 4 : 2);
+
+  const sheets: SheetDefinition[] = [
     {
       name: "Executive Summary",
       table: true,
@@ -661,10 +798,30 @@ function buildFallbackSheets(title: string, userMessage: string): SheetDefinitio
       ],
     },
   ];
+
+  if (targetSheets > 2) {
+    for (let i = 3; i <= targetSheets; i++) {
+      sheets.push({
+        name: `Breakdown Tab ${i}`,
+        table: true,
+        rows: [
+          ["Item ID", "Sub-System", "Category", "Q1 Actual", "Q2 Projection", "Variance"],
+          [`ITM-${i}01`, "Component Infrastructure", "Core", 12000, 14500, "+20.8%"],
+          [`ITM-${i}02`, "Network Optimization", "Cloud", 8500, 9200, "+8.2%"],
+          [`ITM-${i}03`, "Data Ingestion Pipeline", "Storage", 6400, 6800, "+6.3%"],
+        ],
+      });
+    }
+  }
+
+  return sheets;
 }
 
 function buildFallbackSlides(title: string, userMessage: string): SlideDefinition[] {
-  return [
+  const lengthIntent = parseUserLengthIntent(userMessage);
+  const targetSlides = lengthIntent.targetSlides ?? (lengthIntent.isExtensive ? 10 : 5);
+
+  const slides: SlideDefinition[] = [
     {
       title,
       subtitle: "Comprehensive Topic Briefing & Strategy",
@@ -712,4 +869,20 @@ function buildFallbackSlides(title: string, userMessage: string): SlideDefinitio
       ],
     },
   ];
+
+  if (targetSlides > 5) {
+    for (let i = 6; i <= targetSlides; i++) {
+      slides.push({
+        title: `Deep-Dive Topic Focus (Part ${i - 5})`,
+        bullets: [
+          `Specialized analytical breakdown for dimension ${i}`,
+          "Empirical metrics and operational considerations",
+          "Continuous optimization benchmarks and mitigation strategies",
+        ],
+        footnote: `Section ${i} analysis`,
+      });
+    }
+  }
+
+  return slides;
 }

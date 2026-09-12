@@ -100,15 +100,14 @@ export async function runDocumentPipeline(input: {
   } = input;
 
   // ── Stage 1: Analyzing ────────────────────────────────────────────────
-  onProgress({ stage: "analyzing", format, message: "Understanding your request" });
+  onProgress({ stage: "analyzing", format, message: "Analyzing prompt & scope" });
+  await paceStage(450, signal);
 
-  // Brief yield to allow the client to render the analyzing state
-  await yieldToEventLoop();
-
-  // ── Stage 2: Researching (conditional) ────────────────────────────────
+  // ── Stage 2: Planning & Research ──────────────────────────────────────
   let research: ResearchResult | undefined;
 
-  onProgress({ stage: "planning", format, message: "Planning the document structure" });
+  onProgress({ stage: "planning", format, message: "Planning document architecture" });
+  await paceStage(350, signal);
 
   try {
     research = await performResearch(
@@ -116,19 +115,18 @@ export async function runDocumentPipeline(input: {
       history,
       format,
       (researchStage) => {
-        // Map research sub-stages to pipeline progress
         switch (researchStage) {
           case "searching":
-            onProgress({ stage: "researching", format, message: "Searching the web for relevant information" });
+            onProgress({ stage: "researching", format, message: "Searching verified sources" });
             break;
           case "fetching":
-            onProgress({ stage: "searching", format, message: "Reading source content" });
+            onProgress({ stage: "searching", format, message: "Gathering authoritative content" });
             break;
           case "analyzing_sources":
-            onProgress({ stage: "analyzing_sources", format, message: "Analyzing gathered sources" });
+            onProgress({ stage: "analyzing_sources", format, message: "Synthesizing research insights" });
             break;
           default:
-            onProgress({ stage: "researching", format, message: "Researching information" });
+            onProgress({ stage: "researching", format, message: "Researching topic" });
         }
       },
       signal
@@ -141,12 +139,13 @@ export async function runDocumentPipeline(input: {
   if (research.needed && research.sourceCount > 0) {
     console.log(`[DocGen] Research complete: ${research.sourceCount} sources, ${research.findings.length} findings`);
   }
+  await paceStage(300, signal);
 
   // ── Stage 3: Content Generation (AI Planning) ────────────────────────
   onProgress({
     stage: "content_generated",
     format,
-    message: "Generating document content",
+    message: "Drafting in-depth content & sections",
     researchSourceCount: research?.sourceCount,
     researchFindingCount: research?.findings.length,
   });
@@ -170,7 +169,7 @@ export async function runDocumentPipeline(input: {
   onProgress({
     stage: "designing",
     format: plan.format,
-    message: "Designing document layout and structure",
+    message: "Formatting layout & typography",
   });
 
   const spec = buildDocumentSpec(plan);
@@ -183,15 +182,17 @@ export async function runDocumentPipeline(input: {
       publisher: s.publisher,
     }));
   }
+  await paceStage(450, signal);
 
   // ── Stage 5: File Generation ─────────────────────────────────────────
   onProgress({
     stage: "generating",
     format: spec.format,
-    message: "Generating the file",
+    message: "Compiling document",
   });
 
   const generated = await generateDocument(spec);
+  await paceStage(400, signal);
 
   // ── Metrics: real page/sheet/slide/word counts for the artifact → ───────
   const metrics = await computeFileMetrics(spec, generated.buffer);
@@ -200,12 +201,13 @@ export async function runDocumentPipeline(input: {
   onProgress({
     stage: "validating",
     format: spec.format,
-    message: "Checking the generated document",
+    message: "Validating document integrity",
   });
 
   // Byte-level validation on the actual generated buffer. Non-blocking: the
   // report is included in the result, and only logged here for transparency.
   const qualityReport = validateDocument(spec, generated.buffer);
+  await paceStage(350, signal);
 
   if (!qualityReport.passed) {
     console.warn(
@@ -221,6 +223,8 @@ export async function runDocumentPipeline(input: {
     spec,
     summary: plan.summary,
     generated,
+    sources: spec.sources && spec.sources.length > 0 ? spec.sources : undefined,
+    metrics,
   });
 
   return {
@@ -351,9 +355,20 @@ export async function generateAndDeliverFile(input: {
   spec: DocumentSpec;
   summary?: string;
   generated?: GeneratedArtifact;
+  sources?: Array<{ title: string; url: string; publisher?: string }>;
+  metrics?: { pages?: number; sheets?: number; slides?: number; words?: number };
 }): Promise<GeneratedFileResult> {
   const { userId, assistantMessageId, conversationId, spec, generated } = input;
   const { buffer, filename, mimeType } = generated ?? (await generateDocument(spec));
+  const sources =
+    input.sources ??
+    (spec.sources && spec.sources.length > 0 ? spec.sources : undefined);
+  const metrics = input.metrics;
+  const metadataJson = JSON.stringify({
+    sources: sources && sources.length > 0 ? sources : undefined,
+    metrics: metrics ?? undefined,
+    format: spec.format,
+  });
 
   const fileId = crypto.randomUUID();
   const saved = await storagePut(
@@ -373,6 +388,12 @@ export async function generateAndDeliverFile(input: {
       sizeBytes: buffer.length,
       storageKey: saved.key,
       url: saved.url,
+      contentText: metadataJson,
+      metadata: {
+        sources,
+        metrics,
+        format: spec.format,
+      },
       status: "ready",
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -412,6 +433,7 @@ export async function generateAndDeliverFile(input: {
         mime_type: mimeType,
         size_bytes: buffer.length,
         status: "ready",
+        content_text: metadataJson,
       });
 
       if (insertError) {
@@ -457,11 +479,22 @@ export async function generateAndDeliverFile(input: {
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 /**
- * Yields to the event loop briefly so the client has time to render
- * the current progress stage before the next heavy computation begins.
+ * Smoothly paces pipeline progress stages so live transitions feel
+ * deliberate, deeply analytical, and polished rather than flashing instantly.
  */
-function yieldToEventLoop(): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, 0));
+function paceStage(ms = 450, signal?: AbortSignal): Promise<void> {
+  return new Promise(resolve => {
+    if (signal?.aborted) return resolve();
+    const timer = setTimeout(resolve, ms);
+    signal?.addEventListener(
+      "abort",
+      () => {
+        clearTimeout(timer);
+        resolve();
+      },
+      { once: true }
+    );
+  });
 }
 
 export { FORMAT_MIME };

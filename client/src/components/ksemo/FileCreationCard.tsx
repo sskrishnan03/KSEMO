@@ -1,16 +1,21 @@
 import type { DocFormat } from "@/lib/docFormats";
-import { ArrowUpRight, Download, ExternalLink, RotateCw } from "lucide-react";
-import { memo } from "react";
+import {
+  Check,
+  ChevronDown,
+  Download,
+  RotateCw,
+} from "lucide-react";
+import React, { memo, useEffect, useState } from "react";
 import {
   FileBrandMark,
   type FileBrandVariant,
 } from "@/components/ksemo/FileBrandIcons";
+import { cn } from "@/lib/utils";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { cn } from "@/lib/utils";
 
 export type FileCreationStage =
   | "analyzing"
@@ -42,6 +47,7 @@ export type FileMetrics = {
 const FORMAT_CONFIGS: Record<
   DocFormat,
   {
+    writing: string;
     creating: string;
     ready: string;
     short: string;
@@ -50,6 +56,7 @@ const FORMAT_CONFIGS: Record<
   }
 > = {
   pdf: {
+    writing: "Writing PDF",
     creating: "Creating PDF",
     ready: "PDF ready",
     short: "PDF",
@@ -57,20 +64,23 @@ const FORMAT_CONFIGS: Record<
     mdLabel: "PDF",
   },
   docx: {
-    creating: "Creating document",
+    writing: "Writing Word document",
+    creating: "Creating Word document",
     ready: "Document ready",
-    short: "document",
+    short: "Word document",
     ext: "DOCX",
     mdLabel: "DOCX",
   },
   xlsx: {
-    creating: "Creating workbook",
+    writing: "Writing Excel workbook",
+    creating: "Creating Excel workbook",
     ready: "Workbook ready",
-    short: "workbook",
+    short: "Excel workbook",
     ext: "XLSX",
     mdLabel: "XLSX",
   },
   pptx: {
+    writing: "Writing presentation",
     creating: "Creating presentation",
     ready: "Presentation ready",
     short: "presentation",
@@ -78,6 +88,7 @@ const FORMAT_CONFIGS: Record<
     mdLabel: "PPTX",
   },
   txt: {
+    writing: "Writing text file",
     creating: "Creating text file",
     ready: "Text file ready",
     short: "text file",
@@ -85,6 +96,7 @@ const FORMAT_CONFIGS: Record<
     mdLabel: "TXT",
   },
   markdown: {
+    writing: "Writing markdown file",
     creating: "Creating markdown file",
     ready: "Markdown file ready",
     short: "markdown file",
@@ -92,6 +104,7 @@ const FORMAT_CONFIGS: Record<
     mdLabel: "MD",
   },
   csv: {
+    writing: "Writing spreadsheet",
     creating: "Creating spreadsheet",
     ready: "Spreadsheet ready",
     short: "spreadsheet",
@@ -110,21 +123,52 @@ const FORMAT_TO_VARIANT: Record<DocFormat, FileBrandVariant> = {
   csv: "text",
 };
 
-// Mapping backend stages to user-friendly status lines — only one shows at a time.
-const STATUS_LINES: Partial<Record<FileCreationStage, string>> = {
-  analyzing: "Analyzing your request",
-  planning: "Planning the document",
-  researching: "Researching relevant information",
-  searching: "Searching for information",
-  fetching: "Gathering content",
-  analyzing_sources: "Analyzing sources",
-  content_generated: "Writing and formatting",
-  designing: "Designing layout",
-  generating: "Generating file",
-  validating: "Validating document",
-};
+export function getLiveStatusPhrase(stage: FileCreationStage, format?: DocFormat): string {
+  switch (stage) {
+    case "analyzing":
+      return "Crafting the intelligence";
+    case "researching":
+    case "searching":
+      return "Gathering verified insights";
+    case "fetching":
+    case "analyzing_sources":
+      return "Synthesizing research";
+    case "planning":
+      return "Structuring the content";
+    case "content_generated": {
+      if (format === "xlsx" || format === "csv") return "Writing the spreadsheet";
+      if (format === "pptx") return "Writing the presentation";
+      return "Writing the document";
+    }
+    case "designing":
+      return "Formatting the layout";
+    case "generating":
+      return "Compiling the file";
+    case "validating":
+      return "Validating document integrity";
+    case "completed":
+      return "Document ready";
+    case "error":
+      return "Document creation failed";
+    default:
+      return "Writing the document";
+  }
+}
 
-const FORMATTING_LINE = "Writing and formatting";
+export const STAGE_NUMBERS: Record<FileCreationStage, number> = {
+  analyzing: 1,
+  researching: 2,
+  searching: 2,
+  fetching: 2,
+  analyzing_sources: 2,
+  planning: 3,
+  content_generated: 4,
+  designing: 5,
+  generating: 6,
+  validating: 7,
+  completed: 8,
+  error: 0,
+};
 
 function formatFileSize(bytes?: number): string | null {
   if (typeof bytes !== "number" || Number.isNaN(bytes) || bytes < 0)
@@ -140,15 +184,25 @@ function formatFileSize(bytes?: number): string | null {
   return `${value.toFixed(digits)} ${units[unit]}`;
 }
 
-function extractDomain(url: string): string {
-  try {
-    return new URL(url).hostname.replace(/^www\./, "");
-  } catch {
-    return url;
+function formatFileMetrics(metrics?: FileMetrics): string | null {
+  if (!metrics) return null;
+  const parts: string[] = [];
+  if (typeof metrics.pages === "number" && metrics.pages > 0) {
+    parts.push(`${metrics.pages} ${metrics.pages === 1 ? "page" : "pages"}`);
   }
+  if (typeof metrics.slides === "number" && metrics.slides > 0) {
+    parts.push(`${metrics.slides} ${metrics.slides === 1 ? "slide" : "slides"}`);
+  }
+  if (typeof metrics.sheets === "number" && metrics.sheets > 0) {
+    parts.push(`${metrics.sheets} ${metrics.sheets === 1 ? "sheet" : "sheets"}`);
+  }
+  if (typeof metrics.words === "number" && metrics.words > 0) {
+    parts.push(`${metrics.words.toLocaleString()} words`);
+  }
+  return parts.length ? parts.join(" \u00b7 ") : null;
 }
 
-type FileCreationCardProps = {
+export type FileCreationCardProps = {
   stage: FileCreationStage;
   format?: DocFormat;
   filename?: string;
@@ -160,55 +214,6 @@ type FileCreationCardProps = {
   metrics?: FileMetrics;
 };
 
-// ── Source chips ───────────────────────────────────────────────────────────
-const SourceChips = memo(function SourceChips({
-  sources,
-}: {
-  sources: FileSource[];
-}) {
-  if (!sources.length) return null;
-
-  return (
-    <div>
-      <p className="mb-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60">
-        Sources
-      </p>
-      <div className="flex flex-wrap gap-1.5">
-        {sources.map((source, index) => {
-          const domain = source.publisher || extractDomain(source.url);
-          return (
-            <Tooltip key={source.url || index}>
-              <TooltipTrigger asChild>
-                <a
-                  href={source.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  aria-label={`Open ${source.title || domain}`}
-                  className={cn(
-                    "group/chip inline-flex max-w-[160px] items-center gap-1 rounded-md",
-                    "border border-border/60 bg-muted/40 px-2 py-0.5",
-                    "text-[11px] leading-5 text-muted-foreground",
-                    "transition-all duration-150",
-                    "hover:bg-muted/70 hover:text-foreground"
-                  )}
-                >
-                  <span className="truncate">{domain}</span>
-                  <ExternalLink className="size-2.5 shrink-0 opacity-0 transition-opacity duration-150 group-hover/chip:opacity-60" />
-                </a>
-              </TooltipTrigger>
-              <TooltipContent side="top" sideOffset={6}>
-                <span className="line-clamp-2 max-w-[220px]">
-                  {source.title || domain}
-                </span>
-              </TooltipContent>
-            </Tooltip>
-          );
-        })}
-      </div>
-    </div>
-  );
-});
-
 // ── Main card ──────────────────────────────────────────────────────────────
 export const FileCreationCard = memo(function FileCreationCard({
   stage,
@@ -217,8 +222,21 @@ export const FileCreationCard = memo(function FileCreationCard({
   fileUrl,
   fileSizeBytes,
   onRetry,
-  sources,
+  researchSourceCount,
+  metrics,
 }: FileCreationCardProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [showReady, setShowReady] = useState(true);
+
+  useEffect(() => {
+    if (stage === "completed") {
+      const timer = setTimeout(() => {
+        setShowReady(false);
+      }, 15000);
+      return () => clearTimeout(timer);
+    }
+  }, [stage]);
+
   const config = FORMAT_CONFIGS[format] || FORMAT_CONFIGS.pdf;
   const variant = FORMAT_TO_VARIANT[format] || "generic";
   const displayName = filename || `document.${format}`;
@@ -226,15 +244,15 @@ export const FileCreationCard = memo(function FileCreationCard({
   // ── Error state ─────────────────────────────────────────────────────────
   if (stage === "error") {
     return (
-      <div className="my-1 w-full max-w-2xl">
-        <div className="flex items-center gap-3 rounded-xl border border-border/50 bg-card/60 px-3.5 py-3">
+      <div className="my-2 w-fit max-w-md animate-in fade-in duration-200">
+        <div className="flex items-center gap-3.5 rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-destructive">
           <FileBrandMark
             variant={variant}
-            className="size-10 shrink-0 opacity-70 saturate-[0.5]"
+            className="size-9 shrink-0 opacity-80 saturate-[0.5]"
           />
           <div className="min-w-0 flex-1">
             <p className="text-[13px] font-medium text-foreground">
-              Document couldn't be created
+              Document creation could not be completed
             </p>
             <p className="mt-0.5 text-[11px] text-muted-foreground">
               Something went wrong while generating the {config.short}.
@@ -245,10 +263,10 @@ export const FileCreationCard = memo(function FileCreationCard({
               type="button"
               onClick={onRetry}
               className={cn(
-                "inline-flex shrink-0 items-center gap-1.5 rounded-lg",
-                "border border-border/60 bg-muted/50 px-2.5 py-1.5",
-                "text-[11px] font-medium text-muted-foreground",
-                "transition-colors duration-150 hover:bg-muted hover:text-foreground"
+                "inline-flex shrink-0 items-center gap-1.5 rounded-xl",
+                "border border-border/70 bg-card px-3 py-1.5",
+                "text-[11.5px] font-medium text-foreground shadow-sm",
+                "transition-all duration-150 hover:bg-muted active:scale-[0.98]"
               )}
             >
               <RotateCw className="size-3" />
@@ -260,91 +278,193 @@ export const FileCreationCard = memo(function FileCreationCard({
     );
   }
 
-  // ── Processing state ────────────────────────────────────────────────────
+  // ── In-Progress / Creating state (CONTAINER-FREE, TEXT-ONLY PROCESS DROPDOWN) ──
   if (stage !== "completed") {
-    const statusLine =
-      STATUS_LINES[stage as FileCreationStage] ?? FORMATTING_LINE;
+    const statusPhrase = getLiveStatusPhrase(stage as FileCreationStage, format);
+    const currentOrder = STAGE_NUMBERS[stage as FileCreationStage] ?? 1;
+
+    const hasResearch =
+      (researchSourceCount && researchSourceCount > 0) ||
+      ["researching", "searching", "fetching", "analyzing_sources"].includes(
+        stage
+      );
+
+    const steps = [
+      {
+        id: "analyzing",
+        order: 1,
+        label: "Analyzing the request",
+      },
+      ...(hasResearch
+        ? [
+            {
+              id: "researching",
+              order: 2,
+              label:
+                researchSourceCount && researchSourceCount > 0
+                  ? `Gathering verified research (${researchSourceCount} sources)`
+                  : "Gathering verified research",
+            },
+          ]
+        : []),
+      {
+        id: "planning",
+        order: 3,
+        label: "Structuring the content",
+      },
+      {
+        id: "content",
+        order: 4,
+        label:
+          format === "xlsx" || format === "csv"
+            ? "Writing the spreadsheet"
+            : format === "pptx"
+              ? "Writing the presentation"
+              : "Writing the document",
+      },
+      {
+        id: "designing",
+        order: 5,
+        label: "Formatting the layout",
+      },
+      {
+        id: "generating",
+        order: 6,
+        label: "Compiling the file",
+      },
+      {
+        id: "validating",
+        order: 7,
+        label: "Validating document integrity",
+      },
+    ];
 
     return (
-      <div className="my-1 w-full max-w-2xl">
-        <div className="flex items-center gap-3 rounded-xl border border-border/50 bg-card/60 px-3.5 py-3">
-          <FileBrandMark variant={variant} className="size-10 shrink-0" />
-          <div className="min-w-0 flex-1">
-            <p className="text-[13px] font-medium text-foreground">
-              {config.creating}
-            </p>
-            <p
-              key={stage}
-              className="mt-0.5 flex items-center gap-2 text-[11px] text-muted-foreground animate-in fade-in duration-200"
-            >
-              <span className="inline-block size-1.5 shrink-0 rounded-full bg-muted-foreground/40 animate-pulse" />
-              {statusLine}
-            </p>
+      <div
+        data-testid="file-creation-drafting"
+        className="my-2 flex flex-col items-start select-none animate-in fade-in duration-150"
+      >
+        {/* Interactive process row as the dropdown trigger (minimal, container-free) */}
+        <button
+          type="button"
+          onClick={() => setIsExpanded(prev => !prev)}
+          aria-expanded={isExpanded}
+          aria-label={isExpanded ? "Collapse generation process" : "Expand generation process"}
+          className="group/process flex min-h-[36px] items-center gap-2 py-1 text-left cursor-pointer transition-colors focus-visible:outline-none"
+        >
+          <FileBrandMark variant={variant} className="size-6 shrink-0 select-none" />
+          <span className="text-[14.5px] font-medium text-foreground transition-opacity duration-200">
+            {statusPhrase}
+          </span>
+          <ChevronDown
+            className={cn(
+              "size-4 text-muted-foreground transition-transform duration-200 group-hover/process:text-foreground",
+              isExpanded && "rotate-180"
+            )}
+          />
+        </button>
+
+        {/* Minimal text-based process dropdown (no green lines, checkmarks, spinners, or circles) */}
+        {isExpanded && (
+          <div
+            data-testid="file-creation-process-list"
+            className="mt-2 space-y-2 pl-8 animate-in fade-in slide-in-from-top-1 duration-150"
+          >
+            {steps.map(step => {
+              const isCompleted = currentOrder > step.order;
+              const isActive = currentOrder === step.order;
+
+              return (
+                <div key={step.id} className="text-[13.5px] leading-snug">
+                  <span
+                    className={cn(
+                      "transition-colors duration-200 select-none",
+                      isActive
+                        ? "font-medium text-foreground"
+                        : isCompleted
+                          ? "text-muted-foreground"
+                          : "text-muted-foreground/40"
+                    )}
+                  >
+                    {step.label}
+                  </span>
+                </div>
+              );
+            })}
           </div>
-        </div>
+        )}
       </div>
     );
   }
 
-  // ── Completed state ─────────────────────────────────────────────────────
-  const sizeLabel = formatFileSize(fileSizeBytes);
-
+  // ── Completed state (ELEVATED HEIGHT, AUTO-WIDTH, CLICK TO OPEN, HOVER DOWNLOAD) ───
   return (
-    <div className="my-1 w-full max-w-2xl animate-in fade-in duration-200">
-      <div className="rounded-xl border border-border/50 bg-card/60 transition-shadow duration-200 hover:shadow-[0_2px_8px_rgba(0,0,0,0.06)]">
-        {/* File row */}
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3.5 py-3 sm:flex-nowrap">
-          <FileBrandMark variant={variant} className="size-10 shrink-0" />
-          <div className="min-w-0 flex-1">
-            <p className="text-[13px] font-medium text-foreground leading-tight">
-              {displayName}
+    <div
+      data-testid="file-creation-completed"
+      className="my-2 w-fit min-w-[280px] sm:min-w-[320px] max-w-lg animate-in fade-in duration-200"
+    >
+      <a
+        href={fileUrl}
+        target="_blank"
+        rel="noreferrer"
+        className={cn(
+          "group/file relative flex min-h-[64px] items-center gap-3.5 rounded-2xl",
+          "border border-border/80 bg-card/90 px-4 py-3.5 shadow-sm backdrop-blur-sm",
+          "transition-all duration-200 hover:border-border hover:bg-accent/60 hover:shadow-md",
+          "dark:bg-card/60 dark:hover:bg-card/90 cursor-pointer"
+        )}
+      >
+        {/* File Brand Logo: clean, properly sized (size-9 / 36px), no extra wrapper layer */}
+        <FileBrandMark variant={variant} className="size-9 shrink-0 select-none" />
+
+        {/* Title & auto-dismissing Ready status (no duplicate format badge) */}
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[14.5px] font-medium leading-snug text-foreground group-hover/file:text-primary transition-colors">
+            {displayName}
+          </p>
+
+          {showReady && (
+            <p className="mt-1 flex items-center gap-1 text-[11.5px] font-medium text-emerald-600 dark:text-emerald-400 animate-in fade-in duration-200">
+              <Check className="size-3 stroke-[2.5]" />
+              <span>Ready</span>
             </p>
-            <p className="mt-0.5 text-[11px] text-muted-foreground">
-              {config.mdLabel}
-              {sizeLabel ? ` \u00b7 ${sizeLabel}` : ""}
-            </p>
-          </div>
-          <div className="flex w-full shrink-0 items-center gap-1.5 sm:w-auto">
-            {fileUrl && (
-              <a
-                href={fileUrl}
-                target="_blank"
-                rel="noreferrer"
-                className={cn(
-                  "inline-flex h-7 items-center gap-1 whitespace-nowrap rounded-lg px-2.5",
-                  "bg-foreground text-[11px] font-medium text-background",
-                  "transition-colors duration-150 hover:bg-foreground/85"
-                )}
-              >
-                Open
-                <ArrowUpRight className="size-3" />
-              </a>
-            )}
-            {fileUrl && (
-              <a
-                href={fileUrl}
-                download={displayName}
-                aria-label={`Download ${displayName}`}
-                title="Download file"
-                className={cn(
-                  "inline-flex size-7 items-center justify-center rounded-lg",
-                  "border border-border/60 text-muted-foreground",
-                  "transition-colors duration-150 hover:bg-muted hover:text-foreground"
-                )}
-              >
-                <Download className="size-3.5" />
-              </a>
-            )}
-          </div>
+          )}
         </div>
 
-        {/* Sources — inline chips, no dropdown */}
-        {sources && sources.length > 0 && (
-          <div className="animate-in fade-in duration-300 border-t border-border/40 px-3.5 pb-3 pt-2.5">
-            <SourceChips sources={sources} />
-          </div>
+        {/* Download Option: Only shows on hover, stationary, transparent without white background */}
+        {fileUrl && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={e => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const a = document.createElement("a");
+                  a.href = fileUrl;
+                  a.download = displayName;
+                  document.body.appendChild(a);
+                  a.click();
+                  document.body.removeChild(a);
+                }}
+                aria-label={`Download ${displayName}`}
+                className={cn(
+                  "relative flex size-9 shrink-0 items-center justify-center rounded-xl",
+                  "bg-transparent text-muted-foreground",
+                  "opacity-0 transition-opacity duration-150 group-hover/file:opacity-100",
+                  "hover:bg-muted/80 hover:text-foreground",
+                  "focus-visible:opacity-100"
+                )}
+              >
+                <Download className="size-4" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" sideOffset={6}>
+              Download
+            </TooltipContent>
+          </Tooltip>
         )}
-      </div>
+      </a>
     </div>
   );
 });

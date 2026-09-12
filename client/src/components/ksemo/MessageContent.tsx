@@ -98,12 +98,45 @@ function formatBytes(bytes?: number): string | null {
   const units = ["B", "KB", "MB", "GB"];
   let value = bytes;
   let unit = 0;
-  while (value >= 1024 && unit < units.length - 1) {
-    value /= 1024;
-    unit += 1;
-  }
   const digits = unit === 0 || value >= 100 ? 0 : value >= 10 ? 1 : 2;
   return `${value.toFixed(digits)} ${units[unit]}`;
+}
+
+export function splitFirstSentence(content: string): { first: string; rest: string } {
+  const text = content.trim();
+  if (!text) return { first: "", rest: "" };
+
+  // 1. Double newline indicates separate paragraphs - standard markdown separation
+  const doubleNewline = text.indexOf("\n\n");
+  if (doubleNewline !== -1) {
+    return {
+      first: text.slice(0, doubleNewline).trim(),
+      rest: text.slice(doubleNewline + 2).trim(),
+    };
+  }
+
+  // 2. Single newline
+  const singleNewline = text.indexOf("\n");
+  if (singleNewline !== -1) {
+    return {
+      first: text.slice(0, singleNewline).trim(),
+      rest: text.slice(singleNewline + 1).trim(),
+    };
+  }
+
+  // 3. Sentence boundary within a single line (ending with . ! ? followed by whitespace and a capital/number/markdown header)
+  const sentenceMatch = text.match(/^([^.!?]+[.!?])\s+([A-Z0-9#*-].*)$/s);
+  if (sentenceMatch) {
+    return {
+      first: sentenceMatch[1].trim(),
+      rest: sentenceMatch[2].trim(),
+    };
+  }
+
+  return {
+    first: text,
+    rest: "",
+  };
 }
 
 export const MessageContent = memo(function MessageContent({
@@ -115,6 +148,7 @@ export const MessageContent = memo(function MessageContent({
   isSpeaking,
   speechState,
   isCurrentGeneration = false,
+  isFileGenerating = false,
   hideTypingIndicator = false,
   onEdit,
   onRegenerate,
@@ -127,8 +161,10 @@ export const MessageContent = memo(function MessageContent({
   onEditValueChange,
   onSaveEdit,
   onCancelEdit,
+  fileCreationNode,
 }: {
   message: KsemoMessage;
+  fileCreationNode?: React.ReactNode;
   onSpeak: (text: string, messageId: string) => void;
   onPause: () => void;
   onResume: () => void;
@@ -136,6 +172,7 @@ export const MessageContent = memo(function MessageContent({
   isSpeaking: boolean;
   speechState: "idle" | "playing" | "paused";
   isCurrentGeneration?: boolean;
+  isFileGenerating?: boolean;
   hideTypingIndicator?: boolean;
   onEdit?: (message: KsemoMessage) => void;
   onRegenerate?: (message: KsemoMessage) => void;
@@ -226,6 +263,10 @@ export const MessageContent = memo(function MessageContent({
   );
 
   const isCancelled = !isUser && message.status === "cancelled";
+  const isGeneratingFile = Boolean(
+    isFileGenerating ||
+    (message.fileGeneration && message.fileGeneration.status === "processing")
+  );
 
   const renderStoppedNotice = () => (
     <div
@@ -404,10 +445,48 @@ export const MessageContent = memo(function MessageContent({
               )
             ) : cleanContent ? (
               <>
-                <div className="ksemo-markdown prose prose-neutral max-w-none text-[15px] leading-6 dark:prose-invert">
-                  <Streamdown components={KSEMO_MARKDOWN_COMPONENTS}>
-                    {cleanContent}
-                  </Streamdown>
+                {fileCreationNode ? (
+                  <>
+                    {(() => {
+                      const { first, rest } = splitFirstSentence(cleanContent);
+                      return (
+                        <>
+                          {first ? (
+                            <div className="ksemo-markdown prose prose-neutral max-w-none text-[15px] leading-6 dark:prose-invert">
+                              <Streamdown components={KSEMO_MARKDOWN_COMPONENTS}>
+                                {first}
+                              </Streamdown>
+                            </div>
+                          ) : null}
+
+                          <div className="my-2">
+                            {fileCreationNode}
+                          </div>
+
+                          {rest ? (
+                            <div className="ksemo-markdown prose prose-neutral max-w-none text-[15px] leading-6 dark:prose-invert mt-2">
+                              <Streamdown components={KSEMO_MARKDOWN_COMPONENTS}>
+                                {rest}
+                              </Streamdown>
+                            </div>
+                          ) : null}
+                        </>
+                      );
+                    })()}
+                  </>
+                ) : (
+                  <div className="ksemo-markdown prose prose-neutral max-w-none text-[15px] leading-6 dark:prose-invert">
+                    <Streamdown components={KSEMO_MARKDOWN_COMPONENTS}>
+                      {cleanContent}
+                    </Streamdown>
+                  </div>
+                )}
+                {isCancelled && renderStoppedNotice()}
+              </>
+            ) : fileCreationNode ? (
+              <>
+                <div className="my-2">
+                  {fileCreationNode}
                 </div>
                 {isCancelled && renderStoppedNotice()}
               </>
@@ -415,7 +494,10 @@ export const MessageContent = memo(function MessageContent({
               renderStoppedNotice()
             ) : message.status === "streaming" &&
               isCurrentGeneration &&
-              !hideTypingIndicator ? (
+              !hideTypingIndicator &&
+              !message.fileGeneration &&
+              !fileCreationNode &&
+              !(message.attachments?.length && !isUser) ? (
               <div
                 className="flex h-7 items-center gap-1.5"
                 aria-label="KSEMO is responding"
@@ -429,7 +511,7 @@ export const MessageContent = memo(function MessageContent({
           )}
 
           {/* Attachments (e.g. images, uploaded files; generated document is presented via primary FileCreationCard) */}
-          {!isUser && message.attachments?.length && !message.fileGeneration ? (
+          {!isUser && message.attachments?.length && !message.fileGeneration && !fileCreationNode ? (
             <div className="mt-2 flex max-w-full flex-col items-start gap-2">
               {message.attachments.map(file => {
                 const kind = getFileKind(file.filename, file.mimeType);
@@ -517,6 +599,7 @@ export const MessageContent = memo(function MessageContent({
               })}
             </div>
           ) : null}
+
           {isUser && message.content && (
             <div className="mt-1.5 flex items-center gap-1 max-lg:opacity-100 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
               {action(
@@ -534,7 +617,7 @@ export const MessageContent = memo(function MessageContent({
                 )}
             </div>
           )}
-          {!isUser && (message.content || message.status === "failed" || message.status === "cancelled") && (
+          {!isUser && !isGeneratingFile && (message.content || message.status === "failed" || message.status === "cancelled" || Boolean(fileCreationNode)) && (
             <div className="mt-1.5 flex items-center gap-1">
               {message.content &&
                 action(
