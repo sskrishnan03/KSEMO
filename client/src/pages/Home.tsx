@@ -2131,6 +2131,8 @@ export default function Home() {
       isRecording={voice.state === "recording"}
       isTranscribing={voice.state === "transcribing"}
       recordingSeconds={voice.seconds}
+      audioBars={voice.audioBars}
+      audioLevel={voice.audioLevel}
       value={composerValue}
       onValueChange={setComposerValue}
       activeMode={activeMode}
@@ -2431,6 +2433,8 @@ export default function Home() {
                       isRecording={voice.state === "recording"}
                       isTranscribing={voice.state === "transcribing"}
                       recordingSeconds={voice.seconds}
+                      audioBars={voice.audioBars}
+                      audioLevel={voice.audioLevel}
                       value={composerValue}
                       onValueChange={setComposerValue}
                       activeMode={activeMode}

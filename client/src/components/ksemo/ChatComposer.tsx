@@ -81,6 +81,84 @@ function getModeToken(mode: CapabilityMode): string {
   return MODE_TOKEN_LABELS[mode] ?? getCapabilityOption(mode).title;
 }
 
+export const DictateRecordingPill = memo(function DictateRecordingPill({
+  recordingSeconds,
+  audioBars,
+  audioLevel = 0,
+  onStop,
+  onTranscribe,
+}: {
+  recordingSeconds: number;
+  audioBars?: number[];
+  audioLevel?: number;
+  onStop: () => void;
+  onTranscribe: () => void;
+}) {
+  const bars =
+    audioBars && audioBars.length > 0
+      ? audioBars
+      : [0.15, 0.35, 0.65, 0.85, 0.45, 0.95, 0.75, 0.35, 0.85, 0.55, 0.25, 0.45];
+
+  return (
+    <div
+      className="flex min-w-[210px] sm:min-w-[250px] items-center justify-between gap-3 overflow-hidden rounded-full border border-border bg-muted/80 backdrop-blur-xs px-4 py-1.5 shadow-sm animate-in fade-in zoom-in-95 duration-150"
+      role="region"
+      aria-label="Dictation recording controls"
+    >
+      <div className="flex h-6 items-center gap-1" aria-hidden="true">
+        {bars.map((val, index) => {
+          const height = Math.max(4, Math.min(22, Math.round(4 + val * 18)));
+          return (
+            <span
+              key={index}
+              className={cn(
+                "w-1 rounded-full transition-all duration-75 ease-out",
+                val > 0.25 ? "bg-primary" : "bg-muted-foreground/50"
+              )}
+              style={{ height: `${height}px` }}
+            />
+          );
+        })}
+      </div>
+      <span className="text-[13px] font-semibold tabular-nums text-foreground tracking-tight select-none">
+        {String(Math.floor(recordingSeconds / 60)).padStart(2, "0")}:
+        {String(recordingSeconds % 60).padStart(2, "0")}
+      </span>
+      <div className="flex items-center gap-1.5">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={onStop}
+              className="size-7 rounded-full text-foreground/80 hover:bg-destructive/15 hover:text-destructive transition-colors"
+              aria-label="Stop"
+            >
+              <Square className="size-2.5 fill-current" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">Stop</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              type="button"
+              size="icon"
+              onClick={onTranscribe}
+              className="size-7 rounded-full bg-foreground text-background hover:bg-foreground/90 transition-colors shadow-xs"
+              aria-label="Transcribe"
+            >
+              <Check className="size-3.5 stroke-[2.5]" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">Transcribe</TooltipContent>
+        </Tooltip>
+      </div>
+    </div>
+  );
+});
+
 export const ChatComposer = memo(function ChatComposer({
   onSend,
   onCancel,
@@ -118,6 +196,8 @@ export const ChatComposer = memo(function ChatComposer({
   isEditingMessage = false,
   onSaveEdit,
   onCancelEdit,
+  audioBars,
+  audioLevel,
 }: {
   onSend: (content: string) => void;
   onCancel: () => void;
@@ -128,6 +208,8 @@ export const ChatComposer = memo(function ChatComposer({
   isRecording: boolean;
   isTranscribing: boolean;
   recordingSeconds: number;
+  audioBars?: number[];
+  audioLevel?: number;
   value: string;
   onValueChange: (value: string) => void;
   onAttachment?: (file: File) => void;
@@ -848,60 +930,13 @@ export const ChatComposer = memo(function ChatComposer({
                   {!hideVoiceInput && (
                     <>
                       {isRecording ? (
-                        <div className="flex items-center gap-2 overflow-hidden rounded-full border border-border bg-muted px-3 py-1.5 shadow-sm">
-                          <div className="flex items-end gap-0.5 overflow-hidden">
-                            {[4, 8, 12, 7, 15, 9, 5, 11].map(
-                              (height, index) => (
-                                <span
-                                  key={index}
-                                  className="w-1 animate-pulse rounded-full bg-muted-foreground/80"
-                                  style={{
-                                    height,
-                                    animationDelay: `${index * 70}ms`,
-                                  }}
-                                />
-                              )
-                            )}
-                          </div>
-                          <span className="text-[12px] font-medium tabular-nums text-foreground">
-                            {String(Math.floor(recordingSeconds / 60)).padStart(
-                              2,
-                              "0"
-                            )}
-                            :{String(recordingSeconds % 60).padStart(2, "0")}
-                          </span>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={onCancelRecording}
-                                className="size-6 rounded-full text-foreground/80 hover:bg-accent hover:text-foreground transition-colors"
-                                aria-label="Discard"
-                              >
-                                <X className="size-3" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent side="bottom">
-                              Discard
-                            </TooltipContent>
-                          </Tooltip>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                size="icon"
-                                onClick={onVoice}
-                                className="size-6 rounded-full bg-foreground text-background hover:bg-foreground/90 transition-colors"
-                                aria-label="Transcribe"
-                              >
-                                <Check className="size-3" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent side="bottom">
-                              Transcribe
-                            </TooltipContent>
-                          </Tooltip>
-                        </div>
+                        <DictateRecordingPill
+                          recordingSeconds={recordingSeconds}
+                          audioBars={audioBars}
+                          audioLevel={audioLevel}
+                          onStop={onCancelRecording}
+                          onTranscribe={onVoice}
+                        />
                       ) : isTranscribing ? (
                         <Tooltip>
                           <TooltipTrigger asChild>
@@ -995,60 +1030,13 @@ export const ChatComposer = memo(function ChatComposer({
                   {!hideVoiceInput && (
                     <>
                       {isRecording ? (
-                        <div className="flex items-center gap-2 overflow-hidden rounded-full border border-border bg-muted px-3 py-1.5 shadow-sm">
-                          <div className="flex items-end gap-0.5 overflow-hidden">
-                            {[4, 8, 12, 7, 15, 9, 5, 11].map(
-                              (height, index) => (
-                                <span
-                                  key={index}
-                                  className="w-1 animate-pulse rounded-full bg-muted-foreground/80"
-                                  style={{
-                                    height,
-                                    animationDelay: `${index * 70}ms`,
-                                  }}
-                                />
-                              )
-                            )}
-                          </div>
-                          <span className="text-[12px] font-medium tabular-nums text-foreground">
-                            {String(Math.floor(recordingSeconds / 60)).padStart(
-                              2,
-                              "0"
-                            )}
-                            :{String(recordingSeconds % 60).padStart(2, "0")}
-                          </span>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={onCancelRecording}
-                                className="size-6 rounded-full text-foreground/80 hover:bg-accent hover:text-foreground transition-colors"
-                                aria-label="Discard"
-                              >
-                                <X className="size-3" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent side="bottom">
-                              Discard
-                            </TooltipContent>
-                          </Tooltip>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                size="icon"
-                                onClick={onVoice}
-                                className="size-6 rounded-full bg-foreground text-background hover:bg-foreground/90 transition-colors"
-                                aria-label="Transcribe"
-                              >
-                                <Check className="size-3" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent side="bottom">
-                              Transcribe
-                            </TooltipContent>
-                          </Tooltip>
-                        </div>
+                        <DictateRecordingPill
+                          recordingSeconds={recordingSeconds}
+                          audioBars={audioBars}
+                          audioLevel={audioLevel}
+                          onStop={onCancelRecording}
+                          onTranscribe={onVoice}
+                        />
                       ) : isTranscribing ? (
                         <Tooltip>
                           <TooltipTrigger asChild>

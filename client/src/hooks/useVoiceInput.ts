@@ -39,10 +39,18 @@ export function useVoiceInput({
 }) {
   const [state, setState] = useState<VoiceState>("idle");
   const [seconds, setSeconds] = useState(0);
+  const [audioBars, setAudioBars] = useState<number[]>(() =>
+    new Array(12).fill(0.12)
+  );
+  const [audioLevel, setAudioLevel] = useState(0);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<number | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const animFrameRef = useRef<number | null>(null);
+  const lastAudioUpdateRef = useRef<number>(0);
   const mutation = trpc.voice.transcribe.useMutation({
     onSuccess: result => {
       setState("idle");
@@ -58,6 +66,20 @@ export function useVoiceInput({
   });
 
   const releaseStream = useCallback(() => {
+    if (animFrameRef.current) {
+      cancelAnimationFrame(animFrameRef.current);
+      animFrameRef.current = null;
+    }
+    if (audioContextRef.current && audioContextRef.current.state !== "closed") {
+      try {
+        void audioContextRef.current.close();
+      } catch {}
+      audioContextRef.current = null;
+    }
+    analyserRef.current = null;
+    setAudioLevel(0);
+    setAudioBars(new Array(12).fill(0.12));
+
     streamRef.current?.getTracks().forEach(track => track.stop());
     streamRef.current = null;
     if (timerRef.current) window.clearInterval(timerRef.current);
@@ -130,6 +152,58 @@ export function useVoiceInput({
         () => setSeconds(current => current + 1),
         1_000
       );
+
+      try {
+        const AudioCtx =
+          window.AudioContext ||
+          (window as unknown as { webkitAudioContext: typeof AudioContext })
+            .webkitAudioContext;
+        if (AudioCtx) {
+          const audioCtx = new AudioCtx();
+          audioContextRef.current = audioCtx;
+          const source = audioCtx.createMediaStreamSource(stream);
+          const analyser = audioCtx.createAnalyser();
+          analyser.fftSize = 64;
+          analyser.smoothingTimeConstant = 0.45;
+          source.connect(analyser);
+          analyserRef.current = analyser;
+
+          const freqBins = new Uint8Array(analyser.frequencyBinCount);
+          const BAR_COUNT = 12;
+
+          const tick = (now: number) => {
+            if (!streamRef.current || !analyserRef.current) return;
+            if (now - lastAudioUpdateRef.current >= 40) {
+              lastAudioUpdateRef.current = now;
+              analyser.getByteFrequencyData(freqBins);
+
+              let sum = 0;
+              for (let i = 0; i < freqBins.length; i++) {
+                sum += freqBins[i];
+              }
+              const avg = sum / (freqBins.length * 255);
+              const normalizedLevel = Math.min(1, avg * 3.0);
+              setAudioLevel(normalizedLevel);
+
+              const bars: number[] = [];
+              const step = Math.max(1, Math.floor(freqBins.length / BAR_COUNT));
+              for (let i = 0; i < BAR_COUNT; i++) {
+                const raw = (freqBins[i * step] || 0) / 255;
+                const boosted = Math.min(
+                  1,
+                  Math.max(0.12, raw * 1.5 + normalizedLevel * 1.2)
+                );
+                bars.push(boosted);
+              }
+              setAudioBars(bars);
+            }
+            animFrameRef.current = requestAnimationFrame(tick);
+          };
+          animFrameRef.current = requestAnimationFrame(tick);
+        }
+      } catch {
+        // Fallback gracefully
+      }
     } catch (error) {
       releaseStream();
       setState("idle");
@@ -170,5 +244,5 @@ export function useVoiceInput({
 
   useEffect(() => () => cancel(), [cancel]);
 
-  return { state, seconds, start, stop, cancel };
+  return { state, seconds, start, stop, cancel, audioBars, audioLevel };
 }
