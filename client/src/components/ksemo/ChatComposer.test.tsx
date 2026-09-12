@@ -157,4 +157,33 @@ describe("ChatComposer", () => {
     expect(markup).toContain('aria-label="Cancel edit"');
     expect(markup).toContain('aria-label="Save edit"');
   });
+
+  it("renders all 5 file brand icons with cohesive white document page, folded corner, and embedded format words", async () => {
+    const { PdfLogo, WordLogo, ExcelLogo, PowerPointLogo, TextLogo } = await import("./FileBrandLogos");
+    const pdfMarkup = renderToStaticMarkup(createElement(PdfLogo, { className: "size-6" }));
+    const wordMarkup = renderToStaticMarkup(createElement(WordLogo, { className: "size-6" }));
+    const excelMarkup = renderToStaticMarkup(createElement(ExcelLogo, { className: "size-6" }));
+    const pptMarkup = renderToStaticMarkup(createElement(PowerPointLogo, { className: "size-6" }));
+    const textMarkup = renderToStaticMarkup(createElement(TextLogo, { className: "size-6" }));
+
+    // Each icon has its signature format word embedded directly in the badge
+    expect(pdfMarkup).toContain("PDF");
+    expect(wordMarkup).toContain("WORD");
+    expect(excelMarkup).toContain("EXCEL");
+    expect(pptMarkup).toContain("PPT");
+    expect(textMarkup).toContain("TEXT");
+
+    // All logos share the unified white document surface with soft drop shadow
+    expect(pdfMarkup).toContain("ellipse");
+    expect(wordMarkup).toContain("ellipse");
+    expect(excelMarkup).toContain("ellipse");
+    expect(pptMarkup).toContain("ellipse");
+    expect(textMarkup).toContain("ellipse");
+
+    expect(pdfMarkup).toContain("#ffffff");
+    expect(wordMarkup).toContain("#ffffff");
+    expect(excelMarkup).toContain("#ffffff");
+    expect(pptMarkup).toContain("#ffffff");
+    expect(textMarkup).toContain("#ffffff");
+  });
 });
