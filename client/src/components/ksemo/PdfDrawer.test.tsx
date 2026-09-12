@@ -174,6 +174,10 @@ describe("PdfDrawer", () => {
     // Drag-to-copy fill handle present
     expect(markup).toContain("Drag to copy cell content");
 
+    // Column and row drag-resize handles present
+    expect(markup).toContain("cursor-col-resize");
+    expect(markup).toContain("cursor-row-resize");
+
     // No status bar (no Ready / rows / cols summary) and no add-sheet button
     expect(markup).not.toContain("Ready");
     expect(markup).not.toContain("Add new sheet");
@@ -183,7 +187,7 @@ describe("PdfDrawer", () => {
     expect(markup).toContain("Summary");
     expect(markup).toContain("Q1");
     expect(markup).toContain("100");
-    expect(markup).toContain(">50</th>");
+    expect(markup).toContain('data-row="49"');
   });
 
   it("renders drawer with clean filename and controls for PowerPoint (.pptx) presentation", () => {

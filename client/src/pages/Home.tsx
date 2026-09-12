@@ -167,7 +167,7 @@ function rememberNewChatIntent(userId: number): void {
 
 export default function Home() {
   const { user, loading, logout } = useAuth();
-  const { closePdf } = usePdfViewer();
+  const { closePdf, isOpen: isDocumentOpen } = usePdfViewer();
   const [, setLocation] = useLocation();
   const searchParams = useMemo(
     () => new URLSearchParams(window.location.search),
@@ -2106,6 +2106,7 @@ export default function Home() {
 
   useEffect(() => {
     if (!activePrimaryWorkspace) return;
+    if (isDocumentOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         stableCloseWorkspace();
@@ -2113,7 +2114,7 @@ export default function Home() {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [activePrimaryWorkspace, stableCloseWorkspace]);
+  }, [activePrimaryWorkspace, stableCloseWorkspace, isDocumentOpen]);
 
   useGlobalShortcuts({
     onNewChat: stableNewChat,
