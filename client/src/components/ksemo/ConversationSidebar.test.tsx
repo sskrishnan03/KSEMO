@@ -51,6 +51,8 @@ describe("KSEMO conversation sidebar disclosure", () => {
     );
     expect(markup).toContain('data-disclosure-group="pinned"');
     expect(markup).toContain('data-disclosure-group="recent"');
+    expect(markup).toContain("w-full");
+    expect(markup).toContain("cursor-pointer");
     expect(markup).toContain("lucide-message-circle");
     expect(markup).not.toContain("bg-muted-foreground/10");
     expect(markup).toContain("lucide-square-pen");

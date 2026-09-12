@@ -492,8 +492,9 @@ const ConversationGroup = memo(function ConversationGroup({
   return (
     <section className="mb-5">
       <button
+        type="button"
         onClick={() => setExpanded(current => !current)}
-        className="group flex items-center gap-1.5 px-2 py-1.5 text-left text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground"
+        className="group flex w-full items-center gap-1.5 px-2 py-1.5 text-left text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground cursor-pointer select-none"
         aria-expanded={expanded}
         data-disclosure-group={label.toLowerCase()}
       >
