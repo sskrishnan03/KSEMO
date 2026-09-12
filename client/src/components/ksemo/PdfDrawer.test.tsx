@@ -158,9 +158,9 @@ describe("PdfDrawer", () => {
     expect(markup).not.toContain("rounded-xl");
     expect(markup).not.toContain("shadow-2xl");
 
-    // Formula bar with coordinate and editable placeholder input (no fx glyph)
+    // Formula bar with coordinate fallback and no pre-selected cell (no fx glyph)
     expect(markup).toContain("A1");
-    expect(markup).toContain("Enter text, numbers, or formula...");
+    expect(markup).toContain("Click any cell to edit");
     expect(markup).not.toContain("fx");
 
     // Add row / add column quick controls exist
@@ -170,13 +170,6 @@ describe("PdfDrawer", () => {
     // Undo / Redo controls exist
     expect(markup).toContain('aria-label="Undo"');
     expect(markup).toContain('aria-label="Redo"');
-
-    // Drag-to-copy fill handle present
-    expect(markup).toContain("Drag to copy cell content");
-
-    // Column and row drag-resize handles present
-    expect(markup).toContain("cursor-col-resize");
-    expect(markup).toContain("cursor-row-resize");
 
     // No status bar (no Ready / rows / cols summary) and no add-sheet button
     expect(markup).not.toContain("Ready");

@@ -388,12 +388,7 @@ export const ExcelViewer = memo(function ExcelViewer({
     col: number;
     coord: string;
     value: any;
-  } | null>({
-    row: 0,
-    col: 0,
-    coord: "A1",
-    value: sheets[0]?.data?.[0]?.[0] ?? "",
-  });
+  } | null>(null);
 
   const [editingCell, setEditingCell] = useState<{
     row: number;
@@ -403,35 +398,10 @@ export const ExcelViewer = memo(function ExcelViewer({
   const [selectedCol, setSelectedCol] = useState<number | null>(null);
   const [selectedRow, setSelectedRow] = useState<number | null>(null);
   const cellInputRef = useRef<HTMLInputElement | null>(null);
-  const [fillDrag, setFillDrag] = useState<{
-    startRow: number;
-    startCol: number;
-    endRow: number;
-    endCol: number;
-  } | null>(null);
-  const dragOriginRef = useRef<{ row: number; col: number } | null>(null);
-  const dragFillRangeRef = useRef<{
-    startRow: number;
-    startCol: number;
-    endRow: number;
-    endCol: number;
-  } | null>(null);
   const [undoStack, setUndoStack] = useState<ExcelSheetData[][]>([]);
   const [redoStack, setRedoStack] = useState<ExcelSheetData[][]>([]);
   const [renamingSheetIdx, setRenamingSheetIdx] = useState<number | null>(null);
   const [renameValue, setRenameValue] = useState<string>("");
-  const [colWidths, setColWidths] = useState<Record<number, number>>({});
-  const [rowHeights, setRowHeights] = useState<Record<number, number>>({});
-  const [colResize, setColResize] = useState<{
-    col: number;
-    startX: number;
-    startW: number;
-  } | null>(null);
-  const [rowResize, setRowResize] = useState<{
-    row: number;
-    startY: number;
-    startH: number;
-  } | null>(null);
 
   const currentSheet = localSheets[activeSheetIdx] || {
     name: "Sheet1",
@@ -534,10 +504,8 @@ export const ExcelViewer = memo(function ExcelViewer({
     [currentSheet]
   );
 
-  // Handle cell click (Excel-style: first click selects, click again to edit)
+  // Handle cell click (Excel-style: single click selects only)
   const handleCellClick = (rIdx: number, cIdx: number, currentVal: any) => {
-    const alreadySelected =
-      selectedCell?.row === rIdx && selectedCell?.col === cIdx;
     setSelectedCell({
       row: rIdx,
       col: cIdx,
@@ -546,12 +514,7 @@ export const ExcelViewer = memo(function ExcelViewer({
     });
     setSelectedCol(null);
     setSelectedRow(null);
-    if (alreadySelected) {
-      setEditingCell({ row: rIdx, col: cIdx });
-      setEditValue(String(currentVal ?? ""));
-    } else {
-      setEditingCell(null);
-    }
+    setEditingCell(null);
   };
 
   // Handle cell double click
@@ -590,137 +553,6 @@ export const ExcelViewer = memo(function ExcelViewer({
     next[activeSheetIdx] = sheet;
     commitChange(next);
   };
-
-  // Start drag-to-copy fill from the fill handle
-  const handleFillMouseDown = (rIdx: number, cIdx: number) => {
-    setEditingCell(null);
-    dragOriginRef.current = { row: rIdx, col: cIdx };
-    setFillDrag({ startRow: rIdx, startCol: cIdx, endRow: rIdx, endCol: cIdx });
-  };
-
-  // Track the drag fill range and commit the copied value on release
-  useEffect(() => {
-    if (!fillDrag) return;
-    dragFillRangeRef.current = fillDrag;
-
-    const handleMouseMove = (e: MouseEvent) => {
-      const el = document.elementFromPoint(e.clientX, e.clientY) as
-        | HTMLElement
-        | null;
-      const cellEl = el?.closest?.("[data-cell]") as HTMLElement | null;
-      if (!cellEl) return;
-      const r = Number(cellEl.dataset.row);
-      const c = Number(cellEl.dataset.col);
-      if (Number.isNaN(r) || Number.isNaN(c)) return;
-      setFillDrag(prev =>
-        prev ? { ...prev, endRow: r, endCol: c } : prev
-      );
-    };
-
-    const handleMouseUp = () => {
-      const range = dragFillRangeRef.current;
-      const origin = dragOriginRef.current;
-      if (range && origin) {
-        const minR = Math.min(range.startRow, range.endRow);
-        const maxR = Math.max(range.startRow, range.endRow);
-        const minC = Math.min(range.startCol, range.endCol);
-        const maxC = Math.max(range.startCol, range.endCol);
-        const sourceVal =
-          localSheets[activeSheetIdx]?.data[origin.row]?.[origin.col] ?? "";
-        const next = localSheets.map((s, idx) => {
-          if (idx !== activeSheetIdx) return s;
-          const rows = s.data.map(r => (Array.isArray(r) ? [...r] : []));
-          for (let r = minR; r <= maxR; r++) {
-            while (rows.length <= r) rows.push([]);
-            for (let c = minC; c <= maxC; c++) {
-              while (rows[r].length <= c) rows[r].push("");
-              rows[r][c] = sourceVal;
-            }
-          }
-          return { ...s, data: rows };
-        });
-        commitChange(next);
-        setSelectedCell({
-          row: range.endRow,
-          col: range.endCol,
-          coord: `${getColumnLetter(range.endCol)}${range.endRow + 1}`,
-          value: sourceVal,
-        });
-      }
-      setFillDrag(null);
-      dragOriginRef.current = null;
-      dragFillRangeRef.current = null;
-    };
-
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("mouseup", handleMouseUp);
-    return () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
-    };
-  }, [fillDrag, localSheets, activeSheetIdx, commitChange]);
-
-  // Column width resize (drag the divider between column letters)
-  const startColResize = (e: React.MouseEvent, cIdx: number) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setEditingCell(null);
-    setColResize({
-      col: cIdx,
-      startX: e.clientX,
-      startW: Math.max(colWidths[cIdx] || 120, 60),
-    });
-  };
-
-  useEffect(() => {
-    if (!colResize) return;
-    const handleMove = (e: MouseEvent) => {
-      const zoom = scale || 1;
-      const w = Math.max(
-        60,
-        colResize.startW + (e.clientX - colResize.startX) / zoom
-      );
-      setColWidths(prev => ({ ...prev, [colResize.col]: Math.round(w) }));
-    };
-    const handleUp = () => setColResize(null);
-    window.addEventListener("mousemove", handleMove);
-    window.addEventListener("mouseup", handleUp);
-    return () => {
-      window.removeEventListener("mousemove", handleMove);
-      window.removeEventListener("mouseup", handleUp);
-    };
-  }, [colResize, scale]);
-
-  // Row height resize (drag the divider below the row numbers)
-  const startRowResize = (e: React.MouseEvent, rIdx: number) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setEditingCell(null);
-    setRowResize({
-      row: rIdx,
-      startY: e.clientY,
-      startH: Math.max(rowHeights[rIdx] || 28, 24),
-    });
-  };
-
-  useEffect(() => {
-    if (!rowResize) return;
-    const handleMove = (e: MouseEvent) => {
-      const zoom = scale || 1;
-      const h = Math.max(
-        24,
-        rowResize.startH + (e.clientY - rowResize.startY) / zoom
-      );
-      setRowHeights(prev => ({ ...prev, [rowResize.row]: Math.round(h) }));
-    };
-    const handleUp = () => setRowResize(null);
-    window.addEventListener("mousemove", handleMove);
-    window.addEventListener("mouseup", handleUp);
-    return () => {
-      window.removeEventListener("mousemove", handleMove);
-      window.removeEventListener("mouseup", handleUp);
-    };
-  }, [rowResize, scale]);
 
   // Keyboard navigation & direct typing
   useEffect(() => {
@@ -890,7 +722,6 @@ export const ExcelViewer = memo(function ExcelViewer({
           }}
           onFocus={() => {
             if (selectedCell && !editingCell) {
-              setEditingCell({ row: selectedCell.row, col: selectedCell.col });
               setEditValue(String(selectedCell.value ?? ""));
             }
           }}
@@ -908,7 +739,7 @@ export const ExcelViewer = memo(function ExcelViewer({
               ? "Enter text, numbers, or formula..."
               : "Click any cell to edit"
           }
-          className="flex-1 px-3 py-1.5 bg-background rounded border border-border text-foreground font-sans text-sm outline-hidden focus:ring-1 focus:ring-emerald-600 transition-all placeholder:text-muted-foreground/40"
+          className="flex-1 px-3 py-1.5 bg-background rounded border border-border text-foreground font-sans text-sm outline-hidden transition-all placeholder:text-muted-foreground/40"
         />
 
         {/* Quick Add Row & Column buttons */}
@@ -989,7 +820,6 @@ export const ExcelViewer = memo(function ExcelViewer({
                   return (
                     <th
                       key={idx}
-                      style={{ width: colWidths[idx] }}
                       onClick={() => {
                         setSelectedCol(idx);
                         setSelectedRow(null);
@@ -1003,13 +833,6 @@ export const ExcelViewer = memo(function ExcelViewer({
                       )}
                     >
                       {col}
-                      {/* Column resize handle (centered on the divider line) */}
-                      <span
-                        onMouseDown={e => startColResize(e, idx)}
-                        onClick={e => e.stopPropagation()}
-                        onDoubleClick={e => e.stopPropagation()}
-                        className="absolute -right-1 top-0 z-20 h-full w-2 cursor-col-resize"
-                      />
                     </th>
                   );
                 })}
@@ -1022,7 +845,6 @@ export const ExcelViewer = memo(function ExcelViewer({
                 return (
                   <tr
                     key={rIdx}
-                    style={{ height: rowHeights[rIdx] }}
                     className="hover:bg-muted/15"
                   >
                     {/* Sticky Row Number */}
@@ -1040,13 +862,6 @@ export const ExcelViewer = memo(function ExcelViewer({
                       )}
                     >
                       {rIdx + 1}
-                      {/* Row resize handle */}
-                      <span
-                        onMouseDown={e => startRowResize(e, rIdx)}
-                        onClick={e => e.stopPropagation()}
-                        onDoubleClick={e => e.stopPropagation()}
-                        className="absolute bottom-0 left-0 z-20 h-1.5 w-full cursor-row-resize"
-                      />
                     </th>
                     {colHeaders.map((_, cIdx) => {
                       const val =
@@ -1058,12 +873,6 @@ export const ExcelViewer = memo(function ExcelViewer({
                         editingCell?.row === rIdx && editingCell?.col === cIdx;
                       const isInSelectedCol = selectedCol === cIdx;
                       const isInSelectedRow = selectedRow === rIdx;
-                      const isInFillRange = fillDrag
-                        ? rIdx >= Math.min(fillDrag.startRow, fillDrag.endRow) &&
-                          rIdx <= Math.max(fillDrag.startRow, fillDrag.endRow) &&
-                          cIdx >= Math.min(fillDrag.startCol, fillDrag.endCol) &&
-                          cIdx <= Math.max(fillDrag.startCol, fillDrag.endCol)
-                        : false;
 
                       return (
                         <td
@@ -1077,12 +886,11 @@ export const ExcelViewer = memo(function ExcelViewer({
                           }
                           className={cn(
                             "w-[120px] min-w-[100px] border-r border-b border-border/60 px-2 py-1 text-xs truncate cursor-cell transition-colors relative",
-                            isInFillRange ? "bg-emerald-500/25" : "",
                             isInSelectedCol || isInSelectedRow
                               ? "bg-emerald-500/15"
                               : "",
                             isSelected
-                              ? "ring-2 ring-emerald-600 ring-inset bg-emerald-500/15 font-medium z-10"
+                              ? "ring-2 ring-emerald-600 ring-inset bg-emerald-500/15 font-medium"
                               : "hover:bg-muted/30"
                           )}
                         >
@@ -1120,24 +928,12 @@ export const ExcelViewer = memo(function ExcelViewer({
                                 }
                               }}
                               onBlur={() => setEditingCell(null)}
-                              className="w-full bg-transparent text-foreground font-sans text-xs px-0 py-0 outline-hidden"
+                              className="w-full border-none bg-transparent text-foreground font-sans text-xs px-0 py-0 outline-hidden"
                             />
                           ) : (
                             <span className="select-text block truncate">
                               {String(val)}
                             </span>
-                          )}
-                          {/* Drag-to-copy fill handle */}
-                          {isSelected && !isEditing && !fillDrag && (
-                            <span
-                              onMouseDown={e => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                handleFillMouseDown(rIdx, cIdx);
-                              }}
-                              title="Drag to copy cell content"
-                              className="absolute bottom-0 right-0 size-2.5 bg-emerald-600 rounded-sm cursor-crosshair z-20 border border-white/70"
-                            />
                           )}
                         </td>
                       );
