@@ -25,7 +25,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Download,
-  Loader2,
   Minus,
   Plus,
   X,
@@ -233,8 +232,15 @@ const PdfPageItem = memo(function PdfPageItem({
       className="relative mb-6 rounded-sm bg-white text-black shadow-xl border border-black/10 overflow-hidden mx-auto transition-transform"
     >
       {isRendering && (
-        <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/70 backdrop-blur-xs">
-          <Loader2 className="size-5 animate-spin text-muted-foreground" />
+        <div
+          className="absolute inset-0 z-10 flex items-center justify-center bg-white/70 backdrop-blur-xs"
+          data-testid="pdf-page-loading"
+        >
+          <div
+            className="loader text-muted-foreground"
+            style={{ width: 40, height: 10 }}
+            aria-hidden
+          />
         </div>
       )}
 
@@ -1369,11 +1375,15 @@ export const PdfDrawer = memo(function PdfDrawer() {
           )}
         >
           {isLoading && (
-            <div className="flex h-full min-h-[300px] flex-col items-center justify-center gap-2.5">
-              <Loader2 className="size-7 animate-spin text-primary" />
-              <p className="text-xs font-medium text-muted-foreground">
-                Loading document...
-              </p>
+            <div
+              className="flex h-full min-h-[300px] flex-col items-center justify-center gap-2.5"
+              data-testid="pdf-drawer-loading"
+            >
+              <div
+                className="loader text-primary"
+                style={{ width: 56, height: 14 }}
+                aria-hidden
+              />
             </div>
           )}
 
