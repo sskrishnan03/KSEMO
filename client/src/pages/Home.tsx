@@ -1081,8 +1081,12 @@ export default function Home() {
           } else if (eventName === "assistant.completed") {
             lastProgressAt = Date.now();
           } else if (eventName === "conversation.titleUpdated") {
-            // Invalidate the conversation list to refresh the sidebar with the new title
+            // Invalidate the conversation list and active conversation to refresh with the new title
             utils.conversation.list.invalidate();
+            const updatedId = str(data.conversationId);
+            if (updatedId) {
+              utils.conversation.get.invalidate({ id: updatedId });
+            }
           } else if (eventName === "assistant.error") {
             lastProgressAt = Date.now();
             errorMessage =
