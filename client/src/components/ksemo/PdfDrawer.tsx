@@ -1,10 +1,4 @@
-import React, {
-  memo,
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import React, { memo, useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -27,6 +21,8 @@ import {
   Download,
   Minus,
   Plus,
+  Redo2,
+  Undo2,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -118,7 +114,8 @@ const PdfPageItem = memo(function PdfPageItem({
         // 1. Render Canvas
         const canvas = canvasRef.current;
         if (canvas && !isCancelled) {
-          const dpr = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
+          const dpr =
+            typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
           canvas.width = Math.floor(viewportWidth * dpr);
           canvas.height = Math.floor(viewportHeight * dpr);
           canvas.style.width = `${viewportWidth}px`;
@@ -236,11 +233,7 @@ const PdfPageItem = memo(function PdfPageItem({
           className="absolute inset-0 z-10 flex items-center justify-center bg-white/70 backdrop-blur-xs"
           data-testid="pdf-page-loading"
         >
-          <div
-            className="loader text-muted-foreground"
-            style={{ width: 40, height: 10 }}
-            aria-hidden
-          />
+          <div className="loader text-muted-foreground" aria-hidden />
         </div>
       )}
 
@@ -366,7 +359,8 @@ async function parsePptxSlides(buffer: ArrayBuffer): Promise<SlideData[]> {
     slides.push({
       slideNumber: i + 1,
       title: slideTitle || `Slide ${i + 1}`,
-      items: items.length > 0 ? items : [{ text: `Slide ${i + 1}`, isTitle: true }],
+      items:
+        items.length > 0 ? items : [{ text: `Slide ${i + 1}`, isTitle: true }],
     });
   }
 
@@ -401,44 +395,115 @@ export const ExcelViewer = memo(function ExcelViewer({
     value: sheets[0]?.data?.[0]?.[0] ?? "",
   });
 
-  const [editingCell, setEditingCell] = useState<{ row: number; col: number } | null>(null);
+  const [editingCell, setEditingCell] = useState<{
+    row: number;
+    col: number;
+  } | null>(null);
   const [editValue, setEditValue] = useState<string>("");
   const [selectedCol, setSelectedCol] = useState<number | null>(null);
   const [selectedRow, setSelectedRow] = useState<number | null>(null);
   const cellInputRef = useRef<HTMLInputElement | null>(null);
+  const [fillDrag, setFillDrag] = useState<{
+    startRow: number;
+    startCol: number;
+    endRow: number;
+    endCol: number;
+  } | null>(null);
+  const dragOriginRef = useRef<{ row: number; col: number } | null>(null);
+  const dragFillRangeRef = useRef<{
+    startRow: number;
+    startCol: number;
+    endRow: number;
+    endCol: number;
+  } | null>(null);
+  const [undoStack, setUndoStack] = useState<ExcelSheetData[][]>([]);
+  const [redoStack, setRedoStack] = useState<ExcelSheetData[][]>([]);
+  const [renamingSheetIdx, setRenamingSheetIdx] = useState<number | null>(null);
+  const [renameValue, setRenameValue] = useState<string>("");
 
-  const currentSheet = localSheets[activeSheetIdx] || { name: "Sheet1", data: [] };
+  const currentSheet = localSheets[activeSheetIdx] || {
+    name: "Sheet1",
+    data: [],
+  };
   const maxColsInSheet = currentSheet.data.reduce(
     (max, r) => Math.max(max, Array.isArray(r) ? r.length : 0),
     0
   );
-  const numCols = Math.max(maxColsInSheet + 4, 16);
-  const numRows = Math.max(currentSheet.data.length + 10, 36);
+  const numCols = Math.max(maxColsInSheet, 50);
+  const numRows = Math.max(currentSheet.data.length, 50);
 
-  const colHeaders = Array.from({ length: numCols }, (_, i) => getColumnLetter(i));
+  const colHeaders = Array.from({ length: numCols }, (_, i) =>
+    getColumnLetter(i)
+  );
   const rowIndices = Array.from({ length: numRows }, (_, i) => i);
+
+  // Commit a change with undo/redo history (auto-saves to the parent)
+  const commitChange = useCallback(
+    (next: ExcelSheetData[]) => {
+      setUndoStack(prev => [...prev, localSheets].slice(-50));
+      setRedoStack([]);
+      setLocalSheets(next);
+      onSheetsChange?.(next);
+    },
+    [localSheets, onSheetsChange]
+  );
+
+  // Undo / Redo
+  const handleUndo = () => {
+    if (undoStack.length === 0) return;
+    const previous = undoStack[undoStack.length - 1];
+    setUndoStack(prev => prev.slice(0, -1));
+    setRedoStack(prev => [...prev, localSheets]);
+    setLocalSheets(previous);
+    onSheetsChange?.(previous);
+    setSelectedCell({ row: 0, col: 0, coord: "A1", value: "" });
+    setEditingCell(null);
+    setSelectedCol(null);
+    setSelectedRow(null);
+  };
+
+  const handleRedo = () => {
+    if (redoStack.length === 0) return;
+    const next = redoStack[redoStack.length - 1];
+    setRedoStack(prev => prev.slice(0, -1));
+    setUndoStack(prev => [...prev, localSheets]);
+    setLocalSheets(next);
+    onSheetsChange?.(next);
+    setSelectedCell({ row: 0, col: 0, coord: "A1", value: "" });
+    setEditingCell(null);
+    setSelectedCol(null);
+    setSelectedRow(null);
+  };
+
+  // Sheet tab rename
+  const commitRename = (sIdx: number) => {
+    const newName = renameValue.trim();
+    setRenamingSheetIdx(null);
+    if (!newName || newName === localSheets[sIdx]?.name) return;
+    const next = localSheets.map((s, idx) =>
+      idx === sIdx ? { ...s, name: newName } : s
+    );
+    commitChange(next);
+  };
 
   // Update cell value helper
   const updateCellValue = useCallback(
     (sheetIdx: number, rIdx: number, cIdx: number, val: string) => {
-      setLocalSheets(prev => {
-        const next = prev.map((s, idx) => {
-          if (idx !== sheetIdx) return s;
-          const rows = s.data.map(r => (Array.isArray(r) ? [...r] : []));
-          while (rows.length <= rIdx) {
-            rows.push([]);
-          }
-          while (rows[rIdx].length <= cIdx) {
-            rows[rIdx].push("");
-          }
-          rows[rIdx][cIdx] = val;
-          return { ...s, data: rows };
-        });
-        onSheetsChange?.(next);
-        return next;
+      const next = localSheets.map((s, idx) => {
+        if (idx !== sheetIdx) return s;
+        const rows = s.data.map(r => (Array.isArray(r) ? [...r] : []));
+        while (rows.length <= rIdx) {
+          rows.push([]);
+        }
+        while (rows[rIdx].length <= cIdx) {
+          rows[rIdx].push("");
+        }
+        rows[rIdx][cIdx] = val;
+        return { ...s, data: rows };
       });
+      commitChange(next);
     },
-    [onSheetsChange]
+    [localSheets, commitChange]
   );
 
   const selectCell = useCallback(
@@ -450,6 +515,7 @@ export const ExcelViewer = memo(function ExcelViewer({
         coord: `${getColumnLetter(cIdx)}${rIdx + 1}`,
         value: val,
       });
+      setEditingCell(null);
       setSelectedCol(null);
       setSelectedRow(null);
     },
@@ -458,24 +524,24 @@ export const ExcelViewer = memo(function ExcelViewer({
 
   // Handle cell click
   const handleCellClick = (rIdx: number, cIdx: number, currentVal: any) => {
-    if (selectedCell?.row === rIdx && selectedCell?.col === cIdx) {
-      setEditingCell({ row: rIdx, col: cIdx });
-      setEditValue(String(currentVal ?? ""));
-    } else {
-      setSelectedCell({
-        row: rIdx,
-        col: cIdx,
-        coord: `${getColumnLetter(cIdx)}${rIdx + 1}`,
-        value: currentVal ?? "",
-      });
-      setSelectedCol(null);
-      setSelectedRow(null);
-      setEditingCell(null);
-    }
+    setSelectedCell({
+      row: rIdx,
+      col: cIdx,
+      coord: `${getColumnLetter(cIdx)}${rIdx + 1}`,
+      value: currentVal ?? "",
+    });
+    setSelectedCol(null);
+    setSelectedRow(null);
+    setEditingCell({ row: rIdx, col: cIdx });
+    setEditValue(String(currentVal ?? ""));
   };
 
   // Handle cell double click
-  const handleCellDoubleClick = (rIdx: number, cIdx: number, currentVal: any) => {
+  const handleCellDoubleClick = (
+    rIdx: number,
+    cIdx: number,
+    currentVal: any
+  ) => {
     setSelectedCell({
       row: rIdx,
       col: cIdx,
@@ -488,48 +554,112 @@ export const ExcelViewer = memo(function ExcelViewer({
 
   // Add new row at bottom
   const handleAddRow = () => {
-    setLocalSheets(prev => {
-      const next = [...prev];
-      const sheet = { ...next[activeSheetIdx] };
-      const data = sheet.data.map(r => (Array.isArray(r) ? [...r] : []));
-      data.push(new Array(numCols).fill(""));
-      sheet.data = data;
-      next[activeSheetIdx] = sheet;
-      onSheetsChange?.(next);
-      return next;
-    });
+    const sheet = { ...localSheets[activeSheetIdx] };
+    const data = sheet.data.map(r => (Array.isArray(r) ? [...r] : []));
+    data.push(new Array(numCols).fill(""));
+    sheet.data = data;
+    const next = [...localSheets];
+    next[activeSheetIdx] = sheet;
+    commitChange(next);
   };
 
   // Add new column at right
   const handleAddCol = () => {
-    setLocalSheets(prev => {
-      const next = [...prev];
-      const sheet = { ...next[activeSheetIdx] };
-      const data = sheet.data.map(r => (Array.isArray(r) ? [...r, ""] : [""]));
-      sheet.data = data;
-      next[activeSheetIdx] = sheet;
-      onSheetsChange?.(next);
-      return next;
-    });
+    const sheet = { ...localSheets[activeSheetIdx] };
+    const data = sheet.data.map(r => (Array.isArray(r) ? [...r, ""] : [""]));
+    sheet.data = data;
+    const next = [...localSheets];
+    next[activeSheetIdx] = sheet;
+    commitChange(next);
   };
 
-  // Add new sheet
-  const handleAddNewSheet = () => {
-    const newName = `Sheet${localSheets.length + 1}`;
-    const newSheet: ExcelSheetData = { name: newName, data: [] };
-    const next = [...localSheets, newSheet];
-    setLocalSheets(next);
-    onSheetsChange?.(next);
-    setActiveSheetIdx(localSheets.length);
-    setSelectedCell({ row: 0, col: 0, coord: "A1", value: "" });
+  // Start drag-to-copy fill from the fill handle
+  const handleFillMouseDown = (rIdx: number, cIdx: number) => {
     setEditingCell(null);
-    setSelectedCol(null);
-    setSelectedRow(null);
+    dragOriginRef.current = { row: rIdx, col: cIdx };
+    setFillDrag({ startRow: rIdx, startCol: cIdx, endRow: rIdx, endCol: cIdx });
   };
+
+  // Track the drag fill range and commit the copied value on release
+  useEffect(() => {
+    if (!fillDrag) return;
+    dragFillRangeRef.current = fillDrag;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const el = document.elementFromPoint(e.clientX, e.clientY) as
+        | HTMLElement
+        | null;
+      const cellEl = el?.closest?.("[data-cell]") as HTMLElement | null;
+      if (!cellEl) return;
+      const r = Number(cellEl.dataset.row);
+      const c = Number(cellEl.dataset.col);
+      if (Number.isNaN(r) || Number.isNaN(c)) return;
+      setFillDrag(prev =>
+        prev ? { ...prev, endRow: r, endCol: c } : prev
+      );
+    };
+
+    const handleMouseUp = () => {
+      const range = dragFillRangeRef.current;
+      const origin = dragOriginRef.current;
+      if (range && origin) {
+        const minR = Math.min(range.startRow, range.endRow);
+        const maxR = Math.max(range.startRow, range.endRow);
+        const minC = Math.min(range.startCol, range.endCol);
+        const maxC = Math.max(range.startCol, range.endCol);
+        const sourceVal =
+          localSheets[activeSheetIdx]?.data[origin.row]?.[origin.col] ?? "";
+        const next = localSheets.map((s, idx) => {
+          if (idx !== activeSheetIdx) return s;
+          const rows = s.data.map(r => (Array.isArray(r) ? [...r] : []));
+          for (let r = minR; r <= maxR; r++) {
+            while (rows.length <= r) rows.push([]);
+            for (let c = minC; c <= maxC; c++) {
+              while (rows[r].length <= c) rows[r].push("");
+              rows[r][c] = sourceVal;
+            }
+          }
+          return { ...s, data: rows };
+        });
+        commitChange(next);
+        setSelectedCell({
+          row: range.endRow,
+          col: range.endCol,
+          coord: `${getColumnLetter(range.endCol)}${range.endRow + 1}`,
+          value: sourceVal,
+        });
+      }
+      setFillDrag(null);
+      dragOriginRef.current = null;
+      dragFillRangeRef.current = null;
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [fillDrag, localSheets, activeSheetIdx, commitChange]);
 
   // Keyboard navigation & direct typing
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      const mod = e.ctrlKey || e.metaKey;
+
+      // Undo / Redo shortcuts (work even while editing a cell)
+      if (mod && (e.key === "z" || e.key === "Z")) {
+        e.preventDefault();
+        if (e.shiftKey) handleRedo();
+        else handleUndo();
+        return;
+      }
+      if (mod && (e.key === "y" || e.key === "Y")) {
+        e.preventDefault();
+        handleRedo();
+        return;
+      }
+
       if (editingCell) return;
       if (!selectedCell) return;
 
@@ -581,6 +711,8 @@ export const ExcelViewer = memo(function ExcelViewer({
     activeSheetIdx,
     selectCell,
     updateCellValue,
+    handleUndo,
+    handleRedo,
   ]);
 
   return (
@@ -589,15 +721,10 @@ export const ExcelViewer = memo(function ExcelViewer({
       className="flex flex-col h-full w-full bg-background overflow-hidden select-none"
     >
       {/* Excel Formula Bar */}
-      <div className="flex items-center gap-2 border-b border-border bg-muted/40 px-3 py-1.5 text-xs text-muted-foreground font-mono select-none shrink-0">
+      <div className="flex items-center gap-2 border-b border-border bg-muted/40 px-3.5 py-2 text-sm text-muted-foreground font-mono select-none shrink-0">
         {/* Active Cell Coordinate */}
-        <span className="w-16 shrink-0 font-bold text-foreground text-center bg-card py-1 rounded border border-border shadow-2xs">
+        <span className="w-16 shrink-0 font-bold text-foreground text-center bg-card py-1.5 rounded border border-border shadow-2xs">
           {selectedCell ? selectedCell.coord : "A1"}
-        </span>
-
-        {/* fx formula indicator */}
-        <span className="text-muted-foreground/70 italic font-serif text-sm font-semibold px-0.5 select-none">
-          fx
         </span>
 
         {/* Editable Formula Bar Input */}
@@ -614,7 +741,12 @@ export const ExcelViewer = memo(function ExcelViewer({
             const val = e.target.value;
             if (selectedCell) {
               setEditValue(val);
-              updateCellValue(activeSheetIdx, selectedCell.row, selectedCell.col, val);
+              updateCellValue(
+                activeSheetIdx,
+                selectedCell.row,
+                selectedCell.col,
+                val
+              );
               setSelectedCell(prev => (prev ? { ...prev, value: val } : null));
             }
           }}
@@ -638,38 +770,82 @@ export const ExcelViewer = memo(function ExcelViewer({
               ? "Enter text, numbers, or formula..."
               : "Click any cell to edit"
           }
-          className="flex-1 px-2.5 py-1 bg-background rounded border border-border text-foreground font-sans text-xs outline-hidden focus:ring-1 focus:ring-emerald-600 transition-all placeholder:text-muted-foreground/40"
+          className="flex-1 px-3 py-1.5 bg-background rounded border border-border text-foreground font-sans text-sm outline-hidden focus:ring-1 focus:ring-emerald-600 transition-all placeholder:text-muted-foreground/40"
         />
 
         {/* Quick Add Row & Column buttons */}
-        <div className="flex items-center gap-1 shrink-0">
-          <button
-            type="button"
-            onClick={handleAddRow}
-            title="Add row at bottom"
-            className="px-2 py-1 text-[11px] font-medium text-muted-foreground hover:text-foreground hover:bg-card rounded border border-border/80 transition-colors cursor-pointer"
-          >
-            + Row
-          </button>
-          <button
-            type="button"
-            onClick={handleAddCol}
-            title="Add column at right"
-            className="px-2 py-1 text-[11px] font-medium text-muted-foreground hover:text-foreground hover:bg-card rounded border border-border/80 transition-colors cursor-pointer"
-          >
-            + Col
-          </button>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={handleAddRow}
+                className="px-3 py-1.5 text-xs font-semibold font-sans text-muted-foreground hover:text-foreground hover:bg-card rounded border border-border/80 transition-colors cursor-pointer"
+              >
+                + Row
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">Add a row at the bottom</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={handleAddCol}
+                className="px-3 py-1.5 text-xs font-semibold font-sans text-muted-foreground hover:text-foreground hover:bg-card rounded border border-border/80 transition-colors cursor-pointer"
+              >
+                + Col
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              Add a column at the right
+            </TooltipContent>
+          </Tooltip>
+
+          <span className="mx-1 h-5 w-px bg-border/80" />
+
+          {/* Undo / Redo buttons */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={handleUndo}
+                disabled={undoStack.length === 0}
+                aria-label="Undo"
+                className="px-2 py-1.5 text-muted-foreground hover:text-foreground hover:bg-card rounded border border-border/80 transition-colors cursor-pointer [&_svg]:size-4 disabled:opacity-30 disabled:pointer-events-none"
+              >
+                <Undo2 />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">Undo (Ctrl+Z)</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={handleRedo}
+                disabled={redoStack.length === 0}
+                aria-label="Redo"
+                className="px-2 py-1.5 text-muted-foreground hover:text-foreground hover:bg-card rounded border border-border/80 transition-colors cursor-pointer [&_svg]:size-4 disabled:opacity-30 disabled:pointer-events-none"
+              >
+                <Redo2 />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">Redo (Ctrl+Y)</TooltipContent>
+          </Tooltip>
         </div>
       </div>
 
       {/* Spreadsheet Grid Table */}
       <div className="flex-1 overflow-auto bg-background select-none">
-        <div style={{ zoom: scale !== 1.0 ? scale : undefined, minWidth: "100%" }}>
+        <div
+          style={{ zoom: scale !== 1.0 ? scale : undefined, minWidth: "100%" }}
+        >
           <table className="border-collapse text-xs text-foreground min-w-full table-fixed">
             <thead>
               <tr className="sticky top-0 z-20 bg-muted/95 backdrop-blur-xs border-b border-border shadow-2xs">
                 {/* Top-left blank cell */}
-                <th className="sticky left-0 z-30 w-12 min-w-[48px] bg-muted border-r border-b border-border text-center font-normal text-muted-foreground/40 py-1" />
+                <th className="sticky left-0 z-30 w-10 min-w-[40px] bg-muted border-r border-b border-border text-center font-normal text-muted-foreground/40 py-1" />
                 {colHeaders.map((col, idx) => {
                   const isColSelected = selectedCol === idx;
                   return (
@@ -707,7 +883,7 @@ export const ExcelViewer = memo(function ExcelViewer({
                         selectCell(rIdx, 0);
                       }}
                       className={cn(
-                        "sticky left-0 z-10 w-12 min-w-[48px] border-r border-b border-border px-2 py-1 text-right font-mono text-[11px] font-normal cursor-pointer select-none transition-colors",
+                        "sticky left-0 z-10 w-10 min-w-[40px] border-r border-b border-border px-2 py-1 text-right font-mono text-[11px] font-normal cursor-pointer select-none transition-colors",
                         isRowSelected
                           ? "bg-emerald-600/20 text-emerald-700 dark:text-emerald-300 font-bold border-r-2 border-r-emerald-600"
                           : "bg-muted/80 text-muted-foreground hover:bg-muted"
@@ -716,22 +892,38 @@ export const ExcelViewer = memo(function ExcelViewer({
                       {rIdx + 1}
                     </th>
                     {colHeaders.map((_, cIdx) => {
-                      const val = rowData[cIdx] !== undefined ? rowData[cIdx] : "";
+                      const val =
+                        rowData[cIdx] !== undefined ? rowData[cIdx] : "";
                       const isSelected =
-                        selectedCell?.row === rIdx && selectedCell?.col === cIdx;
+                        selectedCell?.row === rIdx &&
+                        selectedCell?.col === cIdx;
                       const isEditing =
                         editingCell?.row === rIdx && editingCell?.col === cIdx;
                       const isInSelectedCol = selectedCol === cIdx;
                       const isInSelectedRow = selectedRow === rIdx;
+                      const isInFillRange = fillDrag
+                        ? rIdx >= Math.min(fillDrag.startRow, fillDrag.endRow) &&
+                          rIdx <= Math.max(fillDrag.startRow, fillDrag.endRow) &&
+                          cIdx >= Math.min(fillDrag.startCol, fillDrag.endCol) &&
+                          cIdx <= Math.max(fillDrag.startCol, fillDrag.endCol)
+                        : false;
 
                       return (
                         <td
                           key={cIdx}
+                          data-cell
+                          data-row={rIdx}
+                          data-col={cIdx}
                           onClick={() => handleCellClick(rIdx, cIdx, val)}
-                          onDoubleClick={() => handleCellDoubleClick(rIdx, cIdx, val)}
+                          onDoubleClick={() =>
+                            handleCellDoubleClick(rIdx, cIdx, val)
+                          }
                           className={cn(
                             "w-[120px] min-w-[100px] border-r border-b border-border/60 px-2 py-1 text-xs truncate cursor-cell transition-colors relative",
-                            isInSelectedCol || isInSelectedRow ? "bg-emerald-500/5" : "",
+                            isInFillRange ? "bg-emerald-500/25" : "",
+                            isInSelectedCol || isInSelectedRow
+                              ? "bg-emerald-500/10"
+                              : "",
                             isSelected
                               ? "ring-2 ring-emerald-600 ring-inset bg-emerald-500/15 font-medium z-10"
                               : "hover:bg-muted/30"
@@ -747,7 +939,12 @@ export const ExcelViewer = memo(function ExcelViewer({
                               onChange={e => {
                                 const newVal = e.target.value;
                                 setEditValue(newVal);
-                                updateCellValue(activeSheetIdx, rIdx, cIdx, newVal);
+                                updateCellValue(
+                                  activeSheetIdx,
+                                  rIdx,
+                                  cIdx,
+                                  newVal
+                                );
                                 setSelectedCell(prev =>
                                   prev ? { ...prev, value: newVal } : null
                                 );
@@ -766,12 +963,24 @@ export const ExcelViewer = memo(function ExcelViewer({
                                 }
                               }}
                               onBlur={() => setEditingCell(null)}
-                              className="w-full h-full bg-background text-foreground font-sans text-xs px-1 py-0 outline-hidden ring-2 ring-emerald-600 ring-inset"
+                              className="w-full bg-transparent text-foreground font-sans text-xs px-0 py-0 outline-hidden"
                             />
                           ) : (
                             <span className="select-text block truncate">
                               {String(val)}
                             </span>
+                          )}
+                          {/* Drag-to-copy fill handle */}
+                          {isSelected && !isEditing && !fillDrag && (
+                            <span
+                              onMouseDown={e => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                handleFillMouseDown(rIdx, cIdx);
+                              }}
+                              title="Drag to copy cell content"
+                              className="absolute bottom-0 right-0 size-2.5 bg-emerald-600 rounded-sm cursor-nwse-resize z-20 border border-white/70"
+                            />
                           )}
                         </td>
                       );
@@ -784,17 +993,19 @@ export const ExcelViewer = memo(function ExcelViewer({
         </div>
       </div>
 
-      {/* Excel Sheet Tabs Footer & Status Bar */}
-      <div className="flex items-center justify-between border-t border-border bg-muted/40 px-3 py-1.5 text-xs shrink-0 select-none">
+      {/* Excel Sheet Tabs Footer */}
+      <div className="flex items-center border-t border-border bg-muted/40 px-4 py-2 text-sm shrink-0 select-none">
         {/* Sheet Tabs */}
-        <div className="flex items-center gap-1 overflow-x-auto max-w-[65%] py-0.5">
+        <div className="flex items-center gap-1.5 overflow-x-auto py-0.5">
           {localSheets.map((sheet, sIdx) => {
             const isActive = sIdx === activeSheetIdx;
+            const isRenamingThis = renamingSheetIdx === sIdx;
             return (
               <button
                 key={sIdx}
                 type="button"
                 onClick={() => {
+                  if (isRenamingThis) return;
                   setActiveSheetIdx(sIdx);
                   setSelectedCell({
                     row: 0,
@@ -806,35 +1017,40 @@ export const ExcelViewer = memo(function ExcelViewer({
                   setSelectedCol(null);
                   setSelectedRow(null);
                 }}
+                onDoubleClick={e => {
+                  e.stopPropagation();
+                  setRenamingSheetIdx(sIdx);
+                  setRenameValue(sheet.name);
+                }}
                 className={cn(
-                  "px-3.5 py-1 text-xs font-semibold rounded-t-md transition-all cursor-pointer whitespace-nowrap",
+                    "px-4 py-1.5 text-sm font-semibold rounded-t-md transition-all cursor-pointer whitespace-nowrap",
                   isActive
                     ? "bg-background text-emerald-600 dark:text-emerald-400 border-t-2 border-t-emerald-600 border-x border-border shadow-xs font-bold"
                     : "text-muted-foreground hover:bg-background/60 hover:text-foreground"
                 )}
               >
-                {sheet.name}
+                {isRenamingThis ? (
+                  <input
+                    type="text"
+                    autoFocus
+                    value={renameValue}
+                    onClick={e => e.stopPropagation()}
+                    onDoubleClick={e => e.stopPropagation()}
+                    onChange={e => setRenameValue(e.target.value)}
+                    onKeyDown={e => {
+                      e.stopPropagation();
+                      if (e.key === "Enter") commitRename(sIdx);
+                      else if (e.key === "Escape") setRenamingSheetIdx(null);
+                    }}
+                    onBlur={() => commitRename(sIdx)}
+                    className="min-w-20 bg-transparent text-foreground text-sm font-semibold px-0 py-0 leading-none outline-hidden"
+                  />
+                ) : (
+                  sheet.name
+                )}
               </button>
             );
           })}
-          {/* Add Sheet button */}
-          <button
-            type="button"
-            onClick={handleAddNewSheet}
-            title="Add new sheet"
-            className="size-6 flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-background border border-transparent hover:border-border transition-colors cursor-pointer"
-          >
-            <Plus className="size-3.5" />
-          </button>
-        </div>
-
-        {/* Status indicator (with pr-36 so it doesn't collide with zoom controls) */}
-        <div className="flex items-center gap-2.5 text-[11px] font-medium text-muted-foreground pr-36 select-none">
-          <span className="text-emerald-600 dark:text-emerald-400 font-semibold">Ready</span>
-          <span>•</span>
-          <span>{currentSheet.data.length} rows</span>
-          <span>•</span>
-          <span>{numCols} cols</span>
         </div>
       </div>
     </div>
@@ -901,6 +1117,96 @@ const PowerPointViewer = memo(function PowerPointViewer({
   );
 });
 
+interface EditablePageFieldProps {
+  value: number;
+  total: number;
+  label: string;
+  onNavigate: (n: number) => void;
+}
+
+// Editable page/slide number: shows a clean "1 / 11" button; click it to turn
+// into the current page number input. Enter jumps, Esc cancels.
+const EditablePageField = memo(function EditablePageField({
+  value,
+  total,
+  label,
+  onNavigate,
+}: EditablePageFieldProps) {
+  const [editing, setEditing] = useState<boolean>(false);
+  const [draft, setDraft] = useState<string>(String(value));
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  const startEditing = useCallback(() => {
+    setDraft(String(value));
+    setEditing(true);
+  }, [value]);
+
+  const commit = useCallback(() => {
+    setEditing(false);
+    const num = Number.parseInt(draft, 10);
+    if (Number.isFinite(num) && num >= 1 && num <= total) {
+      onNavigate(num);
+    }
+  }, [draft, total, onNavigate]);
+
+  const cancel = useCallback(() => {
+    setDraft(String(value));
+    setEditing(false);
+  }, [value]);
+
+  useEffect(() => {
+    if (editing && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.setSelectionRange(
+        inputRef.current.value.length,
+        inputRef.current.value.length
+      );
+    }
+  }, [editing]);
+
+  if (!editing) {
+    return (
+      <button
+        type="button"
+        onClick={startEditing}
+        aria-label={`${label} ${value} of ${total}`}
+        className="flex h-9 min-w-[72px] cursor-pointer select-none items-center justify-center gap-1 rounded-lg px-2.5 text-sm font-bold tabular-nums text-foreground transition-colors hover:bg-accent hover:text-foreground"
+      >
+        {value}
+        <span className="font-semibold text-muted-foreground">/</span>
+        <span className="font-semibold text-muted-foreground">{total}</span>
+      </button>
+    );
+  }
+
+  return (
+    <span className="flex select-none items-center gap-1 px-1 tabular-nums">
+      <input
+        ref={inputRef}
+        type="text"
+        inputMode="numeric"
+        autoComplete="off"
+        aria-label={`${label} number`}
+        value={draft}
+        onChange={e => setDraft(e.target.value.replace(/[^\d]/g, ""))}
+        onKeyDown={e => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            e.stopPropagation();
+            commit();
+          } else if (e.key === "Escape") {
+            e.preventDefault();
+            e.stopPropagation();
+            cancel();
+          }
+        }}
+        onBlur={cancel}
+        className="h-9 w-11 rounded-lg bg-accent text-center text-sm font-bold text-foreground outline-none"
+      />
+    </span>
+  );
+});
+
 export const PdfDrawer = memo(function PdfDrawer() {
   const { currentPdf, isOpen, closePdf } = usePdfViewer();
   const [pdfDoc, setPdfDoc] = useState<any>(null);
@@ -921,11 +1227,21 @@ export const PdfDrawer = memo(function PdfDrawer() {
   const [containerWidth, setContainerWidth] = useState<number>(800);
   const basePageWidthRef = useRef<number>(600);
 
-  const isPdfDoc = currentPdf ? isPdf(currentPdf.filename, currentPdf.mimeType) : false;
-  const isWordDoc = currentPdf ? isWord(currentPdf.filename, currentPdf.mimeType) : false;
-  const isExcelDoc = currentPdf ? isExcel(currentPdf.filename, currentPdf.mimeType) : false;
-  const isPowerPointDoc = currentPdf ? isPowerPoint(currentPdf.filename, currentPdf.mimeType) : false;
-  const isTextDoc = currentPdf ? isText(currentPdf.filename, currentPdf.mimeType) : false;
+  const isPdfDoc = currentPdf
+    ? isPdf(currentPdf.filename, currentPdf.mimeType)
+    : false;
+  const isWordDoc = currentPdf
+    ? isWord(currentPdf.filename, currentPdf.mimeType)
+    : false;
+  const isExcelDoc = currentPdf
+    ? isExcel(currentPdf.filename, currentPdf.mimeType)
+    : false;
+  const isPowerPointDoc = currentPdf
+    ? isPowerPoint(currentPdf.filename, currentPdf.mimeType)
+    : false;
+  const isTextDoc = currentPdf
+    ? isText(currentPdf.filename, currentPdf.mimeType)
+    : false;
   const ext = currentPdf?.filename.split(".").pop() || "";
   const brandVariant = brandVariantForExt(ext);
 
@@ -1122,7 +1438,8 @@ export const PdfDrawer = memo(function PdfDrawer() {
     } else {
       setIsFit(true);
       const available = Math.max(containerWidth - 64, 280);
-      const base = basePageWidthRef.current > 0 ? basePageWidthRef.current : 800;
+      const base =
+        basePageWidthRef.current > 0 ? basePageWidthRef.current : 800;
       setScale(Math.min(available / base, 2.5));
     }
   }, [isFit, containerWidth]);
@@ -1138,7 +1455,9 @@ export const PdfDrawer = memo(function PdfDrawer() {
         e.preventDefault();
         setIsFit(false);
         const zoomDelta = e.deltaY < 0 ? 0.08 : -0.08;
-        setScale(prev => Math.min(Math.max(Number((prev + zoomDelta).toFixed(2)), 0.25), 3.0));
+        setScale(prev =>
+          Math.min(Math.max(Number((prev + zoomDelta).toFixed(2)), 0.25), 3.0)
+        );
       }
     };
 
@@ -1172,7 +1491,12 @@ export const PdfDrawer = memo(function PdfDrawer() {
 
       const target = event.target as HTMLElement | null;
       const activeTag = target?.tagName?.toLowerCase();
-      if (activeTag === "input" || activeTag === "textarea" || target?.isContentEditable) return;
+      if (
+        activeTag === "input" ||
+        activeTag === "textarea" ||
+        target?.isContentEditable
+      )
+        return;
 
       const isCtrlOrCmd = event.ctrlKey || event.metaKey;
 
@@ -1195,12 +1519,20 @@ export const PdfDrawer = memo(function PdfDrawer() {
 
       // PowerPoint slide arrow key navigation
       if (isPowerPointDoc && pptxSlides.length > 0) {
-        if (event.key === "ArrowRight" || event.key === "ArrowDown" || event.key === "PageDown") {
+        if (
+          event.key === "ArrowRight" ||
+          event.key === "ArrowDown" ||
+          event.key === "PageDown"
+        ) {
           event.preventDefault();
           if (currentSlide < pptxSlides.length) {
             scrollToSlide(currentSlide + 1);
           }
-        } else if (event.key === "ArrowLeft" || event.key === "ArrowUp" || event.key === "PageUp") {
+        } else if (
+          event.key === "ArrowLeft" ||
+          event.key === "ArrowUp" ||
+          event.key === "PageUp"
+        ) {
           event.preventDefault();
           if (currentSlide > 1) {
             scrollToSlide(currentSlide - 1);
@@ -1288,6 +1620,30 @@ export const PdfDrawer = memo(function PdfDrawer() {
 
   const pagesArray = Array.from({ length: numPages }, (_, i) => i + 1);
 
+  const hasPagination =
+    (isPdfDoc && numPages > 0) || (isPowerPointDoc && pptxSlides.length > 0);
+  const currentIdx = isPdfDoc ? currentPage : currentSlide;
+  const totalCount = isPdfDoc ? numPages : pptxSlides.length;
+  const navLabel = isPdfDoc ? "page" : "slide";
+  const isAtPrevBoundary = hasPagination
+    ? isPdfDoc
+      ? currentPage <= 1
+      : currentSlide <= 1
+    : true;
+  const isAtNextBoundary = hasPagination
+    ? isPdfDoc
+      ? currentPage >= numPages
+      : currentSlide >= pptxSlides.length
+    : true;
+  const navPrevious = () => {
+    if (isPdfDoc) scrollToPage(currentPage - 1);
+    else scrollToSlide(currentSlide - 1);
+  };
+  const navNext = () => {
+    if (isPdfDoc) scrollToPage(currentPage + 1);
+    else scrollToSlide(currentSlide + 1);
+  };
+
   return (
     <div
       role="dialog"
@@ -1301,9 +1657,9 @@ export const PdfDrawer = memo(function PdfDrawer() {
       )}
     >
       {/* Top Header */}
-      <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-card/90 px-3 sm:px-4 backdrop-blur-md gap-3">
+      <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-border bg-card/90 px-3 sm:px-4 backdrop-blur-md">
         {/* Left Side: Only the File Name and Brand mark (no subtitles, no file size) */}
-        <div className="flex items-center gap-2.5 min-w-0">
+        <div className="flex min-w-0 items-center gap-2.5">
           <FileBrandMark variant={brandVariant} className="size-6 shrink-0" />
           <p
             className="truncate text-sm font-semibold text-foreground leading-normal"
@@ -1379,11 +1735,7 @@ export const PdfDrawer = memo(function PdfDrawer() {
               className="flex h-full min-h-[300px] flex-col items-center justify-center gap-2.5"
               data-testid="pdf-drawer-loading"
             >
-              <div
-                className="loader text-primary"
-                style={{ width: 56, height: 14 }}
-                aria-hidden
-              />
+              <div className="loader text-primary" aria-hidden />
             </div>
           )}
 
@@ -1393,7 +1745,9 @@ export const PdfDrawer = memo(function PdfDrawer() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => void downloadFile(currentPdf.url, currentPdf.filename)}
+                onClick={() =>
+                  void downloadFile(currentPdf.url, currentPdf.filename)
+                }
                 className="gap-2"
               >
                 <Download className="size-4" />
@@ -1457,12 +1811,12 @@ export const PdfDrawer = memo(function PdfDrawer() {
           )}
 
           {/* PowerPoint Presentation (.pptx, .ppt) Rendering */}
-          {!isLoading && !loadError && isPowerPointDoc && pptxSlides.length > 0 && (
-            <PowerPointViewer
-              slides={pptxSlides}
-              scale={scale}
-            />
-          )}
+          {!isLoading &&
+            !loadError &&
+            isPowerPointDoc &&
+            pptxSlides.length > 0 && (
+              <PowerPointViewer slides={pptxSlides} scale={scale} />
+            )}
 
           {/* Text Document (.txt, .md, .json, etc.) Rendering */}
           {!isLoading && !loadError && isTextDoc && textContent !== null && (
@@ -1496,7 +1850,9 @@ export const PdfDrawer = memo(function PdfDrawer() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => void downloadFile(currentPdf.url, currentPdf.filename)}
+                  onClick={() =>
+                    void downloadFile(currentPdf.url, currentPdf.filename)
+                  }
                   className="gap-2"
                 >
                   <Download className="size-4" />
@@ -1505,113 +1861,60 @@ export const PdfDrawer = memo(function PdfDrawer() {
               </div>
             )}
         </div>
+        {/* Bottom-Left Pagination Pill */}
+        {hasPagination && !isLoading && !loadError && (
+          <div
+            data-testid="pdf-drawer-pagination-bar"
+            className="absolute bottom-4 left-4 z-30 flex items-center gap-0.5 rounded-full border border-border/70 bg-card px-2 py-1 shadow-lg [&_svg]:stroke-[2.5] animate-in fade-in-0 duration-200 select-none sm:bottom-5"
+          >
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  disabled={isAtPrevBoundary}
+                  onClick={navPrevious}
+                  aria-label={`Previous ${navLabel}`}
+                  className="size-9 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-30 transition-colors"
+                >
+                  <ChevronLeft className="size-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top">Previous {navLabel}</TooltipContent>
+            </Tooltip>
 
-        {/* Bottom Left Floating Page/Slide Indicator (Compact) */}
-        {!isLoading && !loadError && (
-          <>
-            {/* PDF Page Indicator */}
-            {isPdfDoc && numPages > 0 && (
-              <div
-                data-testid="pdf-drawer-page-indicator"
-                className="absolute bottom-4 left-4 z-30 flex items-center gap-1 rounded-xl border border-border/80 bg-card/90 px-2 py-1 text-xs font-medium text-foreground shadow-lg backdrop-blur-md animate-in fade-in-0 duration-200"
-              >
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      disabled={currentPage <= 1}
-                      onClick={() => scrollToPage(currentPage - 1)}
-                      aria-label="Previous page"
-                      className="size-7 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-30 transition-colors"
-                    >
-                      <ChevronLeft className="size-3.5" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="top">Previous page</TooltipContent>
-                </Tooltip>
+            <EditablePageField
+              value={currentIdx}
+              total={totalCount}
+              label={navLabel}
+              onNavigate={isPdfDoc ? scrollToPage : scrollToSlide}
+            />
 
-                <span className="px-1.5 tabular-nums text-xs select-none">
-                  <strong className="text-foreground font-semibold">{currentPage}</strong>
-                  <span className="text-muted-foreground/60 mx-1">/</span>
-                  <span className="text-muted-foreground">{numPages}</span>
-                </span>
-
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      disabled={currentPage >= numPages}
-                      onClick={() => scrollToPage(currentPage + 1)}
-                      aria-label="Next page"
-                      className="size-7 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-30 transition-colors"
-                    >
-                      <ChevronRight className="size-3.5" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="top">Next page</TooltipContent>
-                </Tooltip>
-              </div>
-            )}
-
-            {/* PowerPoint Slide Indicator */}
-            {isPowerPointDoc && pptxSlides.length > 0 && (
-              <div
-                data-testid="pdf-drawer-slide-indicator"
-                className="absolute bottom-4 left-4 z-30 flex items-center gap-1 rounded-xl border border-border/80 bg-card/90 px-2 py-1 text-xs font-medium text-foreground shadow-lg backdrop-blur-md animate-in fade-in-0 duration-200"
-              >
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      disabled={currentSlide <= 1}
-                      onClick={() => scrollToSlide(currentSlide - 1)}
-                      aria-label="Previous slide"
-                      className="size-7 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-30 transition-colors"
-                    >
-                      <ChevronLeft className="size-3.5" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="top">Previous slide</TooltipContent>
-                </Tooltip>
-
-                <span className="px-1.5 tabular-nums text-xs select-none">
-                  <strong className="text-foreground font-semibold">Slide {currentSlide}</strong>
-                  <span className="text-muted-foreground/60 mx-1">/</span>
-                  <span className="text-muted-foreground">{pptxSlides.length}</span>
-                </span>
-
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      disabled={currentSlide >= pptxSlides.length}
-                      onClick={() => scrollToSlide(currentSlide + 1)}
-                      aria-label="Next slide"
-                      className="size-7 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-30 transition-colors"
-                    >
-                      <ChevronRight className="size-3.5" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="top">Next slide</TooltipContent>
-                </Tooltip>
-              </div>
-            )}
-          </>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  disabled={isAtNextBoundary}
+                  onClick={navNext}
+                  aria-label={`Next ${navLabel}`}
+                  className="size-9 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-30 transition-colors"
+                >
+                  <ChevronRight className="size-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top">Next {navLabel}</TooltipContent>
+            </Tooltip>
+          </div>
         )}
 
-        {/* Bottom Right Floating Zoom Controls (+ / - and Scale) */}
+        {/* Bottom-Right Zoom Pill */}
         {!isLoading && !loadError && (
           <div
-            data-testid="pdf-drawer-zoom-controls"
+            data-testid="pdf-drawer-control-bar"
             className={cn(
-              "absolute z-30 flex items-center gap-1.5 animate-in fade-in-0 duration-200 select-none",
-              isExcelDoc
-                ? "bottom-1.5 right-3 rounded-lg border border-border/80 bg-card/95 px-2 py-0.5 text-xs shadow-xs"
-                : "bottom-4 sm:bottom-5 right-4 sm:right-5 rounded-2xl border border-border/80 bg-card/95 px-2.5 py-1.5 text-sm font-medium shadow-xl backdrop-blur-md"
+              "absolute right-4 z-30 flex items-center gap-0.5 rounded-full border border-border/70 bg-card px-2 py-1 shadow-lg [&_svg]:stroke-[2.5] animate-in fade-in-0 duration-200 select-none",
+              "bottom-4 sm:bottom-5"
             )}
           >
             <Tooltip>
@@ -1622,25 +1925,19 @@ export const PdfDrawer = memo(function PdfDrawer() {
                   disabled={scale <= 0.35}
                   onClick={handleZoomOut}
                   aria-label="Zoom out"
-                  className={cn(
-                    "rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-30 transition-colors",
-                    isExcelDoc ? "size-6" : "size-8 sm:size-9 sm:rounded-xl"
-                  )}
+                  className="size-9 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-30 transition-colors"
                 >
-                  <Minus className={isExcelDoc ? "size-3.5" : "size-4 sm:size-4.5"} />
+                  <Minus className="size-5" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="top">Zoom out (-)</TooltipContent>
             </Tooltip>
 
+            {/* Fit / Percentage toggle */}
             <button
               type="button"
               onClick={handleToggleFit}
-              title="Click to toggle Fit / 100%"
-              className={cn(
-                "tabular-nums font-semibold text-muted-foreground hover:text-foreground hover:bg-accent/60 rounded transition-colors cursor-pointer select-none",
-                isExcelDoc ? "px-1.5 py-0.5 text-xs min-w-[42px]" : "px-2.5 py-1 text-sm min-w-[52px] rounded-lg"
-              )}
+              className="h-9 min-w-[52px] rounded-lg px-2.5 text-sm font-bold tabular-nums text-muted-foreground transition-colors cursor-pointer hover:bg-accent hover:text-foreground"
             >
               {isFit ? "Fit" : `${Math.round(scale * 100)}%`}
             </button>
@@ -1653,12 +1950,9 @@ export const PdfDrawer = memo(function PdfDrawer() {
                   disabled={scale >= 2.8}
                   onClick={handleZoomIn}
                   aria-label="Zoom in"
-                  className={cn(
-                    "rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-30 transition-colors",
-                    isExcelDoc ? "size-6" : "size-8 sm:size-9 sm:rounded-xl"
-                  )}
+                  className="size-9 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-30 transition-colors"
                 >
-                  <Plus className={isExcelDoc ? "size-3.5" : "size-4 sm:size-4.5"} />
+                  <Plus className="size-5" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="top">Zoom in (+)</TooltipContent>

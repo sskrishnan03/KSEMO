@@ -127,7 +127,7 @@ describe("PdfDrawer", () => {
     expect(markup).not.toContain("<iframe");
   });
 
-  it("renders ExcelViewer edge-to-edge with formula bar, editable input, sticky grid headers, and sheet tabs without container card", () => {
+  it("renders ExcelViewer edge-to-edge with formula bar, add row/col, undo/redo, minimum 50x50 grid, drag-to-copy handle, and renamable sheet tabs", () => {
     const sheets = [
       {
         name: "Financials",
@@ -143,10 +143,14 @@ describe("PdfDrawer", () => {
     ];
 
     const markup = renderToStaticMarkup(
-      createElement(ExcelViewer, {
-        sheets,
-        scale: 1.0,
-      })
+      createElement(
+        TooltipProvider,
+        null,
+        createElement(ExcelViewer, {
+          sheets,
+          scale: 1.0,
+        })
+      )
     );
 
     // Edge-to-edge layout: no container card rounded-xl or shadow-2xl
@@ -154,23 +158,32 @@ describe("PdfDrawer", () => {
     expect(markup).not.toContain("rounded-xl");
     expect(markup).not.toContain("shadow-2xl");
 
-    // Formula bar with coordinate, fx symbol, and editable input
+    // Formula bar with coordinate and editable placeholder input (no fx glyph)
     expect(markup).toContain("A1");
-    expect(markup).toContain("fx");
+    expect(markup).toContain("Enter text, numbers, or formula...");
+    expect(markup).not.toContain("fx");
+
+    // Add row / add column quick controls exist
     expect(markup).toContain("+ Row");
     expect(markup).toContain("+ Col");
 
-    // Table grid with column letters and row numbers
+    // Undo / Redo controls exist
+    expect(markup).toContain('aria-label="Undo"');
+    expect(markup).toContain('aria-label="Redo"');
+
+    // Drag-to-copy fill handle present
+    expect(markup).toContain("Drag to copy cell content");
+
+    // No status bar (no Ready / rows / cols summary) and no add-sheet button
+    expect(markup).not.toContain("Ready");
+    expect(markup).not.toContain("Add new sheet");
+
+    // Grid renders sheet tabs, actual data, and minimum 50x50 grid
     expect(markup).toContain("Financials");
     expect(markup).toContain("Summary");
     expect(markup).toContain("Q1");
     expect(markup).toContain("100");
-
-    // Bottom sheet tabs and add sheet button
-    expect(markup).toContain("Ready");
-    expect(markup).toContain("rows");
-    expect(markup).toContain("cols");
-    expect(markup).toContain("Add new sheet");
+    expect(markup).toContain(">50</th>");
   });
 
   it("renders drawer with clean filename and controls for PowerPoint (.pptx) presentation", () => {

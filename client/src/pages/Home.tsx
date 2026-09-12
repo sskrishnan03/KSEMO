@@ -37,6 +37,7 @@ import {
 } from "../components/ksemo/FileCreationCard";
 import { PdfDrawer } from "../components/ksemo/PdfDrawer";
 import type { DocFormat } from "@/lib/docFormats";
+import { usePdfViewer } from "@/contexts/PdfViewerContext";
 import AuthStage from "./AuthStage";
 import { ConversationSidebar } from "../components/ksemo/ConversationSidebar";
 import { MobileChatNavBar } from "../components/ksemo/MobileChatNavBar";
@@ -166,6 +167,7 @@ function rememberNewChatIntent(userId: number): void {
 
 export default function Home() {
   const { user, loading, logout } = useAuth();
+  const { closePdf } = usePdfViewer();
   const [, setLocation] = useLocation();
   const searchParams = useMemo(
     () => new URLSearchParams(window.location.search),
@@ -571,8 +573,14 @@ export default function Home() {
       let persistedMetrics: FileMetrics | undefined = fileGeneration?.metrics;
       let persistedFormat: string | undefined = fileGeneration?.format;
 
-      if (firstAttachment?.metadata && typeof firstAttachment.metadata === "object") {
-        if (Array.isArray(firstAttachment.metadata.sources) && firstAttachment.metadata.sources.length > 0) {
+      if (
+        firstAttachment?.metadata &&
+        typeof firstAttachment.metadata === "object"
+      ) {
+        if (
+          Array.isArray(firstAttachment.metadata.sources) &&
+          firstAttachment.metadata.sources.length > 0
+        ) {
           persistedSources = firstAttachment.metadata.sources;
         }
         if (firstAttachment.metadata.metrics) {
@@ -581,7 +589,10 @@ export default function Home() {
         if (firstAttachment.metadata.format) {
           persistedFormat = firstAttachment.metadata.format;
         }
-      } else if (firstAttachment?.contentText && typeof firstAttachment.contentText === "string") {
+      } else if (
+        firstAttachment?.contentText &&
+        typeof firstAttachment.contentText === "string"
+      ) {
         try {
           const parsed = JSON.parse(firstAttachment.contentText);
           if (parsed && typeof parsed === "object") {
@@ -616,7 +627,10 @@ export default function Home() {
           (hasGeneratedFile
             ? {
                 stage: "completed",
-                format: (persistedFormat as DocFormat) || (format as DocFormat) || "pdf",
+                format:
+                  (persistedFormat as DocFormat) ||
+                  (format as DocFormat) ||
+                  "pdf",
                 status: "created" as const,
                 sources: persistedSources,
                 metrics: persistedMetrics,
@@ -950,7 +964,9 @@ export default function Home() {
     const resolvedMode =
       activeMode !== "chat"
         ? activeMode
-        : (detected.isFileRequest && detected.format ? detected.format : null);
+        : detected.isFileRequest && detected.format
+          ? detected.format
+          : null;
 
     // In file creation mode the backend runs the document pipeline,
     // so seed the generation card immediately on the optimistic assistant draft.
@@ -1444,6 +1460,7 @@ export default function Home() {
   function newChat() {
     // Starting a fresh chat aborts any stream targeting the current view so the
     // composer is free, but never touches background streams in other chats.
+    closePdf();
     const target = activeConversationId;
     for (const stream of streamsRef.current) {
       if (stream.active && stream.conversationId === target) {
@@ -1463,10 +1480,17 @@ export default function Home() {
     activeConversationIdRef.current = null;
     if (user?.id) rememberNewChatIntent(user.id);
     setPrimaryWorkspace(null);
-    if (typeof window !== "undefined" && window.location.search.includes("workspace=")) {
+    if (
+      typeof window !== "undefined" &&
+      window.location.search.includes("workspace=")
+    ) {
       const next = new URL(window.location.href);
       next.searchParams.delete("workspace");
-      window.history.replaceState({}, "", next.pathname + (next.search ? next.search : ""));
+      window.history.replaceState(
+        {},
+        "",
+        next.pathname + (next.search ? next.search : "")
+      );
     }
     setAttachmentNotices([]);
     setActiveMode("chat");
@@ -1745,7 +1769,9 @@ export default function Home() {
 
   async function captureScreenshot() {
     if (!navigator.mediaDevices?.getDisplayMedia) {
-      toast.info("Screen capture is supported on desktop browsers. Use Take photo or upload files on mobile.");
+      toast.info(
+        "Screen capture is supported on desktop browsers. Use Take photo or upload files on mobile."
+      );
       return;
     }
     let stream: MediaStream | null = null;
@@ -1869,13 +1895,21 @@ export default function Home() {
   }
 
   function selectConversation(id: string) {
+    closePdf();
     setPrimaryWorkspace(null);
     setSidebarOpen(false);
 
-    if (typeof window !== "undefined" && window.location.search.includes("workspace=")) {
+    if (
+      typeof window !== "undefined" &&
+      window.location.search.includes("workspace=")
+    ) {
       const next = new URL(window.location.href);
       next.searchParams.delete("workspace");
-      window.history.replaceState({}, "", next.pathname + (next.search ? next.search : ""));
+      window.history.replaceState(
+        {},
+        "",
+        next.pathname + (next.search ? next.search : "")
+      );
     }
 
     if (id === activeConversationId) {
@@ -2041,19 +2075,28 @@ export default function Home() {
       })
   );
   const stableOnSearch = usePersistFn(() => {
+    closePdf();
     setPrimaryWorkspace("search");
     setSidebarOpen(false);
   });
   const stableOnWorkspace = usePersistFn((_section: "files") => {
+    closePdf();
     setPrimaryWorkspace("library");
     setSidebarOpen(false);
   });
   const stableCloseWorkspace = usePersistFn(() => {
     setPrimaryWorkspace(null);
-    if (typeof window !== "undefined" && window.location.search.includes("workspace=")) {
+    if (
+      typeof window !== "undefined" &&
+      window.location.search.includes("workspace=")
+    ) {
       const next = new URL(window.location.href);
       next.searchParams.delete("workspace");
-      window.history.replaceState({}, "", next.pathname + (next.search ? next.search : ""));
+      window.history.replaceState(
+        {},
+        "",
+        next.pathname + (next.search ? next.search : "")
+      );
     }
   });
   const stableOnSettings = usePersistFn(() => {
@@ -2300,8 +2343,7 @@ export default function Home() {
                       disabled={!activeConversationId}
                       onSelect={() => {
                         if (activeConversationId) {
-                          const pinned =
-                            activeConversation?.isPinned ?? false;
+                          const pinned = activeConversation?.isPinned ?? false;
                           stableOnPin({
                             id: activeConversationId,
                             isPinned: pinned,
@@ -2310,9 +2352,7 @@ export default function Home() {
                       }}
                     >
                       <Pin className="mr-2 size-4" />
-                      {activeConversation?.isPinned
-                        ? "Unpin"
-                        : "Pin"}
+                      {activeConversation?.isPinned ? "Unpin" : "Pin"}
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       disabled={!activeConversationId}
@@ -2350,8 +2390,7 @@ export default function Home() {
                           stableOnDelete({
                             id: activeConversationId,
                             title:
-                              activeConversation?.title ??
-                              "this conversation",
+                              activeConversation?.title ?? "this conversation",
                           });
                       }}
                     >
@@ -2384,8 +2423,7 @@ export default function Home() {
                 >
                   {visibleMessages.map(message => {
                     const activeFileGen =
-                      fileGeneration &&
-                      fileGeneration.messageId === message.id
+                      fileGeneration && fileGeneration.messageId === message.id
                         ? fileGeneration
                         : message.fileGeneration
                           ? {
@@ -2396,8 +2434,7 @@ export default function Home() {
                               createdAt: 0,
                               message: message.fileGeneration.message,
                               researchSourceCount:
-                                message.fileGeneration
-                                  .researchSourceCount,
+                                message.fileGeneration.researchSourceCount,
                               sources: message.fileGeneration.sources,
                               metrics: message.fileGeneration.metrics,
                             }
@@ -2414,14 +2451,11 @@ export default function Home() {
                                 : (activeFileGen.stage as FileCreationStage)
                           }
                           format={
-                            (activeFileGen.format as DocFormat) ||
-                            undefined
+                            (activeFileGen.format as DocFormat) || undefined
                           }
                           filename={message.attachments?.[0]?.filename}
                           fileUrl={message.attachments?.[0]?.url}
-                          fileSizeBytes={
-                            message.attachments?.[0]?.sizeBytes
-                          }
+                          fileSizeBytes={message.attachments?.[0]?.sizeBytes}
                           researchSourceCount={
                             activeFileGen.researchSourceCount
                           }
