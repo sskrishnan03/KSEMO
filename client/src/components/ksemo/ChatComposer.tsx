@@ -577,7 +577,7 @@ export const ChatComposer = memo(function ChatComposer({
                   <span
                     className={`flex size-11 shrink-0 items-center justify-center rounded-lg ${kind.colorClass}`}
                   >
-                    <kind.icon className="size-6" />
+                    <kind.icon className="size-10 shrink-0" />
                   </span>
                   <span className="flex min-w-0 flex-col">
                     <span className="max-w-[150px] truncate text-[13px] font-semibold text-foreground">
@@ -1442,14 +1442,10 @@ export function LibraryPickerContent({
                     <img
                       src={file.url}
                       alt={file.filename}
-                      className="size-12 shrink-0 rounded-md object-cover"
+                      className="size-11 shrink-0 rounded-lg object-cover"
                     />
                   ) : (
-                    <span
-                      className={`flex size-12 shrink-0 items-center justify-center rounded-md ${kind.colorClass}`}
-                    >
-                      <kind.icon className="size-7" />
-                    </span>
+                    <kind.icon className="size-10 shrink-0" />
                   )}
                   <div className="flex min-w-0 flex-1 flex-col">
                     <span className="truncate text-sm font-medium text-foreground">

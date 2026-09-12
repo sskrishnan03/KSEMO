@@ -117,14 +117,7 @@ export const ChatFilesDialog = memo(function ChatFilesDialog({
                         />
                       </span>
                     ) : (
-                      <span
-                        className={cn(
-                          "flex size-11 shrink-0 items-center justify-center rounded-lg shadow-xs",
-                          kind.colorClass
-                        )}
-                      >
-                        <kind.icon className="size-5" />
-                      </span>
+                      <kind.icon className="size-10 shrink-0" />
                     )}
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[13px] font-semibold text-foreground group-hover:text-primary transition-colors">
