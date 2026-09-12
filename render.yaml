@@ -3,7 +3,7 @@ services:
     name: ksemo
     env: node
     plan: free
-    buildCommand: pnpm install --prod=false && pnpm build
+    buildCommand: pnpm install --prod=false --node-linker=hoisted && pnpm build
     startCommand: pnpm start
     envVars:
       - key: NODE_ENV
