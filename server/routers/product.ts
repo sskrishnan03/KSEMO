@@ -1,7 +1,8 @@
+import fs from "fs";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { storagePut } from "../storage";
-import { extractFileText, extensionOf } from "../fileExtract";
+import { storagePut, resolveStoragePath } from "../storage";
+import { extractFileText, extensionOf, TEXT_EXTENSIONS } from "../fileExtract";
 import { protectedProcedure, router } from "../_core/trpc";
 import {
   createFileForUser,
@@ -317,7 +318,8 @@ export const workspaceRouter = router({
         filename: row.filename,
         mimeType: row.mimeType,
         sizeBytes: row.sizeBytes,
-        status: row.status === "failed" ? ("failed" as const) : ("ready" as const),
+        status:
+          row.status === "failed" ? ("failed" as const) : ("ready" as const),
         createdAt: row.createdAt ? new Date(row.createdAt) : new Date(),
         updatedAt: row.updatedAt ? new Date(row.updatedAt) : new Date(),
         isFavorite: false,
@@ -360,7 +362,9 @@ export const workspaceRouter = router({
             message: "File not found.",
           });
 
-        await updateFileForUser(input.id, ctx.user.id, { filename: input.filename });
+        await updateFileForUser(input.id, ctx.user.id, {
+          filename: input.filename,
+        });
         return { success: true } as const;
       }),
     upload: protectedProcedure
@@ -444,6 +448,49 @@ export const workspaceRouter = router({
       .mutation(async ({ ctx, input }) => {
         await deleteFileForUser(input.id, ctx.user.id);
         return { success: true } as const;
+      }),
+    saveContent: protectedProcedure
+      .input(
+        z.object({
+          id: entityId,
+          content: z.string().max(5_000_000, "File content is too large."),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const file = await getFileForUser(input.id, ctx.user.id);
+        if (!file)
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "File not found.",
+          });
+
+        // Only text-based files can be edited inline in the viewer.
+        const isTextMime =
+          file.mimeType.startsWith("text/") ||
+          file.mimeType === "application/json";
+        if (!isTextMime && !TEXT_EXTENSIONS.has(extensionOf(file.filename))) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Only text files can be edited in KSEMO.",
+          });
+        }
+
+        const buffer = Buffer.from(input.content, "utf8");
+        if (!buffer.length || buffer.length > MAX_UPLOAD_BYTES)
+          throw new TRPCError({
+            code: "PAYLOAD_TOO_LARGE",
+            message: "Files must be smaller than 25 MB.",
+          });
+
+        const absolute = resolveStoragePath(file.storageKey);
+        await fs.promises.writeFile(absolute, buffer);
+
+        await updateFileForUser(input.id, ctx.user.id, {
+          sizeBytes: buffer.length,
+          contentText: input.content,
+        });
+
+        return { success: true, sizeBytes: buffer.length } as const;
       }),
     attachToConversation: protectedProcedure
       .input(z.object({ fileId: entityId, conversationId: entityId }))
@@ -550,8 +597,7 @@ export const workspaceRouter = router({
         projects: projectsRes.data || [],
         conversations: conversations.map(conversation => ({
           conversation,
-          messages:
-            messagesByConversation[String(conversation.id)] ?? [],
+          messages: messagesByConversation[String(conversation.id)] ?? [],
         })),
         files: filesRes.data || [],
         memories: memoriesRes.data || [],

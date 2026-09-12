@@ -129,7 +129,9 @@ export async function upsertUser(user: InsertUser): Promise<void> {
   }
 }
 
-export async function getUserByOpenId(openId: string): Promise<User | undefined> {
+export async function getUserByOpenId(
+  openId: string
+): Promise<User | undefined> {
   return inMemoryStore.getUserByOpenId(openId);
 }
 
@@ -141,7 +143,10 @@ export async function updateUserProfile(
   userId: number,
   nameOrValues: string | { name?: string | null }
 ): Promise<User | undefined> {
-  const name = typeof nameOrValues === "string" ? nameOrValues : nameOrValues?.name ?? "";
+  const name =
+    typeof nameOrValues === "string"
+      ? nameOrValues
+      : (nameOrValues?.name ?? "");
   return inMemoryStore.updateUserProfile(userId, name);
 }
 
@@ -261,7 +266,10 @@ export async function removeFollowingAssistantDuplicatesForUser(
   messageId: string,
   userId: number
 ): Promise<string[]> {
-  return inMemoryStore.removeFollowingAssistantDuplicatesForUser(messageId, userId);
+  return inMemoryStore.removeFollowingAssistantDuplicatesForUser(
+    messageId,
+    userId
+  );
 }
 
 export async function editMessageForUser(input: {
@@ -350,7 +358,9 @@ export async function saveUserMemoryFacts(
   factsArg?: Array<MemoryFactToSave>
 ): Promise<number> {
   const conversationId =
-    typeof conversationIdOrFacts === "string" ? conversationIdOrFacts : undefined;
+    typeof conversationIdOrFacts === "string"
+      ? conversationIdOrFacts
+      : undefined;
   const facts = Array.isArray(conversationIdOrFacts)
     ? conversationIdOrFacts
     : factsArg || [];
@@ -419,7 +429,10 @@ export async function createFileForUser(file: KsemoFile): Promise<KsemoFile> {
           updated_at: file.updatedAt.toISOString(),
         });
         if (error) {
-          console.warn("[supabase-db] Supabase file sync warning:", error.message);
+          console.warn(
+            "[supabase-db] Supabase file sync warning:",
+            error.message
+          );
         }
       }
     } catch (err) {
@@ -501,9 +514,14 @@ export async function listFilesForUser(userId: number): Promise<KsemoFile[]> {
       }
     }
   } catch (err) {
-    console.warn("[supabase-db] Supabase file listing fallback to memory:", err);
+    console.warn(
+      "[supabase-db] Supabase file listing fallback to memory:",
+      err
+    );
   }
-  return localFiles.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  return localFiles.sort(
+    (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
+  );
 }
 
 export async function updateFileForUser(
@@ -516,16 +534,26 @@ export async function updateFileForUser(
     try {
       const updateData: Record<string, any> = {};
       if (values.filename !== undefined) updateData.filename = values.filename;
-      if (values.contentText !== undefined) updateData.content_text = values.contentText;
+      if (values.contentText !== undefined)
+        updateData.content_text = values.contentText;
       if (values.status !== undefined) updateData.status = values.status;
+      if (values.sizeBytes !== undefined)
+        updateData.size_bytes = values.sizeBytes;
       if (Object.keys(updateData).length > 0) {
-        await supabase.from("files").update(updateData).eq("id", id).eq("user_id", userId);
+        await supabase
+          .from("files")
+          .update(updateData)
+          .eq("id", id)
+          .eq("user_id", userId);
       }
     } catch {}
   }
 }
 
-export async function deleteFileForUser(id: string, userId: number): Promise<boolean> {
+export async function deleteFileForUser(
+  id: string,
+  userId: number
+): Promise<boolean> {
   const deleted = await inMemoryStore.deleteFile(id, userId);
   if (isSupabaseConfigured && userId > 0) {
     try {
@@ -539,7 +567,10 @@ export async function listMessageFilesForUser(
   messageId: string,
   userId: number
 ): Promise<any[]> {
-  const localResults = await inMemoryStore.listMessageFilesForUser(messageId, userId);
+  const localResults = await inMemoryStore.listMessageFilesForUser(
+    messageId,
+    userId
+  );
   if (localResults.length > 0) return localResults;
 
   if (isSupabaseConfigured) {
@@ -622,7 +653,10 @@ export async function attachFileToConversationForUser(input: {
         message_id: null,
       });
     } catch (error: any) {
-      console.warn("[Attach] Supabase conversation sync notice:", error?.message || error);
+      console.warn(
+        "[Attach] Supabase conversation sync notice:",
+        error?.message || error
+      );
     }
   }
   return att;

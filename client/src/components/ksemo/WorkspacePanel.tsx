@@ -185,7 +185,10 @@ export const WorkspacePanel = memo(function WorkspacePanel({
                         );
                       })()}
                       {(() => {
-                        const isPdfFile = isViewableDocument(file.filename, file.mimeType);
+                        const isPdfFile = isViewableDocument(
+                          file.filename,
+                          file.mimeType
+                        );
                         return (
                           <a
                             href={file.url}
@@ -197,6 +200,7 @@ export const WorkspacePanel = memo(function WorkspacePanel({
                                 openPdf({
                                   url: file.url,
                                   filename: file.filename,
+                                  id: file.id,
                                 });
                                 onOpenChange(false);
                               }

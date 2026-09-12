@@ -103,7 +103,10 @@ function formatBytes(bytes?: number): string | null {
   return `${value.toFixed(digits)} ${units[unit]}`;
 }
 
-export function splitFirstSentence(content: string): { first: string; rest: string } {
+export function splitFirstSentence(content: string): {
+  first: string;
+  rest: string;
+} {
   const text = content.trim();
   if (!text) return { first: "", rest: "" };
 
@@ -204,7 +207,9 @@ export const MessageContent = memo(function MessageContent({
   // Interrupted/cancelled responses must not display default fallback errors
   const cleanContent =
     message.status === "cancelled" &&
-    /^I[’']m sorry, I couldn[’']t generate a response\.?$/i.test(rawClean.trim())
+    /^I[’']m sorry, I couldn[’']t generate a response\.?$/i.test(
+      rawClean.trim()
+    )
       ? ""
       : rawClean;
 
@@ -319,7 +324,9 @@ export const MessageContent = memo(function MessageContent({
                               onClick={() => setLightboxIndex(i)}
                               className={cn(
                                 "group relative shrink-0 overflow-hidden rounded-xl border border-border/80 bg-muted/50 shadow-sm transition-all hover:border-border hover:shadow-md",
-                                isSingle ? "size-28 sm:size-32" : "size-24 sm:size-28"
+                                isSingle
+                                  ? "size-28 sm:size-32"
+                                  : "size-24 sm:size-28"
                               )}
                               aria-label={`View ${file.filename}`}
                             >
@@ -387,133 +394,137 @@ export const MessageContent = memo(function MessageContent({
                   : "max-w-none rounded-tl-md bg-transparent px-0 py-0 text-foreground"
               )}
             >
-            {isUser ? (
-              !userExpanded ? (
-                <div
-                  role={userLong ? "button" : undefined}
-                  tabIndex={userLong ? 0 : undefined}
-                  aria-expanded={userLong ? false : undefined}
-                  onClick={userLong ? () => setUserExpanded(true) : undefined}
-                  onKeyDown={
-                    userLong
-                      ? e => {
-                          if (e.key === "Enter" || e.key === " ") {
-                            e.preventDefault();
-                            setUserExpanded(true);
+              {isUser ? (
+                !userExpanded ? (
+                  <div
+                    role={userLong ? "button" : undefined}
+                    tabIndex={userLong ? 0 : undefined}
+                    aria-expanded={userLong ? false : undefined}
+                    onClick={userLong ? () => setUserExpanded(true) : undefined}
+                    onKeyDown={
+                      userLong
+                        ? e => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              setUserExpanded(true);
+                            }
                           }
-                        }
-                      : undefined
-                  }
-                  className="relative w-full cursor-pointer text-left"
-                >
-                  <p
-                    ref={userTextRef}
-                    className="w-full whitespace-pre-wrap text-left line-clamp-8"
+                        : undefined
+                    }
+                    className="relative w-full cursor-pointer text-left"
                   >
-                    {message.content}
-                  </p>
-                  {userLong && (
-                    <>
-                      <div
-                        className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-muted to-transparent"
-                        aria-hidden="true"
-                      />
-                      <span className="absolute -bottom-2.5 -right-3.5 flex items-center gap-1 rounded-full bg-sidebar px-3 py-1 text-[15px] text-foreground/70 transition-colors hover:bg-accent hover:text-foreground">
-                        Show more
-                        <ChevronDown className="size-3.5" />
-                      </span>
-                    </>
-                  )}
-                </div>
-              ) : (
-                <div className="relative w-full pb-9">
-                  <p
-                    ref={userTextRef}
-                    className="w-full whitespace-pre-wrap text-left"
-                  >
-                    {message.content}
-                  </p>
-                  {userLong && (
-                    <button
-                      type="button"
-                      onClick={() => setUserExpanded(false)}
-                      className="absolute -bottom-2.5 -right-3.5 flex items-center gap-1 rounded-full bg-sidebar px-3 py-1 text-[15px] text-foreground/70 transition-colors hover:bg-accent hover:text-foreground"
+                    <p
+                      ref={userTextRef}
+                      className="w-full whitespace-pre-wrap text-left line-clamp-8"
                     >
-                      Show less
-                      <ChevronDown className="size-3.5 rotate-180 transition-transform" />
-                    </button>
-                  )}
-                </div>
-              )
-            ) : cleanContent ? (
-              <>
-                {fileCreationNode ? (
-                  <>
-                    {(() => {
-                      const { first, rest } = splitFirstSentence(cleanContent);
-                      return (
-                        <>
-                          {first ? (
-                            <div className="ksemo-markdown prose prose-neutral max-w-none text-[15px] leading-6 dark:prose-invert">
-                              <Streamdown components={KSEMO_MARKDOWN_COMPONENTS}>
-                                {first}
-                              </Streamdown>
-                            </div>
-                          ) : null}
-
-                          <div className="my-2">
-                            {fileCreationNode}
-                          </div>
-
-                          {rest ? (
-                            <div className="ksemo-markdown prose prose-neutral max-w-none text-[15px] leading-6 dark:prose-invert mt-2">
-                              <Streamdown components={KSEMO_MARKDOWN_COMPONENTS}>
-                                {rest}
-                              </Streamdown>
-                            </div>
-                          ) : null}
-                        </>
-                      );
-                    })()}
-                  </>
-                ) : (
-                  <div className="ksemo-markdown prose prose-neutral max-w-none text-[15px] leading-6 dark:prose-invert">
-                    <Streamdown components={KSEMO_MARKDOWN_COMPONENTS}>
-                      {cleanContent}
-                    </Streamdown>
+                      {message.content}
+                    </p>
+                    {userLong && (
+                      <>
+                        <div
+                          className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-muted to-transparent"
+                          aria-hidden="true"
+                        />
+                        <span className="absolute -bottom-2.5 -right-3.5 flex items-center gap-1 rounded-full bg-sidebar px-3 py-1 text-[15px] text-foreground/70 transition-colors hover:bg-accent hover:text-foreground">
+                          Show more
+                          <ChevronDown className="size-3.5" />
+                        </span>
+                      </>
+                    )}
                   </div>
-                )}
-                {isCancelled && renderStoppedNotice()}
-              </>
-            ) : fileCreationNode ? (
-              <>
-                <div className="my-2">
-                  {fileCreationNode}
+                ) : (
+                  <div className="relative w-full pb-9">
+                    <p
+                      ref={userTextRef}
+                      className="w-full whitespace-pre-wrap text-left"
+                    >
+                      {message.content}
+                    </p>
+                    {userLong && (
+                      <button
+                        type="button"
+                        onClick={() => setUserExpanded(false)}
+                        className="absolute -bottom-2.5 -right-3.5 flex items-center gap-1 rounded-full bg-sidebar px-3 py-1 text-[15px] text-foreground/70 transition-colors hover:bg-accent hover:text-foreground"
+                      >
+                        Show less
+                        <ChevronDown className="size-3.5 rotate-180 transition-transform" />
+                      </button>
+                    )}
+                  </div>
+                )
+              ) : cleanContent ? (
+                <>
+                  {fileCreationNode ? (
+                    <>
+                      {(() => {
+                        const { first, rest } =
+                          splitFirstSentence(cleanContent);
+                        return (
+                          <>
+                            {first ? (
+                              <div className="ksemo-markdown prose prose-neutral max-w-none text-[15px] leading-6 dark:prose-invert">
+                                <Streamdown
+                                  components={KSEMO_MARKDOWN_COMPONENTS}
+                                >
+                                  {first}
+                                </Streamdown>
+                              </div>
+                            ) : null}
+
+                            <div className="my-2">{fileCreationNode}</div>
+
+                            {rest ? (
+                              <div className="ksemo-markdown prose prose-neutral max-w-none text-[15px] leading-6 dark:prose-invert mt-2">
+                                <Streamdown
+                                  components={KSEMO_MARKDOWN_COMPONENTS}
+                                >
+                                  {rest}
+                                </Streamdown>
+                              </div>
+                            ) : null}
+                          </>
+                        );
+                      })()}
+                    </>
+                  ) : (
+                    <div className="ksemo-markdown prose prose-neutral max-w-none text-[15px] leading-6 dark:prose-invert">
+                      <Streamdown components={KSEMO_MARKDOWN_COMPONENTS}>
+                        {cleanContent}
+                      </Streamdown>
+                    </div>
+                  )}
+                  {isCancelled && renderStoppedNotice()}
+                </>
+              ) : fileCreationNode ? (
+                <>
+                  <div className="my-2">{fileCreationNode}</div>
+                  {isCancelled && renderStoppedNotice()}
+                </>
+              ) : isCancelled ? (
+                renderStoppedNotice()
+              ) : message.status === "streaming" &&
+                isCurrentGeneration &&
+                !hideTypingIndicator &&
+                !message.fileGeneration &&
+                !fileCreationNode &&
+                !(message.attachments?.length && !isUser) ? (
+                <div
+                  className="flex h-7 items-center gap-1.5"
+                  aria-label="KSEMO is responding"
+                >
+                  <span className="size-1.5 animate-pulse rounded-full bg-muted-foreground" />
+                  <span className="size-1.5 animate-pulse rounded-full bg-muted-foreground [animation-delay:150ms]" />
+                  <span className="size-1.5 animate-pulse rounded-full bg-muted-foreground [animation-delay:300ms]" />
                 </div>
-                {isCancelled && renderStoppedNotice()}
-              </>
-            ) : isCancelled ? (
-              renderStoppedNotice()
-            ) : message.status === "streaming" &&
-              isCurrentGeneration &&
-              !hideTypingIndicator &&
-              !message.fileGeneration &&
-              !fileCreationNode &&
-              !(message.attachments?.length && !isUser) ? (
-              <div
-                className="flex h-7 items-center gap-1.5"
-                aria-label="KSEMO is responding"
-              >
-                <span className="size-1.5 animate-pulse rounded-full bg-muted-foreground" />
-                <span className="size-1.5 animate-pulse rounded-full bg-muted-foreground [animation-delay:150ms]" />
-                <span className="size-1.5 animate-pulse rounded-full bg-muted-foreground [animation-delay:300ms]" />
-              </div>
-            ) : null}
-          </div>
+              ) : null}
+            </div>
           )}
 
           {/* Attachments (e.g. images, uploaded files; generated document is presented via primary FileCreationCard) */}
-          {!isUser && message.attachments?.length && !message.fileGeneration && !fileCreationNode ? (
+          {!isUser &&
+          message.attachments?.length &&
+          !message.fileGeneration &&
+          !fileCreationNode ? (
             <div className="mt-2 flex max-w-full flex-col items-start gap-2">
               {message.attachments.map(file => {
                 const kind = getFileKind(file.filename, file.mimeType);
@@ -570,6 +581,7 @@ export const MessageContent = memo(function MessageContent({
                             url: file.url,
                             filename: file.filename,
                             sizeBytes: file.sizeBytes,
+                            id: file.id,
                           });
                         } else {
                           setPreviewFile(file);
@@ -623,61 +635,72 @@ export const MessageContent = memo(function MessageContent({
                 ),
                 copyMessage
               )}
-              {onEdit && !isEditing &&
+              {onEdit &&
+                !isEditing &&
                 action("Edit message", <Pencil className="size-4" />, () =>
                   onEdit(message)
                 )}
             </div>
           )}
-          {!isUser && !isGeneratingFile && (message.content || message.status === "failed" || message.status === "cancelled" || Boolean(fileCreationNode)) && (
-            <div className="mt-1.5 flex items-center gap-1">
-              {message.content &&
-                action(
-                  copied ? "Copied" : "Copy response",
-                  copied ? (
-                    <Check className="size-4" />
-                  ) : (
-                    <Copy className="size-4" />
-                  ),
-                  copyMessage
-                )}
-              {message.content &&
-                onShare &&
-                action("Share response", <ShareIcon className="size-4" />, () =>
-                  onShare(message)
-                )}
-              {(onRegenerate || onRetry) &&
-                action(
-                  message.status === "failed" ? "Retry response" : "Regenerate response",
-                  <RotateCcw className="size-4" />,
-                  () => (onRegenerate ? onRegenerate(message) : onRetry?.(message))
-                )}
-              {onFeedback && message.content && (
-                <>
-                  {action(
-                    "Good response",
-                    <ThumbsUp className="size-4" />,
-                    () => onFeedback(message.id, "up")
+          {!isUser &&
+            !isGeneratingFile &&
+            (message.content ||
+              message.status === "failed" ||
+              message.status === "cancelled" ||
+              Boolean(fileCreationNode)) && (
+              <div className="mt-1.5 flex items-center gap-1">
+                {message.content &&
+                  action(
+                    copied ? "Copied" : "Copy response",
+                    copied ? (
+                      <Check className="size-4" />
+                    ) : (
+                      <Copy className="size-4" />
+                    ),
+                    copyMessage
                   )}
-                  {action(
-                    "Bad response",
-                    <ThumbsDown className="size-4" />,
-                    () => onFeedback(message.id, "down")
+                {message.content &&
+                  onShare &&
+                  action(
+                    "Share response",
+                    <ShareIcon className="size-4" />,
+                    () => onShare(message)
                   )}
-                </>
-              )}
-              <MessageOverflow
-                message={message}
-                onReadAloud={
-                  message.content
-                    ? () => onSpeak(message.content, message.id)
-                    : undefined
-                }
-                onStopReading={isSpeaking ? onStop : undefined}
-                onDelete={onDelete}
-              />
-            </div>
-          )}
+                {(onRegenerate || onRetry) &&
+                  action(
+                    message.status === "failed"
+                      ? "Retry response"
+                      : "Regenerate response",
+                    <RotateCcw className="size-4" />,
+                    () =>
+                      onRegenerate ? onRegenerate(message) : onRetry?.(message)
+                  )}
+                {onFeedback && message.content && (
+                  <>
+                    {action(
+                      "Good response",
+                      <ThumbsUp className="size-4" />,
+                      () => onFeedback(message.id, "up")
+                    )}
+                    {action(
+                      "Bad response",
+                      <ThumbsDown className="size-4" />,
+                      () => onFeedback(message.id, "down")
+                    )}
+                  </>
+                )}
+                <MessageOverflow
+                  message={message}
+                  onReadAloud={
+                    message.content
+                      ? () => onSpeak(message.content, message.id)
+                      : undefined
+                  }
+                  onStopReading={isSpeaking ? onStop : undefined}
+                  onDelete={onDelete}
+                />
+              </div>
+            )}
         </div>
       </article>
 

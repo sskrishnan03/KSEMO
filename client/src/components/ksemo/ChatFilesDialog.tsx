@@ -94,7 +94,8 @@ export const ChatFilesDialog = memo(function ChatFilesDialog({
               No files in this chat
             </p>
             <p className="mt-1 text-xs text-muted-foreground max-w-[15rem] leading-relaxed">
-              Files generated or attached in this conversation will appear here for quick access.
+              Files generated or attached in this conversation will appear here
+              for quick access.
             </p>
           </div>
         ) : (
@@ -102,7 +103,10 @@ export const ChatFilesDialog = memo(function ChatFilesDialog({
             {rows.map(file => {
               const kind = getFileKind(file.filename, file.mimeType);
               const image = isImage(file);
-              const isPdfFile = isViewableDocument(file.filename, file.mimeType);
+              const isPdfFile = isViewableDocument(
+                file.filename,
+                file.mimeType
+              );
               return (
                 <li key={file.id}>
                   <a
@@ -115,6 +119,7 @@ export const ChatFilesDialog = memo(function ChatFilesDialog({
                         openPdf({
                           url: file.url,
                           filename: file.filename,
+                          id: file.id,
                         });
                         onOpenChange(false);
                       }

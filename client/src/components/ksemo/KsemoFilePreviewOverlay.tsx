@@ -7,7 +7,11 @@ import { getFileKind } from "@/lib/fileKinds";
 import { downloadFile } from "@/lib/downloadFile";
 import { Download, ExternalLink, FolderOpen, X } from "lucide-react";
 import { memo, useEffect } from "react";
-import { usePdfViewer, isPdf, isViewableDocument } from "@/contexts/PdfViewerContext";
+import {
+  usePdfViewer,
+  isPdf,
+  isViewableDocument,
+} from "@/contexts/PdfViewerContext";
 
 export type PreviewFile = {
   id: string;
@@ -24,7 +28,8 @@ type KsemoFilePreviewOverlayProps = {
 };
 
 function formatBytes(bytes?: number): string | null {
-  if (typeof bytes !== "number" || Number.isNaN(bytes) || bytes < 0) return null;
+  if (typeof bytes !== "number" || Number.isNaN(bytes) || bytes < 0)
+    return null;
   const units = ["B", "KB", "MB", "GB"];
   let value = bytes;
   let unit = 0;
@@ -37,13 +42,15 @@ function formatBytes(bytes?: number): string | null {
 }
 
 function isTextLike(file: PreviewFile): boolean {
-  const ext = /\.([a-zA-Z0-9]+)$/.exec(file.filename.trim())?.[1]?.toLowerCase();
+  const ext = /\.([a-zA-Z0-9]+)$/
+    .exec(file.filename.trim())?.[1]
+    ?.toLowerCase();
   if (file.mimeType?.startsWith("text/")) return true;
   return Boolean(
     ext &&
-      ["txt", "log", "tsv", "json", "xml", "yml", "yaml", "csv", "md"].includes(
-        ext
-      )
+    ["txt", "log", "tsv", "json", "xml", "yml", "yaml", "csv", "md"].includes(
+      ext
+    )
   );
 }
 
@@ -62,6 +69,7 @@ export const KsemoFilePreviewOverlay = memo(function KsemoFilePreviewOverlay({
         filename: file.filename,
         sizeBytes: file.sizeBytes,
         mimeType: file.mimeType,
+        id: file.id,
       });
       onClose();
     }
@@ -158,7 +166,11 @@ export const KsemoFilePreviewOverlay = memo(function KsemoFilePreviewOverlay({
               className="mx-auto h-full max-h-[70vh] w-auto object-contain"
             />
           ) : isPdfDoc ? (
-            <iframe src={file.url} title={file.filename} className="h-[70vh] w-full" />
+            <iframe
+              src={file.url}
+              title={file.filename}
+              className="h-[70vh] w-full"
+            />
           ) : showInline ? (
             <iframe
               src={file.url}

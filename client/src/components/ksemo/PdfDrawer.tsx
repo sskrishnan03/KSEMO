@@ -14,14 +14,17 @@ import {
   usePdfViewer,
 } from "@/contexts/PdfViewerContext";
 import { downloadFile } from "@/lib/downloadFile";
+import { trpc } from "@/lib/trpc";
 import { FileBrandMark, brandVariantForExt } from "./FileBrandIcons";
 import {
   ChevronLeft,
   ChevronRight,
   Download,
   Minus,
+  Pencil,
   Plus,
   Redo2,
+  Save,
   Undo2,
   X,
 } from "lucide-react";
@@ -575,11 +578,7 @@ export const ExcelViewer = memo(function ExcelViewer({
       // Never hijack keys while the user is typing in a text field
       const target = e.target as HTMLElement | null;
       const tag = target?.tagName?.toLowerCase();
-      if (
-        tag === "input" ||
-        tag === "textarea" ||
-        target?.isContentEditable
-      ) {
+      if (tag === "input" || tag === "textarea" || target?.isContentEditable) {
         return;
       }
 
@@ -656,12 +655,7 @@ export const ExcelViewer = memo(function ExcelViewer({
         e.preventDefault();
         updateCellValue(activeSheetIdx, row, col, "");
         setSelectedCell(prev => (prev ? { ...prev, value: "" } : null));
-      } else if (
-        e.key.length === 1 &&
-        !e.ctrlKey &&
-        !e.metaKey &&
-        !e.altKey
-      ) {
+      } else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
         setEditingCell({ row, col });
         setEditValue(e.key);
         updateCellValue(activeSheetIdx, row, col, e.key);
@@ -754,7 +748,9 @@ export const ExcelViewer = memo(function ExcelViewer({
                 + Row
               </button>
             </TooltipTrigger>
-            <TooltipContent side="bottom">Add a row at the bottom</TooltipContent>
+            <TooltipContent side="bottom">
+              Add a row at the bottom
+            </TooltipContent>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -843,10 +839,7 @@ export const ExcelViewer = memo(function ExcelViewer({
                 const rowData = currentSheet.data[rIdx] || [];
                 const isRowSelected = selectedRow === rIdx;
                 return (
-                  <tr
-                    key={rIdx}
-                    className="hover:bg-muted/15"
-                  >
+                  <tr key={rIdx} className="hover:bg-muted/15">
                     {/* Sticky Row Number */}
                     <th
                       onClick={() => {
@@ -976,7 +969,7 @@ export const ExcelViewer = memo(function ExcelViewer({
                   setRenameValue(sheet.name);
                 }}
                 className={cn(
-                    "px-4 py-1.5 text-sm font-semibold rounded-t-md transition-all cursor-pointer whitespace-nowrap",
+                  "px-4 py-1.5 text-sm font-semibold rounded-t-md transition-all cursor-pointer whitespace-nowrap",
                   isActive
                     ? "bg-background text-emerald-600 dark:text-emerald-400 border-t-2 border-t-emerald-600 border-x border-border shadow-xs font-bold"
                     : "text-muted-foreground hover:bg-background/60 hover:text-foreground"
@@ -1172,6 +1165,19 @@ export const PdfDrawer = memo(function PdfDrawer() {
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+
+  // Text document inline editing + auto-save
+  const [isEditingText, setIsEditingText] = useState<boolean>(false);
+  const [draftText, setDraftText] = useState<string>("");
+  const [saveState, setSaveState] = useState<
+    "idle" | "saving" | "saved" | "error"
+  >("idle");
+  const draftRef = useRef<string>("");
+  const lastSavedRef = useRef<string | null>(null);
+  const draftFileIdRef = useRef<string | null>(null);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveTextMutation = trpc.workspace.files.saveContent.useMutation();
 
   // Zoom management
   const [scale, setScale] = useState<number>(1.0);
@@ -1370,6 +1376,116 @@ export const PdfDrawer = memo(function PdfDrawer() {
     ext,
     containerWidth,
   ]);
+
+  // Persist edited text to the server (used by auto-save and on exit)
+  const persistText = useCallback(
+    async (
+      content: string,
+      fileId = draftFileIdRef.current ?? currentPdf?.id
+    ) => {
+      if (!fileId) {
+        setSaveState("idle");
+        return;
+      }
+      setSaveState("saving");
+      try {
+        await saveTextMutation.mutateAsync({ id: fileId, content });
+        lastSavedRef.current = content;
+        setTextContent(content);
+        setSaveState("saved");
+        if (saveResetTimerRef.current) {
+          clearTimeout(saveResetTimerRef.current);
+        }
+        saveResetTimerRef.current = setTimeout(() => {
+          if (draftRef.current === lastSavedRef.current) {
+            setSaveState("idle");
+          }
+        }, 1500);
+      } catch {
+        setSaveState("error");
+      }
+    },
+    [currentPdf?.id, saveTextMutation]
+  );
+
+  // Exit edit mode whenever the drawer closes or the file changes
+  useEffect(() => {
+    if (!isOpen || !currentPdf?.url) {
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = null;
+      }
+      if (draftRef.current && draftRef.current !== lastSavedRef.current) {
+        void persistText(draftRef.current);
+      }
+      setIsEditingText(false);
+      draftRef.current = "";
+      lastSavedRef.current = null;
+      draftFileIdRef.current = null;
+    }
+  }, [isOpen, currentPdf?.url, persistText]);
+
+  // Debounced auto-save as the user types
+  const handleTextChange = useCallback(
+    (value: string) => {
+      setDraftText(value);
+      draftRef.current = value;
+      if (value === lastSavedRef.current) {
+        setSaveState("idle");
+        if (saveTimerRef.current) {
+          clearTimeout(saveTimerRef.current);
+          saveTimerRef.current = null;
+        }
+        return;
+      }
+      setSaveState("saving");
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+      }
+      saveTimerRef.current = setTimeout(() => {
+        void persistText(draftRef.current);
+      }, 800);
+    },
+    [persistText]
+  );
+
+  // Toggle between view and edit for text documents
+  const handleEditToggle = useCallback(() => {
+    if (isEditingText) {
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = null;
+      }
+      if (draftRef.current !== lastSavedRef.current) {
+        void persistText(draftRef.current);
+      }
+      setIsEditingText(false);
+    } else {
+      setDraftText(textContent ?? "");
+      draftRef.current = textContent ?? "";
+      lastSavedRef.current = textContent ?? null;
+      draftFileIdRef.current = currentPdf?.id ?? null;
+      setSaveState("idle");
+      setIsEditingText(true);
+    }
+  }, [isEditingText, textContent, currentPdf?.id, persistText]);
+
+  // Ctrl/Cmd+S inside the editor flushes the pending auto-save immediately
+  useEffect(() => {
+    if (!isEditingText) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
+        event.preventDefault();
+        if (saveTimerRef.current) {
+          clearTimeout(saveTimerRef.current);
+          saveTimerRef.current = null;
+        }
+        void persistText(draftRef.current);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isEditingText, persistText]);
 
   // Handle Zoom In
   const handleZoomIn = useCallback(() => {
@@ -1623,8 +1739,42 @@ export const PdfDrawer = memo(function PdfDrawer() {
           </p>
         </div>
 
-        {/* Right Side: Download Option, then Cancel Option (only icons, with hover) */}
+        {/* Right Side: Edit (text only), Download, then Cancel (only icons, with hover) */}
         <div className="flex shrink-0 items-center gap-1.5">
+          {/* Edit Text Button (Text Documents Only) */}
+          {isTextDoc &&
+            currentPdf?.id &&
+            !isLoading &&
+            !loadError &&
+            textContent !== null && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant={isEditingText ? "default" : "ghost"}
+                    size="icon"
+                    onClick={handleEditToggle}
+                    data-testid="pdf-drawer-edit-btn"
+                    aria-label={isEditingText ? "Done editing" : "Edit text"}
+                    className={cn(
+                      "size-9 rounded-lg transition-colors",
+                      isEditingText
+                        ? "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 hover:text-primary-foreground"
+                        : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                    )}
+                  >
+                    {isEditingText ? (
+                      <Save className="size-4" />
+                    ) : (
+                      <Pencil className="size-4" />
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" sideOffset={6}>
+                  {isEditingText ? "Done" : "Edit"}
+                </TooltipContent>
+              </Tooltip>
+            )}
+
           {/* Download Button (Icon Only) */}
           <Tooltip>
             <TooltipTrigger asChild>
@@ -1772,21 +1922,45 @@ export const PdfDrawer = memo(function PdfDrawer() {
             )}
 
           {/* Text Document (.txt, .md, .json, etc.) Rendering */}
-          {!isLoading && !loadError && isTextDoc && textContent !== null && (
-            <div
-              data-testid="text-document-viewer"
-              className="mx-auto my-4 bg-white text-neutral-900 dark:bg-card dark:text-foreground shadow-xl border border-border/80 rounded-sm p-6 sm:p-10 min-h-[600px] select-text selection:bg-blue-500/30 transition-transform origin-top"
-              style={{
-                maxWidth: "860px",
-                width: "100%",
-                zoom: scale !== 1.0 ? scale : undefined,
-              }}
-            >
-              <pre className="whitespace-pre-wrap font-mono text-xs sm:text-[13px] leading-relaxed text-foreground/90 font-normal">
-                {textContent}
-              </pre>
-            </div>
-          )}
+          {!isLoading &&
+            !loadError &&
+            isTextDoc &&
+            textContent !== null &&
+            (isEditingText ? (
+              <div
+                data-testid="text-document-editor"
+                className="mx-auto my-4 flex flex-col bg-white text-neutral-900 dark:bg-card dark:text-foreground shadow-xl border border-border/80 rounded-sm min-h-[600px] transition-transform origin-top"
+                style={{
+                  maxWidth: "860px",
+                  width: "100%",
+                  zoom: scale !== 1.0 ? scale : undefined,
+                }}
+              >
+                <textarea
+                  data-testid="text-document-editor-textarea"
+                  value={draftText}
+                  onChange={e => handleTextChange(e.target.value)}
+                  spellCheck={false}
+                  aria-label="Edit text file"
+                  className="w-full flex-1 resize-none bg-transparent px-5 py-4 font-mono text-xs sm:text-[13px] leading-relaxed text-foreground/90 focus:outline-none selection:bg-blue-500/30"
+                  style={{ minHeight: "600px" }}
+                />
+              </div>
+            ) : (
+              <div
+                data-testid="text-document-viewer"
+                className="mx-auto my-4 bg-white text-neutral-900 dark:bg-card dark:text-foreground shadow-xl border border-border/80 rounded-sm p-6 sm:p-10 min-h-[600px] select-text selection:bg-blue-500/30 transition-transform origin-top"
+                style={{
+                  maxWidth: "860px",
+                  width: "100%",
+                  zoom: scale !== 1.0 ? scale : undefined,
+                }}
+              >
+                <pre className="whitespace-pre-wrap font-mono text-xs sm:text-[13px] leading-relaxed text-foreground/90 font-normal">
+                  {textContent}
+                </pre>
+              </div>
+            ))}
 
           {/* Unsupported Format Fallback */}
           {!isLoading &&

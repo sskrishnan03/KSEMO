@@ -2457,6 +2457,7 @@ export default function Home() {
                           filename={message.attachments?.[0]?.filename}
                           fileUrl={message.attachments?.[0]?.url}
                           fileSizeBytes={message.attachments?.[0]?.sizeBytes}
+                          fileId={message.attachments?.[0]?.id}
                           researchSourceCount={
                             activeFileGen.researchSourceCount
                           }

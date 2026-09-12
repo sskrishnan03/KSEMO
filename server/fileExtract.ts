@@ -9,7 +9,7 @@ import { inMemoryStore } from "./inMemoryStore";
 
 export const MAX_EXTRACT_CHARS = 200_000;
 
-const TEXT_EXTENSIONS = new Set([
+export const TEXT_EXTENSIONS = new Set([
   "txt",
   "tsv",
   "json",
@@ -91,7 +91,9 @@ async function extractPdf(buffer: Buffer): Promise<string | null> {
     if (pageText) {
       parts.push(`--- Page ${i + 1} of ${numPages} ---\n${pageText}`);
     } else {
-      parts.push(`--- Page ${i + 1} of ${numPages} ---\n[Empty or image-only page]`);
+      parts.push(
+        `--- Page ${i + 1} of ${numPages} ---\n[Empty or image-only page]`
+      );
     }
   }
   return parts.join("\n\n");
@@ -126,7 +128,9 @@ async function extractSheet(buffer: Buffer): Promise<string | null> {
 
     const headers = Array.from({ length: maxCols }, (_, idx) => {
       const val = Array.isArray(rows[0]) ? rows[0][idx] : undefined;
-      const str = String(val ?? "").replace(/[\r\n|]/g, " ").trim();
+      const str = String(val ?? "")
+        .replace(/[\r\n|]/g, " ")
+        .trim();
       return str || `Col_${idx + 1}`;
     });
 
@@ -137,7 +141,9 @@ async function extractSheet(buffer: Buffer): Promise<string | null> {
       const row = Array.isArray(rows[rIdx]) ? rows[rIdx] : [];
       const cells = headers.map((_, cIdx) => {
         const val = row[cIdx];
-        return String(val ?? "").replace(/[\r\n|]/g, " ").trim();
+        return String(val ?? "")
+          .replace(/[\r\n|]/g, " ")
+          .trim();
       });
       if (cells.some(c => c.length > 0)) {
         parts.push(`| ${cells.join(" | ")} |`);
@@ -177,7 +183,10 @@ async function extractPptx(buffer: Buffer): Promise<string | null> {
   return parts.join("\n\n");
 }
 
-async function extractAudio(buffer: Buffer, mimeType: string): Promise<string | null> {
+async function extractAudio(
+  buffer: Buffer,
+  mimeType: string
+): Promise<string | null> {
   try {
     const { transcribeAudio } = await import("./_core/voiceTranscription");
     const result = await transcribeAudio({

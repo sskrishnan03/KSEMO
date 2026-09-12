@@ -11,6 +11,7 @@ export type PdfViewerFile = {
   filename: string;
   sizeBytes?: number;
   mimeType?: string;
+  id?: string;
 };
 
 export type DocumentViewerFile = PdfViewerFile;
@@ -79,7 +80,10 @@ export function isText(filename?: string, mimeType?: string): boolean {
   );
 }
 
-export function isViewableDocument(filename?: string, mimeType?: string): boolean {
+export function isViewableDocument(
+  filename?: string,
+  mimeType?: string
+): boolean {
   return (
     isPdf(filename, mimeType) ||
     isWord(filename, mimeType) ||
@@ -102,7 +106,9 @@ export function PdfViewerProvider({
   initialPdf?: PdfViewerFile | null;
   initialOpen?: boolean;
 }) {
-  const [currentPdf, setCurrentPdf] = useState<PdfViewerFile | null>(initialPdf);
+  const [currentPdf, setCurrentPdf] = useState<PdfViewerFile | null>(
+    initialPdf
+  );
   const [isOpen, setIsOpen] = useState(initialOpen);
 
   const openPdf = useCallback((file: PdfViewerFile) => {

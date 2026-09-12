@@ -165,6 +165,7 @@ export function LibraryWorkspace({
           url: file.url,
           filename: file.filename,
           sizeBytes: file.sizeBytes,
+          id: file.id,
         });
       } else {
         setOpenedFile(file);
@@ -832,9 +833,7 @@ const LibraryGridCard = memo(function LibraryGridCard({
       aria-pressed={selected}
       className={cn(
         "group relative cursor-pointer overflow-hidden rounded-2xl border bg-card transition-colors focus-visible:outline-none",
-        selected
-          ? "border-muted-foreground"
-          : "border-border"
+        selected ? "border-muted-foreground" : "border-border"
       )}
     >
       <button
@@ -845,7 +844,9 @@ const LibraryGridCard = memo(function LibraryGridCard({
         }}
         className={cn(
           "pointer-events-none absolute left-2.5 top-2.5 z-10 rounded-full p-0.5 transition-[opacity,transform] duration-150 group-hover:pointer-events-auto group-hover:scale-100 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:scale-100 group-focus-within:opacity-100 group-active:pointer-events-auto group-active:scale-100 group-active:opacity-100 focus-visible:pointer-events-auto focus-visible:scale-100 focus-visible:opacity-100 max-lg:pointer-events-auto max-lg:scale-100 max-lg:opacity-100",
-          selected || isMenuOpen ? "scale-100 opacity-100" : "scale-90 opacity-0"
+          selected || isMenuOpen
+            ? "scale-100 opacity-100"
+            : "scale-90 opacity-0"
         )}
         aria-label={`${selected ? "Deselect" : "Select"} ${file.filename}`}
         aria-pressed={selected}
@@ -936,6 +937,7 @@ const LibraryGridCard = memo(function LibraryGridCard({
               url: file.url,
               filename: file.filename,
               sizeBytes: file.sizeBytes,
+              id: file.id,
             });
           }
         }}
@@ -1024,7 +1026,9 @@ const LibraryListRow = memo(function LibraryListRow({
         }}
         className={cn(
           "pointer-events-none rounded-full p-0.5 transition-[opacity,transform] duration-150 group-hover:pointer-events-auto group-hover:scale-100 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:scale-100 group-focus-within:opacity-100 group-active:pointer-events-auto group-active:scale-100 group-active:opacity-100 focus-visible:pointer-events-auto focus-visible:scale-100 focus-visible:opacity-100 max-lg:pointer-events-auto max-lg:scale-100 max-lg:opacity-100",
-          selected || isMenuOpen ? "scale-100 opacity-100" : "scale-90 opacity-0"
+          selected || isMenuOpen
+            ? "scale-100 opacity-100"
+            : "scale-90 opacity-0"
         )}
         aria-label={`${selected ? "Deselect" : "Select"} ${file.filename}`}
         aria-pressed={selected}
@@ -1043,6 +1047,7 @@ const LibraryListRow = memo(function LibraryListRow({
               url: file.url,
               filename: file.filename,
               sizeBytes: file.sizeBytes,
+              id: file.id,
             });
           }
         }}
@@ -1062,6 +1067,7 @@ const LibraryListRow = memo(function LibraryListRow({
               url: file.url,
               filename: file.filename,
               sizeBytes: file.sizeBytes,
+              id: file.id,
             });
           }
         }}

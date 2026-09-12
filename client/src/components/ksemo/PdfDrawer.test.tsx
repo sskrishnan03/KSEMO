@@ -1,7 +1,11 @@
-import { createElement } from "react";
+import { createElement, useRef, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { httpBatchLink } from "@trpc/client";
 import { describe, expect, it } from "vitest";
+import superjson from "superjson";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { trpc } from "@/lib/trpc";
 import { PdfDrawer, ExcelViewer } from "./PdfDrawer";
 import {
   PdfViewerProvider,
@@ -13,23 +17,66 @@ import {
   isWord,
 } from "@/contexts/PdfViewerContext";
 
+function Providers({ children }: { children: ReactNode }) {
+  const ref = useRef<{
+    queryClient: QueryClient;
+    trpcClient: ReturnType<typeof trpc.createClient>;
+  } | null>(null);
+  if (ref.current === null) {
+    ref.current = {
+      queryClient: new QueryClient({
+        defaultOptions: {
+          queries: { retry: false },
+          mutations: { retry: false },
+        },
+      }),
+      trpcClient: trpc.createClient({
+        links: [
+          httpBatchLink({
+            url: "http://localhost/api/trpc",
+            transformer: superjson,
+          }),
+        ],
+      }),
+    };
+  }
+  return createElement(trpc.Provider, {
+    client: ref.current.trpcClient,
+    queryClient: ref.current.queryClient,
+    children: createElement(
+      QueryClientProvider,
+      { client: ref.current.queryClient },
+      children
+    ),
+  });
+}
+
 function TestDrawerWithFile({
   file,
   openImmediately = true,
 }: {
-  file: { url: string; filename: string; sizeBytes?: number; mimeType?: string } | null;
+  file: {
+    url: string;
+    filename: string;
+    sizeBytes?: number;
+    mimeType?: string;
+  } | null;
   openImmediately?: boolean;
 }) {
   return createElement(
     TooltipProvider,
     null,
     createElement(
-      PdfViewerProvider,
-      {
-        initialPdf: file,
-        initialOpen: openImmediately,
-      },
-      createElement(PdfDrawer)
+      Providers,
+      null,
+      createElement(
+        PdfViewerProvider,
+        {
+          initialPdf: file,
+          initialOpen: openImmediately,
+        },
+        createElement(PdfDrawer)
+      )
     )
   );
 }
@@ -40,7 +87,11 @@ describe("PdfDrawer", () => {
       createElement(
         TooltipProvider,
         null,
-        createElement(PdfViewerProvider, null, createElement(PdfDrawer))
+        createElement(
+          Providers,
+          null,
+          createElement(PdfViewerProvider, null, createElement(PdfDrawer))
+        )
       )
     );
     expect(markup).toBe("");

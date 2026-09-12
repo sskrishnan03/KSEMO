@@ -20,7 +20,11 @@ import {
   type FileBrandVariant,
 } from "@/components/ksemo/FileBrandIcons";
 import { cn } from "@/lib/utils";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { downloadFile } from "@/lib/downloadFile";
 import { usePdfViewer, isViewableDocument } from "@/contexts/PdfViewerContext";
 
@@ -130,7 +134,10 @@ const FORMAT_TO_VARIANT: Record<DocFormat, FileBrandVariant> = {
   csv: "text",
 };
 
-export function getLiveStatusPhrase(stage: FileCreationStage, format?: DocFormat): string {
+export function getLiveStatusPhrase(
+  stage: FileCreationStage,
+  format?: DocFormat
+): string {
   switch (stage) {
     case "analyzing":
       return "Crafting the intelligence";
@@ -143,7 +150,8 @@ export function getLiveStatusPhrase(stage: FileCreationStage, format?: DocFormat
     case "planning":
       return "Structuring the content";
     case "content_generated": {
-      if (format === "xlsx" || format === "csv") return "Writing the spreadsheet";
+      if (format === "xlsx" || format === "csv")
+        return "Writing the spreadsheet";
       if (format === "pptx") return "Writing the presentation";
       return "Writing the document";
     }
@@ -198,10 +206,14 @@ function formatFileMetrics(metrics?: FileMetrics): string | null {
     parts.push(`${metrics.pages} ${metrics.pages === 1 ? "page" : "pages"}`);
   }
   if (typeof metrics.slides === "number" && metrics.slides > 0) {
-    parts.push(`${metrics.slides} ${metrics.slides === 1 ? "slide" : "slides"}`);
+    parts.push(
+      `${metrics.slides} ${metrics.slides === 1 ? "slide" : "slides"}`
+    );
   }
   if (typeof metrics.sheets === "number" && metrics.sheets > 0) {
-    parts.push(`${metrics.sheets} ${metrics.sheets === 1 ? "sheet" : "sheets"}`);
+    parts.push(
+      `${metrics.sheets} ${metrics.sheets === 1 ? "sheet" : "sheets"}`
+    );
   }
   if (typeof metrics.words === "number" && metrics.words > 0) {
     parts.push(`${metrics.words.toLocaleString()} words`);
@@ -215,6 +227,7 @@ export type FileCreationCardProps = {
   filename?: string;
   fileUrl?: string;
   fileSizeBytes?: number;
+  fileId?: string;
   onRetry?: () => void;
   researchSourceCount?: number;
   sources?: FileSource[];
@@ -230,6 +243,7 @@ export const FileCreationCard = memo(function FileCreationCard({
   filename,
   fileUrl,
   fileSizeBytes,
+  fileId,
   onRetry,
   researchSourceCount,
   metrics,
@@ -313,7 +327,10 @@ export const FileCreationCard = memo(function FileCreationCard({
 
   // ── In-Progress / Creating state (CONTAINER-FREE, TEXT-ONLY PROCESS DROPDOWN) ──
   if (stage !== "completed") {
-    const statusPhrase = getLiveStatusPhrase(stage as FileCreationStage, format);
+    const statusPhrase = getLiveStatusPhrase(
+      stage as FileCreationStage,
+      format
+    );
     const currentOrder = STAGE_NUMBERS[stage as FileCreationStage] ?? 1;
 
     const hasResearch =
@@ -394,10 +411,17 @@ export const FileCreationCard = memo(function FileCreationCard({
           type="button"
           onClick={() => setIsExpanded(prev => !prev)}
           aria-expanded={isExpanded}
-          aria-label={isExpanded ? "Collapse generation process" : "Expand generation process"}
+          aria-label={
+            isExpanded
+              ? "Collapse generation process"
+              : "Expand generation process"
+          }
           className="group/process flex min-h-[36px] items-center gap-2 py-1 text-left cursor-pointer transition-colors focus-visible:outline-none"
         >
-          <FileBrandMark variant={variant} className="size-6 shrink-0 select-none" />
+          <FileBrandMark
+            variant={variant}
+            className="size-6 shrink-0 select-none"
+          />
           <span className="text-[14.5px] font-medium text-foreground transition-opacity duration-200">
             {statusPhrase}
           </span>
@@ -480,6 +504,7 @@ export const FileCreationCard = memo(function FileCreationCard({
               url: fileUrl,
               filename: displayName,
               sizeBytes: fileSizeBytes,
+              id: fileId,
             });
           }
         }}
@@ -491,7 +516,10 @@ export const FileCreationCard = memo(function FileCreationCard({
         )}
       >
         {/* File Brand Logo: clean, properly sized (size-9 / 36px), no extra wrapper layer */}
-        <FileBrandMark variant={variant} className="size-9 shrink-0 select-none" />
+        <FileBrandMark
+          variant={variant}
+          className="size-9 shrink-0 select-none"
+        />
 
         {/* Title & auto-dismissing Ready status (no duplicate format badge) */}
         <div className="min-w-0 flex-1">
