@@ -1,4 +1,4 @@
-import React, { memo, useCallback, useEffect, useRef, useState } from "react";
+﻿import React, { memo, useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -1157,16 +1157,16 @@ export const ExcelViewer = memo(function ExcelViewer({
                         inBandCell
                           ? {
                               ...(rIdx === selLoRow
-                                ? { borderTop: "1px solid #10b981" }
+                                ? { borderTop: "2px solid #10b981" }
                                 : {}),
                               ...(rIdx === selHiRow
-                                ? { borderBottom: "1px solid #10b981" }
+                                ? { borderBottom: "2px solid #10b981" }
                                 : {}),
                               ...(cIdx === selLoCol
-                                ? { borderLeft: "1px solid #10b981" }
+                                ? { borderLeft: "2px solid #10b981" }
                                 : {}),
                               ...(cIdx === selHiCol
-                                ? { borderRight: "1px solid #10b981" }
+                                ? { borderRight: "2px solid #10b981" }
                                 : {}),
                             }
                           : undefined;
@@ -1176,16 +1176,16 @@ export const ExcelViewer = memo(function ExcelViewer({
                         inRange && isMultiRange
                           ? {
                               ...(rIdx === rangeLoRow
-                                ? { borderTop: "1px solid #10b981" }
+                                ? { borderTop: "2px solid #10b981" }
                                 : {}),
                               ...(rIdx === rangeHiRow
-                                ? { borderBottom: "1px solid #10b981" }
+                                ? { borderBottom: "2px solid #10b981" }
                                 : {}),
                               ...(cIdx === rangeLoCol
-                                ? { borderLeft: "1px solid #10b981" }
+                                ? { borderLeft: "2px solid #10b981" }
                                 : {}),
                               ...(cIdx === rangeHiCol
-                                ? { borderRight: "1px solid #10b981" }
+                                ? { borderRight: "2px solid #10b981" }
                                 : {}),
                             }
                           : undefined;
@@ -1226,7 +1226,7 @@ export const ExcelViewer = memo(function ExcelViewer({
                               ? "bg-white/[0.06] dark:bg-white/[0.06]"
                               : "",
                             showActiveRing
-                              ? "ring-1 ring-emerald-600 ring-inset bg-white/[0.06] dark:bg-white/[0.06] font-medium"
+                              ? "ring-2 ring-emerald-600 ring-inset bg-white/[0.06] dark:bg-white/[0.06] font-medium"
                               : inRange && isMultiRange
                                 ? ""
                                 : "hover:bg-muted/30"
