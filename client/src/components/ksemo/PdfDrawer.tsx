@@ -427,6 +427,18 @@ export const ExcelViewer = memo(function ExcelViewer({
   const [selectedCol, setSelectedCol] = useState<number | null>(null);
   const [selectedRow, setSelectedRow] = useState<number | null>(null);
   const [selectAll, setSelectAll] = useState<boolean>(false);
+  const [range, setRange] = useState<{
+    startRow: number;
+    startCol: number;
+    endRow: number;
+    endCol: number;
+  } | null>(null);
+  const dragRef = useRef<{
+    active: boolean;
+    moved: boolean;
+    startRow: number;
+    startCol: number;
+  }>({ active: false, moved: false, startRow: 0, startCol: 0 });
   const cellInputRef = useRef<HTMLInputElement | null>(null);
   const [undoStack, setUndoStack] = useState<ExcelSheetData[][]>([]);
   const [redoStack, setRedoStack] = useState<ExcelSheetData[][]>([]);
@@ -443,6 +455,7 @@ export const ExcelViewer = memo(function ExcelViewer({
   );
   const numCols = Math.max(maxColsInSheet, 50);
   const numRows = Math.max(currentSheet.data.length, 50);
+  const usedRowCount = Math.max(currentSheet.data.length, 1);
 
   const colHeaders = Array.from({ length: numCols }, (_, i) =>
     getColumnLetter(i)
@@ -473,6 +486,7 @@ export const ExcelViewer = memo(function ExcelViewer({
     setSelectedCol(null);
     setSelectedRow(null);
     setSelectAll(false);
+    setRange(null);
   };
 
   const handleRedo = () => {
@@ -487,6 +501,7 @@ export const ExcelViewer = memo(function ExcelViewer({
     setSelectedCol(null);
     setSelectedRow(null);
     setSelectAll(false);
+    setRange(null);
   };
 
   // Sheet tab rename
@@ -533,12 +548,53 @@ export const ExcelViewer = memo(function ExcelViewer({
       setSelectedCol(null);
       setSelectedRow(null);
       setSelectAll(false);
+      setRange({ startRow: rIdx, startCol: cIdx, endRow: rIdx, endCol: cIdx });
     },
     [currentSheet]
   );
 
+  // Start a selection drag (mouse pressed on a cell)
+  const handleCellMouseDown = (rIdx: number, cIdx: number) => {
+    setSelectedCol(null);
+    setSelectedRow(null);
+    setSelectAll(false);
+    setSelectedCell({
+      row: rIdx,
+      col: cIdx,
+      coord: `${getColumnLetter(cIdx)}${rIdx + 1}`,
+      value: currentSheet.data[rIdx]?.[cIdx] ?? "",
+    });
+    setRange({ startRow: rIdx, startCol: cIdx, endRow: rIdx, endCol: cIdx });
+    setEditingCell(null);
+    dragRef.current = {
+      active: true,
+      moved: false,
+      startRow: rIdx,
+      startCol: cIdx,
+    };
+  };
+
+  // Dragging across cells extends the selection rectangle (Excel-style)
+  const handleCellMouseEnter = (rIdx: number, cIdx: number) => {
+    if (!dragRef.current.active) return;
+    if (rIdx !== dragRef.current.startRow || cIdx !== dragRef.current.startCol) {
+      dragRef.current.moved = true;
+    }
+    setRange(prev =>
+      prev
+        ? { ...prev, endRow: rIdx, endCol: cIdx }
+        : { startRow: rIdx, startCol: cIdx, endRow: rIdx, endCol: cIdx }
+    );
+    setEditingCell(null);
+  };
+
   // Handle cell click (Excel-style: single click selects only)
   const handleCellClick = (rIdx: number, cIdx: number, currentVal: any) => {
+    // A real drag already handled the selection; ignore the trailing click
+    if (dragRef.current.moved) {
+      dragRef.current.moved = false;
+      return;
+    }
     setSelectedCell({
       row: rIdx,
       col: cIdx,
@@ -548,6 +604,7 @@ export const ExcelViewer = memo(function ExcelViewer({
     setSelectedCol(null);
     setSelectedRow(null);
     setSelectAll(false);
+    setRange({ startRow: rIdx, startCol: cIdx, endRow: rIdx, endCol: cIdx });
     setEditingCell(null);
   };
 
@@ -566,6 +623,7 @@ export const ExcelViewer = memo(function ExcelViewer({
     setSelectedCol(null);
     setSelectedRow(null);
     setSelectAll(false);
+    setRange({ startRow: rIdx, startCol: cIdx, endRow: rIdx, endCol: cIdx });
     setEditingCell({ row: rIdx, col: cIdx });
     setEditValue(String(currentVal ?? ""));
   };
@@ -583,6 +641,7 @@ export const ExcelViewer = memo(function ExcelViewer({
         value: currentSheet.data[0]?.[cIdx] ?? "",
       });
       setEditingCell(null);
+      setRange(null);
     },
     [currentSheet]
   );
@@ -600,6 +659,7 @@ export const ExcelViewer = memo(function ExcelViewer({
         value: currentSheet.data[rIdx]?.[0] ?? "",
       });
       setEditingCell(null);
+      setRange(null);
     },
     [currentSheet]
   );
@@ -616,10 +676,21 @@ export const ExcelViewer = memo(function ExcelViewer({
       value: currentSheet.data[0]?.[0] ?? "",
     });
     setEditingCell(null);
+    setRange(null);
   }, [currentSheet]);
 
-  // Copy the current selection (cell / row / column / whole sheet) so it can
-  // be pasted into Excel verbatim (rows -> "\n", cells within a row -> "\t")
+  // Stop dragging when the mouse is released anywhere
+  useEffect(() => {
+    const handleMouseUp = () => {
+      dragRef.current.active = false;
+    };
+    window.addEventListener("mouseup", handleMouseUp);
+    return () => window.removeEventListener("mouseup", handleMouseUp);
+  }, []);
+
+  // Copy the current selection (cell / range / row / column / whole sheet) so
+  // it can be pasted into Excel verbatim (rows -> "\n", cells within a row ->
+  // "\t")
   const handleCopy = useCallback(() => {
     const joinCells = (values: any[]) =>
       values.map(v => String(v ?? "")).join("\t");
@@ -652,6 +723,23 @@ export const ExcelViewer = memo(function ExcelViewer({
           ? currentSheet.data[selectedRow]
           : []
       );
+    } else if (range) {
+      const loRow = Math.min(range.startRow, range.endRow);
+      const hiRow = Math.max(range.startRow, range.endRow);
+      const loCol = Math.min(range.startCol, range.endCol);
+      const hiCol = Math.max(range.startCol, range.endCol);
+      const lines: string[] = [];
+      for (let r = loRow; r <= hiRow; r++) {
+        const row = Array.isArray(currentSheet.data[r])
+          ? currentSheet.data[r]
+          : [];
+        const cells: string[] = [];
+        for (let c = loCol; c <= hiCol; c++) {
+          cells.push(String(row[c] ?? ""));
+        }
+        lines.push(cells.join("\t"));
+      }
+      textToCopy = lines.join("\n");
     } else if (selectedCell) {
       textToCopy = String(selectedCell.value ?? "");
     } else {
@@ -659,7 +747,7 @@ export const ExcelViewer = memo(function ExcelViewer({
     }
 
     void copyTextToClipboard(textToCopy);
-  }, [selectAll, selectedCol, selectedRow, selectedCell, currentSheet]);
+  }, [selectAll, selectedCol, selectedRow, range, selectedCell, currentSheet]);
 
   // Add new row at bottom
   const handleAddRow = () => {
@@ -956,7 +1044,7 @@ export const ExcelViewer = memo(function ExcelViewer({
                   title="Click to select the whole sheet"
                   className={cn(
                     "sticky left-0 z-30 w-10 min-w-[40px] bg-muted border-r border-b border-border text-center font-normal text-muted-foreground/40 py-1 cursor-pointer transition-colors",
-                    selectAll && "bg-emerald-600/20"
+                    selectAll && "bg-emerald-500/20"
                   )}
                 />
                 {colHeaders.map((col, idx) => {
@@ -968,7 +1056,7 @@ export const ExcelViewer = memo(function ExcelViewer({
                       className={cn(
                         "relative w-[120px] min-w-[100px] border-r border-b border-border px-2 py-1 text-center text-xs font-semibold cursor-pointer transition-colors select-none",
                         isColSelected
-                          ? "bg-emerald-600/20 text-emerald-700 dark:text-emerald-300 font-bold border-b-2 border-b-emerald-600"
+                          ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-bold"
                           : "text-muted-foreground bg-muted/80 hover:bg-muted"
                       )}
                     >
@@ -990,7 +1078,7 @@ export const ExcelViewer = memo(function ExcelViewer({
                       className={cn(
                         "relative sticky left-0 z-10 w-10 min-w-[40px] border-r border-b border-border px-2 py-1 text-right font-mono text-[11px] font-normal cursor-pointer select-none transition-colors",
                         isRowSelected
-                          ? "bg-muted text-emerald-700 dark:text-emerald-300 font-bold border-r-2 border-r-emerald-600"
+                          ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-bold"
                           : "bg-muted text-muted-foreground"
                       )}
                     >
@@ -999,13 +1087,122 @@ export const ExcelViewer = memo(function ExcelViewer({
                     {colHeaders.map((_, cIdx) => {
                       const val =
                         rowData[cIdx] !== undefined ? rowData[cIdx] : "";
-                      const isSelected =
+                      const isEditing =
+                        editingCell?.row === rIdx &&
+                        editingCell?.col === cIdx;
+
+                      // Drag range rectangle membership (Excel-style)
+                      const rangeLoRow = range
+                        ? Math.min(range.startRow, range.endRow)
+                        : -1;
+                      const rangeHiRow = range
+                        ? Math.max(range.startRow, range.endRow)
+                        : -2;
+                      const rangeLoCol = range
+                        ? Math.min(range.startCol, range.endCol)
+                        : -1;
+                      const rangeHiCol = range
+                        ? Math.max(range.startCol, range.endCol)
+                        : -2;
+                      const inRange =
+                        range !== null &&
+                        rIdx >= rangeLoRow &&
+                        rIdx <= rangeHiRow &&
+                        cIdx >= rangeLoCol &&
+                        cIdx <= rangeHiCol;
+                      const isMultiRange =
+                        range !== null &&
+                        (range.startRow !== range.endRow ||
+                          range.startCol !== range.endCol);
+
+                      // Whole column / row / sheet selections draw a thin
+                      // green outline around the entire band (Excel-style)
+                      const selLoRow =
+                        selectedRow !== null
+                          ? selectedRow
+                          : selectedCol !== null || selectAll
+                            ? 0
+                            : -1;
+                      const selHiRow =
+                        selectedRow !== null
+                          ? selectedRow
+                          : selectedCol !== null
+                            ? usedRowCount - 1
+                            : selectAll
+                              ? numRows - 1
+                              : -2;
+                      const selLoCol =
+                        selectedCol !== null
+                          ? selectedCol
+                          : selectedRow !== null || selectAll
+                            ? 0
+                            : -1;
+                      const selHiCol =
+                        selectedCol !== null
+                          ? selectedCol
+                          : selectedRow !== null || selectAll
+                            ? numCols - 1
+                            : -2;
+                      const inBand =
+                        selectedCol !== null ||
+                        selectedRow !== null ||
+                        selectAll;
+                      const inBandCell =
+                        inBand &&
+                        rIdx >= selLoRow &&
+                        rIdx <= selHiRow &&
+                        cIdx >= selLoCol &&
+                        cIdx <= selHiCol;
+                      const bandEdgeStyle: React.CSSProperties | undefined =
+                        inBandCell
+                          ? {
+                              ...(rIdx === selLoRow
+                                ? { borderTop: "1px solid #10b981" }
+                                : {}),
+                              ...(rIdx === selHiRow
+                                ? { borderBottom: "1px solid #10b981" }
+                                : {}),
+                              ...(cIdx === selLoCol
+                                ? { borderLeft: "1px solid #10b981" }
+                                : {}),
+                              ...(cIdx === selHiCol
+                                ? { borderRight: "1px solid #10b981" }
+                                : {}),
+                            }
+                          : undefined;
+
+                      // Only the thin outer line of the dragged rectangle is drawn
+                      const rangeEdgeStyle: React.CSSProperties | undefined =
+                        inRange && isMultiRange
+                          ? {
+                              ...(rIdx === rangeLoRow
+                                ? { borderTop: "1px solid #10b981" }
+                                : {}),
+                              ...(rIdx === rangeHiRow
+                                ? { borderBottom: "1px solid #10b981" }
+                                : {}),
+                              ...(cIdx === rangeLoCol
+                                ? { borderLeft: "1px solid #10b981" }
+                                : {}),
+                              ...(cIdx === rangeHiCol
+                                ? { borderRight: "1px solid #10b981" }
+                                : {}),
+                            }
+                          : undefined;
+
+                      // Active-cell ring only for a single-cell selection and
+                      // never when a whole column / row / sheet is selected
+                      const isSingleRange =
+                        range !== null &&
+                        range.startRow === range.endRow &&
+                        range.startCol === range.endCol;
+                      const showActiveRing =
+                        !selectAll &&
+                        selectedCol === null &&
+                        selectedRow === null &&
+                        isSingleRange &&
                         selectedCell?.row === rIdx &&
                         selectedCell?.col === cIdx;
-                      const isEditing =
-                        editingCell?.row === rIdx && editingCell?.col === cIdx;
-                      const isInSelectedCol = selectedCol === cIdx;
-                      const isInSelectedRow = selectedRow === rIdx;
 
                       return (
                         <td
@@ -1013,18 +1210,26 @@ export const ExcelViewer = memo(function ExcelViewer({
                           data-cell
                           data-row={rIdx}
                           data-col={cIdx}
+                          onMouseDown={() => handleCellMouseDown(rIdx, cIdx)}
+                          onMouseEnter={() => handleCellMouseEnter(rIdx, cIdx)}
                           onClick={() => handleCellClick(rIdx, cIdx, val)}
                           onDoubleClick={() =>
                             handleCellDoubleClick(rIdx, cIdx, val)
                           }
+                          style={{
+                            ...(bandEdgeStyle || {}),
+                            ...(rangeEdgeStyle || {}),
+                          }}
                           className={cn(
-                            "w-[120px] min-w-[100px] border-r border-b border-border/60 px-2 py-1 text-xs truncate cursor-cell transition-colors relative",
-isInSelectedCol || isInSelectedRow || selectAll
-                          ? "bg-emerald-500/15"
-                          : "",
-                            isSelected
-                              ? "ring-2 ring-emerald-600 ring-inset bg-emerald-500/15 font-medium"
-                              : "hover:bg-muted/30"
+                            "relative w-[120px] min-w-[100px] border-r border-b border-border/60 px-2 py-1 text-xs truncate cursor-cell transition-colors",
+                            inBandCell
+                              ? "bg-white/[0.06] dark:bg-white/[0.06]"
+                              : "",
+                            showActiveRing
+                              ? "ring-1 ring-emerald-600 ring-inset bg-white/[0.06] dark:bg-white/[0.06] font-medium"
+                              : inRange && isMultiRange
+                                ? ""
+                                : "hover:bg-muted/30"
                           )}
                         >
                           {isEditing ? (
@@ -1034,6 +1239,7 @@ isInSelectedCol || isInSelectedRow || selectAll
                               type="text"
                               value={editValue}
                               onClick={e => e.stopPropagation()}
+                              onMouseDown={e => e.stopPropagation()}
                               onChange={e => {
                                 const newVal = e.target.value;
                                 setEditValue(newVal);
@@ -1103,6 +1309,7 @@ isInSelectedCol || isInSelectedRow || selectAll
                   setSelectedCol(null);
                   setSelectedRow(null);
                   setSelectAll(false);
+                  setRange(null);
                 }}
                 onDoubleClick={e => {
                   e.stopPropagation();
