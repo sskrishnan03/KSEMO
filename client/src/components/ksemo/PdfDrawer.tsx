@@ -1,4 +1,11 @@
-﻿import React, { memo, useCallback, useEffect, useRef, useState } from "react";
+﻿import React, {
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -317,6 +324,28 @@ function getColumnLetter(colIndex: number): string {
   return letter;
 }
 
+function colIndexFromLetters(letters: string): number {
+  let idx = 0;
+  for (const ch of letters) {
+    idx = idx * 26 + (ch.charCodeAt(0) - 64);
+  }
+  return idx - 1;
+}
+
+// Copy a formula to a new position: relative refs move with the delta,
+// absolute refs ($A$1, $A1, A$1) stay anchored.
+function adjustFormulaRefs(formula: string, dRow: number, dCol: number): string {
+  return formula.replace(
+    /(\$?)([A-Z]+)(\$?)(\d+)/g,
+    (m, dc: string, cols: string, dr: string, rn: string) => {
+      const newCol = dc === "$" ? cols : getColumnLetter(colIndexFromLetters(cols) + dCol);
+      const rowNum = parseInt(rn, 10);
+      const newRow = dr === "$" ? rn : String(rowNum + dRow);
+      return dc + newCol + dr + newRow;
+    }
+  );
+}
+
 // Copy plain text to the clipboard with a fallback for non-secure contexts
 async function copyTextToClipboard(text: string): Promise<boolean> {
   try {
@@ -439,6 +468,15 @@ export const ExcelViewer = memo(function ExcelViewer({
     startRow: number;
     startCol: number;
   }>({ active: false, moved: false, startRow: 0, startCol: 0 });
+
+  // Internal clipboard for Ctrl+C / Ctrl+X / Ctrl+V
+  const clipboardRef = useRef<{
+    grid: any[][];
+    rows: number;
+    cols: number;
+    topLeft: { row: number; col: number };
+  } | null>(null);
+
   const cellInputRef = useRef<HTMLInputElement | null>(null);
   const [undoStack, setUndoStack] = useState<ExcelSheetData[][]>([]);
   const [redoStack, setRedoStack] = useState<ExcelSheetData[][]>([]);
@@ -461,6 +499,65 @@ export const ExcelViewer = memo(function ExcelViewer({
     getColumnLetter(i)
   );
   const rowIndices = Array.from({ length: numRows }, (_, i) => i);
+
+  // Bounding box of the current selection (cell / range / row / column / all)
+  const activeSelBounds = useMemo(() => {
+    if (selectAll) {
+      return {
+        has: true,
+        loRow: 0,
+        hiRow: numRows - 1,
+        loCol: 0,
+        hiCol: numCols - 1,
+      };
+    }
+    if (selectedCol !== null) {
+      return {
+        has: true,
+        loRow: 0,
+        hiRow: usedRowCount - 1,
+        loCol: selectedCol,
+        hiCol: selectedCol,
+      };
+    }
+    if (selectedRow !== null) {
+      return {
+        has: true,
+        loRow: selectedRow,
+        hiRow: selectedRow,
+        loCol: 0,
+        hiCol: numCols - 1,
+      };
+    }
+    if (range) {
+      return {
+        has: true,
+        loRow: Math.min(range.startRow, range.endRow),
+        hiRow: Math.max(range.startRow, range.endRow),
+        loCol: Math.min(range.startCol, range.endCol),
+        hiCol: Math.max(range.startCol, range.endCol),
+      };
+    }
+    if (selectedCell) {
+      return {
+        has: true,
+        loRow: selectedCell.row,
+        hiRow: selectedCell.row,
+        loCol: selectedCell.col,
+        hiCol: selectedCell.col,
+      };
+    }
+    return { has: false, loRow: 0, hiRow: -1, loCol: 0, hiCol: -1 };
+  }, [
+    selectAll,
+    selectedCol,
+    selectedRow,
+    range,
+    selectedCell,
+    numRows,
+    numCols,
+    usedRowCount,
+  ]);
 
   // Commit a change with undo/redo history (auto-saves to the parent)
   const commitChange = useCallback(
@@ -684,70 +781,198 @@ export const ExcelViewer = memo(function ExcelViewer({
     const handleMouseUp = () => {
       dragRef.current.active = false;
     };
+    const handlePointerUp = () => {
+      dragRef.current.active = false;
+    };
     window.addEventListener("mouseup", handleMouseUp);
-    return () => window.removeEventListener("mouseup", handleMouseUp);
+    window.addEventListener("pointerup", handlePointerUp);
+    return () => {
+      window.removeEventListener("mouseup", handleMouseUp);
+      window.removeEventListener("pointerup", handlePointerUp);
+    };
   }, []);
 
-  // Copy the current selection (cell / range / row / column / whole sheet) so
-  // it can be pasted into Excel verbatim (rows -> "\n", cells within a row ->
-  // "\t")
-  const handleCopy = useCallback(() => {
-    const joinCells = (values: any[]) =>
+  // Build the current selection as a 2D clipboard block + plain TSV text
+  const buildCopyBlock = useCallback(() => {
+    const joinRow = (values: any[]) =>
       values.map(v => String(v ?? "")).join("\t");
 
-    let textToCopy = "";
+    let grid: any[][] | null = null;
+    let topLeft = { row: 0, col: 0 };
+
+    const padRows = (rows: any[][], cols: number) =>
+      rows.map(r => {
+        const row = Array.isArray(r) ? r : [];
+        return Array.from({ length: cols }, (_, i) => row[i] ?? "");
+      });
 
     if (selectAll) {
-      const rows = currentSheet.data;
-      const maxCols = rows.reduce(
+      const cols = currentSheet.data.reduce(
         (m, r) => Math.max(m, Array.isArray(r) ? r.length : 0),
         0
       );
-      textToCopy = rows
-        .map(r => {
-          const row = Array.isArray(r) ? r : [];
-          return joinCells(
-            Array.from({ length: maxCols }, (_, i) => row[i] ?? "")
-          );
-        })
-        .join("\n");
+      grid = padRows(currentSheet.data, cols);
     } else if (selectedCol !== null) {
-      textToCopy = currentSheet.data
-        .map(r =>
-          String((Array.isArray(r) ? r[selectedCol] : undefined) ?? "")
-        )
-        .join("\n");
+      grid = currentSheet.data.map(r => [
+        (Array.isArray(r) ? r[selectedCol] : undefined) ?? "",
+      ]);
+      topLeft = { row: 0, col: selectedCol };
     } else if (selectedRow !== null) {
-      textToCopy = joinCells(
+      grid = [
         Array.isArray(currentSheet.data[selectedRow])
           ? currentSheet.data[selectedRow]
-          : []
-      );
+          : [],
+      ];
+      topLeft = { row: selectedRow, col: 0 };
     } else if (range) {
-      const loRow = Math.min(range.startRow, range.endRow);
-      const hiRow = Math.max(range.startRow, range.endRow);
-      const loCol = Math.min(range.startCol, range.endCol);
-      const hiCol = Math.max(range.startCol, range.endCol);
-      const lines: string[] = [];
-      for (let r = loRow; r <= hiRow; r++) {
+      const loR = Math.min(range.startRow, range.endRow);
+      const hiR = Math.max(range.startRow, range.endRow);
+      const loC = Math.min(range.startCol, range.endCol);
+      const hiC = Math.max(range.startCol, range.endCol);
+      topLeft = { row: loR, col: loC };
+      grid = [];
+      for (let r = loR; r <= hiR; r++) {
         const row = Array.isArray(currentSheet.data[r])
           ? currentSheet.data[r]
           : [];
-        const cells: string[] = [];
-        for (let c = loCol; c <= hiCol; c++) {
-          cells.push(String(row[c] ?? ""));
-        }
-        lines.push(cells.join("\t"));
+        const cells: any[] = [];
+        for (let c = loC; c <= hiC; c++) cells.push(row[c] ?? "");
+        grid.push(cells);
       }
-      textToCopy = lines.join("\n");
     } else if (selectedCell) {
-      textToCopy = String(selectedCell.value ?? "");
-    } else {
-      return;
+      grid = [[selectedCell.value ?? ""]];
+      topLeft = { row: selectedCell.row, col: selectedCell.col };
     }
+    if (!grid || grid.length === 0) return null;
 
-    void copyTextToClipboard(textToCopy);
+    return {
+      grid,
+      rows: grid.length,
+      cols: grid[0]?.length ?? 0,
+      topLeft,
+      text: grid.map(joinRow).join("\n"),
+    };
   }, [selectAll, selectedCol, selectedRow, range, selectedCell, currentSheet]);
+
+  // Copy the current selection (cell / range / row / column / whole sheet) so
+  // it can be pasted into Excel verbatim (rows -> "\n", cells within a row ->
+  // "\t") and stored internally for Ctrl+V
+  const handleCopy = useCallback(() => {
+    const block = buildCopyBlock();
+    if (!block) return;
+    clipboardRef.current = {
+      grid: block.grid,
+      rows: block.rows,
+      cols: block.cols,
+      topLeft: block.topLeft,
+    };
+    void copyTextToClipboard(block.text);
+  }, [buildCopyBlock]);
+
+  // Clear a rectangle of cells on the active sheet as one undoable step
+  const clearCellsInRegion = useCallback(
+    (loRow: number, hiRow: number, loCol: number, hiCol: number) => {
+      const next = localSheets.map((s, idx) => {
+        if (idx !== activeSheetIdx) return s;
+        const rows = s.data.map(r => (Array.isArray(r) ? [...r] : []));
+        for (let r = loRow; r <= hiRow; r++) {
+          while (rows.length <= r) rows.push([]);
+          const row = rows[r];
+          for (let c = loCol; c <= hiCol; c++) {
+            while (row.length <= c) row.push("");
+            row[c] = "";
+          }
+        }
+        return { ...s, data: rows };
+      });
+      commitChange(next);
+    },
+    [localSheets, activeSheetIdx, commitChange]
+  );
+
+  // Delete / Backspace: clear the whole current selection
+  const clearCurrentSelection = useCallback(() => {
+    if (!activeSelBounds.has) return;
+    clearCellsInRegion(
+      activeSelBounds.loRow,
+      activeSelBounds.hiRow,
+      activeSelBounds.loCol,
+      activeSelBounds.hiCol
+    );
+  }, [activeSelBounds, clearCellsInRegion]);
+
+  // Cut: copy then clear the source cells
+  const handleCut = useCallback(() => {
+    const block = buildCopyBlock();
+    if (!block) return;
+    handleCopy();
+    clearCellsInRegion(
+      block.topLeft.row,
+      block.topLeft.row + block.rows - 1,
+      block.topLeft.col,
+      block.topLeft.col + block.cols - 1
+    );
+  }, [buildCopyBlock, handleCopy, clearCellsInRegion]);
+
+  // Paste: repeat the clipped pattern over the current selection (or anchor)
+  const handlePaste = useCallback(() => {
+    const clip = clipboardRef.current;
+    if (!clip || !selectedCell || clip.rows === 0 || clip.cols === 0) return;
+    const anchorRow = selectedCell.row;
+    const anchorCol = selectedCell.col;
+    const selIsSingle =
+      activeSelBounds.has &&
+      activeSelBounds.loRow === activeSelBounds.hiRow &&
+      activeSelBounds.loCol === activeSelBounds.hiCol;
+    const dest = !selIsSingle && clip.rows === 1 && clip.cols === 1
+      ? {
+          loRow: activeSelBounds.loRow,
+          hiRow: activeSelBounds.hiRow,
+          loCol: activeSelBounds.loCol,
+          hiCol: activeSelBounds.hiCol,
+        }
+      : {
+          loRow: anchorRow,
+          hiRow: selIsSingle
+            ? anchorRow + clip.rows - 1
+            : activeSelBounds.loRow + clip.rows - 1,
+          loCol: anchorCol,
+          hiCol: selIsSingle
+            ? anchorCol + clip.cols - 1
+            : activeSelBounds.loCol + clip.cols - 1,
+        };
+    const next = localSheets.map((s, idx) => {
+      if (idx !== activeSheetIdx) return s;
+      const rows = s.data.map(r => (Array.isArray(r) ? [...r] : []));
+      for (let r = dest.loRow; r <= dest.hiRow; r++) {
+        while (rows.length <= r) rows.push([]);
+        const row = rows[r];
+        const relR = ((r - dest.loRow) % clip.rows + clip.rows) % clip.rows;
+        for (let c = dest.loCol; c <= dest.hiCol; c++) {
+          while (row.length <= c) row.push("");
+          const relC = ((c - dest.loCol) % clip.cols + clip.cols) % clip.cols;
+          let v = clip.grid[relR][relC];
+          if (typeof v === "string" && v.startsWith("=")) {
+            const fromR = clip.topLeft.row + relR;
+            const fromC = clip.topLeft.col + relC;
+            v = adjustFormulaRefs(v, r - fromR, c - fromC);
+          }
+          row[c] = v;
+        }
+      }
+      return { ...s, data: rows };
+    });
+    const changed = next.some(
+      (s, idx) => idx === activeSheetIdx && s !== localSheets[idx]
+    );
+    if (changed) commitChange(next);
+  }, [
+    selectedCell,
+    activeSelBounds,
+    localSheets,
+    activeSheetIdx,
+    commitChange,
+  ]);
 
   // Add new row at bottom
   const handleAddRow = () => {
@@ -808,6 +1033,18 @@ export const ExcelViewer = memo(function ExcelViewer({
         handleCopy();
         return;
       }
+      // Cut the current selection (copy + clear it in one undo step)
+      if (mod && (e.key === "x" || e.key === "X")) {
+        e.preventDefault();
+        handleCut();
+        return;
+      }
+      // Paste the last copied block starting at the active cell
+      if (mod && (e.key === "v" || e.key === "V")) {
+        e.preventDefault();
+        handlePaste();
+        return;
+      }
 
       if (editingCell) return;
 
@@ -838,6 +1075,65 @@ export const ExcelViewer = memo(function ExcelViewer({
       const { row, col } = selectedCell;
       const lastRow = numRows - 1;
       const lastCol = numCols - 1;
+
+      // Shift + Arrow extends the selection from the active cell
+      const arrowKey = e.key.startsWith("Arrow") ? e.key : null;
+      if (arrowKey && e.shiftKey) {
+        e.preventDefault();
+        let endRow = row;
+        let endCol = col;
+        if (arrowKey === "ArrowDown") endRow = Math.min(row + 1, lastRow);
+        else if (arrowKey === "ArrowUp") endRow = Math.max(row - 1, 0);
+        else if (arrowKey === "ArrowRight") endCol = Math.min(col + 1, lastCol);
+        else if (arrowKey === "ArrowLeft") endCol = Math.max(col - 1, 0);
+        setRange({ startRow: row, startCol: col, endRow, endCol });
+        return;
+      }
+      // Ctrl/Cmd + Arrow jumps through data regions
+      if (arrowKey && mod) {
+        e.preventDefault();
+        const anyVal = (rr: number, cc: number) => {
+          const v = currentSheet.data[rr]?.[cc];
+          return v !== undefined && v !== null && String(v) !== "";
+        };
+        const findEdge = (
+          r: number,
+          c: number,
+          dr: number,
+          dc: number
+        ): { r: number; c: number } => {
+          let curR = r;
+          let curC = c;
+          if (dr !== 0) {
+            while (
+              curR + dr >= 0 &&
+              curR + dr <= lastRow &&
+              anyVal(curR + dr, c)
+            ) {
+              curR += dr;
+            }
+          } else {
+            while (
+              curC + dc >= 0 &&
+              curC + dc <= lastCol &&
+              anyVal(r, curC + dc)
+            ) {
+              curC += dc;
+            }
+          }
+          return { r: curR, c: curC };
+        };
+        const dirMap: Record<string, [number, number]> = {
+          ArrowDown: [1, 0],
+          ArrowUp: [-1, 0],
+          ArrowRight: [0, 1],
+          ArrowLeft: [0, -1],
+        };
+        const [dr, dc] = dirMap[arrowKey];
+        const edge = findEdge(row, col, dr, dc);
+        selectCell(edge.r, edge.c);
+        return;
+      }
 
       if (e.key === "Tab") {
         e.preventDefault();
@@ -874,13 +1170,16 @@ export const ExcelViewer = memo(function ExcelViewer({
       } else if (e.key === "ArrowLeft") {
         e.preventDefault();
         selectCell(row, Math.max(col - 1, 0));
-      } else if (e.key === "Enter" || e.key === "F2") {
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        selectCell(Math.min(row + 1, lastRow), col);
+      } else if (e.key === "F2") {
         e.preventDefault();
         setEditingCell({ row, col });
         setEditValue(String(selectedCell.value ?? ""));
       } else if (e.key === "Delete" || e.key === "Backspace") {
         e.preventDefault();
-        updateCellValue(activeSheetIdx, row, col, "");
+        clearCurrentSelection();
         setSelectedCell(prev => (prev ? { ...prev, value: "" } : null));
       } else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
         setEditingCell({ row, col });
@@ -900,12 +1199,16 @@ export const ExcelViewer = memo(function ExcelViewer({
     numRows,
     numCols,
     activeSheetIdx,
+    currentSheet,
     selectCell,
     updateCellValue,
     handleUndo,
     handleRedo,
     handleSelectAll,
     handleCopy,
+    handleCut,
+    handlePaste,
+    clearCurrentSelection,
   ]);
 
   return (
@@ -1210,7 +1513,11 @@ export const ExcelViewer = memo(function ExcelViewer({
                           data-cell
                           data-row={rIdx}
                           data-col={cIdx}
-                          onMouseDown={() => handleCellMouseDown(rIdx, cIdx)}
+                          onPointerDown={e => {
+                            if (e.button !== 0) return;
+                            handleCellMouseDown(rIdx, cIdx);
+                          }}
+                          onPointerEnter={() => handleCellMouseEnter(rIdx, cIdx)}
                           onMouseEnter={() => handleCellMouseEnter(rIdx, cIdx)}
                           onClick={() => handleCellClick(rIdx, cIdx, val)}
                           onDoubleClick={() =>
