@@ -135,6 +135,19 @@ const FORMAT_TO_VARIANT: Record<DocFormat, FileBrandVariant> = {
   csv: "text",
 };
 
+// Brand colors for the file-type label: the extension text below the file
+// name wears the color of the format (red PDF, blue Word, green Excel,
+// orange PowerPoint, slate for text/spreadsheet).
+const FORMAT_TEXT_COLOR: Record<DocFormat, string> = {
+  pdf: "#E8504F",
+  docx: "#4F7DF2",
+  xlsx: "#2FA06A",
+  pptx: "#F0783A",
+  txt: "#9AA4B2",
+  markdown: "#9AA4B2",
+  csv: "#9AA4B2",
+};
+
 export function getLiveStatusPhrase(
   stage: FileCreationStage,
   format?: DocFormat
@@ -492,7 +505,7 @@ export const FileCreationCard = memo(function FileCreationCard({
         <div
           ref={stageRef}
           data-testid="file-preview-stage"
-          className="relative grid h-[240px] place-items-center overflow-hidden bg-neutral-900 shadow-inner ring-1 ring-inset ring-white/5"
+          className="relative grid h-[240px] place-items-center overflow-hidden bg-neutral-900 bg-gradient-to-br from-white/[0.06] via-transparent to-transparent shadow-inner ring-1 ring-inset ring-white/5"
         >
           <FileDocumentPreview
             format={format}
@@ -519,7 +532,12 @@ export const FileCreationCard = memo(function FileCreationCard({
             <p className="truncate text-[15px] font-semibold leading-snug text-foreground">
               {displayName}
             </p>
-            <p className="mt-0.5 text-[10.5px] font-medium tracking-wide text-muted-foreground uppercase">
+            <p
+              className="mt-0.5 text-[11.5px] font-bold tracking-wide uppercase"
+              style={{
+                color: FORMAT_TEXT_COLOR[format] ?? "#9AA4B2",
+              }}
+            >
               {config.ext}
             </p>
           </div>
@@ -556,9 +574,10 @@ function escapeHtml(source: string): string {
 }
 
 /**
- * White "sheet of paper" drawn at a canonical size and scaled up so the
- * rendered page fills the available preview width (edge-to-edge, cropped by
- * the stage when the page runs taller than the stage).
+ * Light "sheet of paper" (pages stay light like real files) drawn at a
+ * canonical size and scaled up so the rendered page fills the available
+ * preview width (edge-to-edge, cropped by the stage when the page runs taller
+ * than the stage).
  */
 function MiniPage({
   children,
@@ -579,7 +598,7 @@ function MiniPage({
     <div
       style={{ width, height }}
       className={cn(
-        "relative shrink-0 overflow-hidden rounded-[3px] bg-white text-neutral-800 shadow-xl shadow-black/15 ring-1 ring-black/10 select-none",
+        "relative shrink-0 overflow-hidden rounded-tl-[8px] rounded-bl-[8px] bg-white text-neutral-800 shadow-xl shadow-black/15 ring-1 ring-black/10 select-none",
         className
       )}
     >
@@ -636,10 +655,6 @@ function PreviewFallback({
 function WordMini({ html, width }: { html: string; width: number }) {
   return (
     <MiniPage width={width}>
-      <div className="flex items-center justify-between border-b border-neutral-300 px-4 pb-1.5 pt-2.5 text-[8px] font-semibold uppercase tracking-widest text-neutral-400">
-        <span>Document</span>
-        <span>Page 1</span>
-      </div>
       <div
         className="space-y-2.5 px-4 pt-3 pb-3 leading-relaxed [&_a]:text-blue-600 [&_blockquote]:border-l-2 [&_blockquote]:border-neutral-300 [&_blockquote]:pl-2 [&_blockquote]:text-[11.5px] [&_blockquote]:text-neutral-500 [&_blockquote]:italic [&_h1]:mb-2 [&_h1]:text-[18px] [&_h1]:font-bold [&_h1]:text-neutral-900 [&_h2]:mb-1.5 [&_h2]:text-[16px] [&_h2]:font-semibold [&_h2]:text-neutral-900 [&_h3]:mb-1 [&_h3]:text-[13.5px] [&_h3]:font-semibold [&_h3]:text-neutral-900 [&_li]:mb-0.5 [&_li]:text-[11.5px] [&_ol]:mb-2 [&_ol]:list-decimal [&_ol]:pl-4 [&_p]:mb-2 [&_p]:text-[11.5px] [&_strong]:font-semibold [&_table]:my-1.5 [&_table]:w-full [&_table]:border-collapse [&_table]:border [&_table]:border-neutral-300 [&_td]:border [&_td]:border-neutral-300 [&_td]:px-1 [&_td]:py-0.5 [&_td]:text-[9px] [&_th]:border [&_th]:border-neutral-300 [&_th]:bg-neutral-50 [&_th]:px-1 [&_th]:py-0.5 [&_th]:text-[9px] [&_th]:font-semibold [&_th]:text-left [&_ul]:mb-2 [&_ul]:list-disc [&_ul]:pl-4"
         dangerouslySetInnerHTML={{ __html: html }}
@@ -652,11 +667,7 @@ function TextMini({ text, width }: { text: string; width: number }) {
   const lines = text.split(/\r?\n/).slice(0, 30).join("\n");
   return (
     <MiniPage width={width}>
-      <div className="flex items-center justify-between border-b border-neutral-300 px-4 pb-1.5 pt-2.5 text-[8px] font-semibold uppercase tracking-widest text-neutral-400">
-        <span>Text</span>
-        <span>1</span>
-      </div>
-      <pre className="whitespace-pre-wrap px-4 py-2.5 font-mono text-[10px] leading-[1.65] text-neutral-700">
+      <pre className="whitespace-pre-wrap px-4 pt-3 pb-2.5 font-mono text-[10px] leading-[1.65] text-neutral-700">
         {lines}
       </pre>
     </MiniPage>
@@ -729,11 +740,7 @@ function MarkdownMini({ text, width }: { text: string; width: number }) {
 
   return (
     <MiniPage width={width}>
-      <div className="flex items-center justify-between border-b border-neutral-300 px-4 pb-1.5 pt-2.5 text-[8px] font-semibold uppercase tracking-widest text-neutral-400">
-        <span>Markdown</span>
-        <span>1</span>
-      </div>
-      <div className="px-4 pt-2.5 pb-2">{nodes}</div>
+      <div className="px-4 pt-3 pb-2">{nodes}</div>
     </MiniPage>
   );
 }
@@ -758,22 +765,19 @@ function ExcelMini({
   return (
     <div
       style={{ width }}
-      className="shrink-0 overflow-hidden rounded-[3px] bg-white text-neutral-800 shadow-xl shadow-black/15 ring-1 ring-black/10 select-none"
+      className="shrink-0 overflow-hidden rounded-tl-[8px] rounded-bl-[8px] bg-white text-neutral-800 shadow-xl shadow-black/15 ring-1 ring-black/10 select-none"
     >
-      <div className="flex items-center justify-between border-b border-neutral-300 px-3 pb-1.5 pt-2.5 text-[8px] font-semibold uppercase tracking-widest text-neutral-400">
-        <span>{sheet.name || "Sheet1"}</span>
-      </div>
-      <div className="px-2 pt-1.5 pb-2">
+      <div className="px-2 pt-2 pb-2">
         <table className="w-full table-fixed border-collapse">
           <thead>
             <tr>
-              <th className="w-4 border border-neutral-300 bg-neutral-50 px-1 py-1 text-right text-[9px] font-normal text-neutral-400">
+              <th className="w-4 border border-[#C6D9C8] bg-[#E7F1E4] px-1 py-1 text-right text-[9px] font-semibold text-[#2E7D4F]">
                 #
               </th>
               {columnLetters.map(letter => (
                 <th
                   key={letter}
-                  className="border border-neutral-300 bg-neutral-100 px-1 py-1 text-center text-[10px] font-bold text-neutral-500"
+                  className="border border-[#C6D9C8] bg-[#E7F1E4] px-1 py-1 text-center text-[10px] font-bold text-[#1E6B3C]"
                 >
                   {letter}
                 </th>
@@ -783,13 +787,13 @@ function ExcelMini({
           <tbody>
             {rows.map((row, ri) => (
               <tr key={ri}>
-                <th className="border border-neutral-300 bg-neutral-50 px-1 py-0.5 text-right text-[9px] font-normal text-neutral-400">
+                <th className="border border-[#C6D9C8] bg-[#EDF6EA] px-1 py-0.5 text-right text-[9px] font-semibold text-[#2E7D4F]">
                   {ri + 1}
                 </th>
                 {Array.from({ length: colCount }, (_, ci) => (
                   <td
                     key={ci}
-                    className="truncate border border-neutral-300 px-1 py-0.5 text-[10.5px] text-neutral-800"
+                    className="truncate border border-neutral-200 px-1 py-0.5 text-[10.5px] text-neutral-800"
                   >
                     {cellText(row[ci])}
                   </td>
@@ -812,9 +816,9 @@ function CsvMini({ rows, width }: { rows: string[][]; width: number }) {
   return (
     <div
       style={{ width }}
-      className="shrink-0 overflow-hidden rounded-[3px] bg-white text-neutral-800 shadow-xl shadow-black/15 ring-1 ring-black/10 select-none"
+      className="shrink-0 overflow-hidden rounded-tl-[8px] rounded-bl-[8px] bg-white text-neutral-800 shadow-xl shadow-black/15 ring-1 ring-black/10 select-none"
     >
-      <div className="flex items-center justify-between border-b border-neutral-300 px-3 pb-1.5 pt-2.5 text-[8px] font-semibold uppercase tracking-widest text-neutral-400">
+      <div className="flex items-center justify-between border-b border-neutral-200 bg-neutral-50 px-3 py-1.5 text-[8px] font-semibold tracking-widest text-neutral-500 uppercase">
         <span>Spreadsheet</span>
       </div>
       <div className="px-2 pt-1.5 pb-2">
@@ -966,7 +970,7 @@ function FileDocumentPreview({
           src={data.pageImageUrl}
           alt={`Preview of ${displayName}`}
           style={{ width: pageWidth }}
-          className="shrink-0 rounded-[3px] shadow-xl shadow-black/30 ring-1 ring-white/10"
+          className="shrink-0 rounded-tl-[8px] rounded-bl-[8px] shadow-xl shadow-black/30 ring-1 ring-white/10"
         />
       ) : (
         <PreviewFallback
