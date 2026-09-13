@@ -12,9 +12,6 @@ import { VoiceVisual } from "./VoiceVisual";
 
 const MAX_CAPTION_CHARS = 160;
 
-// Keeps the spoken caption compact for long answers: once it passes ~2 lines
-// it shows only the newest words, so old text slides away instead of the note
-// growing taller (the "coming and closing" effect).
 function fitCaptionTail(text: string): string {
   if (text.length <= MAX_CAPTION_CHARS) return text;
   let startIndex = text.length - MAX_CAPTION_CHARS;
@@ -23,19 +20,14 @@ function fitCaptionTail(text: string): string {
   return tail.length > 0 ? tail : text.slice(-MAX_CAPTION_CHARS);
 }
 
-// Smoothly update caption to avoid jumping backwards
 function getSmoothCaption(fullText: string, previousText: string): string {
   if (fullText.length <= MAX_CAPTION_CHARS) return fullText;
-  
-  // If the new text is just an extension of previous text, show the end
   if (fullText.startsWith(previousText) && previousText.length > 0) {
     const tailLength = MAX_CAPTION_CHARS;
     let smoothStart = Math.max(0, fullText.length - tailLength);
     while (smoothStart > 0 && !/\s/.test(fullText[smoothStart - 1])) smoothStart -= 1;
     return fullText.slice(smoothStart).trimStart();
   }
-  
-  // Otherwise use the normal tail function
   return fitCaptionTail(fullText);
 }
 
@@ -73,7 +65,6 @@ export function VoiceChat({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Track subtitle changes for smooth transitions
   useEffect(() => {
     if (voice.state === "speaking" && voice.subtitle) {
       setPreviousSubtitle(voice.subtitle);
@@ -193,7 +184,6 @@ export function VoiceChat({
               state={voice.state}
               muted={micOff}
               levelRef={voice.levelRef}
-              freqDataRef={voice.freqDataRef}
               className="h-full w-full"
             />
           </div>

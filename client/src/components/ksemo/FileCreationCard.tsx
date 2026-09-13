@@ -210,6 +210,7 @@ export type FileCreationCardProps = {
   researchSourceCount?: number;
   sources?: FileSource[];
   metrics?: FileMetrics;
+  summary?: string;
   defaultExpanded?: boolean;
   initialShowReady?: boolean;
 };
@@ -224,7 +225,6 @@ export const FileCreationCard = memo(function FileCreationCard({
   fileId,
   onRetry,
   researchSourceCount,
-  metrics,
   defaultExpanded = false,
   initialShowReady = false,
 }: FileCreationCardProps) {

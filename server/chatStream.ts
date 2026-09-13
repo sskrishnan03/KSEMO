@@ -42,7 +42,7 @@ const BASE_SYSTEM_INSTRUCTION =
 const FILE_TEXT_PER_FILE_CHARS = 150_000;
 
 const VOICE_STYLE_INSTRUCTION =
-  "Your reply will be spoken aloud in a live voice conversation. Answer exactly and completely, with the same full detail you would give in a written reply — but in plain natural spoken language. No markdown formatting, no bullet or numbered lists, no tables, no headings, no filler, and do not repeat the question back.";
+  "You are in a live, real-time voice conversation speaking directly with the user. Sound natural, warm, conversational, and direct, like a thoughtful human expert talking to a colleague. Use natural phrasing and common contractions (I'm, it's, you'll, don't). Do NOT use any markdown formatting, asterisks, bullet points, headers, or emojis since your words are spoken aloud by a speech synthesizer. Speak in clear, flowing sentences with natural pauses (commas and periods). Never repeat the question back.";
 
 // The Gemini/OpenAI-compatible provider cannot resolve localhost or relative
 // storage URLs, so images are read from disk and sent inline as base64 data
@@ -562,7 +562,8 @@ export function registerChatStream(app: Express) {
 
         // Auto-detect file creation from natural language if not explicitly selected from UI
         // e.g. "I want this in PDF", "give me this in Word", "create a spreadsheet of...", etc.
-        const detected = (!forcedFormat && content) ? detectFileRequest(content) : null;
+        const isVoiceMode = body.mode === "voice";
+        const detected = (!forcedFormat && content && !isVoiceMode) ? detectFileRequest(content) : null;
         const targetFormat: GeneratedFileResult["format"] | null =
           forcedFormat ?? (detected?.isFileRequest && detected.format && FILE_FORMATS.has(detected.format) ? (detected.format as GeneratedFileResult["format"]) : null);
 

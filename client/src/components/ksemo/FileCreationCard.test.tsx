@@ -187,6 +187,12 @@ describe("FileCreationCard", () => {
       expect(markup).not.toContain("240 KB");
       expect(markup).not.toContain("6 pages");
       expect(markup).not.toContain("1,420 words");
+
+      // No analysis panel or integrity badge on the card
+      expect(markup).not.toContain("View analysis");
+      expect(markup).not.toContain("Hide analysis");
+      expect(markup).not.toContain("Integrity verified");
+      expect(markup).not.toContain("Generation Pipeline Audit");
     });
 
     it("renders the preview card width contract (wide, not a giant or tiny container)", () => {

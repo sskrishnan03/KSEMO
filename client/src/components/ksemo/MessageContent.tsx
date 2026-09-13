@@ -63,6 +63,7 @@ type KsemoMessage = {
       slides?: number;
       words?: number;
     };
+    summary?: string;
   };
 };
 

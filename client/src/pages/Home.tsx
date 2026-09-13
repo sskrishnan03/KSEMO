@@ -232,6 +232,7 @@ export default function Home() {
     researchSourceCount?: number;
     sources?: FileSource[];
     metrics?: FileMetrics;
+    summary?: string;
     fileId?: string;
   } | null>(null);
   const [activeMode, setActiveMode] = useState<CapabilityMode>("chat");
@@ -1219,12 +1220,14 @@ export default function Home() {
                   sizeBytes?: number;
                   sources?: FileSource[];
                   metrics?: FileMetrics;
+                  summary?: string;
                 }
               | undefined;
             const fileSources = fileData?.sources?.length
               ? fileData.sources
               : undefined;
             const fileMetrics = fileData?.metrics;
+            const fileSummary = fileData?.summary;
             setFileGeneration(current => ({
               messageId: str(data.messageId),
               stage: "completed",
@@ -1234,6 +1237,7 @@ export default function Home() {
               researchSourceCount: current?.researchSourceCount,
               sources: fileSources ?? current?.sources,
               metrics: fileMetrics ?? current?.metrics,
+              summary: fileSummary ?? current?.summary,
               fileId: fileData?.fileId ?? current?.fileId,
             }));
             if (isViewingThisStream()) {
@@ -1251,6 +1255,7 @@ export default function Home() {
                             fileGeneration?.researchSourceCount,
                           sources: fileSources ?? fileGeneration?.sources,
                           metrics: fileMetrics ?? fileGeneration?.metrics,
+                          summary: fileSummary ?? fileGeneration?.summary,
                         },
                       }
                     : message
@@ -2436,8 +2441,6 @@ export default function Home() {
                               message: message.fileGeneration.message,
                               researchSourceCount:
                                 message.fileGeneration.researchSourceCount,
-                              sources: message.fileGeneration.sources,
-                              metrics: message.fileGeneration.metrics,
                             }
                           : null;
 
@@ -2461,8 +2464,6 @@ export default function Home() {
                           researchSourceCount={
                             activeFileGen.researchSourceCount
                           }
-                          sources={activeFileGen.sources}
-                          metrics={activeFileGen.metrics}
                           onRetry={() => regenerateMessage(message)}
                         />
                       </div>

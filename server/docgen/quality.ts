@@ -26,6 +26,10 @@ export type QualityReport = {
     hasStructure: boolean;
     hasReferences: boolean;
     byteSize: number;
+    slideCount?: number;
+    sheetCount?: number;
+    calloutCount?: number;
+    statGridCount?: number;
   };
 };
 
@@ -131,6 +135,42 @@ function validateSpecStructure(spec: DocumentSpec): QualityIssue[] {
       });
     }
 
+    // Check semantic blocks
+    for (const b of blocks) {
+      if (b.type === "callout" && (!b.text || b.text.trim().length === 0)) {
+        issues.push({
+          severity: "warning",
+          category: "content",
+          message: "Callout block contains empty text.",
+          fixable: true,
+        });
+      }
+      if (b.type === "statGrid" && (!b.metrics || b.metrics.length === 0)) {
+        issues.push({
+          severity: "warning",
+          category: "content",
+          message: "Stat grid block has no metrics.",
+          fixable: true,
+        });
+      }
+      if (b.type === "processFlow" && (!b.steps || b.steps.length === 0)) {
+        issues.push({
+          severity: "warning",
+          category: "content",
+          message: "Process flow block has no steps.",
+          fixable: true,
+        });
+      }
+      if (b.type === "comparison" && (!b.columns || b.columns.length < 2)) {
+        issues.push({
+          severity: "warning",
+          category: "content",
+          message: "Comparison table requires at least two columns.",
+          fixable: true,
+        });
+      }
+    }
+
     // Check for very short documents
     const totalText = blocks
       .filter((b): b is Extract<DocBlock, { type: "paragraph" | "heading" }> =>
@@ -165,6 +205,51 @@ function validateSpecStructure(spec: DocumentSpec): QualityIssue[] {
           fixable: false,
         });
       }
+      if (sheet.name && /[:\\/?*\[\]]/.test(sheet.name)) {
+        issues.push({
+          severity: "warning",
+          category: "sheet_name",
+          message: `Sheet name "${sheet.name}" contains invalid characters.`,
+          fixable: true,
+        });
+      }
+      if (sheet.name && sheet.name.length > 31) {
+        issues.push({
+          severity: "warning",
+          category: "sheet_name",
+          message: `Sheet name "${sheet.name}" exceeds Excel limit of 31 characters.`,
+          fixable: true,
+        });
+      }
+    }
+
+    // Check if multi-row spreadsheet with numeric data has calculation formulas
+    let hasFormulas = false;
+    let totalDataRows = 0;
+    for (const s of sheets) {
+      if (s.rows && s.rows.length > 2) {
+        totalDataRows += s.rows.length;
+        for (const row of s.rows) {
+          for (const cell of row) {
+            if (typeof cell === "object" && cell !== null && "formula" in cell && cell.formula) {
+              hasFormulas = true;
+              break;
+            } else if (typeof cell === "string" && cell.trim().startsWith("=")) {
+              hasFormulas = true;
+              break;
+            }
+          }
+          if (hasFormulas) break;
+        }
+      }
+    }
+    if (totalDataRows > 6 && !hasFormulas) {
+      issues.push({
+        severity: "info",
+        category: "formulas",
+        message: "Spreadsheet contains tabular data without dynamic calculation formulas.",
+        fixable: false,
+      });
     }
   } else if (spec.format === "pptx") {
     const slides = spec.slides ?? [];
@@ -175,6 +260,29 @@ function validateSpecStructure(spec: DocumentSpec): QualityIssue[] {
         message: "Presentation has no slides.",
         fixable: false,
       });
+    }
+
+    // Check slide layout diversity
+    if (slides.length >= 4) {
+      const bulletSlides = slides.filter(s => {
+        const layout = s.layout || "bullet_list";
+        return (
+          layout === "bullet_list" &&
+          (!s.metrics || s.metrics.length === 0) &&
+          (!s.steps || s.steps.length === 0) &&
+          !s.quote &&
+          (!s.columns || s.columns.length === 0) &&
+          (!s.table || !s.table.rows || s.table.rows.length === 0)
+        );
+      });
+      if (bulletSlides.length / slides.length >= 0.75) {
+        issues.push({
+          severity: "info",
+          category: "layout_diversity",
+          message: "Presentation slide layouts lack visual diversity (mostly uniform bullet lists).",
+          fixable: true,
+        });
+      }
     }
   }
 
@@ -302,6 +410,8 @@ function computeStats(
   let headingCount = 0;
   let paragraphCount = 0;
   let listCount = 0;
+  let calloutCount = 0;
+  let statGridCount = 0;
   let hasTitle = false;
   let hasStructure = false;
   let hasReferences = false;
@@ -328,6 +438,12 @@ function computeStats(
         break;
       case "table":
         tableCount++;
+        break;
+      case "callout":
+        calloutCount++;
+        break;
+      case "statGrid":
+        statGridCount++;
         break;
     }
   }
@@ -361,6 +477,10 @@ function computeStats(
     hasStructure,
     hasReferences,
     byteSize: buffer.length,
+    slideCount: spec.slides?.length,
+    sheetCount: spec.sheets?.length,
+    calloutCount: calloutCount > 0 ? calloutCount : undefined,
+    statGridCount: statGridCount > 0 ? statGridCount : undefined,
   };
 }
 

@@ -155,6 +155,42 @@ describe("quality validation", () => {
     const report = validateDocument(spec, Buffer.from("%PDF-1.7\n%%EOF", "utf8"));
     expect(report.passed).toBe(false);
   });
+
+  it("flags slide decks lacking layout diversity", () => {
+    const spec: DocumentSpec = {
+      format: "pptx",
+      filename: "bullets_only.pptx",
+      title: "Repetitive Deck",
+      slides: [
+        { title: "Slide 1", bullets: ["A", "B"] },
+        { title: "Slide 2", bullets: ["C", "D"] },
+        { title: "Slide 3", bullets: ["E", "F"] },
+        { title: "Slide 4", bullets: ["G", "H"] },
+      ],
+    };
+    const report = validateDocument(spec, Buffer.from("PK\x03\x04mockpptxdata"));
+    expect(report.issues.some(i => i.category === "layout_diversity")).toBe(true);
+  });
+
+  it("validates semantic blocks for empty content", () => {
+    const spec: DocumentSpec = {
+      format: "pdf",
+      filename: "semantic_empty.pdf",
+      title: "Bad Blocks",
+      blocks: [
+        { type: "heading", level: 1, text: "Bad Blocks" },
+        { type: "callout", text: "" },
+        { type: "statGrid", metrics: [] },
+        { type: "processFlow", steps: [] },
+        { type: "comparison", columns: ["SingleCol"], rows: [] },
+      ],
+    };
+    const report = validateDocument(spec, Buffer.from("%PDF-1.7\n%%EOF"));
+    expect(report.issues.some(i => i.message.includes("Callout block contains empty text"))).toBe(true);
+    expect(report.issues.some(i => i.message.includes("Stat grid block has no metrics"))).toBe(true);
+    expect(report.issues.some(i => i.message.includes("Process flow block has no steps"))).toBe(true);
+    expect(report.issues.some(i => i.message.includes("Comparison table requires at least two columns"))).toBe(true);
+  });
 });
 
 describe("spec helpers", () => {
@@ -251,5 +287,172 @@ describe("parseUserLengthIntent", () => {
     const pdfBuf = await generatePdf(spec);
     expect(pdfBuf.length).toBeGreaterThan(1000);
     expect(pdfBuf.toString("ascii", 0, 5)).toBe("%PDF-");
+  });
+});
+
+describe("semantic document blocks and theme rendering", () => {
+  it("renders all semantic blocks into PDF and Word cleanly", async () => {
+    const spec: DocumentSpec = {
+      format: "pdf",
+      filename: "semantic_showcase.pdf",
+      title: "Master Architecture Report",
+      theme: "technical",
+      blocks: [
+        { type: "heading", level: 1, text: "System Performance" },
+        {
+          type: "callout",
+          title: "Architecture Note",
+          text: "All nodes operate on distributed consensus with zero-downtime failover.",
+          intent: "tip",
+        },
+        {
+          type: "statGrid",
+          metrics: [
+            { label: "Active Nodes", value: "1,024", change: "+12%" },
+            { label: "Throughput", value: "94.2k", change: "ops/sec" },
+            { label: "Latency P99", value: "4.2ms", change: "-18%" },
+          ],
+        },
+        {
+          type: "processFlow",
+          title: "Deployment Pipeline",
+          steps: [
+            { step: 1, title: "Static Analysis", description: "Lints and type checks" },
+            { step: 2, title: "Integration Build", description: "Containerized test run" },
+            { step: 3, title: "Production Canary", description: "10% progressive traffic shift" },
+          ],
+        },
+        {
+          type: "comparison",
+          columns: ["Feature", "Standard Tier", "Enterprise Tier"],
+          rows: [
+            ["High Availability", "99.9% SLA", "99.999% SLA"],
+            ["Data Retention", "30 Days", "Unlimited"],
+            ["Dedicated VPC", "Optional", "Included"],
+          ],
+        },
+        {
+          type: "quote",
+          text: "Simplicity is prerequisite for reliability.",
+          author: "Edsger W. Dijkstra",
+        },
+        {
+          type: "codeBlock",
+          language: "typescript",
+          code: "const engine = new FileCreationEngine();\nawait engine.produceArtifact();",
+        },
+      ],
+    };
+
+    // PDF check
+    const pdfBuf = await generatePdf(spec);
+    expect(pdfBuf.length).toBeGreaterThan(1000);
+    expect(pdfBuf.toString("ascii", 0, 5)).toBe("%PDF-");
+
+    // DOCX check
+    const docxSpec = { ...spec, format: "docx" as const, filename: "semantic_showcase.docx" };
+    const docxBuf = await generateDocx(docxSpec);
+    expect(docxBuf[0]).toBe(0x50);
+    expect(docxBuf[1]).toBe(0x4b);
+
+    // TXT check
+    const txtSpec = { ...spec, format: "txt" as const, filename: "semantic_showcase.txt" };
+    const txtBuf = generateTxt(txtSpec);
+    const txt = txtBuf.toString("utf8");
+    expect(txt).toContain("Architecture Note");
+    expect(txt).toContain("1,024");
+    expect(txt).toContain("Dijkstra");
+  });
+});
+
+describe("advanced XLSX formula generation", () => {
+  it("writes real calculation formulas and format strings into sheets", () => {
+    const spec: DocumentSpec = {
+      format: "xlsx",
+      filename: "financial_model.xlsx",
+      title: "Corporate Financial Model",
+      sheets: [
+        {
+          name: "Income Statement",
+          table: true,
+          hasTotals: true,
+          rows: [
+            ["Metric", "FY24 ($M)", "FY25 ($M)", "YoY Growth"],
+            ["Revenue", 120.5, 150.0, { formula: "=(C2-B2)/B2", value: 0.2448, numFmt: "percent" }],
+            ["COGS", 48.2, 55.0, { formula: "=(C3-B3)/B3", value: 0.1411, numFmt: "percent" }],
+            ["Gross Profit", { formula: "=B2-B3", value: 72.3, numFmt: "currency" }, { formula: "=C2-C3", value: 95.0, numFmt: "currency" }, ""],
+            ["Total Overhead", 35.0, 42.0, ""],
+            ["Net Income", { formula: "=B4-B5", value: 37.3, numFmt: "currency" }, { formula: "=C4-C5", value: 53.0, numFmt: "currency" }, ""],
+          ],
+        },
+      ],
+    };
+
+    const buf = generateXlsx(spec);
+    expect(buf[0]).toBe(0x50);
+    expect(buf[1]).toBe(0x4b);
+
+    const report = validateDocument(spec, buf);
+    expect(report.passed).toBe(true);
+    expect(report.issues.filter(i => i.severity === "error")).toHaveLength(0);
+  });
+});
+
+describe("PPTX varied slide layouts", () => {
+  it("renders modern 16:9 slides with varied layouts", async () => {
+    const spec: DocumentSpec = {
+      format: "pptx",
+      filename: "investor_deck.pptx",
+      title: "Strategic Growth Overview",
+      theme: "business",
+      slides: [
+        {
+          title: "Strategic Growth 2026",
+          subtitle: "Enterprise Expansion & Market Leadership",
+          layout: "title",
+        },
+        {
+          title: "Key Performance Drivers",
+          layout: "big_number",
+          metrics: [
+            { label: "Annual Recurring Revenue", value: "$42M", change: "+85% YoY" },
+            { label: "Net Revenue Retention", value: "134%", change: "+600 bps" },
+          ],
+        },
+        {
+          title: "Market Transition Dynamics",
+          layout: "two_column",
+          columns: [
+            { heading: "Traditional Architecture", points: ["Monolithic deployments", "Manual scaling", "High latency"] },
+            { heading: "Next-Gen KSEMO Architecture", points: ["Event-driven microservices", "Autonomous elasticity", "Sub-5ms p99"] },
+          ],
+        },
+        {
+          title: "Execution Roadmap",
+          layout: "process",
+          steps: [
+            { step: 1, title: "Phase 1: Foundation", description: "Core engine refactor" },
+            { step: 2, title: "Phase 2: Scale", description: "Multi-tenant deployment" },
+            { step: 3, title: "Phase 3: Dominance", description: "Global ecosystem integration" },
+          ],
+        },
+        {
+          title: "Guiding Mission",
+          layout: "quote",
+          quote: {
+            text: "The best way to predict the future is to invent it.",
+            author: "Alan Kay",
+          },
+        },
+      ],
+    };
+
+    const buf = await generatePptx(spec);
+    expect(buf[0]).toBe(0x50);
+    expect(buf[1]).toBe(0x4b);
+
+    const report = validateDocument(spec, buf);
+    expect(report.passed).toBe(true);
+    expect(report.stats.slideCount).toBe(5);
   });
 });

@@ -10,6 +10,71 @@ export type DocFormat =
   | "pptx"
   | "txt";
 
+export type DocumentTheme =
+  | "modern"
+  | "technical"
+  | "business"
+  | "editorial"
+  | "scientific";
+
+export type ThemeColors = {
+  primary: string;
+  secondary: string;
+  accent: string;
+  surface: string;
+  border: string;
+  text: string;
+  muted: string;
+};
+
+export const THEME_PALETTES: Record<DocumentTheme, ThemeColors> = {
+  modern: {
+    primary: "1E293B",     // slate-800
+    secondary: "475569",   // slate-600
+    accent: "2563EB",      // royal blue
+    surface: "F8FAFC",     // slate-50
+    border: "E2E8F0",      // slate-200
+    text: "0F172A",        // slate-900
+    muted: "64748B",       // slate-500
+  },
+  technical: {
+    primary: "0F172A",     // dark indigo slate
+    secondary: "334155",
+    accent: "0284C7",      // sky-600
+    surface: "F0F9FF",     // sky-50
+    border: "BAE6FD",
+    text: "0C4A6E",
+    muted: "64748B",
+  },
+  business: {
+    primary: "1E3A8A",     // deep navy
+    secondary: "1E40AF",
+    accent: "059669",      // emerald
+    surface: "F8FAFC",
+    border: "CBD5E1",
+    text: "0F172A",
+    muted: "64748B",
+  },
+  editorial: {
+    primary: "292524",     // warm stone
+    secondary: "44403C",
+    accent: "D97706",      // amber
+    surface: "FAFAF9",
+    border: "E7E5E4",
+    text: "1C1917",
+    muted: "78716C",
+  },
+  scientific: {
+    primary: "115E59",     // teal
+    secondary: "0F766E",
+    accent: "0D9488",
+    surface: "F0FDFA",
+    border: "99F6E4",
+    text: "134E4A",
+    muted: "64748B",
+  },
+};
+
 export type DocParagraph = {
   type: "paragraph";
   text: string;
@@ -53,6 +118,66 @@ export type DocImage = {
   src: string;
 };
 
+// Rich semantic components supporting high-density, professional publications
+export type DocCallout = {
+  type: "callout";
+  variant?: "info" | "warning" | "tip" | "takeaway" | "quote";
+  title?: string;
+  text: string;
+};
+
+export type DocStatItem = {
+  value: string;
+  label: string;
+  change?: string;
+  note?: string;
+};
+
+export type DocStatGrid = {
+  type: "statGrid";
+  items?: DocStatItem[];
+  metrics?: DocStatItem[];
+};
+
+export type DocProcessStep = {
+  step: number;
+  title: string;
+  description: string;
+};
+
+export type DocProcessFlow = {
+  type: "processFlow";
+  steps: DocProcessStep[];
+};
+
+export type DocComparison = {
+  type: "comparison";
+  headers?: [string, string] | string[];
+  columns?: string[];
+  rows: Array<
+    | {
+        feature: string;
+        valA: string;
+        valB: string;
+        notes?: string;
+      }
+    | string[]
+  >;
+};
+
+export type DocQuote = {
+  type: "quote";
+  text: string;
+  author?: string;
+  role?: string;
+};
+
+export type DocCodeBlock = {
+  type: "codeBlock";
+  language?: string;
+  code: string;
+};
+
 export type DocBlock =
   | DocParagraph
   | DocHeading
@@ -60,22 +185,61 @@ export type DocBlock =
   | DocNumberedList
   | DocTable
   | DocPageBreak
-  | DocImage;
+  | DocImage
+  | DocCallout
+  | DocStatGrid
+  | DocProcessFlow
+  | DocComparison
+  | DocQuote
+  | DocCodeBlock;
 
 // Spreadsheet-oriented spec: used when format is xlsx.
-export type SheetCell = string | number | boolean | null | { formula?: string; value?: string | number | boolean | null };
+export type SheetCell =
+  | string
+  | number
+  | boolean
+  | null
+  | { formula?: string; value?: string | number | boolean | null; format?: "currency" | "percent" | "number" | "text" };
+
 export type SheetDefinition = {
   name: string;
   rows: SheetCell[][];
   /** Optional table headers applied to the leading row(s). */
   table?: boolean;
+  /** Optional indicator that the bottom row represents summary/totals */
+  hasTotals?: boolean;
 };
 
 // Slide-oriented spec: used when format is pptx.
+export type SlideLayout =
+  | "title"
+  | "section"
+  | "key_message"
+  | "big_number"
+  | "two_column"
+  | "three_column"
+  | "process"
+  | "comparison"
+  | "table"
+  | "stats"
+  | "quote";
+
+export type SlideColumn = {
+  title?: string;
+  text?: string;
+  bullets?: string[];
+};
+
 export type SlideDefinition = {
   title?: string;
   subtitle?: string;
+  layout?: SlideLayout;
   bullets?: string[];
+  columns?: SlideColumn[];
+  metrics?: Array<{ value: string; label: string; change?: string }>;
+  steps?: Array<{ step: number; title: string; description: string }>;
+  quote?: { text: string; author?: string };
+  keyMessage?: { statement: string; context?: string };
   table?: { headers?: string[]; rows: string[][] };
   footnote?: string;
 };
@@ -90,6 +254,7 @@ export type DocumentSpec = {
   format: DocFormat;
   filename: string;
   title: string;
+  theme?: DocumentTheme;
   // For docx/pdf/txt: a linear list of content blocks.
   blocks?: DocBlock[];
   // For xlsx: one or more sheets.
@@ -214,6 +379,87 @@ export function coerceBlocks(value: unknown): DocBlock[] {
             : [],
         });
         break;
+      case "callout":
+        out.push({
+          type: "callout",
+          variant: ["info", "warning", "tip", "takeaway", "quote"].includes(String(b.variant))
+            ? (b.variant as DocCallout["variant"])
+            : "info",
+          title: b.title ? asStr(b.title) : undefined,
+          text: asStr(b.text),
+        });
+        break;
+      case "statGrid":
+        if (Array.isArray(b.items)) {
+          const items: DocStatItem[] = b.items
+            .filter(it => it && typeof it === "object")
+            .map(it => {
+              const obj = it as Record<string, unknown>;
+              return {
+                value: asStr(obj.value),
+                label: asStr(obj.label),
+                change: obj.change ? asStr(obj.change) : undefined,
+                note: obj.note ? asStr(obj.note) : undefined,
+              };
+            })
+            .filter(it => it.value || it.label);
+          if (items.length > 0) {
+            out.push({ type: "statGrid", items });
+          }
+        }
+        break;
+      case "processFlow":
+        if (Array.isArray(b.steps)) {
+          const steps: DocProcessStep[] = b.steps
+            .filter(s => s && typeof s === "object")
+            .map((s, idx) => {
+              const obj = s as Record<string, unknown>;
+              return {
+                step: typeof obj.step === "number" ? obj.step : idx + 1,
+                title: asStr(obj.title),
+                description: asStr(obj.description),
+              };
+            })
+            .filter(s => s.title || s.description);
+          if (steps.length > 0) {
+            out.push({ type: "processFlow", steps });
+          }
+        }
+        break;
+      case "comparison":
+        if (Array.isArray(b.rows)) {
+          out.push({
+            type: "comparison",
+            headers: Array.isArray(b.headers) ? b.headers.map(h => asStr(h)) : ["Feature / Metric", "Option A", "Option B"],
+            rows: (b.rows as unknown[])
+              .filter(r => r && typeof r === "object")
+              .map(r => {
+                const obj = r as Record<string, unknown>;
+                return {
+                  feature: asStr(obj.feature),
+                  valA: asStr(obj.valA),
+                  valB: asStr(obj.valB),
+                  notes: obj.notes ? asStr(obj.notes) : undefined,
+                };
+              }),
+          });
+        }
+        break;
+      case "quote":
+        out.push({
+          type: "quote",
+          text: asStr(b.text),
+          author: b.author ? asStr(b.author) : undefined,
+          role: b.role ? asStr(b.role) : undefined,
+        });
+        break;
+      case "codeBlock":
+        out.push({
+          type: "codeBlock",
+          language: b.language ? asStr(b.language) : undefined,
+          code: asStr(b.code),
+        });
+        break;
       case "pageBreak":
         out.push({ type: "pageBreak" });
         break;
@@ -233,12 +479,27 @@ export function coerceSheets(value: unknown): SheetDefinition[] {
       return {
         name: asStr(s.name, "Sheet"),
         table: Boolean(s.table),
+        hasTotals: Boolean(s.hasTotals),
         rows: Array.isArray(s.rows)
           ? s.rows
               .filter(r => Array.isArray(r))
               .map(r => (r as unknown[]).map(cell => {
                 if (cell === null || cell === undefined || typeof cell === "string" || typeof cell === "number" || typeof cell === "boolean")
                   return cell as SheetCell;
+                if (typeof cell === "object") {
+                  const cObj = cell as Record<string, unknown>;
+                  if (cObj.formula || cObj.value !== undefined) {
+                    return {
+                      formula: cObj.formula ? asStr(cObj.formula) : undefined,
+                      value: (typeof cObj.value === "string" || typeof cObj.value === "number" || typeof cObj.value === "boolean")
+                        ? cObj.value
+                        : undefined,
+                      format: ["currency", "percent", "number", "text"].includes(String(cObj.format))
+                        ? (cObj.format as "currency" | "percent" | "number" | "text")
+                        : undefined,
+                    } as SheetCell;
+                  }
+                }
                 return asStr(cell);
               }))
           : [],
@@ -253,10 +514,73 @@ export function coerceSlides(value: unknown): SlideDefinition[] {
     .map(v => {
       const s = v as Record<string, unknown>;
       const tableRaw = s.table as Record<string, unknown> | undefined;
+      const metricsRaw = Array.isArray(s.metrics)
+        ? s.metrics
+            .filter(m => m && typeof m === "object")
+            .map(m => {
+              const obj = m as Record<string, unknown>;
+              return {
+                value: asStr(obj.value),
+                label: asStr(obj.label),
+                change: obj.change ? asStr(obj.change) : undefined,
+              };
+            })
+        : undefined;
+
+      const columnsRaw = Array.isArray(s.columns)
+        ? s.columns
+            .filter(c => c && typeof c === "object")
+            .map(c => {
+              const obj = c as Record<string, unknown>;
+              return {
+                title: obj.title ? asStr(obj.title) : undefined,
+                text: obj.text ? asStr(obj.text) : undefined,
+                bullets: Array.isArray(obj.bullets) ? obj.bullets.map(b => asStr(b)).filter(Boolean) : undefined,
+              };
+            })
+        : undefined;
+
+      const stepsRaw = Array.isArray(s.steps)
+        ? s.steps
+            .filter(st => st && typeof st === "object")
+            .map((st, i) => {
+              const obj = st as Record<string, unknown>;
+              return {
+                step: typeof obj.step === "number" ? obj.step : i + 1,
+                title: asStr(obj.title),
+                description: asStr(obj.description),
+              };
+            })
+        : undefined;
+
+      const validLayouts: SlideLayout[] = [
+        "title",
+        "section",
+        "key_message",
+        "big_number",
+        "two_column",
+        "three_column",
+        "process",
+        "comparison",
+        "table",
+        "stats",
+        "quote",
+      ];
+
       return {
         title: asStr(s.title),
-        subtitle: asStr(s.subtitle),
+        subtitle: s.subtitle ? asStr(s.subtitle) : undefined,
+        layout: validLayouts.includes(s.layout as SlideLayout) ? (s.layout as SlideLayout) : undefined,
         bullets: Array.isArray(s.bullets) ? s.bullets.map(b => asStr(b)).filter(Boolean) : undefined,
+        columns: columnsRaw,
+        metrics: metricsRaw,
+        steps: stepsRaw,
+        quote: s.quote && typeof s.quote === "object"
+          ? { text: asStr((s.quote as Record<string, unknown>).text), author: (s.quote as Record<string, unknown>).author ? asStr((s.quote as Record<string, unknown>).author) : undefined }
+          : undefined,
+        keyMessage: s.keyMessage && typeof s.keyMessage === "object"
+          ? { statement: asStr((s.keyMessage as Record<string, unknown>).statement), context: (s.keyMessage as Record<string, unknown>).context ? asStr((s.keyMessage as Record<string, unknown>).context) : undefined }
+          : undefined,
         table:
           tableRaw && Array.isArray(tableRaw.rows)
             ? {
@@ -268,7 +592,7 @@ export function coerceSlides(value: unknown): SlideDefinition[] {
                   .map(r => (r as unknown[]).map(c => asStr(c))),
               }
             : undefined,
-        footnote: asStr(s.footnote),
+        footnote: s.footnote ? asStr(s.footnote) : undefined,
       };
     });
 }

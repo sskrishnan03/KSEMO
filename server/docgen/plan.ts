@@ -14,6 +14,7 @@ export type DocumentPlan =
       format: "pdf" | "docx" | "xlsx" | "pptx" | "txt";
       filename: string;
       title: string;
+      theme?: "modern" | "technical" | "business" | "editorial" | "scientific";
       summary: string;
       content: {
         blocks?: unknown[];
@@ -201,123 +202,185 @@ You MUST generate an extensive, highly comprehensive document that fills at leas
 
   if (format === "xlsx") {
     structureExample = `
+"theme": "business",
 "content": {
   "sheets": [
     {
-      "name": "Overview & Data",
+      "name": "KPI Dashboard",
       "table": true,
       "rows": [
-        ["Category", "Metric", "Target", "Actual", "Status", "Variance", "Notes"],
-        ["Operations", "Efficiency", 95, 98, "Exceeded", "+3%", "Optimized workflows implemented"],
-        ["Finance", "Revenue ($K)", 500, 542, "Exceeded", "+8.4%", "Strong Q3 performance"],
-        ["Quality", "Defect Rate (%)", 1.5, 0.9, "Exceeded", "-0.6%", "Strict QA protocols"],
-        ["Timeline", "Delivery (Days)", 14, 12, "On Track", "-2", "Early milestone completion"]
+        ["Key Metric", "Target", "Actual", "Performance", "Formula / Logic", "Status"],
+        ["Revenue Growth", 15.0, 18.4, "+3.4%", "Actual vs Target", "Exceeded"],
+        ["Operating Efficiency", 88.0, 94.2, "+6.2%", "Productivity SLA", "Exceeded"],
+        ["Customer Retention", 92.0, 95.8, "+3.8%", "Annualized Rate", "Strong"],
+        ["Net Margin (%)", 22.0, 26.5, "+4.5%", "EBITDA Margin", "Exceeded"],
+        ["Total Impact ($K)", 5000, 6240, "=SUM(B2:B5)", "Aggregated Value", "Optimal"]
       ]
     },
     {
-      "name": "Detailed Breakdown",
+      "name": "Operational Breakdown",
       "table": true,
       "rows": [
-        ["Item ID", "Description", "Department", "Cost ($)", "Lead Time", "Priority"],
-        ["A-101", "Core System Modules", "Engineering", 12500, "3 weeks", "High"],
-        ["A-102", "Cloud Infrastructure", "DevOps", 4800, "1 week", "Critical"],
-        ["A-103", "Security Audit", "Compliance", 7500, "2 weeks", "Medium"]
+        ["Line Item ID", "Workstream", "Quarter", "Budget ($)", "Actual ($)", "Variance ($)", "Status"],
+        ["WS-101", "Core Infrastructure", "Q1", 45000, 41200, "=-3800", "Under Budget"],
+        ["WS-102", "Security & Governance", "Q1", 28000, 26400, "=-1600", "Under Budget"],
+        ["WS-103", "Data Pipeline Automation", "Q2", 62000, 58900, "=-3100", "Under Budget"],
+        ["WS-104", "Integration Testing", "Q2", 18500, 17200, "=-1300", "Under Budget"],
+        ["TOTAL", "All Workstreams", "YTD", 153500, 143700, "=SUM(E2:E5)-SUM(D2:D5)", "Favorable"]
+      ]
+    },
+    {
+      "name": "Comparative Analysis",
+      "table": true,
+      "rows": [
+        ["Dimension", "Baseline Benchmark", "Optimized Model", "Efficiency Delta", "Strategic Driver"],
+        ["Processing Latency", "420 ms", "85 ms", "-79.8%", "Caching & Asynchronous Queues"],
+        ["Error Rate", "2.14%", "0.18%", "-91.6%", "Strict Schema Validation"],
+        ["Resource Utilization", "64%", "89%", "+25.0%", "Dynamic Resource Pool"]
       ]
     }
   ]
 }`;
   } else if (format === "pptx") {
     structureExample = `
+"theme": "modern",
 "content": {
   "slides": [
     {
-      "title": "Document Title",
-      "subtitle": "Comprehensive Presentation",
-      "bullets": ["Key objectives and executive summary", "Strategic takeaways"]
+      "layout": "title",
+      "title": "Strategic Architecture & Operational Roadmap",
+      "subtitle": "Executive Briefing and Comprehensive Plan",
+      "bullets": ["High-level executive takeaways", "Core structural recommendations"]
     },
     {
-      "title": "Agenda & Scope",
-      "bullets": [
-        "Foundational Background",
-        "Key Findings & Detailed Analysis",
-        "Methodology & Implementation",
-        "Risks, Mitigations & Next Steps"
+      "layout": "key_message",
+      "title": "Executive Summary",
+      "keyMessage": {
+        "statement": "Modernizing the core infrastructure reduces operational latency by 78% while delivering 99.99% availability.",
+        "context": "Validated across multiple production benchmarks and extensive industry case studies."
+      }
+    },
+    {
+      "layout": "stats",
+      "title": "High-Impact Performance Metrics",
+      "subtitle": "Empirical results from deployment analysis",
+      "metrics": [
+        { "value": "78%", "label": "Latency Reduction", "change": "+4.2x Faster" },
+        { "value": "$1.4M", "label": "Annual Cost Savings", "change": "-32% OPEX" },
+        { "value": "99.99%", "label": "Target SLA Uptime", "change": "Tier-4 Standard" },
+        { "value": "12 Days", "label": "Deployment Cycle", "change": "-65% Time to Value" }
       ]
     },
     {
-      "title": "Core Analysis & Insights",
-      "bullets": [
-        "Primary factors driving current dynamics",
-        "Comparative metrics and qualitative findings",
-        "Strategic differentiators and growth levers"
-      ],
-      "footnote": "Source: Industry research and data modeling"
+      "layout": "two_column",
+      "title": "Architectural Paradigms: Monolithic vs. Distributed",
+      "columns": [
+        {
+          "title": "Legacy Approach",
+          "bullets": [
+            "Tightly coupled deployment dependencies",
+            "Linear scaling constraints during traffic spikes",
+            "Single point of failure risks in primary database"
+          ]
+        },
+        {
+          "title": "Modern Distributed Engine",
+          "bullets": [
+            "Decoupled micro-services with independent scaling",
+            "Resilient failover with zero-downtime rolling deploys",
+            "Granular observability across distributed traces"
+          ]
+        }
+      ]
     },
     {
-      "title": "Comparative Assessment",
+      "layout": "process",
+      "title": "Phased Execution Roadmap",
+      "steps": [
+        { "step": 1, "title": "Discovery & Audit", "description": "Baseline metrics, schema mapping, and dependency graphing." },
+        { "step": 2, "title": "Foundation Build", "description": "Core pipeline provisioning, secrets configuration, and test harnesses." },
+        { "step": 3, "title": "Pilot Migration", "description": "Gradual canary rollout for low-risk non-critical workloads." },
+        { "step": 4, "title": "Full Production", "description": "Traffic cutover, automated alerting, and SLA verification." }
+      ]
+    },
+    {
+      "layout": "table",
+      "title": "Competitive Evaluation Matrix",
       "table": {
-        "headers": ["Dimension", "Baseline", "Current", "Target"],
+        "headers": ["Evaluation Criteria", "Standard Solution", "Proposed Engine", "Advantage"],
         "rows": [
-          ["Efficiency", "72%", "88%", "95%"],
-          ["Throughput", "1.2k/hr", "2.8k/hr", "4.0k/hr"],
-          ["Satisfaction", "84%", "93%", "98%"]
+          ["Throughput Capacity", "5,000 req/s", "35,000 req/s", "7.0x Higher"],
+          ["Mean Time to Recovery", "45 minutes", "2.5 minutes", "18x Faster"],
+          ["Operational Overhead", "High manual toil", "Automated orchestration", "Minimal"]
         ]
       }
     },
     {
-      "title": "Action Plan & Conclusions",
-      "bullets": [
-        "Immediate short-term execution priorities",
-        "Medium-term scaling milestones",
-        "Key performance indicators for ongoing tracking"
-      ]
+      "layout": "quote",
+      "title": "Strategic Perspective",
+      "quote": {
+        "text": "True efficiency is achieved when systems are designed to eliminate friction automatically at every boundary.",
+        "author": "Chief Systems Architect"
+      }
     }
   ]
 }`;
   } else {
-    // pdf, docx, txt — all use the blocks structure
+    // pdf, docx, txt — all use the blocks structure with rich semantic components
     structureExample = `
+"theme": "technical",
 "content": {
   "blocks": [
-    { "type": "heading", "level": 1, "text": "Document Title" },
-    { "type": "paragraph", "text": "In-depth introductory overview providing thorough context and framing the subject matter..." },
-    { "type": "heading", "level": 2, "text": "1. Foundational Architecture & Concepts" },
-    { "type": "paragraph", "text": "Comprehensive explanation of core principles, mechanisms, and key considerations..." },
-    { "type": "bulletList", "items": [
-      "Key Factor 1: Substantial impact on core architecture and operational performance",
-      "Key Factor 2: Empirical evidence demonstrating high fidelity and sustained efficiency",
-      "Key Factor 3: Strategic risk factors and comprehensive mitigation frameworks"
+    { "type": "heading", "level": 1, "text": "Comprehensive Architectural Blueprint" },
+    { "type": "paragraph", "text": "This document delivers a rigorous, publication-grade analysis covering foundational concepts, operational methodologies, empirical metrics, and production guidelines." },
+    { "type": "statGrid", "items": [
+      { "value": "99.99%", "label": "Availability SLA", "change": "+0.8%" },
+      { "value": "18 ms", "label": "p99 Execution Latency", "change": "-62%" },
+      { "value": "100%", "label": "Type-Safe Contracts" }
     ]},
-    { "type": "pageBreak" },
-    { "type": "heading", "level": 2, "text": "2. Detailed Analysis & Data Assessment" },
-    { "type": "table", "headers": ["Category", "Metric", "Baseline", "Projected", "Impact"], "rows": [
-      ["Operational", "Efficiency", "74%", "96%", "High"],
-      ["Financial", "ROI", "12%", "34%", "Transformative"],
-      ["Reliability", "Uptime", "99.2%", "99.99%", "Critical"]
+    { "type": "callout", "variant": "takeaway", "title": "Executive Overview", "text": "The primary objective is to replace fragile manual processes with deterministic, format-native generation engines that maintain strict typographical and semantic fidelity." },
+    { "type": "heading", "level": 2, "text": "1. Core Architectural Principles" },
+    { "type": "paragraph", "text": "Robust system design demands clear separation between semantic intent, layout calculation, and byte-level compilation. Rather than treating file creation as string formatting, the engine produces structured specifications validated against domain rules." },
+    { "type": "processFlow", "steps": [
+      { "step": 1, "title": "Intent Analysis", "description": "Deconstruct user goals, determine audience depth, and identify necessary facts." },
+      { "step": 2, "title": "Information Synthesis", "description": "Structure findings into logical chapters, tables, metric cards, and step flows." },
+      { "step": 3, "title": "Deterministic Layout", "description": "Compile layout geometry, wrap typography, apply theme palettes, and prevent widow lines." },
+      { "step": 4, "title": "Quality Validation", "description": "Inspect text density, verify formula syntax, and perform automatic reflow repairs." }
     ]},
-    { "type": "paragraph", "text": "In-depth commentary and technical evaluation of empirical metrics and findings..." }
+    { "type": "heading", "level": 2, "text": "2. Comparative Assessment & Trade-offs" },
+    { "type": "comparison", "headers": ["Dimension", "Basic Text-to-File", "Intelligent Generation Engine"], "rows": [
+      { "feature": "Document Layout", "valA": "Single font, flat walls of text", "valB": "Dynamic typography, callouts, metrics" },
+      { "feature": "Data Modeling", "valA": "Plain tab-separated text", "valB": "Real calculated formulas and multi-sheet models" },
+      { "feature": "Presentation Slide Variety", "valA": "Title + 5 bullets repeated", "valB": "16:9 canvas with stats, 2-column, and process flows" }
+    ]},
+    { "type": "quote", "text": "Every paragraph, table, and metric must earn its place on the page.", "author": "KSEMO Engineering" }
   ]
 }`;
   }
 
-  return `You are an elite, specialized document generation AI.
-CRITICAL DIRECTIVE:
+  return `You are the central File Creation Intelligence Engine inside KSEMO.
+CRITICAL PRINCIPLE:
+"DO NOT GENERATE A FILE. DESIGN AND PRODUCE THE BEST POSSIBLE ARTIFACT."
+
 The user has requested a ${formatUpper} file to be created.
 User query / prompt:
 "${userMessage.slice(0, 4000)}"
 
-CONTEXT & SUBJECT INSTRUCTIONS:
+CONTEXT & QUALITY MANDATE:
 1. If the user's prompt says "I want this in ${formatUpper}", "give me this in ${formatUpper}", "make this into a ${formatUpper}", or refers to "this", "that", "the above", or previous conversation:
    You MUST base the document directly on the preceding conversation history and assistant messages above!
    Extract all key topics, analysis, facts, figures, tables, and explanations from the chat history and structure them into a complete, professional, multi-page ${formatUpper} document.
-2. If the user provided a specific topic, task, or question (e.g. "Explain photosynthesis, I want this in ${formatUpper}"):
+2. If the user provided a specific topic, task, or question:
    Answer and cover that topic comprehensively and exhaustively within the document.
-3. NEVER set createFile to false. You MUST set "createFile": true.
-4. Set "format": "${format}".
-5. Set "filename": a clear, clean snake_case filename without extension representing the actual topic (e.g. "photosynthesis_comprehensive_guide" or "quarterly_financial_report"). NEVER name it "i_want_this_in_${format}" or "create_file".
-6. Set "title": a polished, professional title representing the document's actual subject matter (e.g. "Photosynthesis: Biological Mechanisms and Energy Conversion").
-7. Set "summary": a clear statement explaining the document created and its contents.
-8. ${lengthDirective}
+3. NEVER generate filler paragraphs, repeated explanations, meaningless generic conclusions, or empty introductions. Every block must earn its place.
+4. When page counts are requested: treat the number as a target, NOT a command to create empty space. Increase useful content, visuals, tables, examples, diagrams, callouts, or explanations as appropriate so the document naturally reaches the requested size.
+5. NEVER set createFile to false. You MUST set "createFile": true.
+6. Set "format": "${format}".
+7. Set "filename": a clear, clean snake_case filename without extension representing the actual topic.
+8. Set "title": a polished, professional title representing the document's actual subject matter.
+9. Set "theme": choose the most appropriate theme for the topic ("technical", "business", "scientific", "editorial", or "modern").
+10. Set "summary": a concise, friendly sentence telling the user what was created.
+11. ${lengthDirective}
 ${DIVERSE_ARCHITECTURE_GUIDE}
 ${researchBlock ? `\n${researchBlock}\n` : ""}
 Output VALID JSON ONLY (no markdown code blocks, no backticks):
@@ -326,7 +389,8 @@ Output VALID JSON ONLY (no markdown code blocks, no backticks):
   "format": "${format}",
   "filename": "document_name",
   "title": "Document Title",
-  "summary": "Generated comprehensive ${formatUpper} file on [Topic].",
+  "theme": "technical",
+  "summary": "I have created the requested ${formatUpper} document.",
   ${researchBlock ? '"sources": [{"title": "...", "url": "...", "publisher": "..."}],' : ""}
   ${structureExample}
 }`;

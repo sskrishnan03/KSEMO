@@ -242,14 +242,40 @@ function countWordsFromBlocks(blocks: DocBlock[]): number {
     if ("text" in block && typeof block.text === "string") {
       count += block.text.split(/\s+/).filter(Boolean).length;
     }
-    if ("items" in block && Array.isArray(block.items)) {
-      count += block.items.join(" ").split(/\s+/).filter(Boolean).length;
+    if ("title" in block && typeof (block as any).title === "string") {
+      count += (block as any).title.split(/\s+/).filter(Boolean).length;
+    }
+    if ("items" in block && Array.isArray((block as any).items)) {
+      count += (block as any).items
+        .map((it: any) => (typeof it === "string" ? it : `${it.label || ""} ${it.value || ""}`))
+        .join(" ")
+        .split(/\s+/)
+        .filter(Boolean).length;
+    }
+    if ("steps" in block && Array.isArray((block as any).steps)) {
+      count += (block as any).steps
+        .map((s: any) => `${s.title || ""} ${s.description || ""}`)
+        .join(" ")
+        .split(/\s+/)
+        .filter(Boolean).length;
     }
     if ("rows" in block && Array.isArray(block.rows)) {
-      count += block.rows.flat().join(" ").split(/\s+/).filter(Boolean).length;
+      for (const r of block.rows) {
+        if (Array.isArray(r)) {
+          count += r.join(" ").split(/\s+/).filter(Boolean).length;
+        } else if (r && typeof r === "object") {
+          const obj = r as any;
+          count += `${obj.feature || ""} ${obj.valA || ""} ${obj.valB || ""}`
+            .split(/\s+/)
+            .filter(Boolean).length;
+        }
+      }
     }
     if ("headers" in block && Array.isArray(block.headers)) {
       count += block.headers.join(" ").split(/\s+/).filter(Boolean).length;
+    }
+    if ("code" in block && typeof (block as any).code === "string") {
+      count += (block as any).code.split(/\s+/).filter(Boolean).length;
     }
   }
   return count;
@@ -290,6 +316,7 @@ export function buildDocumentSpec(plan: Extract<DocumentPlan, { kind: "file" }>)
     filename: plan.filename,
     title: plan.title || "Document",
     summary: plan.summary,
+    theme: plan.theme ?? "modern",
   };
   if (plan.format === "xlsx") {
     const sheets = coerceSheets(plan.content.sheets);

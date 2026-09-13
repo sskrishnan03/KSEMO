@@ -76,10 +76,110 @@ async function toBase64(blob: Blob) {
   return window.btoa(binary);
 }
 
-const TURN_SILENCE_MS = 300;
+// Strip markdown syntax, symbols, emojis, and code artifacts so speech sounds natural & conversational
+export function cleanTextForSpeech(text: string): string {
+  return text
+    // Remove markdown code blocks
+    .replace(/```[\s\S]*?```/g, "")
+    // Remove inline code backticks
+    .replace(/`([^`]+)`/g, "$1")
+    // Remove markdown links: [text](url) -> text
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    // Remove raw URLs
+    .replace(/https?:\/\/\S+/g, "")
+    // Remove markdown bold/italic asterisks & underscores
+    .replace(/[*_]{1,3}([^*_]+)[*_]{1,3}/g, "$1")
+    // Remove markdown headers: # Header -> Header
+    .replace(/^#{1,6}\s+/gm, "")
+    // Remove blockquotes: > Quote -> Quote
+    .replace(/^>\s+/gm, "")
+    // Remove bullet points & list symbols
+    .replace(/[•●○■□▪▫]/g, " ")
+    .replace(/^\s*[-*]\s+/gm, "")
+    // Remove numbering at line start: 1. -> ""
+    .replace(/^\s*\d+\.\s+/gm, "")
+    // Remove emoji characters so speech synthesizers don't read out emoji names
+    .replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, "")
+    // Replace currency and symbols with natural spoken equivalents
+    .replace(/\$(\d+(?:\.\d+)?)/g, "$1 dollars")
+    .replace(/\$/g, " dollars ")
+    .replace(/\s*&\s*/g, " and ")
+    .replace(/\s*%\s*/g, " percent ")
+    // Collapse whitespace
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// Selects the highest quality natural, human-like voice available on this device
+export function selectBestHumanVoice(
+  voices: SpeechSynthesisVoice[],
+  preferredName?: string | null
+): SpeechSynthesisVoice | null {
+  if (!voices.length) return null;
+
+  if (preferredName) {
+    const matched = voices.find(v => v.name === preferredName);
+    if (matched) return matched;
+  }
+
+  const userLang = (typeof navigator !== "undefined" ? navigator.language || "en" : "en")
+    .slice(0, 2)
+    .toLowerCase();
+
+  const priorityScore = (v: SpeechSynthesisVoice): number => {
+    const name = v.name.toLowerCase();
+    const lang = v.lang.toLowerCase();
+    let score = 0;
+
+    if (lang.startsWith(userLang)) score += 60;
+    else if (lang.startsWith("en")) score += 30;
+    else return -100;
+
+    // Neural / Natural Online voices (Edge/Windows, Chrome, macOS) sound like real humans
+    if (name.includes("natural") || name.includes("neural") || name.includes("online (natural)")) {
+      score += 120;
+    }
+    if (name.includes("enhanced") || name.includes("premium")) {
+      score += 90;
+    }
+    if (name.includes("google")) {
+      score += 80;
+    }
+
+    // Known warm conversational voices
+    if (/jenny|aria|guy|sonia|natasha|christopher|roger|steffan|ava|oliver|samantha/i.test(name)) {
+      score += 45;
+    }
+
+    if (v.default) score += 10;
+
+    // Deprioritize robotic legacy desktop synthesizers (like Microsoft David)
+    if (name.includes("david") || (name.includes("desktop") && !name.includes("natural"))) {
+      score -= 50;
+    }
+
+    return score;
+  };
+
+  const scored = [...voices]
+    .map(v => ({ voice: v, score: priorityScore(v) }))
+    .filter(item => item.score > 0)
+    .sort((a, b) => b.score - a.score);
+
+  if (scored.length > 0) {
+    return scored[0].voice;
+  }
+
+  return (
+    voices.find(v => v.lang.toLowerCase().startsWith("en")) ??
+    voices.find(v => v.default) ??
+    voices[0] ??
+    null
+  );
+}
+
+const TURN_SILENCE_MS = 750;
 const INTERIM_COMMIT_MS = 800;
-const BARGE_IN_LEVEL = 0.35;
-const BARGE_IN_HOLD_MS = 800;
 
 export function useVoiceSession(options: {
   conversationId: string | null;
@@ -130,11 +230,11 @@ export function useVoiceSession(options: {
   const speakPendingRef = useRef(0);
   const streamOpenRef = useRef(false);
   const drainResolverRef = useRef<(() => void) | null>(null);
-  const bargeInHoldRef = useRef(0);
   const lastSpeakStartRef = useRef(0);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const recorderChunksRef = useRef<Blob[]>([]);
   const voiceRef = useRef<SpeechSynthesisVoice | null>(null);
+  const activeUtterancesRef = useRef<Set<SpeechSynthesisUtterance>>(new Set());
   const fullReplyRef = useRef("");
   const subtitleCharRef = useRef(0);
   const subtitleTimerRef = useRef<number | null>(null);
@@ -146,6 +246,9 @@ export function useVoiceSession(options: {
   const lastVoiceEventRef = useRef(0);
   const watchdogRef = useRef<number | null>(null);
   const mobileRestartCountRef = useRef(0);
+  const recognitionNetworkFailuresRef = useRef(0);
+  const lastLevelAtRef = useRef(0);
+  const captureModeRef = useRef<"recognition" | "capture" | "none">("none");
 
   const continuousSupported =
     typeof window !== "undefined" && getRecognitionCtor() !== null;
@@ -157,18 +260,8 @@ export function useVoiceSession(options: {
     if (!("speechSynthesis" in window)) return;
     const pickVoice = () => {
       const voices = window.speechSynthesis.getVoices();
-      const preferred = preferredVoiceNameRef.current;
-      const picked =
-        (preferred
-          ? voices.find(voice => voice.name === preferred)
-          : undefined) ??
-        voices.find(voice => voice.default && voice.lang.startsWith("en")) ??
-        voices.find(voice =>
-          voice.lang.startsWith(navigator.language.slice(0, 2))
-        ) ??
-        voices.find(voice => voice.lang.startsWith("en")) ??
-        voices[0] ??
-        null;
+      if (!voices.length) return;
+      const picked = selectBestHumanVoice(voices, preferredVoiceNameRef.current);
       voiceRef.current = picked;
       if (preferredVoiceNameRef.current === null && picked) {
         preferredVoiceNameRef.current = picked.name;
@@ -176,7 +269,8 @@ export function useVoiceSession(options: {
       }
     };
     const refreshVoices = () => {
-      setVoiceList(window.speechSynthesis.getVoices());
+      const voices = window.speechSynthesis.getVoices();
+      setVoiceList(voices);
       pickVoice();
     };
     refreshVoices();
@@ -268,6 +362,27 @@ export function useVoiceSession(options: {
         !wantListeningRef.current
       )
         return;
+      if (analyserRef.current) {
+        if (levelRef.current > 0.08) lastLevelAtRef.current = Date.now();
+        if (
+          Date.now() - lastVoiceEventRef.current > 8000 &&
+          Date.now() - lastLevelAtRef.current < 8000
+        ) {
+          console.warn(
+            "[Voice] Recognition stalled while the mic heard speech, switching to capture fallback"
+          );
+          wantListeningRef.current = false;
+          stopRecognition();
+          stopWatchdog();
+          captureModeRef.current = "capture";
+          interimRef.current = "";
+          setInterim("");
+          stateRef.current = "idle";
+          setState("idle");
+          void startPushToTalk();
+          return;
+        }
+      }
       const text = interimRef.current.trim();
       if (!text || Date.now() - lastVoiceEventRef.current < INTERIM_COMMIT_MS)
         return;
@@ -286,7 +401,30 @@ export function useVoiceSession(options: {
       setInterim("");
       interimRef.current = "";
       lastVoiceEventRef.current = Date.now();
-      if (continuousSupported) startRecognitionInternal();
+      if (continuousSupported) {
+        window.setTimeout(() => {
+          if (
+            unmountedRef.current ||
+            !wantListeningRef.current ||
+            turnActiveRef.current ||
+            recognitionActiveRef.current ||
+            recognitionRef.current
+          )
+            return;
+          startRecognitionInternal();
+        }, 450);
+      }
+    } else if (captureModeRef.current === "capture") {
+      setState("idle");
+      window.setTimeout(() => {
+        if (
+          unmountedRef.current ||
+          stateRef.current !== "idle" ||
+          turnActiveRef.current
+        )
+          return;
+        void startPushToTalk();
+      }, 400);
     } else {
       setState("idle");
     }
@@ -310,6 +448,7 @@ export function useVoiceSession(options: {
     recognition.maxAlternatives = 1;
     recognition.onresult = event => {
       lastVoiceEventRef.current = Date.now();
+      recognitionNetworkFailuresRef.current = 0;
       let finalText = "";
       let interimText = "";
       for (
@@ -361,15 +500,38 @@ export function useVoiceSession(options: {
             : "Could not access the microphone. Check that it is connected and not in use by another app."
         );
       } else if (event.error === "network") {
-        setError(
-          "Speech recognition hit a network problem. Check your connection and tap the microphone to continue."
-        );
-        setState("idle");
-        wantListeningRef.current = false;
+        console.warn("[Voice] Speech recognition network error; scheduling fresh instance restart");
+        recognitionNetworkFailuresRef.current += 1;
+        if (recognitionNetworkFailuresRef.current >= 3) {
+          console.warn(
+            "[Voice] Speech recognition keeps failing on network errors, switching to capture fallback"
+          );
+          wantListeningRef.current = false;
+          stopRecognition();
+          stopWatchdog();
+          captureModeRef.current = "capture";
+          stateRef.current = "idle";
+          setState("idle");
+          setInterim("");
+          interimRef.current = "";
+          void startPushToTalk();
+          return;
+        }
+        window.setTimeout(() => {
+          if (
+            wantListeningRef.current &&
+            !turnActiveRef.current &&
+            !recognitionActiveRef.current &&
+            !unmountedRef.current
+          ) {
+            startRecognitionInternal();
+          }
+        }, 1200);
       }
     };
     recognition.onend = () => {
       recognitionActiveRef.current = false;
+      recognitionRef.current = null;
       if (process.env.NODE_ENV !== "production")
         console.log(
           "[Voice] Recognition ended, wantListening:",
@@ -383,7 +545,7 @@ export function useVoiceSession(options: {
       ) {
         if (isMobileDevice()) {
           mobileRestartCountRef.current += 1;
-          if (mobileRestartCountRef.current > 8) {
+          if (mobileRestartCountRef.current > 12) {
             if (process.env.NODE_ENV !== "production")
               console.log("[Voice] Too many recognition restarts, stopping");
             wantListeningRef.current = false;
@@ -394,7 +556,7 @@ export function useVoiceSession(options: {
             return;
           }
         }
-        const restartDelay = isMobileDevice() ? 500 : 250;
+        const restartDelay = isMobileDevice() ? 400 : 150;
         window.setTimeout(() => {
           if (
             wantListeningRef.current &&
@@ -402,12 +564,7 @@ export function useVoiceSession(options: {
             !recognitionActiveRef.current &&
             !unmountedRef.current
           ) {
-            try {
-              recognitionRef.current?.start();
-              recognitionActiveRef.current = true;
-            } catch {
-              /* restart race is harmless */
-            }
+            startRecognitionInternal();
           }
         }, restartDelay);
       }
@@ -472,7 +629,11 @@ export function useVoiceSession(options: {
   }, [clearSubtitles, stopKeepalive]);
 
   const interruptSpeaking = useCallback(() => {
-    if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+    if ("speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+      if (window.speechSynthesis.paused) window.speechSynthesis.resume();
+    }
+    activeUtterancesRef.current.clear();
     speakPendingRef.current = 0;
     stopKeepalive();
     clearSubtitles();
@@ -482,8 +643,13 @@ export function useVoiceSession(options: {
 
   function hardStopInternal() {
     wantListeningRef.current = false;
+    captureModeRef.current = "none";
     stopRecognition();
-    if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+    if ("speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+      if (window.speechSynthesis.paused) window.speechSynthesis.resume();
+    }
+    activeUtterancesRef.current.clear();
     stopKeepalive();
     speakPendingRef.current = 0;
     abortRef.current?.abort();
@@ -525,15 +691,30 @@ export function useVoiceSession(options: {
 
   function enqueueSentence(rawSentence: string, startOffset: number) {
     if (!("speechSynthesis" in window)) return;
-    const sentence = rawSentence.trim();
+    // Clean text to natural spoken English without markdown clutter or emojis
+    const sentence = cleanTextForSpeech(rawSentence);
     if (!sentence) return;
+
+    // Dynamically query voices if not picked yet
+    if (!voiceRef.current) {
+      const allVoices = window.speechSynthesis.getVoices();
+      if (allVoices.length) {
+        voiceRef.current = selectBestHumanVoice(allVoices, preferredVoiceNameRef.current);
+      }
+    }
+
     const lead = rawSentence.length - rawSentence.trimStart().length;
     const utterance = new SpeechSynthesisUtterance(sentence);
-    utterance.rate = Math.min(1.6, Math.max(0.7, speechRate));
+    // Natural human cadence
+    utterance.rate = Math.min(1.3, Math.max(0.85, speechRate));
     utterance.pitch = 1.0;
     utterance.volume = 1.0;
     if (voiceRef.current) utterance.voice = voiceRef.current;
+
+    // Retain reference in set to prevent Chromium garbage collection speech-drop bug
+    activeUtterancesRef.current.add(utterance);
     speakPendingRef.current += 1;
+
     utterance.onstart = () => {
       lastSpeakStartRef.current = Date.now();
       if (stateRef.current !== "speaking") setState("speaking");
@@ -548,15 +729,25 @@ export function useVoiceSession(options: {
       revealSubtitleTo(startOffset + lead + event.charIndex);
     };
     const settle = () => {
+      activeUtterancesRef.current.delete(utterance);
       speakPendingRef.current = Math.max(0, speakPendingRef.current - 1);
       resolveDrain();
     };
     utterance.onend = settle;
     utterance.onerror = (event) => {
-      console.error('[Voice] Speech synthesis error:', event.error);
+      activeUtterancesRef.current.delete(utterance);
+      console.warn('[Voice] Speech synthesis error:', event.error);
       settle();
     };
+
+    // Unpause in case browser paused speech synthesis
+    if (window.speechSynthesis.paused) {
+      window.speechSynthesis.resume();
+    }
     window.speechSynthesis.speak(utterance);
+    if (window.speechSynthesis.paused) {
+      window.speechSynthesis.resume();
+    }
   }
 
   function flushSpokenChunks(force: boolean) {
@@ -809,6 +1000,7 @@ export function useVoiceSession(options: {
           "[Voice] Mobile path: SpeechRecognition only (no getUserMedia)"
         );
       wantListeningRef.current = true;
+      captureModeRef.current = "recognition";
       lastVoiceEventRef.current = Date.now();
       setState("listening");
       setInterim("");
@@ -832,8 +1024,11 @@ export function useVoiceSession(options: {
           autoGainControl: true,
         },
       });
-      streamRef.current = stream;
-      const audioContext = new AudioContext();
+      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      const audioContext = new AudioCtx();
+      if (audioContext.state === "suspended") {
+        void audioContext.resume();
+      }
       audioContextRef.current = audioContext;
       const source = audioContext.createMediaStreamSource(stream);
       const analyser = audioContext.createAnalyser();
@@ -861,25 +1056,12 @@ export function useVoiceSession(options: {
         for (let i = 0; i < out.length; i++) {
           out[i] = freqBins[i * step] ?? 0;
         }
-        if (
-          stateRef.current === "speaking" &&
-          Date.now() - lastSpeakStartRef.current > 1500
-        ) {
-          if (smoothed > BARGE_IN_LEVEL) {
-            bargeInHoldRef.current += 16;
-            if (bargeInHoldRef.current >= BARGE_IN_HOLD_MS) {
-              bargeInHoldRef.current = 0;
-              interruptSpeaking();
-            }
-          } else {
-            bargeInHoldRef.current = 0;
-          }
-        }
         rafRef.current = requestAnimationFrame(tick);
       };
       rafRef.current = requestAnimationFrame(tick);
 
       wantListeningRef.current = true;
+      captureModeRef.current = "recognition";
       lastVoiceEventRef.current = Date.now();
       setState("listening");
       setInterim("");
@@ -900,10 +1082,11 @@ export function useVoiceSession(options: {
           "KSEMO could not access a microphone. Check that a microphone is connected and available."
         );
     }
-  }, [interruptSpeaking, releaseMicMeter, startWatchdog, stopWatchdog]);
+  }, [releaseMicMeter, startWatchdog, stopWatchdog]);
 
   const stopListening = useCallback(() => {
     wantListeningRef.current = false;
+    captureModeRef.current = "none";
     stopRecognition();
     releaseMicMeter();
     stopWatchdog();
@@ -915,6 +1098,7 @@ export function useVoiceSession(options: {
   const startPushToTalk = useCallback(async () => {
     if (stateRef.current !== "idle" || fallbackRecording) return;
     setError(null);
+    captureModeRef.current = "capture";
     if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
       setError("Voice input is not supported in this browser.");
       return;
@@ -937,6 +1121,9 @@ export function useVoiceSession(options: {
       analyserRef.current = analyser;
       const samples = new Uint8Array(analyser.fftSize);
       let smoothed = 0;
+      let heardSpeech = false;
+      let spokeAt = 0;
+      const startedAt = Date.now();
       const tick = () => {
         const currentAnalyser = analyserRef.current;
         if (!currentAnalyser) return;
@@ -949,6 +1136,21 @@ export function useVoiceSession(options: {
             smoothed) *
           0.25;
         levelRef.current = smoothed;
+        if (smoothed > 0.08) {
+          heardSpeech = true;
+          spokeAt = Date.now();
+        }
+        if (
+          heardSpeech &&
+          Date.now() - startedAt > TURN_SILENCE_MS + 350 &&
+          Date.now() - spokeAt > 1500
+        ) {
+          const activeRecorder = recorderRef.current;
+          if (activeRecorder && activeRecorder.state === "recording") {
+            activeRecorder.stop();
+            return;
+          }
+        }
         rafRef.current = requestAnimationFrame(tick);
       };
       rafRef.current = requestAnimationFrame(tick);
