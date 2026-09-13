@@ -1,9 +1,9 @@
 import type { DocFormat } from "@/lib/docFormats";
 import {
+  ArrowUpRight,
   Check,
   ChevronDown,
   Cpu,
-  Download,
   Globe,
   LayoutList,
   Palette,
@@ -20,12 +20,13 @@ import {
   type FileBrandVariant,
 } from "@/components/ksemo/FileBrandIcons";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { downloadFile } from "@/lib/downloadFile";
+  loadFilePreview,
+  type FilePreviewData,
+  type SheetPreview,
+  type SlidePreview,
+} from "@/lib/filePreview";
 import { usePdfViewer, isViewableDocument } from "@/contexts/PdfViewerContext";
 
 export type FileCreationStage =
@@ -185,42 +186,6 @@ export const STAGE_NUMBERS: Record<FileCreationStage, number> = {
   error: 0,
 };
 
-function formatFileSize(bytes?: number): string | null {
-  if (typeof bytes !== "number" || Number.isNaN(bytes) || bytes < 0)
-    return null;
-  const units = ["B", "KB", "MB", "GB"];
-  let value = bytes;
-  let unit = 0;
-  while (value >= 1024 && unit < units.length - 1) {
-    value /= 1024;
-    unit += 1;
-  }
-  const digits = unit === 0 || value >= 100 ? 0 : value >= 10 ? 1 : 2;
-  return `${value.toFixed(digits)} ${units[unit]}`;
-}
-
-function formatFileMetrics(metrics?: FileMetrics): string | null {
-  if (!metrics) return null;
-  const parts: string[] = [];
-  if (typeof metrics.pages === "number" && metrics.pages > 0) {
-    parts.push(`${metrics.pages} ${metrics.pages === 1 ? "page" : "pages"}`);
-  }
-  if (typeof metrics.slides === "number" && metrics.slides > 0) {
-    parts.push(
-      `${metrics.slides} ${metrics.slides === 1 ? "slide" : "slides"}`
-    );
-  }
-  if (typeof metrics.sheets === "number" && metrics.sheets > 0) {
-    parts.push(
-      `${metrics.sheets} ${metrics.sheets === 1 ? "sheet" : "sheets"}`
-    );
-  }
-  if (typeof metrics.words === "number" && metrics.words > 0) {
-    parts.push(`${metrics.words.toLocaleString()} words`);
-  }
-  return parts.length ? parts.join(" \u00b7 ") : null;
-}
-
 export type FileCreationCardProps = {
   stage: FileCreationStage;
   format?: DocFormat;
@@ -254,6 +219,21 @@ export const FileCreationCard = memo(function FileCreationCard({
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
   const [showReady, setShowReady] = useState(initialShowReady);
   const prevStageRef = useRef<FileCreationStage | null>(stage);
+  const stageRef = useRef<HTMLDivElement>(null);
+  const [stageWidth, setStageWidth] = useState(0);
+
+  useEffect(() => {
+    // Measure the preview stage so the document preview can scale up to fill
+    // the available width (edge-to-edge) on any screen size.
+    const el = stageRef.current;
+    if (!el) return;
+    const update = () => setStageWidth(el.clientWidth);
+    update();
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   useEffect(() => {
     if (initialShowReady && stage === "completed") {
@@ -487,83 +467,582 @@ export const FileCreationCard = memo(function FileCreationCard({
     format === "pptx" ||
     isViewableDocument(displayName);
 
-  // ── Completed state (BALANCED ELEGANT WIDTH, CLICK TO OPEN, HOVER DOWNLOAD) ───
+  const handleOpen = () => {
+    if (!fileUrl) return;
+    if (canOpenInDrawer) {
+      openPdf({
+        url: fileUrl,
+        filename: displayName,
+        sizeBytes: fileSizeBytes,
+        id: fileId,
+      });
+    } else {
+      window.open(fileUrl, "_blank");
+    }
+  };
+
+  // ── Completed state (PREMIUM FULL-ZOOM DOCUMENT CARD, OPEN ONLY) ────────────
   return (
     <div
       data-testid="file-creation-completed"
-      className="my-2 w-fit min-w-[220px] max-w-[340px] sm:max-w-[360px] animate-in fade-in duration-200"
+      className="my-2 w-full max-w-[440px] sm:max-w-[480px] select-none animate-in fade-in-0 slide-in-from-bottom-2 zoom-in-95 duration-300 ease-out"
     >
-      <a
-        href={fileUrl}
-        target="_blank"
-        rel="noreferrer"
-        onClick={e => {
-          if (canOpenInDrawer && fileUrl) {
-            e.preventDefault();
-            openPdf({
-              url: fileUrl,
-              filename: displayName,
-              sizeBytes: fileSizeBytes,
-              id: fileId,
-            });
-          }
-        }}
-        className={cn(
-          "group/file relative flex min-h-[58px] items-center gap-3.5 rounded-2xl",
-          "border border-border/80 bg-card/90 px-4 py-3 shadow-sm backdrop-blur-sm",
-          "transition-all duration-200 hover:border-border hover:bg-accent/60 hover:shadow-md",
-          "dark:bg-card/60 dark:hover:bg-card/90 cursor-pointer"
-        )}
-      >
-        {/* File Brand Logo: clean, properly sized (size-9 / 36px), no extra wrapper layer */}
-        <FileBrandMark
-          variant={variant}
-          className="size-9 shrink-0 select-none"
-        />
-
-        {/* Title & auto-dismissing Ready status (no duplicate format badge) */}
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-[14px] font-medium leading-snug text-foreground group-hover/file:text-primary transition-colors">
-            {displayName}
-          </p>
+      <div className="overflow-hidden rounded-2xl border border-border/70 bg-card/70 shadow-sm backdrop-blur-sm dark:bg-card/60">
+        {/* Dark preview frame — the document is offset inside it (asymmetric, layered) */}
+        <div
+          ref={stageRef}
+          data-testid="file-preview-stage"
+          className="relative grid h-[240px] place-items-center overflow-hidden bg-neutral-900 shadow-inner ring-1 ring-inset ring-white/5"
+        >
+          <FileDocumentPreview
+            format={format}
+            url={fileUrl}
+            displayName={displayName}
+            variant={variant}
+            availWidth={stageWidth}
+          />
 
           {showReady && (
-            <p className="mt-0.5 flex items-center gap-1 text-[11.5px] font-medium text-emerald-600 dark:text-emerald-400 animate-in fade-in duration-200">
+            <span className="absolute top-2 right-2 flex items-center gap-1 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2 py-0.5 text-[10.5px] font-semibold text-emerald-600 dark:text-emerald-400 animate-in fade-in duration-200 backdrop-blur-xs">
               <Check className="size-3 stroke-[2.5]" />
-              <span>Ready</span>
-            </p>
+              Ready
+            </span>
           )}
+
+          {/* Short, strong fade at the bottom — between the document and the file bar only */}
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-card via-card/60 to-transparent" />
         </div>
 
-        {/* Download Option: Only shows on hover, stationary, transparent without white background */}
-        {fileUrl && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                type="button"
-                onClick={e => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  void downloadFile(fileUrl, displayName);
-                }}
-                aria-label={`Download ${displayName}`}
-                className={cn(
-                  "relative flex size-9 shrink-0 items-center justify-center rounded-xl",
-                  "bg-transparent text-muted-foreground",
-                  "opacity-0 transition-opacity duration-150 group-hover/file:opacity-100",
-                  "hover:bg-muted/80 hover:text-foreground",
-                  "focus-visible:opacity-100"
-                )}
-              >
-                <Download className="size-4" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom" sideOffset={6}>
-              Download
-            </TooltipContent>
-          </Tooltip>
-        )}
-      </a>
+        {/* File name (left) + Open (right) — solid card bg matching the fade base */}
+        <div className="relative z-10 flex items-center justify-between gap-3 bg-card px-4 py-3">
+          <div className="min-w-0">
+            <p className="truncate text-[15px] font-semibold leading-snug text-foreground">
+              {displayName}
+            </p>
+            <p className="mt-0.5 text-[10.5px] font-medium tracking-wide text-muted-foreground uppercase">
+              {config.ext}
+            </p>
+          </div>
+          <Button
+            size="sm"
+            onClick={handleOpen}
+            disabled={!fileUrl}
+            aria-label={`Open ${displayName}`}
+            className="shrink-0 rounded-lg bg-neutral-900 text-neutral-50 hover:bg-neutral-800"
+          >
+            Open
+            <ArrowUpRight className="size-3.5" />
+          </Button>
+        </div>
+      </div>
     </div>
   );
 });
+
+// ── Document preview renderers (fixed miniature white pages) ─────────────────
+
+function cellText(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  return String(value);
+}
+
+function escapeHtml(source: string): string {
+  return source
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+/**
+ * White "sheet of paper" drawn at a canonical size and scaled up so the
+ * rendered page fills the available preview width (edge-to-edge, cropped by
+ * the stage when the page runs taller than the stage).
+ */
+function MiniPage({
+  children,
+  width,
+  contentWidth = 320,
+  contentHeight = 452,
+  className,
+}: {
+  children: React.ReactNode;
+  width: number;
+  contentWidth?: number;
+  contentHeight?: number;
+  className?: string;
+}) {
+  const scale = width / contentWidth;
+  const height = Math.round(contentHeight * scale);
+  return (
+    <div
+      style={{ width, height }}
+      className={cn(
+        "relative shrink-0 overflow-hidden rounded-[3px] bg-white text-neutral-800 shadow-xl shadow-black/15 ring-1 ring-black/10 select-none",
+        className
+      )}
+    >
+      <div
+        style={{
+          width: contentWidth,
+          height: contentHeight,
+          transform: `scale(${scale})`,
+          transformOrigin: "top left",
+        }}
+        className="pointer-events-none overflow-hidden"
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function PreviewSkeleton({ variant }: { variant: FileBrandVariant }) {
+  return (
+    <div
+      className="flex flex-col items-center gap-2.5 select-none"
+      aria-hidden="true"
+    >
+      <FileBrandMark variant={variant} className="size-8 shrink-0 opacity-55" />
+      <div className="h-2 w-24 animate-pulse rounded-full bg-foreground/10" />
+      <p className="text-[10.5px] font-medium text-muted-foreground/70">
+        Loading preview…
+      </p>
+    </div>
+  );
+}
+
+function PreviewFallback({
+  variant,
+  displayName,
+  message,
+}: {
+  variant: FileBrandVariant;
+  displayName: string;
+  message: string;
+}) {
+  return (
+    <div className="flex flex-col items-center gap-2.5 text-center select-none">
+      <FileBrandMark variant={variant} className="size-8 shrink-0 opacity-90" />
+      <p className="text-[11px] font-medium text-muted-foreground">{message}</p>
+      <p className="max-w-[220px] truncate text-[10.5px] text-muted-foreground/70">
+        {displayName}
+      </p>
+    </div>
+  );
+}
+
+function WordMini({ html, width }: { html: string; width: number }) {
+  return (
+    <MiniPage width={width}>
+      <div className="flex items-center justify-between border-b border-neutral-300 px-4 pb-1.5 pt-2.5 text-[8px] font-semibold uppercase tracking-widest text-neutral-400">
+        <span>Document</span>
+        <span>Page 1</span>
+      </div>
+      <div
+        className="space-y-2.5 px-4 pt-3 pb-3 leading-relaxed [&_a]:text-blue-600 [&_blockquote]:border-l-2 [&_blockquote]:border-neutral-300 [&_blockquote]:pl-2 [&_blockquote]:text-[11.5px] [&_blockquote]:text-neutral-500 [&_blockquote]:italic [&_h1]:mb-2 [&_h1]:text-[18px] [&_h1]:font-bold [&_h1]:text-neutral-900 [&_h2]:mb-1.5 [&_h2]:text-[16px] [&_h2]:font-semibold [&_h2]:text-neutral-900 [&_h3]:mb-1 [&_h3]:text-[13.5px] [&_h3]:font-semibold [&_h3]:text-neutral-900 [&_li]:mb-0.5 [&_li]:text-[11.5px] [&_ol]:mb-2 [&_ol]:list-decimal [&_ol]:pl-4 [&_p]:mb-2 [&_p]:text-[11.5px] [&_strong]:font-semibold [&_table]:my-1.5 [&_table]:w-full [&_table]:border-collapse [&_table]:border [&_table]:border-neutral-300 [&_td]:border [&_td]:border-neutral-300 [&_td]:px-1 [&_td]:py-0.5 [&_td]:text-[9px] [&_th]:border [&_th]:border-neutral-300 [&_th]:bg-neutral-50 [&_th]:px-1 [&_th]:py-0.5 [&_th]:text-[9px] [&_th]:font-semibold [&_th]:text-left [&_ul]:mb-2 [&_ul]:list-disc [&_ul]:pl-4"
+        dangerouslySetInnerHTML={{ __html: html }}
+      />
+    </MiniPage>
+  );
+}
+
+function TextMini({ text, width }: { text: string; width: number }) {
+  const lines = text.split(/\r?\n/).slice(0, 30).join("\n");
+  return (
+    <MiniPage width={width}>
+      <div className="flex items-center justify-between border-b border-neutral-300 px-4 pb-1.5 pt-2.5 text-[8px] font-semibold uppercase tracking-widest text-neutral-400">
+        <span>Text</span>
+        <span>1</span>
+      </div>
+      <pre className="whitespace-pre-wrap px-4 py-2.5 font-mono text-[10px] leading-[1.65] text-neutral-700">
+        {lines}
+      </pre>
+    </MiniPage>
+  );
+}
+
+function MarkdownMini({ text, width }: { text: string; width: number }) {
+  const lines = text.split(/\r?\n/).slice(0, 34);
+  const nodes: React.ReactNode[] = [];
+  let bullets: string[] = [];
+
+  const flushBullets = (key: number) => {
+    if (bullets.length === 0) return;
+    nodes.push(
+      <ul key={`b-${key}`} className="mb-1 list-disc space-y-0.5 pl-4">
+        {bullets.map((item, idx) => (
+          <li key={idx} className="text-[11px] text-neutral-700">
+            {item}
+          </li>
+        ))}
+      </ul>
+    );
+    bullets = [];
+  };
+
+  lines.forEach((raw, i) => {
+    const line = raw.trim();
+    if (/^###\s+/.test(line)) {
+      flushBullets(i);
+      nodes.push(
+        <div
+          key={i}
+          className="mt-0.5 mb-0.5 text-[11px] font-bold text-neutral-900"
+        >
+          {escapeHtml(line.slice(4))}
+        </div>
+      );
+    } else if (/^##\s+/.test(line)) {
+      flushBullets(i);
+      nodes.push(
+        <div
+          key={i}
+          className="mt-0.5 mb-0.5 text-[12px] font-bold text-neutral-900"
+        >
+          {escapeHtml(line.slice(3))}
+        </div>
+      );
+    } else if (/^#\s+/.test(line)) {
+      flushBullets(i);
+      nodes.push(
+        <div key={i} className="mb-1 text-[16px] font-bold text-neutral-900">
+          {escapeHtml(line.slice(2))}
+        </div>
+      );
+    } else if (/^[-*]\s+/.test(line)) {
+      bullets.push(escapeHtml(line.replace(/^[-*]\s+/, "")));
+    } else if (/^\s*$/.test(raw)) {
+      flushBullets(i);
+      nodes.push(<div key={i} className="h-1" />);
+    } else {
+      flushBullets(i);
+      nodes.push(
+        <p key={i} className="mb-1 text-[11px] leading-snug text-neutral-700">
+          {escapeHtml(line)}
+        </p>
+      );
+    }
+  });
+  flushBullets(lines.length);
+
+  return (
+    <MiniPage width={width}>
+      <div className="flex items-center justify-between border-b border-neutral-300 px-4 pb-1.5 pt-2.5 text-[8px] font-semibold uppercase tracking-widest text-neutral-400">
+        <span>Markdown</span>
+        <span>1</span>
+      </div>
+      <div className="px-4 pt-2.5 pb-2">{nodes}</div>
+    </MiniPage>
+  );
+}
+
+function ExcelMini({
+  sheets,
+  width,
+}: {
+  sheets: SheetPreview[];
+  width: number;
+}) {
+  const sheet = sheets[0] ?? { name: "Sheet1", data: [] };
+  const rows = sheet.data.slice(0, 11);
+  const colCount = Math.min(
+    Math.max(1, ...rows.map(r => (Array.isArray(r) ? r.length : 0))),
+    6
+  );
+  const columnLetters = Array.from({ length: colCount }, (_, i) =>
+    String.fromCharCode(65 + i)
+  );
+
+  return (
+    <div
+      style={{ width }}
+      className="shrink-0 overflow-hidden rounded-[3px] bg-white text-neutral-800 shadow-xl shadow-black/15 ring-1 ring-black/10 select-none"
+    >
+      <div className="flex items-center justify-between border-b border-neutral-300 px-3 pb-1.5 pt-2.5 text-[8px] font-semibold uppercase tracking-widest text-neutral-400">
+        <span>{sheet.name || "Sheet1"}</span>
+      </div>
+      <div className="px-2 pt-1.5 pb-2">
+        <table className="w-full table-fixed border-collapse">
+          <thead>
+            <tr>
+              <th className="w-4 border border-neutral-300 bg-neutral-50 px-1 py-1 text-right text-[9px] font-normal text-neutral-400">
+                #
+              </th>
+              {columnLetters.map(letter => (
+                <th
+                  key={letter}
+                  className="border border-neutral-300 bg-neutral-100 px-1 py-1 text-center text-[10px] font-bold text-neutral-500"
+                >
+                  {letter}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, ri) => (
+              <tr key={ri}>
+                <th className="border border-neutral-300 bg-neutral-50 px-1 py-0.5 text-right text-[9px] font-normal text-neutral-400">
+                  {ri + 1}
+                </th>
+                {Array.from({ length: colCount }, (_, ci) => (
+                  <td
+                    key={ci}
+                    className="truncate border border-neutral-300 px-1 py-0.5 text-[10.5px] text-neutral-800"
+                  >
+                    {cellText(row[ci])}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function CsvMini({ rows, width }: { rows: string[][]; width: number }) {
+  const limited = rows.slice(0, 11);
+  const colCount = Math.min(Math.max(1, ...limited.map(r => r.length)), 5);
+  const header = limited[0] ?? [];
+  const body = limited.slice(1);
+
+  return (
+    <div
+      style={{ width }}
+      className="shrink-0 overflow-hidden rounded-[3px] bg-white text-neutral-800 shadow-xl shadow-black/15 ring-1 ring-black/10 select-none"
+    >
+      <div className="flex items-center justify-between border-b border-neutral-300 px-3 pb-1.5 pt-2.5 text-[8px] font-semibold uppercase tracking-widest text-neutral-400">
+        <span>Spreadsheet</span>
+      </div>
+      <div className="px-2 pt-1.5 pb-2">
+        <table className="w-full table-fixed border-collapse">
+          <thead>
+            <tr>
+              {Array.from({ length: colCount }, (_, i) => (
+                <th
+                  key={i}
+                  className="truncate border border-neutral-300 bg-neutral-100 px-1 py-1 text-left text-[10px] font-bold text-neutral-600"
+                >
+                  {cellText(header[i])}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {body.map((row, ri) => (
+              <tr key={ri}>
+                {Array.from({ length: colCount }, (_, ci) => (
+                  <td
+                    key={ci}
+                    className="truncate border border-neutral-300 px-1 py-0.5 text-[10.5px] text-neutral-700"
+                  >
+                    {cellText(row[ci])}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function SlideMini({
+  slides,
+  width,
+}: {
+  slides: SlidePreview[];
+  width: number;
+}) {
+  const slide = slides[0];
+  if (!slide) return null;
+  const bullets = slide.items.filter(item => !item.isTitle);
+
+  return (
+    <MiniPage width={width} contentWidth={320} contentHeight={180}>
+      <div className="flex h-full flex-col justify-between p-4">
+        <div>
+          <div className="mb-2 flex items-center gap-1.5">
+            <span className="h-1 w-6 rounded-full bg-orange-500" />
+            <span className="text-[8px] font-semibold tracking-widest text-neutral-400 uppercase">
+              Slide 1
+            </span>
+          </div>
+          <h2 className="text-[19px] leading-tight font-bold text-neutral-900">
+            {slide.title}
+          </h2>
+        </div>
+
+        <div className="mt-2 space-y-1.5">
+          {bullets.slice(0, 4).map((item, idx) => (
+            <div key={idx} className="flex items-start gap-1.5">
+              <span className="mt-[2px] h-1 w-1 shrink-0 rounded-full bg-orange-500/80" />
+              <p className="text-[12px] leading-snug text-neutral-600">
+                {item.text}
+              </p>
+            </div>
+          ))}
+        </div>
+
+        <div className="flex items-center justify-between border-t border-neutral-200 pt-1.5 text-[8px] font-medium text-neutral-400">
+          <span>Presentation</span>
+          <span>1 of {slides.length}</span>
+        </div>
+      </div>
+    </MiniPage>
+  );
+}
+
+function FileDocumentPreview({
+  format,
+  url,
+  displayName,
+  variant,
+  availWidth = 0,
+}: {
+  format: DocFormat;
+  url?: string;
+  displayName: string;
+  variant: FileBrandVariant;
+  availWidth?: number;
+}) {
+  const [data, setData] = useState<FilePreviewData | null>(null);
+  const [isLoading, setIsLoading] = useState(Boolean(url));
+
+  // The document spans the full frame width. With the left/top offset it keeps
+  // the offset look on the left and top only, and simply extends (crops) past
+  // the right edge — no empty gap on the right side.
+  const pageWidth = Math.max(availWidth > 0 ? availWidth : 478, 240);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!url) {
+      setData(null);
+      setIsLoading(false);
+      return;
+    }
+    setIsLoading(true);
+    void loadFilePreview(url, format, displayName)
+      .then(next => {
+        if (!cancelled) {
+          setData(next);
+          setIsLoading(false);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setData({ kind: "error", message: "Preview unavailable." });
+          setIsLoading(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [url, format, displayName]);
+
+  if (isLoading) {
+    return <PreviewSkeleton variant={variant} />;
+  }
+
+  if (!data || data.kind === "error") {
+    return (
+      <PreviewFallback
+        variant={variant}
+        displayName={displayName}
+        message="Preview unavailable"
+      />
+    );
+  }
+
+  let body: React.ReactNode;
+  switch (data.kind) {
+    case "pdf":
+      body = data.pageImageUrl ? (
+        <img
+          src={data.pageImageUrl}
+          alt={`Preview of ${displayName}`}
+          style={{ width: pageWidth }}
+          className="shrink-0 rounded-[3px] shadow-xl shadow-black/30 ring-1 ring-white/10"
+        />
+      ) : (
+        <PreviewFallback
+          variant={variant}
+          displayName={displayName}
+          message="Preview unavailable"
+        />
+      );
+      break;
+    case "docx":
+      body = data.html ? (
+        <WordMini html={data.html} width={pageWidth} />
+      ) : (
+        <PreviewFallback
+          variant={variant}
+          displayName={displayName}
+          message="Preview unavailable"
+        />
+      );
+      break;
+    case "xlsx":
+      body = data.sheets.length ? (
+        <ExcelMini sheets={data.sheets} width={pageWidth} />
+      ) : (
+        <PreviewFallback
+          variant={variant}
+          displayName={displayName}
+          message="Preview unavailable"
+        />
+      );
+      break;
+    case "pptx":
+      body = data.slides.length ? (
+        <SlideMini slides={data.slides} width={pageWidth} />
+      ) : (
+        <PreviewFallback
+          variant={variant}
+          displayName={displayName}
+          message="Preview unavailable"
+        />
+      );
+      break;
+    case "csv":
+      body = data.rows.length ? (
+        <CsvMini rows={data.rows} width={pageWidth} />
+      ) : (
+        <PreviewFallback
+          variant={variant}
+          displayName={displayName}
+          message="No data rows"
+        />
+      );
+      break;
+    case "text":
+      body = data.isMarkdown ? (
+        <MarkdownMini text={data.text} width={pageWidth} />
+      ) : (
+        <TextMini text={data.text} width={pageWidth} />
+      );
+      break;
+    default:
+      body = (
+        <PreviewFallback
+          variant={variant}
+          displayName={displayName}
+          message="Preview unavailable"
+        />
+      );
+  }
+
+  // Intentional asymmetric placement: the document starts below/inside the
+  // frame's top-left corner so the dark frame is visible on the top and left,
+  // while the large document extends (and crops) toward the right and bottom.
+  return (
+    <div className="mt-5 ml-3.5 block self-start justify-self-start">
+      {body}
+    </div>
+  );
+}

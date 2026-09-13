@@ -138,8 +138,8 @@ describe("FileCreationCard", () => {
     });
   });
 
-  describe("Completed State (Refined KSEMO Design)", () => {
-    it("renders compact click-to-open card, hover-only transparent download button, ready check, and avoids clutter (no extra icon layer, no duplicate badge, no system tooltip, no jumping animation)", () => {
+  describe("Completed State (Premium Document Preview Card)", () => {
+    it("renders a large preview stage, filename row with Open on the right, and NO Download action", () => {
       const markup = renderCard({
         stage: "completed",
         format: "pdf",
@@ -151,43 +151,71 @@ describe("FileCreationCard", () => {
       });
 
       expect(markup).toContain('data-testid="file-creation-completed"');
+      expect(markup).toContain('data-testid="file-preview-stage"');
       expect(markup).toContain("Quarterly_Report.pdf");
 
-      // Per user request: clutter removed - no file size or page counts displayed
-      expect(markup).not.toContain("240 KB");
-      expect(markup).not.toContain("6 pages");
-      expect(markup).not.toContain("1,420 words");
+      // File type is surfaced as plain metadata in the footer row
+      expect(markup).toContain("PDF");
 
-      // No extra layer wrapper around icon
-      expect(markup).not.toContain("bg-muted/50");
+      // Single action: Open sits next to the filename in a footer BELOW the
+      // preview (preview content on top), blended in by a fade (no hard line),
+      // and there is no Download action at all
+      expect(markup).toContain("flex items-center justify-between gap-3");
+      expect(markup).toContain("bg-gradient-to-t from-card");
+      expect(markup).not.toContain("border-t");
+      expect(markup).toContain('aria-label="Open Quarterly_Report.pdf"');
+      expect(markup).toContain("Open");
+      expect(markup).not.toContain("Download");
 
-      // No redundant text badge next to title (icon already contains brand badge)
-      expect(markup).not.toContain("border-border/70 bg-muted/70");
-
-      // No native browser system tooltip attribute on link
-      expect(markup).not.toContain('title="Open');
-
-      // Balanced elegant width and refined height per user request
-      expect(markup).toContain("max-w-[340px]");
-      expect(markup).toContain("min-h-[58px]");
-      // Card is clickable to open
-      expect(markup).toContain('href="https://example.com/Quarterly_Report.pdf"');
-      expect(markup).toContain('target="_blank"');
       // Ready status indicator when freshly created
       expect(markup).toContain("Ready");
 
-      // Single download button: transparent, only visible on hover, stationary without jumping
-      expect(markup).toContain('aria-label="Download Quarterly_Report.pdf"');
-      expect(markup).toContain("opacity-0 transition-opacity duration-150 group-hover/file:opacity-100");
-      expect(markup).toContain("bg-transparent");
-      expect(markup).not.toContain("translate-y");
-      expect(markup).not.toContain("scale-110");
+      // No ChatGPT-style message actions on the card
+      expect(markup).not.toContain("Copy");
+      expect(markup).not.toContain("Share");
+      expect(markup).not.toContain(">Like");
+      expect(markup).not.toContain("Regenerate");
+      expect(markup).not.toContain("lucide-ellipsis");
+      expect(markup).not.toContain("lucide-thumbs");
+
+      // No legacy attachment-bubble styling (hover-only icon, tiny bubble)
+      expect(markup).not.toContain("group-hover/file");
+      expect(markup).not.toContain("opacity-0 transition-opacity");
+      expect(markup).not.toContain("min-h-[58px]");
+
+      // No size or page-count clutter on the card
+      expect(markup).not.toContain("240 KB");
+      expect(markup).not.toContain("6 pages");
+      expect(markup).not.toContain("1,420 words");
+    });
+
+    it("renders the preview card width contract (wide, not a giant or tiny container)", () => {
+      const markup = renderCard({
+        stage: "completed",
+        format: "docx",
+        filename: "Energy_Transition.docx",
+        fileUrl: "https://example.com/Energy_Transition.docx",
+      });
+
+      expect(markup).toContain('data-testid="file-creation-completed"');
+      expect(markup).toContain("max-w-[480px]");
+      expect(markup).toContain("rounded-2xl");
+      expect(markup).not.toContain("w-fit");
+      expect(markup).not.toContain("min-w-[220px]");
     });
 
     it("does not render source chips in the card UI (sources stay embedded inside the generated file)", () => {
       const sources = [
-        { title: "Global Energy Outlook 2026", url: "https://iea.org/reports/outlook-2026", publisher: "iea.org" },
-        { title: "Renewable Energy Transition", url: "https://nature.com/articles/renewable-energy", publisher: "nature.com" },
+        {
+          title: "Global Energy Outlook 2026",
+          url: "https://iea.org/reports/outlook-2026",
+          publisher: "iea.org",
+        },
+        {
+          title: "Renewable Energy Transition",
+          url: "https://nature.com/articles/renewable-energy",
+          publisher: "nature.com",
+        },
       ];
 
       const markup = renderCard({
@@ -242,15 +270,21 @@ describe("splitFirstSentence (Message Content Formatting)", () => {
   it("splits multi-paragraph content into first sentence and remaining response", () => {
     const content = `I've created your comprehensive PDF document on "Clean Energy Trends".\n\n### Key Highlights\n- Solar power increased by 30%\n- Wind power investments reached record highs.`;
     const result = splitFirstSentence(content);
-    expect(result.first).toBe(`I've created your comprehensive PDF document on "Clean Energy Trends".`);
-    expect(result.rest).toBe(`### Key Highlights\n- Solar power increased by 30%\n- Wind power investments reached record highs.`);
+    expect(result.first).toBe(
+      `I've created your comprehensive PDF document on "Clean Energy Trends".`
+    );
+    expect(result.rest).toBe(
+      `### Key Highlights\n- Solar power increased by 30%\n- Wind power investments reached record highs.`
+    );
   });
 
   it("splits single-line multi-sentence content into first sentence and remaining details", () => {
     const content = `I have generated your financial spreadsheet. The document includes 3 sheets with complete budget breakdowns.`;
     const result = splitFirstSentence(content);
     expect(result.first).toBe(`I have generated your financial spreadsheet.`);
-    expect(result.rest).toBe(`The document includes 3 sheets with complete budget breakdowns.`);
+    expect(result.rest).toBe(
+      `The document includes 3 sheets with complete budget breakdowns.`
+    );
   });
 
   it("returns entire text as first when only a single sentence is provided", () => {
