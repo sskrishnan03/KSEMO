@@ -687,7 +687,7 @@ export const ExcelViewer = memo(function ExcelViewer({
       {/* Excel Formula Bar */}
       <div className="flex items-center gap-2 border-b border-border bg-muted/40 px-3.5 py-2 text-sm text-muted-foreground font-mono select-none shrink-0">
         {/* Active Cell Coordinate */}
-        <span className="w-16 shrink-0 font-bold text-foreground text-center bg-card py-1.5 rounded border border-border shadow-2xs">
+        <span className="w-16 shrink-0 font-bold text-foreground text-center bg-card py-1.5 rounded-lg border border-border shadow-2xs">
           {selectedCell ? selectedCell.coord : "A1"}
         </span>
 
@@ -733,7 +733,7 @@ export const ExcelViewer = memo(function ExcelViewer({
               ? "Enter text, numbers, or formula..."
               : "Click any cell to edit"
           }
-          className="flex-1 px-3 py-1.5 bg-background rounded border border-border text-foreground font-sans text-sm outline-hidden transition-all placeholder:text-muted-foreground/40"
+          className="flex-1 px-3 py-1.5 bg-background rounded-lg border border-border text-foreground font-sans text-sm outline-hidden transition-all placeholder:text-muted-foreground/40"
         />
 
         {/* Quick Add Row & Column buttons */}
@@ -743,7 +743,7 @@ export const ExcelViewer = memo(function ExcelViewer({
               <button
                 type="button"
                 onClick={handleAddRow}
-                className="px-3 py-1.5 text-xs font-semibold font-sans text-muted-foreground hover:text-foreground hover:bg-card rounded border border-border/80 transition-colors cursor-pointer"
+                className="px-3 py-1.5 text-xs font-semibold font-sans text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg border border-border/80 transition-colors cursor-pointer"
               >
                 + Row
               </button>
@@ -757,7 +757,7 @@ export const ExcelViewer = memo(function ExcelViewer({
               <button
                 type="button"
                 onClick={handleAddCol}
-                className="px-3 py-1.5 text-xs font-semibold font-sans text-muted-foreground hover:text-foreground hover:bg-card rounded border border-border/80 transition-colors cursor-pointer"
+                className="px-3 py-1.5 text-xs font-semibold font-sans text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg border border-border/80 transition-colors cursor-pointer"
               >
                 + Col
               </button>
@@ -777,7 +777,7 @@ export const ExcelViewer = memo(function ExcelViewer({
                 onClick={handleUndo}
                 disabled={undoStack.length === 0}
                 aria-label="Undo"
-                className="px-2 py-1.5 text-muted-foreground hover:text-foreground hover:bg-card rounded border border-border/80 transition-colors cursor-pointer [&_svg]:size-4 disabled:opacity-30 disabled:pointer-events-none"
+                className="px-2 py-1.5 text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg border border-border/80 transition-colors cursor-pointer [&_svg]:size-4 disabled:opacity-30 disabled:pointer-events-none"
               >
                 <Undo2 />
               </button>
@@ -791,7 +791,7 @@ export const ExcelViewer = memo(function ExcelViewer({
                 onClick={handleRedo}
                 disabled={redoStack.length === 0}
                 aria-label="Redo"
-                className="px-2 py-1.5 text-muted-foreground hover:text-foreground hover:bg-card rounded border border-border/80 transition-colors cursor-pointer [&_svg]:size-4 disabled:opacity-30 disabled:pointer-events-none"
+                className="px-2 py-1.5 text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg border border-border/80 transition-colors cursor-pointer [&_svg]:size-4 disabled:opacity-30 disabled:pointer-events-none"
               >
                 <Redo2 />
               </button>
@@ -824,7 +824,7 @@ export const ExcelViewer = memo(function ExcelViewer({
                       className={cn(
                         "relative w-[120px] min-w-[100px] border-r border-b border-border px-2 py-1 text-center text-xs font-semibold cursor-pointer transition-colors select-none",
                         isColSelected
-                          ? "bg-emerald-600/20 text-emerald-700 dark:text-emerald-300 font-bold border-b-2 border-b-emerald-600"
+                          ? "bg-emerald-600/20 text-emerald-700 dark:text-emerald-300 font-bold rounded-lg"
                           : "text-muted-foreground bg-muted/80 hover:bg-muted"
                       )}
                     >
@@ -850,7 +850,7 @@ export const ExcelViewer = memo(function ExcelViewer({
                       className={cn(
                         "relative sticky left-0 z-10 w-10 min-w-[40px] border-r border-b border-border px-2 py-1 text-right font-mono text-[11px] font-normal cursor-pointer select-none transition-colors",
                         isRowSelected
-                          ? "bg-muted text-emerald-700 dark:text-emerald-300 font-bold border-r-2 border-r-emerald-600"
+                          ? "bg-muted text-emerald-700 dark:text-emerald-300 font-bold rounded-lg"
                           : "bg-muted text-muted-foreground"
                       )}
                     >
