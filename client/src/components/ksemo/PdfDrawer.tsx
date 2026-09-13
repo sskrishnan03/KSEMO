@@ -317,6 +317,32 @@ function getColumnLetter(colIndex: number): string {
   return letter;
 }
 
+// Copy plain text to the clipboard with a fallback for non-secure contexts
+async function copyTextToClipboard(text: string): Promise<boolean> {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {
+    // Fall back to the legacy execCommand approach below
+  }
+  try {
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.style.position = "fixed";
+    textarea.style.opacity = "0";
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+    const ok = document.execCommand("copy");
+    document.body.removeChild(textarea);
+    return ok;
+  } catch {
+    return false;
+  }
+}
+
 async function parsePptxSlides(buffer: ArrayBuffer): Promise<SlideData[]> {
   const JSZip = (await import("jszip")).default;
   const zip = await JSZip.loadAsync(buffer);
@@ -400,6 +426,7 @@ export const ExcelViewer = memo(function ExcelViewer({
   const [editValue, setEditValue] = useState<string>("");
   const [selectedCol, setSelectedCol] = useState<number | null>(null);
   const [selectedRow, setSelectedRow] = useState<number | null>(null);
+  const [selectAll, setSelectAll] = useState<boolean>(false);
   const cellInputRef = useRef<HTMLInputElement | null>(null);
   const [undoStack, setUndoStack] = useState<ExcelSheetData[][]>([]);
   const [redoStack, setRedoStack] = useState<ExcelSheetData[][]>([]);
@@ -445,6 +472,7 @@ export const ExcelViewer = memo(function ExcelViewer({
     setEditingCell(null);
     setSelectedCol(null);
     setSelectedRow(null);
+    setSelectAll(false);
   };
 
   const handleRedo = () => {
@@ -458,6 +486,7 @@ export const ExcelViewer = memo(function ExcelViewer({
     setEditingCell(null);
     setSelectedCol(null);
     setSelectedRow(null);
+    setSelectAll(false);
   };
 
   // Sheet tab rename
@@ -503,6 +532,7 @@ export const ExcelViewer = memo(function ExcelViewer({
       setEditingCell(null);
       setSelectedCol(null);
       setSelectedRow(null);
+      setSelectAll(false);
     },
     [currentSheet]
   );
@@ -517,6 +547,7 @@ export const ExcelViewer = memo(function ExcelViewer({
     });
     setSelectedCol(null);
     setSelectedRow(null);
+    setSelectAll(false);
     setEditingCell(null);
   };
 
@@ -532,9 +563,103 @@ export const ExcelViewer = memo(function ExcelViewer({
       coord: `${getColumnLetter(cIdx)}${rIdx + 1}`,
       value: currentVal ?? "",
     });
+    setSelectedCol(null);
+    setSelectedRow(null);
+    setSelectAll(false);
     setEditingCell({ row: rIdx, col: cIdx });
     setEditValue(String(currentVal ?? ""));
   };
+
+  // Select an entire column (click a column letter header)
+  const selectColumn = useCallback(
+    (cIdx: number) => {
+      setSelectAll(false);
+      setSelectedCol(cIdx);
+      setSelectedRow(null);
+      setSelectedCell({
+        row: 0,
+        col: cIdx,
+        coord: `${getColumnLetter(cIdx)}1`,
+        value: currentSheet.data[0]?.[cIdx] ?? "",
+      });
+      setEditingCell(null);
+    },
+    [currentSheet]
+  );
+
+  // Select an entire row (click a row number header)
+  const selectRow = useCallback(
+    (rIdx: number) => {
+      setSelectAll(false);
+      setSelectedRow(rIdx);
+      setSelectedCol(null);
+      setSelectedCell({
+        row: rIdx,
+        col: 0,
+        coord: `A${rIdx + 1}`,
+        value: currentSheet.data[rIdx]?.[0] ?? "",
+      });
+      setEditingCell(null);
+    },
+    [currentSheet]
+  );
+
+  // Select the whole spreadsheet (click the empty top-left corner box)
+  const handleSelectAll = useCallback(() => {
+    setSelectAll(true);
+    setSelectedCol(null);
+    setSelectedRow(null);
+    setSelectedCell({
+      row: 0,
+      col: 0,
+      coord: "A1",
+      value: currentSheet.data[0]?.[0] ?? "",
+    });
+    setEditingCell(null);
+  }, [currentSheet]);
+
+  // Copy the current selection (cell / row / column / whole sheet) so it can
+  // be pasted into Excel verbatim (rows -> "\n", cells within a row -> "\t")
+  const handleCopy = useCallback(() => {
+    const joinCells = (values: any[]) =>
+      values.map(v => String(v ?? "")).join("\t");
+
+    let textToCopy = "";
+
+    if (selectAll) {
+      const rows = currentSheet.data;
+      const maxCols = rows.reduce(
+        (m, r) => Math.max(m, Array.isArray(r) ? r.length : 0),
+        0
+      );
+      textToCopy = rows
+        .map(r => {
+          const row = Array.isArray(r) ? r : [];
+          return joinCells(
+            Array.from({ length: maxCols }, (_, i) => row[i] ?? "")
+          );
+        })
+        .join("\n");
+    } else if (selectedCol !== null) {
+      textToCopy = currentSheet.data
+        .map(r =>
+          String((Array.isArray(r) ? r[selectedCol] : undefined) ?? "")
+        )
+        .join("\n");
+    } else if (selectedRow !== null) {
+      textToCopy = joinCells(
+        Array.isArray(currentSheet.data[selectedRow])
+          ? currentSheet.data[selectedRow]
+          : []
+      );
+    } else if (selectedCell) {
+      textToCopy = String(selectedCell.value ?? "");
+    } else {
+      return;
+    }
+
+    void copyTextToClipboard(textToCopy);
+  }, [selectAll, selectedCol, selectedRow, selectedCell, currentSheet]);
 
   // Add new row at bottom
   const handleAddRow = () => {
@@ -579,6 +704,20 @@ export const ExcelViewer = memo(function ExcelViewer({
       const target = e.target as HTMLElement | null;
       const tag = target?.tagName?.toLowerCase();
       if (tag === "input" || tag === "textarea" || target?.isContentEditable) {
+        return;
+      }
+
+      // Select everything with Ctrl/Cmd+A
+      if (mod && (e.key === "a" || e.key === "A")) {
+        e.preventDefault();
+        handleSelectAll();
+        return;
+      }
+
+      // Copy the current selection (cell / row / column / whole sheet)
+      if (mod && (e.key === "c" || e.key === "C")) {
+        e.preventDefault();
+        handleCopy();
         return;
       }
 
@@ -677,6 +816,8 @@ export const ExcelViewer = memo(function ExcelViewer({
     updateCellValue,
     handleUndo,
     handleRedo,
+    handleSelectAll,
+    handleCopy,
   ]);
 
   return (
@@ -809,22 +950,25 @@ export const ExcelViewer = memo(function ExcelViewer({
           <table className="border-separate border-spacing-0 text-xs text-foreground min-w-full table-fixed">
             <thead>
               <tr className="sticky top-0 z-20 bg-muted/95 backdrop-blur-xs shadow-2xs">
-                {/* Top-left blank cell */}
-                <th className="sticky left-0 z-30 w-10 min-w-[40px] bg-muted border-r border-b border-border text-center font-normal text-muted-foreground/40 py-1" />
+                {/* Top-left blank cell (select all) */}
+                <th
+                  onClick={handleSelectAll}
+                  title="Click to select the whole sheet"
+                  className={cn(
+                    "sticky left-0 z-30 w-10 min-w-[40px] bg-muted border-r border-b border-border text-center font-normal text-muted-foreground/40 py-1 cursor-pointer transition-colors",
+                    selectAll && "bg-emerald-600/20"
+                  )}
+                />
                 {colHeaders.map((col, idx) => {
-                  const isColSelected = selectedCol === idx;
+                  const isColSelected = selectedCol === idx || selectAll;
                   return (
                     <th
                       key={idx}
-                      onClick={() => {
-                        setSelectedCol(idx);
-                        setSelectedRow(null);
-                        selectCell(0, idx);
-                      }}
+                      onClick={() => selectColumn(idx)}
                       className={cn(
                         "relative w-[120px] min-w-[100px] border-r border-b border-border px-2 py-1 text-center text-xs font-semibold cursor-pointer transition-colors select-none",
                         isColSelected
-                          ? "bg-emerald-600/20 text-emerald-700 dark:text-emerald-300 font-bold rounded-lg"
+                          ? "bg-emerald-600/20 text-emerald-700 dark:text-emerald-300 font-bold border-b-2 border-b-emerald-600"
                           : "text-muted-foreground bg-muted/80 hover:bg-muted"
                       )}
                     >
@@ -837,20 +981,16 @@ export const ExcelViewer = memo(function ExcelViewer({
             <tbody>
               {rowIndices.map(rIdx => {
                 const rowData = currentSheet.data[rIdx] || [];
-                const isRowSelected = selectedRow === rIdx;
+                const isRowSelected = selectedRow === rIdx || selectAll;
                 return (
                   <tr key={rIdx} className="hover:bg-muted/15">
                     {/* Sticky Row Number */}
                     <th
-                      onClick={() => {
-                        setSelectedRow(rIdx);
-                        setSelectedCol(null);
-                        selectCell(rIdx, 0);
-                      }}
+                      onClick={() => selectRow(rIdx)}
                       className={cn(
                         "relative sticky left-0 z-10 w-10 min-w-[40px] border-r border-b border-border px-2 py-1 text-right font-mono text-[11px] font-normal cursor-pointer select-none transition-colors",
                         isRowSelected
-                          ? "bg-muted text-emerald-700 dark:text-emerald-300 font-bold rounded-lg"
+                          ? "bg-muted text-emerald-700 dark:text-emerald-300 font-bold border-r-2 border-r-emerald-600"
                           : "bg-muted text-muted-foreground"
                       )}
                     >
@@ -879,9 +1019,9 @@ export const ExcelViewer = memo(function ExcelViewer({
                           }
                           className={cn(
                             "w-[120px] min-w-[100px] border-r border-b border-border/60 px-2 py-1 text-xs truncate cursor-cell transition-colors relative",
-                            isInSelectedCol || isInSelectedRow
-                              ? "bg-emerald-500/15"
-                              : "",
+isInSelectedCol || isInSelectedRow || selectAll
+                          ? "bg-emerald-500/15"
+                          : "",
                             isSelected
                               ? "ring-2 ring-emerald-600 ring-inset bg-emerald-500/15 font-medium"
                               : "hover:bg-muted/30"
@@ -962,6 +1102,7 @@ export const ExcelViewer = memo(function ExcelViewer({
                   setEditingCell(null);
                   setSelectedCol(null);
                   setSelectedRow(null);
+                  setSelectAll(false);
                 }}
                 onDoubleClick={e => {
                   e.stopPropagation();
