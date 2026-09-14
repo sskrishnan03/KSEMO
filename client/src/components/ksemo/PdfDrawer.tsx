@@ -236,7 +236,7 @@ const PdfPageItem = memo(function PdfPageItem({
         width: `${dims.width}px`,
         height: `${dims.height}px`,
       }}
-      className="relative mb-6 rounded-sm bg-white text-black shadow-xl border border-black/10 overflow-hidden mx-auto transition-transform"
+      className="relative mb-3 rounded-sm bg-white text-black shadow-xl border border-black/10 overflow-hidden mx-auto transition-transform"
     >
       {isRendering && (
         <div
@@ -1671,18 +1671,101 @@ export const ExcelViewer = memo(function ExcelViewer({
 const PowerPointViewer = memo(function PowerPointViewer({
   slides,
   scale,
+  onPageVisible,
 }: {
   slides: SlideData[];
   scale: number;
+  onPageVisible?: (slideNumber: number) => void;
 }) {
+  const slideElsRef = useRef<Array<HTMLDivElement | null>>([]);
+
+  // Track the current slide from scroll position (robust with CSS zoom, which
+  // interferes with IntersectionObserver geometry).
+  useEffect(() => {
+    const els = slideElsRef.current;
+    if (els.length === 0 || !onPageVisible) return;
+    let raf = 0;
+
+    const findScrollParent = (el: HTMLDivElement | null): HTMLElement => {
+      let node = el?.parentElement ?? null;
+      while (node) {
+        const style = getComputedStyle(node);
+        if (
+          style.overflowY === "auto" ||
+          style.overflowY === "scroll" ||
+          style.overflow === "auto" ||
+          style.overflow === "scroll"
+        )
+          return node;
+        node = node.parentElement;
+      }
+      return document.documentElement;
+    };
+
+    const scrollParent = findScrollParent(els[0]);
+    let lastVisibleSlide = 0;
+
+    const intersectionArea = (
+      a: { top: number; bottom: number },
+      b: { top: number; bottom: number }
+    ) => Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
+
+    const updateCurrentSlide = () => {
+      const viewport =
+        scrollParent === document.documentElement
+          ? { top: 0, bottom: window.innerHeight }
+          : (() => {
+              const r = scrollParent.getBoundingClientRect();
+              return { top: r.top, bottom: r.bottom };
+            })();
+      let bestIdx = 0;
+      let bestArea = -1;
+      for (let i = 0; i < els.length; i++) {
+        const el = els[i];
+        if (!el) continue;
+        const rc = el.getBoundingClientRect();
+        const area = intersectionArea(
+          { top: rc.top, bottom: rc.bottom },
+          viewport
+        );
+        if (area > bestArea) {
+          bestArea = area;
+          bestIdx = i;
+        }
+      }
+      const visibleSlide = slides[bestIdx]?.slideNumber ?? bestIdx + 1;
+      if (visibleSlide !== lastVisibleSlide) {
+        lastVisibleSlide = visibleSlide;
+        onPageVisible(visibleSlide);
+      }
+    };
+
+    const onScrollTick = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(updateCurrentSlide);
+    };
+
+    updateCurrentSlide();
+    scrollParent.addEventListener("scroll", onScrollTick, { passive: true });
+    window.addEventListener("resize", onScrollTick);
+    return () => {
+      cancelAnimationFrame(raf);
+      scrollParent.removeEventListener("scroll", onScrollTick);
+      window.removeEventListener("resize", onScrollTick);
+    };
+  }, [slides, onPageVisible]);
+
   return (
     <div
       data-testid="powerpoint-document-viewer"
-      className="mx-auto flex flex-col items-center gap-8 py-4 w-full"
+      className="mx-auto flex flex-col items-center gap-4 py-4 w-full"
     >
-      {slides.map(slide => (
+      {slides.map((slide, idx) => (
         <div
           key={slide.slideNumber}
+          ref={el => {
+            slideElsRef.current[idx] = el;
+          }}
           data-testid={`pptx-slide-${slide.slideNumber}`}
           data-slide={slide.slideNumber}
           className="aspect-[16/9] w-full max-w-[850px] min-h-[460px] bg-white text-neutral-900 shadow-2xl rounded-2xl border border-neutral-200/80 p-8 sm:p-14 flex flex-col justify-between select-text transition-transform relative overflow-hidden"
@@ -1882,7 +1965,7 @@ const WordPageItem = memo(function WordPageItem({
     <div
       ref={rootRef}
       data-page={pageNumber}
-      className="relative mx-auto my-4 bg-white text-neutral-900 shadow-2xl rounded-xs border border-neutral-300/80 p-12 sm:p-16 select-text selection:bg-blue-500/30 transition-transform origin-top word-document-content font-sans"
+      className="relative mx-auto my-2 bg-white text-neutral-900 shadow-2xl rounded-xs border border-neutral-300/80 p-12 sm:p-16 select-text selection:bg-blue-500/30 transition-transform origin-top word-document-content font-sans"
       style={{
         width: `${A4_WIDTH}px`,
         maxWidth: "100%",
@@ -2796,7 +2879,11 @@ export const PdfDrawer = memo(function PdfDrawer() {
             !loadError &&
             isPowerPointDoc &&
             pptxSlides.length > 0 && (
-              <PowerPointViewer slides={pptxSlides} scale={scale} />
+              <PowerPointViewer
+                slides={pptxSlides}
+                scale={scale}
+                onPageVisible={setCurrentSlide}
+              />
             )}
 
           {/* Text Document (.txt, .md, .json, etc.) Rendering */}

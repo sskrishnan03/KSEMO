@@ -2774,7 +2774,15 @@ export default function Home() {
               )}
             </section>
 
-            {visibleMessages.length > 0 && composerElement}
+            {visibleMessages.length > 0 && (
+              <div className="relative z-10">
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute -top-8 left-0 right-0 h-8 bg-gradient-to-b from-transparent to-background"
+                />
+                {composerElement}
+              </div>
+            )}
             {voiceChatOpen && (
               <VoiceChat
                 conversationId={activeConversationId}
