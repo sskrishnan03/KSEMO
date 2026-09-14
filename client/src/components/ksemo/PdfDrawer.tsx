@@ -334,11 +334,16 @@ function colIndexFromLetters(letters: string): number {
 
 // Copy a formula to a new position: relative refs move with the delta,
 // absolute refs ($A$1, $A1, A$1) stay anchored.
-function adjustFormulaRefs(formula: string, dRow: number, dCol: number): string {
+function adjustFormulaRefs(
+  formula: string,
+  dRow: number,
+  dCol: number
+): string {
   return formula.replace(
     /(\$?)([A-Z]+)(\$?)(\d+)/g,
     (m, dc: string, cols: string, dr: string, rn: string) => {
-      const newCol = dc === "$" ? cols : getColumnLetter(colIndexFromLetters(cols) + dCol);
+      const newCol =
+        dc === "$" ? cols : getColumnLetter(colIndexFromLetters(cols) + dCol);
       const rowNum = parseInt(rn, 10);
       const newRow = dr === "$" ? rn : String(rowNum + dRow);
       return dc + newCol + dr + newRow;
@@ -674,7 +679,10 @@ export const ExcelViewer = memo(function ExcelViewer({
   // Dragging across cells extends the selection rectangle (Excel-style)
   const handleCellMouseEnter = (rIdx: number, cIdx: number) => {
     if (!dragRef.current.active) return;
-    if (rIdx !== dragRef.current.startRow || cIdx !== dragRef.current.startCol) {
+    if (
+      rIdx !== dragRef.current.startRow ||
+      cIdx !== dragRef.current.startCol
+    ) {
       dragRef.current.moved = true;
     }
     setRange(prev =>
@@ -924,33 +932,34 @@ export const ExcelViewer = memo(function ExcelViewer({
       activeSelBounds.has &&
       activeSelBounds.loRow === activeSelBounds.hiRow &&
       activeSelBounds.loCol === activeSelBounds.hiCol;
-    const dest = !selIsSingle && clip.rows === 1 && clip.cols === 1
-      ? {
-          loRow: activeSelBounds.loRow,
-          hiRow: activeSelBounds.hiRow,
-          loCol: activeSelBounds.loCol,
-          hiCol: activeSelBounds.hiCol,
-        }
-      : {
-          loRow: anchorRow,
-          hiRow: selIsSingle
-            ? anchorRow + clip.rows - 1
-            : activeSelBounds.loRow + clip.rows - 1,
-          loCol: anchorCol,
-          hiCol: selIsSingle
-            ? anchorCol + clip.cols - 1
-            : activeSelBounds.loCol + clip.cols - 1,
-        };
+    const dest =
+      !selIsSingle && clip.rows === 1 && clip.cols === 1
+        ? {
+            loRow: activeSelBounds.loRow,
+            hiRow: activeSelBounds.hiRow,
+            loCol: activeSelBounds.loCol,
+            hiCol: activeSelBounds.hiCol,
+          }
+        : {
+            loRow: anchorRow,
+            hiRow: selIsSingle
+              ? anchorRow + clip.rows - 1
+              : activeSelBounds.loRow + clip.rows - 1,
+            loCol: anchorCol,
+            hiCol: selIsSingle
+              ? anchorCol + clip.cols - 1
+              : activeSelBounds.loCol + clip.cols - 1,
+          };
     const next = localSheets.map((s, idx) => {
       if (idx !== activeSheetIdx) return s;
       const rows = s.data.map(r => (Array.isArray(r) ? [...r] : []));
       for (let r = dest.loRow; r <= dest.hiRow; r++) {
         while (rows.length <= r) rows.push([]);
         const row = rows[r];
-        const relR = ((r - dest.loRow) % clip.rows + clip.rows) % clip.rows;
+        const relR = (((r - dest.loRow) % clip.rows) + clip.rows) % clip.rows;
         for (let c = dest.loCol; c <= dest.hiCol; c++) {
           while (row.length <= c) row.push("");
-          const relC = ((c - dest.loCol) % clip.cols + clip.cols) % clip.cols;
+          const relC = (((c - dest.loCol) % clip.cols) + clip.cols) % clip.cols;
           let v = clip.grid[relR][relC];
           if (typeof v === "string" && v.startsWith("=")) {
             const fromR = clip.topLeft.row + relR;
@@ -1391,8 +1400,7 @@ export const ExcelViewer = memo(function ExcelViewer({
                       const val =
                         rowData[cIdx] !== undefined ? rowData[cIdx] : "";
                       const isEditing =
-                        editingCell?.row === rIdx &&
-                        editingCell?.col === cIdx;
+                        editingCell?.row === rIdx && editingCell?.col === cIdx;
 
                       // Drag range rectangle membership (Excel-style)
                       const rangeLoRow = range
@@ -1517,7 +1525,9 @@ export const ExcelViewer = memo(function ExcelViewer({
                             if (e.button !== 0) return;
                             handleCellMouseDown(rIdx, cIdx);
                           }}
-                          onPointerEnter={() => handleCellMouseEnter(rIdx, cIdx)}
+                          onPointerEnter={() =>
+                            handleCellMouseEnter(rIdx, cIdx)
+                          }
                           onMouseEnter={() => handleCellMouseEnter(rIdx, cIdx)}
                           onClick={() => handleCellClick(rIdx, cIdx, val)}
                           onDoubleClick={() =>
@@ -1808,6 +1818,156 @@ const EditablePageField = memo(function EditablePageField({
   );
 });
 
+// A4 dimensions at 96 DPI
+const A4_WIDTH = 794;
+const A4_HEIGHT = 1123;
+const A4_PADDING_X = 48;
+const A4_PADDING_Y = 48;
+const A4_CONTENT_HEIGHT = A4_HEIGHT - A4_PADDING_Y * 2;
+
+/** Split mammoth-generated HTML into A4-sized page chunks. */
+function splitWordHtmlIntoPages(html: string): string[] {
+  if (!html.trim()) return [""];
+
+  const container = document.createElement("div");
+  container.style.cssText =
+    "position:absolute;left:-9999px;top:0;width:" +
+    (A4_WIDTH - A4_PADDING_X * 2) +
+    "px;visibility:hidden;overflow:visible;";
+  container.innerHTML = html;
+  document.body.appendChild(container);
+
+  const blocks = Array.from(container.children);
+  if (blocks.length === 0) {
+    document.body.removeChild(container);
+    return [html];
+  }
+
+  const pages: string[][] = [[]];
+  let currentHeight = 0;
+
+  for (const block of blocks) {
+    const blockHeight = (block as HTMLElement).getBoundingClientRect().height;
+
+    if (
+      currentHeight + blockHeight > A4_CONTENT_HEIGHT &&
+      pages[pages.length - 1].length > 0
+    ) {
+      pages.push([]);
+      currentHeight = 0;
+    }
+
+    pages[pages.length - 1].push(block.outerHTML);
+    currentHeight += blockHeight;
+  }
+
+  document.body.removeChild(container);
+  return pages.map(p => p.join(""));
+}
+
+interface WordPageItemProps {
+  pageNumber: number;
+  totalPages: number;
+  html: string;
+  scale: number;
+  onPageVisible?: (pageNumber: number) => void;
+}
+
+const WordPageItem = memo(function WordPageItem({
+  pageNumber,
+  totalPages,
+  html,
+  scale,
+  onPageVisible,
+}: WordPageItemProps) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el || !onPageVisible) return;
+    const observer = new IntersectionObserver(
+      entries => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) onPageVisible(pageNumber);
+        }
+      },
+      { threshold: 0.4 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [pageNumber, onPageVisible]);
+
+  return (
+    <div
+      ref={containerRef}
+      data-page={pageNumber}
+      className="mx-auto my-3 bg-white text-neutral-900 shadow-2xl rounded-xs border border-neutral-300/80 p-12 sm:p-16 select-text selection:bg-blue-500/30 transition-transform origin-top word-document-content font-sans relative"
+      style={{
+        width: `${A4_WIDTH}px`,
+        maxWidth: "100%",
+        minHeight: `${A4_HEIGHT}px`,
+        zoom: scale !== 1.0 ? scale : undefined,
+      }}
+    >
+      <div className="flex items-center justify-between border-b border-neutral-200 pb-3 mb-8 text-[11px] text-neutral-400 font-medium uppercase tracking-wider select-none">
+        <span>Document</span>
+        <span>
+          Page {pageNumber} of {totalPages}
+        </span>
+      </div>
+
+      <div
+        className="space-y-4 text-neutral-800 leading-relaxed [&_h1]:text-2xl [&_h1]:font-bold [&_h1]:text-neutral-900 [&_h1]:mb-4 [&_h2]:text-xl [&_h2]:font-semibold [&_h2]:text-neutral-900 [&_h2]:mb-3 [&_h3]:text-lg [&_h3]:font-semibold [&_h3]:text-neutral-900 [&_h3]:mb-2 [&_p]:mb-3.5 [&_p]:text-[14.5px] [&_p]:leading-relaxed [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:mb-3.5 [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:mb-3.5 [&_li]:mb-1 [&_table]:w-full [&_table]:border-collapse [&_table]:border [&_table]:border-neutral-300 [&_table]:my-4 [&_th]:border [&_th]:border-neutral-300 [&_th]:bg-neutral-50 [&_th]:px-3.5 [&_th]:py-2 [&_th]:text-xs [&_th]:font-semibold [&_th]:text-left [&_td]:border [&_td]:border-neutral-300 [&_td]:px-3.5 [&_td]:py-2 [&_td]:text-xs [&_blockquote]:border-l-4 [&_blockquote]:border-blue-500 [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:my-3.5 [&_blockquote]:text-neutral-600 [&_a]:text-blue-600 [&_a]:underline [&_a]:underline-offset-2 [&_img]:max-w-full [&_img]:h-auto [&_img]:rounded [&_img]:my-3"
+        dangerouslySetInnerHTML={{ __html: html }}
+      />
+
+      <div className="border-t border-neutral-200 pt-4 mt-12 text-center text-[11px] text-neutral-400 font-medium select-none">
+        <span>
+          Page {pageNumber} of {totalPages}
+        </span>
+      </div>
+    </div>
+  );
+});
+
+interface WordPageViewerProps {
+  html: string;
+  scale: number;
+  onPageVisible?: (pageNumber: number) => void;
+  onPageCount?: (count: number) => void;
+}
+
+const WordPageViewer = memo(function WordPageViewer({
+  html,
+  scale,
+  onPageVisible,
+  onPageCount,
+}: WordPageViewerProps) {
+  const pages = useMemo(() => splitWordHtmlIntoPages(html), [html]);
+
+  useEffect(() => {
+    onPageCount?.(pages.length);
+  }, [pages.length, onPageCount]);
+
+  return (
+    <div
+      className="mx-auto flex flex-col items-center"
+      data-testid="word-document-viewer"
+    >
+      {pages.map((pageHtml, idx) => (
+        <WordPageItem
+          key={idx}
+          pageNumber={idx + 1}
+          totalPages={pages.length}
+          html={pageHtml}
+          scale={scale}
+          onPageVisible={onPageVisible}
+        />
+      ))}
+    </div>
+  );
+});
+
 export const PdfDrawer = memo(function PdfDrawer() {
   const { currentPdf, isOpen, closePdf } = usePdfViewer();
   const [pdfDoc, setPdfDoc] = useState<any>(null);
@@ -1898,6 +2058,7 @@ export const PdfDrawer = memo(function PdfDrawer() {
     setLoadError(null);
     setCurrentPage(1);
     setCurrentSlide(1);
+    setNumPages(0);
     setPdfDoc(null);
     setWordHtml(null);
     setTextContent(null);
@@ -2203,6 +2364,18 @@ export const PdfDrawer = memo(function PdfDrawer() {
     }
   }, []);
 
+  // Scroll to a specific page
+  const scrollToPage = useCallback((pageNum: number) => {
+    if (!scrollContainerRef.current) return;
+    const target = scrollContainerRef.current.querySelector(
+      `[data-page="${pageNum}"]`
+    );
+    if (target) {
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
+      setCurrentPage(pageNum);
+    }
+  }, []);
+
   // Keyboard shortcut handler for Escape, Zoom (+/-/0), and slide navigation
   useEffect(() => {
     if (!isOpen) return;
@@ -2241,6 +2414,29 @@ export const PdfDrawer = memo(function PdfDrawer() {
         handleToggleFit();
       }
 
+      // Word document arrow key page navigation
+      if (isWordDoc && numPages > 0) {
+        if (
+          event.key === "ArrowRight" ||
+          event.key === "ArrowDown" ||
+          event.key === "PageDown"
+        ) {
+          event.preventDefault();
+          if (currentPage < numPages) {
+            scrollToPage(currentPage + 1);
+          }
+        } else if (
+          event.key === "ArrowLeft" ||
+          event.key === "ArrowUp" ||
+          event.key === "PageUp"
+        ) {
+          event.preventDefault();
+          if (currentPage > 1) {
+            scrollToPage(currentPage - 1);
+          }
+        }
+      }
+
       // PowerPoint slide arrow key navigation
       if (isPowerPointDoc && pptxSlides.length > 0) {
         if (
@@ -2273,23 +2469,15 @@ export const PdfDrawer = memo(function PdfDrawer() {
     handleZoomIn,
     handleZoomOut,
     handleToggleFit,
+    isWordDoc,
+    numPages,
+    currentPage,
+    scrollToPage,
     isPowerPointDoc,
     pptxSlides.length,
     currentSlide,
     scrollToSlide,
   ]);
-
-  // Scroll to a specific page
-  const scrollToPage = (pageNum: number) => {
-    if (!scrollContainerRef.current) return;
-    const target = scrollContainerRef.current.querySelector(
-      `[data-page="${pageNum}"]`
-    );
-    if (target) {
-      target.scrollIntoView({ behavior: "smooth", block: "start" });
-      setCurrentPage(pageNum);
-    }
-  };
 
   // Navigate destination internal anchor
   const handleNavigateDest = async (dest: any) => {
@@ -2345,26 +2533,28 @@ export const PdfDrawer = memo(function PdfDrawer() {
   const pagesArray = Array.from({ length: numPages }, (_, i) => i + 1);
 
   const hasPagination =
-    (isPdfDoc && numPages > 0) || (isPowerPointDoc && pptxSlides.length > 0);
-  const currentIdx = isPdfDoc ? currentPage : currentSlide;
-  const totalCount = isPdfDoc ? numPages : pptxSlides.length;
-  const navLabel = isPdfDoc ? "page" : "slide";
+    (isPdfDoc && numPages > 0) ||
+    (isWordDoc && numPages > 0) ||
+    (isPowerPointDoc && pptxSlides.length > 0);
+  const currentIdx = isPdfDoc || isWordDoc ? currentPage : currentSlide;
+  const totalCount = isPdfDoc || isWordDoc ? numPages : pptxSlides.length;
+  const navLabel = isPdfDoc || isWordDoc ? "page" : "slide";
   const isAtPrevBoundary = hasPagination
-    ? isPdfDoc
+    ? isPdfDoc || isWordDoc
       ? currentPage <= 1
       : currentSlide <= 1
     : true;
   const isAtNextBoundary = hasPagination
-    ? isPdfDoc
+    ? isPdfDoc || isWordDoc
       ? currentPage >= numPages
       : currentSlide >= pptxSlides.length
     : true;
   const navPrevious = () => {
-    if (isPdfDoc) scrollToPage(currentPage - 1);
+    if (isPdfDoc || isWordDoc) scrollToPage(currentPage - 1);
     else scrollToSlide(currentSlide - 1);
   };
   const navNext = () => {
-    if (isPdfDoc) scrollToPage(currentPage + 1);
+    if (isPdfDoc || isWordDoc) scrollToPage(currentPage + 1);
     else scrollToSlide(currentSlide + 1);
   };
 
@@ -2530,33 +2720,16 @@ export const PdfDrawer = memo(function PdfDrawer() {
             </div>
           )}
 
-          {/* Word Document (.docx) Rendering as Authentic A4 Sheet */}
+          {/* Word Document (.docx) Rendering as Authentic A4 Pages */}
           {!isLoading && !loadError && isWordDoc && wordHtml && (
-            <div
-              data-testid="word-document-viewer"
-              className="mx-auto my-6 bg-white text-neutral-900 shadow-2xl rounded-xs border border-neutral-300/80 p-12 sm:p-16 min-h-[1123px] select-text selection:bg-blue-500/30 transition-transform origin-top word-document-content font-sans relative"
-              style={{
-                width: "794px",
-                maxWidth: "100%",
-                zoom: scale !== 1.0 ? scale : undefined,
+            <WordPageViewer
+              html={wordHtml}
+              scale={scale}
+              onPageVisible={setCurrentPage}
+              onPageCount={count => {
+                if (count > 0) setNumPages(count);
               }}
-            >
-              {/* Authentic A4 Sheet Header Marker */}
-              <div className="flex items-center justify-between border-b border-neutral-200 pb-3 mb-8 text-[11px] text-neutral-400 font-medium uppercase tracking-wider select-none">
-                <span>Document</span>
-                <span>Page 1</span>
-              </div>
-
-              <div
-                className="space-y-4 text-neutral-800 leading-relaxed [&_h1]:text-2xl [&_h1]:font-bold [&_h1]:text-neutral-900 [&_h1]:mb-4 [&_h2]:text-xl [&_h2]:font-semibold [&_h2]:text-neutral-900 [&_h2]:mb-3 [&_h3]:text-lg [&_h3]:font-semibold [&_h3]:text-neutral-900 [&_h3]:mb-2 [&_p]:mb-3.5 [&_p]:text-[14.5px] [&_p]:leading-relaxed [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:mb-3.5 [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:mb-3.5 [&_li]:mb-1 [&_table]:w-full [&_table]:border-collapse [&_table]:border [&_table]:border-neutral-300 [&_table]:my-4 [&_th]:border [&_th]:border-neutral-300 [&_th]:bg-neutral-50 [&_th]:px-3.5 [&_th]:py-2 [&_th]:text-xs [&_th]:font-semibold [&_th]:text-left [&_td]:border [&_td]:border-neutral-300 [&_td]:px-3.5 [&_td]:py-2 [&_td]:text-xs [&_blockquote]:border-l-4 [&_blockquote]:border-blue-500 [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:my-3.5 [&_blockquote]:text-neutral-600 [&_a]:text-blue-600 [&_a]:underline [&_a]:underline-offset-2 [&_img]:max-w-full [&_img]:h-auto [&_img]:rounded [&_img]:my-3"
-                dangerouslySetInnerHTML={{ __html: wordHtml }}
-              />
-
-              {/* Authentic A4 Sheet Footer Marker */}
-              <div className="border-t border-neutral-200 pt-4 mt-12 text-center text-[11px] text-neutral-400 font-medium select-none">
-                <span>Page 1</span>
-              </div>
-            </div>
+            />
           )}
 
           {/* Excel Spreadsheet (.xlsx, .xls, .csv, .tsv) Rendering */}
@@ -2669,7 +2842,7 @@ export const PdfDrawer = memo(function PdfDrawer() {
               value={currentIdx}
               total={totalCount}
               label={navLabel}
-              onNavigate={isPdfDoc ? scrollToPage : scrollToSlide}
+              onNavigate={isPdfDoc || isWordDoc ? scrollToPage : scrollToSlide}
             />
 
             <Tooltip>

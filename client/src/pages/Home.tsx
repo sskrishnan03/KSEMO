@@ -21,7 +21,14 @@ import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
 import { FolderOpen, Menu, MoreHorizontal, Pin, Trash2 } from "lucide-react";
 import { ShareIcon } from "../components/ksemo/icons";
-import React, { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  Fragment,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { memo } from "react";
 import { useLocation } from "wouter";
 import { ChatComposer } from "../components/ksemo/ChatComposer";
@@ -219,6 +226,10 @@ export default function Home() {
   >(null);
   const [chatMessages, setChatMessages] = useState<KsemoMessage[]>([]);
   const [composerValue, setComposerValue] = useState("");
+  const [composerFocusToken, setComposerFocusToken] = useState(0);
+  const requestComposerFocus = useCallback(() => {
+    setComposerFocusToken(t => t + 1);
+  }, []);
   const [attachmentNotices, setAttachmentNotices] = useState<
     SelectedAttachment[]
   >([]);
@@ -433,21 +444,6 @@ export default function Home() {
       localStorage.setItem("ksemo-sidebar-collapsed", String(sidebarCollapsed));
     } catch {}
   }, [sidebarCollapsed]);
-
-  // When the browser closes, clear the stored conversation ID so the next
-  // session always opens with a fresh new chat. The conversation history is
-  // still accessible from the sidebar.
-  useEffect(() => {
-    const handleBeforeUnload = () => {
-      if (user?.id) {
-        try {
-          localStorage.removeItem(activeConversationStorageKey(user.id));
-        } catch {}
-      }
-    };
-    window.addEventListener("beforeunload", handleBeforeUnload);
-    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [user?.id]);
 
   // When the session ends, forget the previous session's chat state so nothing
   // leaks into the next one.
@@ -763,6 +759,7 @@ export default function Home() {
       conversationQuery.data.some(item => item.id === activeConversationId)
     ) {
       initialSelectionUserIdRef.current = userId;
+      requestComposerFocus();
       return;
     }
     initialSelectionUserIdRef.current = userId;
@@ -774,6 +771,7 @@ export default function Home() {
           setActiveConversationId(sharedConversationId);
           activeConversationIdRef.current = sharedConversationId;
           window.history.replaceState({}, "", window.location.pathname);
+          requestComposerFocus();
         })
         .catch(() => {
           window.history.replaceState({}, "", window.location.pathname);
@@ -781,6 +779,7 @@ export default function Home() {
             setActiveConversationId(conversationQuery.data[0].id);
             activeConversationIdRef.current = conversationQuery.data[0].id;
           }
+          requestComposerFocus();
         });
       return;
     }
@@ -788,16 +787,21 @@ export default function Home() {
     // Restore where the user left off: if they were in a specific chat, reopen
     // it (so a refresh doesn't lose their place). A new-chat marker or no saved
     // session keeps them on a fresh new chat.
-    if (stored.newChatIntent) return;
+    if (stored.newChatIntent) {
+      requestComposerFocus();
+      return;
+    }
     if (
       stored.conversationId &&
       conversationQuery.data.some(item => item.id === stored.conversationId)
     ) {
       setActiveConversationId(stored.conversationId);
       activeConversationIdRef.current = stored.conversationId;
+      requestComposerFocus();
       return;
     }
     if (activeConversationId === null) rememberNewChatIntent(user.id);
+    requestComposerFocus();
   }, [
     user?.id,
     activeConversationId,
@@ -806,6 +810,7 @@ export default function Home() {
     sharedConversationId,
     utils.conversation.get,
     rememberNewChatIntent,
+    requestComposerFocus,
   ]);
 
   useEffect(() => {
@@ -1506,6 +1511,7 @@ export default function Home() {
     setSpeakingMessageId(null);
     setSpeechState("idle");
     setSidebarOpen(false);
+    requestComposerFocus();
   }
 
   async function exportConversation(id: string, format: "pdf" | "word") {
@@ -1925,6 +1931,7 @@ export default function Home() {
       }
       isNearBottomRef.current = true;
       scrollChatToEnd("auto");
+      requestComposerFocus();
       return;
     }
     // Switching is always allowed, even while another conversation's response
@@ -1940,6 +1947,7 @@ export default function Home() {
     setAttachmentNotices([]);
     setEditingMessage(null);
     savedComposerDraftRef.current = "";
+    requestComposerFocus();
   }
 
   function speak(text: string, messageId: string) {
@@ -2255,6 +2263,7 @@ export default function Home() {
       compactBottomSpacing
       onTakeScreenshot={stableCaptureScreenshot}
       hideVoiceInput={options.hideVoiceInput}
+      focusToken={composerFocusToken}
       isEditingMessage={Boolean(editingMessage)}
       onSaveEdit={stableEditAction}
       onCancelEdit={stableCancelEdit}
@@ -2578,6 +2587,7 @@ export default function Home() {
                       menuPlacement="below"
                       isCentered={true}
                       onTakeScreenshot={stableCaptureScreenshot}
+                      focusToken={composerFocusToken}
                     />
                   }
                 />

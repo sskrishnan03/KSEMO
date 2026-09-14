@@ -97,7 +97,10 @@ export const DictateRecordingPill = memo(function DictateRecordingPill({
   const bars =
     audioBars && audioBars.length > 0
       ? audioBars
-      : [0.15, 0.35, 0.65, 0.85, 0.45, 0.95, 0.75, 0.35, 0.85, 0.55, 0.25, 0.45];
+      : [
+          0.15, 0.35, 0.65, 0.85, 0.45, 0.95, 0.75, 0.35, 0.85, 0.55, 0.25,
+          0.45,
+        ];
 
   return (
     <div
@@ -198,6 +201,7 @@ export const ChatComposer = memo(function ChatComposer({
   onCancelEdit,
   audioBars,
   audioLevel,
+  focusToken = 0,
 }: {
   onSend: (content: string) => void;
   onCancel: () => void;
@@ -261,6 +265,7 @@ export const ChatComposer = memo(function ChatComposer({
   isEditingMessage?: boolean;
   onSaveEdit?: () => void;
   onCancelEdit?: () => void;
+  focusToken?: number;
 }) {
   const editorRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -283,13 +288,12 @@ export const ChatComposer = memo(function ChatComposer({
     () => filterLibraryItems(libraryFiles, libraryQuery),
     [libraryFiles, libraryQuery]
   );
-  const visibleAttachmentNotices =
-    isEditingMessage
-      ? []
-      : attachmentNotices ??
-        (attachmentNotice
-          ? [{ fileId: attachmentNotice.name, ...attachmentNotice }]
-          : []);
+  const visibleAttachmentNotices = isEditingMessage
+    ? []
+    : (attachmentNotices ??
+      (attachmentNotice
+        ? [{ fileId: attachmentNotice.name, ...attachmentNotice }]
+        : []));
 
   useEffect(() => {
     if (isEditingMessage) {
@@ -463,6 +467,25 @@ export const ChatComposer = memo(function ChatComposer({
   useEffect(() => {
     if (expanded && !canExpand) setExpanded(false);
   }, [expanded, canExpand]);
+
+  // When a chat is opened (new chat or an existing conversation), focus the
+  // input so the user can start typing immediately. Runs on mount too, so the
+  // composer that appears after messages finish loading also grabs focus.
+  useEffect(() => {
+    if (!focusToken) return;
+    const frame = requestAnimationFrame(() => {
+      const editor = editorRef.current;
+      if (!editor || isEditorDisabled) return;
+      editor.focus({ preventScroll: true });
+      const range = document.createRange();
+      range.selectNodeContents(editor);
+      range.collapse(false);
+      const selection = window.getSelection();
+      selection?.removeAllRanges();
+      selection?.addRange(range);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [focusToken]);
 
   useEffect(() => {
     if (!libraryOpen) return;
@@ -698,7 +721,9 @@ export const ChatComposer = memo(function ChatComposer({
               autoCapitalize="off"
               role="textbox"
               aria-multiline="true"
-              aria-label={isEditingMessage ? "Edit your message" : "Message KSEMO"}
+              aria-label={
+                isEditingMessage ? "Edit your message" : "Message KSEMO"
+              }
               onInput={handleEditorInput}
               onPaste={handlePaste}
               onKeyDown={event => {
@@ -965,9 +990,7 @@ export const ChatComposer = memo(function ChatComposer({
                               <Mic className="size-4.5" />
                             </Button>
                           </TooltipTrigger>
-                          <TooltipContent side="bottom">
-                            Dictate
-                          </TooltipContent>
+                          <TooltipContent side="bottom">Dictate</TooltipContent>
                         </Tooltip>
                       )}
                     </>
@@ -988,9 +1011,7 @@ export const ChatComposer = memo(function ChatComposer({
                         <X className="size-4.5" />
                       </Button>
                     </TooltipTrigger>
-                    <TooltipContent side="bottom">
-                      Cancel edit
-                    </TooltipContent>
+                    <TooltipContent side="bottom">Cancel edit</TooltipContent>
                   </Tooltip>
 
                   {/* Save Button (Tick mark) */}
@@ -1000,16 +1021,16 @@ export const ChatComposer = memo(function ChatComposer({
                         type="button"
                         size="icon"
                         onClick={onSaveEdit}
-                        disabled={!value.trim() || isRecording || isTranscribing}
+                        disabled={
+                          !value.trim() || isRecording || isTranscribing
+                        }
                         className="size-10 rounded-full bg-foreground text-background hover:bg-foreground/90 disabled:bg-muted disabled:text-muted-foreground transition-colors"
                         aria-label="Save edit"
                       >
                         <Check className="size-4.5" />
                       </Button>
                     </TooltipTrigger>
-                    <TooltipContent side="bottom">
-                      Save edit
-                    </TooltipContent>
+                    <TooltipContent side="bottom">Save edit</TooltipContent>
                   </Tooltip>
                 </>
               ) : voiceChatActive ? (
@@ -1065,9 +1086,7 @@ export const ChatComposer = memo(function ChatComposer({
                               <Mic className="size-4.5" />
                             </Button>
                           </TooltipTrigger>
-                          <TooltipContent side="bottom">
-                            Dictate
-                          </TooltipContent>
+                          <TooltipContent side="bottom">Dictate</TooltipContent>
                         </Tooltip>
                       )}
                     </>
