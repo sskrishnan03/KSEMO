@@ -12,6 +12,7 @@ import {
   deleteFileForUser,
   attachFileToConversationForUser,
   supabase,
+  isSupabaseConfigured,
 } from "../supabase-db";
 import type { KsemoFile } from "../../supabase-schema/04-types";
 
@@ -482,8 +483,22 @@ export const workspaceRouter = router({
             message: "Files must be smaller than 25 MB.",
           });
 
-        const absolute = resolveStoragePath(file.storageKey);
-        await fs.promises.writeFile(absolute, buffer);
+        if (isSupabaseConfigured) {
+          const { error } = await supabase.storage
+            .from("ksemo-files")
+            .upload(file.storageKey, new Uint8Array(buffer), {
+              contentType: file.mimeType,
+              upsert: true,
+            });
+          if (error)
+            throw new TRPCError({
+              code: "INTERNAL_SERVER_ERROR",
+              message: "Failed to save file content to storage.",
+            });
+        } else {
+          const absolute = resolveStoragePath(file.storageKey);
+          await fs.promises.writeFile(absolute, buffer);
+        }
 
         await updateFileForUser(input.id, ctx.user.id, {
           sizeBytes: buffer.length,

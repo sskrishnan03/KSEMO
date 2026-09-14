@@ -3,8 +3,7 @@
 // Supported: PDF, DOCX, XLSX/XLS/CSV, PPTX, plain text/markdown/json/etc.
 
 import jszip from "jszip";
-import fs from "fs";
-import { resolveStoragePath } from "./storage";
+import { storageDownload } from "./storage";
 import { updateFileForUser } from "./supabase-db";
 
 export const MAX_EXTRACT_CHARS = 200_000;
@@ -268,14 +267,10 @@ export async function ensureExtractedContent(file: {
     return file.contentText;
   }
   try {
-    const absolutePath = resolveStoragePath(file.storageKey);
-    const exists = await fs.promises
-      .stat(absolutePath)
-      .then(() => true)
-      .catch(() => false);
-    if (!exists) return null;
+    const downloaded = await storageDownload(file.storageKey);
+    if (!downloaded.data) return null;
 
-    const buffer = await fs.promises.readFile(absolutePath);
+    const buffer = downloaded.data;
     const text = await extractFileText(file.filename, file.mimeType, buffer);
     if (text && file.userId !== undefined) {
       await updateFileForUser(String(file.id), file.userId, { contentText: text }).catch(() => {});

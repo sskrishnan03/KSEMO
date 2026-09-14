@@ -23,6 +23,7 @@ import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { registerChatStream } from "../chatStream";
 import { isSupabaseConfigured, supabase } from "../supabase-db";
+import { ensureStorageBucket } from "../storage";
 
 function validateProductionConfig() {
   const isProduction = process.env.NODE_ENV === "production";
@@ -69,6 +70,7 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 
 async function startServer() {
   validateProductionConfig();
+  await ensureStorageBucket();
 
   const app = express();
   const server = createServer(app);

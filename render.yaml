@@ -32,6 +32,8 @@ services:
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
+      - key: SUPABASE_STORAGE_BUCKET
+        value: ksemo-files
       - key: OAUTH_SERVER_URL
         sync: false
       - key: OWNER_OPEN_ID

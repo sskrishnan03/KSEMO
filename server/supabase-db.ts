@@ -1108,6 +1108,21 @@ export async function deleteFileForUser(
   }
   const existing = await getFileForUser(id, userId);
   if (!existing) return false;
+
+  // Best-effort cleanup of the file bytes in Supabase Storage. Never fails
+  // the database delete; orphaned blobs are tolerated if removal errors out.
+  if (existing.storageKey) {
+    try {
+      const bucket = process.env.SUPABASE_STORAGE_BUCKET || "ksemo-files";
+      await supabase.storage.from(bucket).remove([existing.storageKey]);
+    } catch (delErr) {
+      console.warn(
+        `[supabase-db] Storage cleanup failed for ${existing.storageKey}:`,
+        delErr
+      );
+    }
+  }
+
   const { error } = await supabase
     .from("files")
     .delete()

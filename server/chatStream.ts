@@ -14,8 +14,7 @@ import {
 } from "./supabase-db";
 import { streamLLM, type Message } from "./_core/llm";
 import { sdk, SessionLookupError } from "./_core/sdk";
-import { resolveStoragePath } from "./storage";
-import fs from "fs";
+import { storageDownload } from "./storage";
 import { buildUserMemoryContext } from "./memory/retrieval";
 import { memorizeConversation } from "./memory/autoMemorize";
 import {
@@ -46,18 +45,17 @@ const VOICE_STYLE_INSTRUCTION =
   "You are in a live, real-time voice conversation speaking directly with the user. Sound natural, warm, conversational, and direct, like a thoughtful human expert talking to a colleague. Use natural phrasing and common contractions (I'm, it's, you'll, don't). Do NOT use any markdown formatting, asterisks, bullet points, headers, or emojis since your words are spoken aloud by a speech synthesizer. Speak in clear, flowing sentences with natural pauses (commas and periods). Never repeat the question back.";
 
 // The Gemini/OpenAI-compatible provider cannot resolve localhost or relative
-// storage URLs, so images are read from disk and sent inline as base64 data
+// storage URLs, so images are read from storage and sent inline as base64 data
 // URIs instead of remote image_urls that the model could never fetch.
 async function storageImageDataUri(
   storageKey: string,
   mimeType: string
 ): Promise<string | null> {
   try {
-    const absolute = resolveStoragePath(storageKey);
-    const stat = await fs.promises.stat(absolute);
-    if (stat.size > MAX_INLINE_IMAGE_BYTES) return null;
-    const buffer = await fs.promises.readFile(absolute);
-    return `data:${mimeType || "image/png"};base64,${buffer.toString("base64")}`;
+    const downloaded = await storageDownload(storageKey);
+    if (!downloaded.data) return null;
+    if (downloaded.data.length > MAX_INLINE_IMAGE_BYTES) return null;
+    return `data:${mimeType || "image/png"};base64,${downloaded.data.toString("base64")}`;
   } catch (error) {
     console.warn(
       `[ChatStream] could not read stored image ${storageKey}`,
