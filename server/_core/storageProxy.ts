@@ -1,7 +1,8 @@
 import type { Express, Request, Response } from "express";
 import fs from "fs";
 import { resolveStoragePath } from "../storage";
-import { supabase, isSupabaseConfigured } from "../supabase-db";
+import { supabase, isSupabaseConfigured, getFileForUser } from "../supabase-db";
+import { sdk } from "./sdk";
 
 const BUCKET_NAME = process.env.SUPABASE_STORAGE_BUCKET || "ksemo-files";
 
@@ -29,6 +30,36 @@ export function registerStorageProxy(app: Express) {
     if (!key) {
       res.status(400).send("Missing storage key");
       return;
+    }
+
+    // Authenticate the request — storage files are private and require a
+    // valid session. Without this check, anyone who knows a storage key can
+    // download any file.
+    let userId: number | undefined;
+    try {
+      const user = await sdk.authenticateRequest(req);
+      if (!user) {
+        res.status(401).send("Authentication required");
+        return;
+      }
+      userId = user.id;
+    } catch {
+      res.status(401).send("Authentication required");
+      return;
+    }
+
+    // Verify the requested file belongs to the authenticated user.
+    if (isSupabaseConfigured && userId !== undefined) {
+      // Extract the file ID from the storage key pattern: generated/{userId}/{fileId}-{filename} or library/{userId}/{fileId}-{filename}
+      const keyParts = key.split("/");
+      if (keyParts.length >= 3) {
+        const fileOwnerSegment = keyParts[1]; // userId segment
+        const fileOwner = parseInt(fileOwnerSegment, 10);
+        if (!isNaN(fileOwner) && fileOwner !== userId) {
+          res.status(403).send("Access denied");
+          return;
+        }
+      }
     }
 
     const customFilename = req.query.filename

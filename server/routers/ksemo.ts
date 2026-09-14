@@ -24,13 +24,16 @@ import {
   updateConversationForUser,
   updateVoiceSessionForUser,
   upsertUserPreferences,
+  createFileForUser,
 } from "../supabase-db";
+import { storagePut } from "../storage";
 import { listLLMModels } from "../_core/llm";
 import { transcribeAudio } from "../_core/voiceTranscription";
 import { isMailerConfigured, sendFeedbackEmail } from "../_core/mailer";
 import { generateFile, type FileFormat } from "../fileGeneration";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { typeAfterVoiceSession } from "../conversationTypes";
+import type { KsemoFile } from "../../supabase-schema/04-types";
 
 const conversationId = z.string().min(8).max(36);
 const preferenceInput = z.object({
@@ -470,7 +473,7 @@ export const fileGenerationRouter = router({
         description: z.string().optional(),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       try {
         const result = await generateFile({
           format: input.format as FileFormat,
@@ -478,10 +481,47 @@ export const fileGenerationRouter = router({
           title: input.title,
           description: input.description,
         });
-        
+
+        const fileId = crypto.randomUUID();
+        const safeFilename = result.filename
+          .replace(/[<>:"/\\|?*]/g, "_")
+          .replace(/\s+/g, "_")
+          .substring(0, 200);
+        const storagePath = `generated/${ctx.user.id}/${fileId}-${safeFilename}`;
+
+        const saved = await storagePut(
+          storagePath,
+          result.data,
+          result.mimeType
+        );
+
+        const fileRecord: KsemoFile = {
+          id: fileId,
+          userId: ctx.user.id,
+          projectId: null,
+          storageKey: saved.key,
+          url: saved.url,
+          filename: result.filename,
+          mimeType: result.mimeType,
+          sizeBytes: result.size,
+          status: "ready",
+          contentText: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+
+        await createFileForUser(fileRecord);
+
         return {
           success: true,
-          file: result,
+          file: {
+            fileId,
+            filename: result.filename,
+            url: saved.url,
+            storageKey: saved.key,
+            mimeType: result.mimeType,
+            sizeBytes: result.size,
+          },
         };
       } catch (error) {
         console.error("File generation error:", error);

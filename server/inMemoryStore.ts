@@ -33,9 +33,21 @@ const STORE_FILE = STORE_ENV_OVERRIDE || DEFAULT_STORE_FILE;
 const SAVE_DEBOUNCE_MS = 250;
 const STORE_VERSION = 1;
 const DATE_MARKER = "$ksemoDate";
+
+// The in-memory store is ONLY a development/test fallback. When Supabase is
+// configured as the production data store this store is never queried, so its
+// disk snapshot must be disabled too — writing to Render's ephemeral disk for
+// a data set nothing reads is pointless disk churn.
+const SUPABASE_CONFIGURED = Boolean(
+  process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
+);
+
 // Persistence is skipped in tests unless a store file is explicitly requested
-// (tests can point KSEMO_STORE_FILE at a temp path to test real durability).
-const SAVE_DISABLED = !STORE_ENV_OVERRIDE && process.env.NODE_ENV === "test";
+// (tests can point KSEMO_STORE_FILE at a temp path to test real durability),
+// and skipped entirely when Supabase is the configured data store.
+const SAVE_DISABLED =
+  !STORE_ENV_OVERRIDE &&
+  (process.env.NODE_ENV === "test" || SUPABASE_CONFIGURED);
 
 // Dates can't round-trip through JSON naively, so they are tagged with a
 // marker key before serialization and revived on load. Chat content that is

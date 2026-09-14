@@ -9,7 +9,6 @@ import { storagePut } from "../storage";
 import {
   attachFileToMessageForUser,
   createFileForUser,
-  upsertUser,
 } from "../supabase-db";
 import { generateDocument, type GeneratedArtifact } from "./generate";
 import type { DocBlock, DocumentSpec, DocFormat, SourceReference } from "./spec";
@@ -406,14 +405,6 @@ export async function generateAndDeliverFile(input: {
     buffer,
     mimeType
   );
-
-  // Ensure the user row exists (upsert_user RPC is a no-op in local dev memory)
-  await upsertUser({
-    openId: `user-${userId}`,
-    name: "KSEMO User",
-    email: `user${userId}@ksemo.internal`,
-    role: "user",
-  }).catch(() => {});
 
   // Create the file record (Supabase or inMemoryStore)
   await createFileForUser({
