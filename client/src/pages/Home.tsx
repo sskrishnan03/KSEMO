@@ -88,6 +88,12 @@ const STREAM_MAX_DURATION_MS = 300_000;
 
 const REFRESH_TIMEOUT_MS = 20_000;
 
+// When the user stops a document pipeline mid-run, the backend still finishes
+// the file and attaches it to the message. Poll briefly so the standard file
+// card can take over instead of leaving a frozen "creating…" dropdown.
+const FILE_RECOVERY_POLL_INTERVAL_MS = 1000;
+const FILE_RECOVERY_POLL_MAX_ATTEMPTS = 12;
+
 function withDeadline<T>(promise: Promise<T>, ms: number): Promise<T | null> {
   return Promise.race([
     promise,
@@ -551,7 +557,7 @@ export default function Home() {
       const hasGeneratedFile =
         (message as Record<string, unknown>).fileGeneration !== undefined ||
         (message.role === "assistant" &&
-          message.status === "completed" &&
+          (message.status === "completed" || message.status === "cancelled") &&
           (message.attachments ?? []).length > 0);
       const fileGeneration = (message as Record<string, unknown>)
         .fileGeneration as
@@ -638,14 +644,32 @@ export default function Home() {
     setChatMessages(current => {
       if (!current.length) return serverMessages;
       const serverIds = new Set(serverMessages.map(message => message.id));
+      const previousById = new Map(
+        current.map(message => [message.id, message])
+      );
+      const mergedMessages = serverMessages.map(message => {
+        // Keep the live file card on screen while the server record for an
+        // interrupted document pipeline is still settling. The backend only
+        // marks the message cancelled-with-file once the pipeline finishes,
+        // so without this the drafting/completed card would flicker away.
+        if (message.status === "streaming" && !message.fileGeneration) {
+          const previousFileGeneration = previousById.get(
+            message.id
+          )?.fileGeneration;
+          if (previousFileGeneration) {
+            return { ...message, fileGeneration: previousFileGeneration };
+          }
+        }
+        return message;
+      });
       const localStreaming = current.filter(
         message =>
           message.status === "streaming" &&
           message.id.startsWith("local-") &&
           !serverIds.has(message.id)
       );
-      if (!localStreaming.length) return serverMessages;
-      return [...serverMessages, ...localStreaming];
+      if (!localStreaming.length) return mergedMessages;
+      return [...mergedMessages, ...localStreaming];
     });
   }, [activeConversationId, activeQuery.data, activeQuery.isLoading]);
 
@@ -1428,6 +1452,22 @@ export default function Home() {
       // shows the finished response immediately (server has already settled it).
       await syncConversationFromServer(completedConversation.conversationId);
 
+      // A user stop during document creation does not cancel the backend
+      // pipeline — it still attaches the finished file to the message. Poll
+      // quietly and swap the frozen drafting card to the standard file card
+      // once the file lands (or show a clean stopped card if it never does).
+      if (
+        userStopped &&
+        resolvedMode &&
+        completedConversation.assistantMessageId
+      ) {
+        pollGeneratedFileRecovery(
+          completedConversation.conversationId,
+          completedConversation.assistantMessageId,
+          resolvedMode
+        );
+      }
+
       if (
         isViewingThisStream() &&
         preferencesQuery.data?.autoPlayResponses &&
@@ -1445,6 +1485,144 @@ export default function Home() {
       REFRESH_TIMEOUT_MS
     );
     return fresh !== null;
+  }
+
+  function settleInterruptedGeneration(
+    assistantMessageId: string,
+    format: string
+  ) {
+    setChatMessages(current =>
+      current.map(message =>
+        message.id === assistantMessageId
+          ? {
+              ...message,
+              fileGeneration: {
+                stage: "interrupted" as FileCreationStage,
+                format: format as DocFormat,
+                status: "error" as const,
+              },
+            }
+          : message
+      )
+    );
+    setFileGeneration(current =>
+      current && current.messageId === assistantMessageId ? null : current
+    );
+  }
+
+  function settleRecoveredFile(
+    assistantMessageId: string,
+    format: string,
+    attachments: Record<string, unknown>[]
+  ) {
+    const firstAttachment = attachments[0] as
+      | {
+          id?: string;
+          filename?: string;
+          mimeType?: string;
+          url?: string;
+          sizeBytes?: number;
+          metadata?: unknown;
+          contentText?: string | null;
+        }
+      | undefined;
+    let sources: FileSource[] | undefined;
+    let metrics: FileMetrics | undefined;
+    let resolvedFormat = format;
+    if (
+      firstAttachment?.metadata &&
+      typeof firstAttachment.metadata === "object"
+    ) {
+      const meta = firstAttachment.metadata as {
+        sources?: unknown;
+        metrics?: unknown;
+        format?: unknown;
+      };
+      if (Array.isArray(meta.sources) && meta.sources.length > 0) {
+        sources = meta.sources as FileSource[];
+      }
+      if (meta.metrics && typeof meta.metrics === "object") {
+        metrics = meta.metrics as FileMetrics;
+      }
+      if (typeof meta.format === "string") resolvedFormat = meta.format;
+    } else if (firstAttachment?.contentText) {
+      try {
+        const parsed = JSON.parse(firstAttachment.contentText);
+        if (parsed && typeof parsed === "object") {
+          if (Array.isArray(parsed.sources) && parsed.sources.length > 0) {
+            sources = parsed.sources;
+          }
+          if (parsed.metrics) metrics = parsed.metrics;
+          if (typeof parsed.format === "string") resolvedFormat = parsed.format;
+        }
+      } catch {}
+    }
+
+    setChatMessages(current =>
+      current.map(message =>
+        message.id === assistantMessageId
+          ? {
+              ...message,
+              fileGeneration: {
+                stage: "completed",
+                format: (resolvedFormat || format) as DocFormat,
+                status: "created" as const,
+                sources,
+                metrics,
+              },
+              attachments: attachments as KsemoMessage["attachments"],
+            }
+          : message
+      )
+    );
+    setFileGeneration(current =>
+      current && current.messageId === assistantMessageId ? null : current
+    );
+    utils.workspace.files.list.invalidate();
+  }
+
+  function pollGeneratedFileRecovery(
+    conversationId: string,
+    assistantMessageId: string,
+    format: string
+  ) {
+    let attempts = 0;
+    let settled = false;
+    const tick = async () => {
+      if (settled) return;
+      attempts += 1;
+      try {
+        const fresh = await utils.conversation.get.fetch({
+          id: conversationId,
+        });
+        const target = fresh?.messages?.find(
+          message => message.id === assistantMessageId
+        );
+        const attachments = (target?.attachments ?? []) as Record<
+          string,
+          unknown
+        >[];
+        if (attachments.length > 0) {
+          settled = true;
+          settleRecoveredFile(assistantMessageId, format, attachments);
+          return;
+        }
+        if (attempts >= FILE_RECOVERY_POLL_MAX_ATTEMPTS) {
+          settled = true;
+          settleInterruptedGeneration(assistantMessageId, format);
+          return;
+        }
+        window.setTimeout(tick, FILE_RECOVERY_POLL_INTERVAL_MS);
+      } catch {
+        if (attempts >= FILE_RECOVERY_POLL_MAX_ATTEMPTS) {
+          settled = true;
+          settleInterruptedGeneration(assistantMessageId, format);
+        } else {
+          window.setTimeout(tick, FILE_RECOVERY_POLL_INTERVAL_MS);
+        }
+      }
+    };
+    window.setTimeout(tick, FILE_RECOVERY_POLL_INTERVAL_MS);
   }
 
   function stopGeneration() {
@@ -2483,9 +2661,11 @@ export default function Home() {
                           stage={
                             activeFileGen.status === "created"
                               ? "completed"
-                              : activeFileGen.status === "error"
-                                ? "error"
-                                : (activeFileGen.stage as FileCreationStage)
+                              : activeFileGen.stage === "interrupted"
+                                ? "interrupted"
+                                : activeFileGen.status === "error"
+                                  ? "error"
+                                  : (activeFileGen.stage as FileCreationStage)
                           }
                           format={
                             (activeFileGen.format as DocFormat) || undefined

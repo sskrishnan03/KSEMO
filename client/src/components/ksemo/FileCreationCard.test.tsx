@@ -268,6 +268,22 @@ describe("FileCreationCard", () => {
       expect(markup).toContain("Try again");
     });
   });
+
+  describe("Interrupted State", () => {
+    it("renders a clean stopped card with retry when onRetry provided", () => {
+      const onRetry = vi.fn();
+      const markup = renderCard({
+        stage: "interrupted",
+        format: "docx",
+        onRetry,
+      });
+
+      expect(markup).toContain("Document creation was stopped");
+      expect(markup).toContain("Try again");
+      expect(markup).not.toContain('data-testid="file-creation-drafting"');
+      expect(markup).not.toContain('data-testid="file-creation-completed"');
+    });
+  });
 });
 
 import { splitFirstSentence } from "./MessageContent";

@@ -1867,41 +1867,22 @@ function splitWordHtmlIntoPages(html: string): string[] {
 
 interface WordPageItemProps {
   pageNumber: number;
-  totalPages: number;
   html: string;
   scale: number;
-  onPageVisible?: (pageNumber: number) => void;
+  rootRef?: (el: HTMLDivElement | null) => void;
 }
 
 const WordPageItem = memo(function WordPageItem({
   pageNumber,
-  totalPages,
   html,
   scale,
-  onPageVisible,
+  rootRef,
 }: WordPageItemProps) {
-  const containerRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el || !onPageVisible) return;
-    const observer = new IntersectionObserver(
-      entries => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) onPageVisible(pageNumber);
-        }
-      },
-      { threshold: 0.4 }
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [pageNumber, onPageVisible]);
-
   return (
     <div
-      ref={containerRef}
+      ref={rootRef}
       data-page={pageNumber}
-      className="mx-auto my-3 bg-white text-neutral-900 shadow-2xl rounded-xs border border-neutral-300/80 p-12 sm:p-16 select-text selection:bg-blue-500/30 transition-transform origin-top word-document-content font-sans relative"
+      className="relative mx-auto my-4 bg-white text-neutral-900 shadow-2xl rounded-xs border border-neutral-300/80 p-12 sm:p-16 select-text selection:bg-blue-500/30 transition-transform origin-top word-document-content font-sans"
       style={{
         width: `${A4_WIDTH}px`,
         maxWidth: "100%",
@@ -1909,23 +1890,15 @@ const WordPageItem = memo(function WordPageItem({
         zoom: scale !== 1.0 ? scale : undefined,
       }}
     >
-      <div className="flex items-center justify-between border-b border-neutral-200 pb-3 mb-8 text-[11px] text-neutral-400 font-medium uppercase tracking-wider select-none">
-        <span>Document</span>
-        <span>
-          Page {pageNumber} of {totalPages}
-        </span>
-      </div>
-
       <div
         className="space-y-4 text-neutral-800 leading-relaxed [&_h1]:text-2xl [&_h1]:font-bold [&_h1]:text-neutral-900 [&_h1]:mb-4 [&_h2]:text-xl [&_h2]:font-semibold [&_h2]:text-neutral-900 [&_h2]:mb-3 [&_h3]:text-lg [&_h3]:font-semibold [&_h3]:text-neutral-900 [&_h3]:mb-2 [&_p]:mb-3.5 [&_p]:text-[14.5px] [&_p]:leading-relaxed [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:mb-3.5 [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:mb-3.5 [&_li]:mb-1 [&_table]:w-full [&_table]:border-collapse [&_table]:border [&_table]:border-neutral-300 [&_table]:my-4 [&_th]:border [&_th]:border-neutral-300 [&_th]:bg-neutral-50 [&_th]:px-3.5 [&_th]:py-2 [&_th]:text-xs [&_th]:font-semibold [&_th]:text-left [&_td]:border [&_td]:border-neutral-300 [&_td]:px-3.5 [&_td]:py-2 [&_td]:text-xs [&_blockquote]:border-l-4 [&_blockquote]:border-blue-500 [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:my-3.5 [&_blockquote]:text-neutral-600 [&_a]:text-blue-600 [&_a]:underline [&_a]:underline-offset-2 [&_img]:max-w-full [&_img]:h-auto [&_img]:rounded [&_img]:my-3"
         dangerouslySetInnerHTML={{ __html: html }}
       />
 
-      <div className="border-t border-neutral-200 pt-4 mt-12 text-center text-[11px] text-neutral-400 font-medium select-none">
-        <span>
-          Page {pageNumber} of {totalPages}
-        </span>
-      </div>
+      {/* Page number, bottom-right corner only */}
+      <span className="absolute bottom-3 right-6 select-none text-[11px] font-medium tabular-nums text-neutral-400">
+        {pageNumber}
+      </span>
     </div>
   );
 });
@@ -1944,10 +1917,86 @@ const WordPageViewer = memo(function WordPageViewer({
   onPageCount,
 }: WordPageViewerProps) {
   const pages = useMemo(() => splitWordHtmlIntoPages(html), [html]);
+  const pageElsRef = useRef<Array<HTMLDivElement | null>>([]);
 
   useEffect(() => {
     onPageCount?.(pages.length);
   }, [pages.length, onPageCount]);
+
+  // Track the current page from scroll position (robust with CSS zoom, which
+  // interferes with IntersectionObserver geometry).
+  useEffect(() => {
+    const els = pageElsRef.current;
+    if (els.length === 0 || !onPageVisible) return;
+    let raf = 0;
+
+    const findScrollParent = (el: HTMLDivElement | null): HTMLElement => {
+      let node = el?.parentElement ?? null;
+      while (node) {
+        const style = getComputedStyle(node);
+        if (
+          style.overflowY === "auto" ||
+          style.overflowY === "scroll" ||
+          style.overflow === "auto" ||
+          style.overflow === "scroll"
+        )
+          return node;
+        node = node.parentElement;
+      }
+      return document.documentElement;
+    };
+
+    const scrollParent = findScrollParent(els[0]);
+    let lastVisiblePage = 0;
+
+    const intersectionArea = (
+      a: { top: number; bottom: number },
+      b: { top: number; bottom: number }
+    ) => Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
+
+    const updateCurrentPage = () => {
+      const viewport =
+        scrollParent === document.documentElement
+          ? { top: 0, bottom: window.innerHeight }
+          : (() => {
+              const r = scrollParent.getBoundingClientRect();
+              return { top: r.top, bottom: r.bottom };
+            })();
+      let bestPage = 1;
+      let bestArea = -1;
+      for (let i = 0; i < els.length; i++) {
+        const el = els[i];
+        if (!el) continue;
+        const rc = el.getBoundingClientRect();
+        const area = intersectionArea(
+          { top: rc.top, bottom: rc.bottom },
+          viewport
+        );
+        if (area > bestArea) {
+          bestArea = area;
+          bestPage = i + 1;
+        }
+      }
+      if (bestPage !== lastVisiblePage) {
+        lastVisiblePage = bestPage;
+        onPageVisible(bestPage);
+      }
+    };
+
+    const onScrollTick = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(updateCurrentPage);
+    };
+
+    updateCurrentPage();
+    scrollParent.addEventListener("scroll", onScrollTick, { passive: true });
+    window.addEventListener("resize", onScrollTick);
+    return () => {
+      cancelAnimationFrame(raf);
+      scrollParent.removeEventListener("scroll", onScrollTick);
+      window.removeEventListener("resize", onScrollTick);
+    };
+  }, [pages.length, onPageVisible]);
 
   return (
     <div
@@ -1958,10 +2007,11 @@ const WordPageViewer = memo(function WordPageViewer({
         <WordPageItem
           key={idx}
           pageNumber={idx + 1}
-          totalPages={pages.length}
           html={pageHtml}
           scale={scale}
-          onPageVisible={onPageVisible}
+          rootRef={el => {
+            pageElsRef.current[idx] = el;
+          }}
         />
       ))}
     </div>

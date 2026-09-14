@@ -41,6 +41,7 @@ export type FileCreationStage =
   | "generating"
   | "validating"
   | "completed"
+  | "interrupted"
   | "error";
 
 export type FileSource = {
@@ -177,6 +178,8 @@ export function getLiveStatusPhrase(
       return "Validating document integrity";
     case "completed":
       return "Document ready";
+    case "interrupted":
+      return "Document creation stopped";
     case "error":
       return "Document creation failed";
     default:
@@ -196,6 +199,7 @@ export const STAGE_NUMBERS: Record<FileCreationStage, number> = {
   generating: 6,
   validating: 7,
   completed: 8,
+  interrupted: 0,
   error: 0,
 };
 
@@ -296,6 +300,44 @@ export const FileCreationCard = memo(function FileCreationCard({
             </p>
             <p className="mt-0.5 text-[11px] text-muted-foreground">
               Something went wrong while generating the {config.short}.
+            </p>
+          </div>
+          {onRetry && (
+            <button
+              type="button"
+              onClick={onRetry}
+              className={cn(
+                "inline-flex shrink-0 items-center gap-1.5 rounded-xl",
+                "border border-border/70 bg-card px-3 py-1.5",
+                "text-[11.5px] font-medium text-foreground shadow-sm",
+                "transition-all duration-150 hover:bg-muted active:scale-[0.98]"
+              )}
+            >
+              <RotateCw className="size-3" />
+              Try again
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Interrupted / stopped state ────────────────────────────────────────
+  if (stage === "interrupted") {
+    return (
+      <div className="my-2 w-fit max-w-md animate-in fade-in duration-200">
+        <div className="flex items-center gap-3.5 rounded-2xl border border-border/60 bg-muted/40 px-4 py-3 text-foreground">
+          <FileBrandMark
+            variant={variant}
+            className="size-9 shrink-0 opacity-70 saturate-[0.6]"
+          />
+          <div className="min-w-0 flex-1">
+            <p className="text-[13px] font-medium text-foreground">
+              Document creation was stopped
+            </p>
+            <p className="mt-0.5 text-[11px] text-muted-foreground">
+              You interrupted the process while the {config.short} was being
+              generated.
             </p>
           </div>
           {onRetry && (
