@@ -42,15 +42,18 @@ export function getSessionCookieOptions(
         : undefined;
 
   const secure = !isLocal || isSecureRequest(req);
+
+  // KSEMO runs as a same-origin application (browser ⇄ its own HTTPS origin).
+  // SameSite=Lax keeps the session cookie sent on same-origin navigation and on
+  // top-level redirects (which is what the Google OAuth callback uses), while
+  // blocking cross-site CSRF cookies. SameSite=None would only be needed if the
+  // site were embedded in cross-origin iframes or called cross-site, which KSEMO
+  // does not do. Partitioned cookies are unnecessary for this deployment.
   return {
     httpOnly: true,
     path: "/",
     domain,
-    // SameSite=None + Secure + partitioned allows cookies to work in cross-origin
-    // iframes. Partitioned is only valid on secure (https) connections, so it is
-    // enabled purely when `secure` is true to avoid Chrome rejecting the cookie.
-    sameSite: secure ? "none" : "lax",
+    sameSite: "lax",
     secure,
-    partitioned: secure,
-  } as CookieOptions;
+  };
 }

@@ -6,8 +6,11 @@
 // the UI reflects actual backend processing — not fake timers.
 
 import { storagePut } from "../storage";
-import { attachFileToMessageForUser, supabase, isSupabaseConfigured } from "../supabase-db";
-import { inMemoryStore } from "../inMemoryStore";
+import {
+  attachFileToMessageForUser,
+  createFileForUser,
+  upsertUser,
+} from "../supabase-db";
 import { generateDocument, type GeneratedArtifact } from "./generate";
 import type { DocBlock, DocumentSpec, DocFormat, SourceReference } from "./spec";
 import { sanitizeFilename, FORMAT_MIME, coerceBlocks, coerceSheets, coerceSlides } from "./spec";
@@ -404,72 +407,31 @@ export async function generateAndDeliverFile(input: {
     mimeType
   );
 
-  // Always register in local memory store first to guarantee instant availability
-  try {
-    const memFile = {
-      id: fileId,
-      userId,
-      projectId: null,
-      filename,
-      mimeType,
-      sizeBytes: buffer.length,
-      storageKey: saved.key,
-      url: saved.url,
-      contentText: metadataJson,
-      metadata: {
-        sources,
-        metrics,
-        format: spec.format,
-      },
-      status: "ready",
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    } as const;
-    inMemoryStore.files.set(fileId, memFile as never);
-  } catch (memErr) {
-    console.warn("[DocGen] local in-memory store error:", memErr);
-  }
+  // Ensure the user row exists (upsert_user RPC is a no-op in local dev memory)
+  await upsertUser({
+    openId: `user-${userId}`,
+    name: "KSEMO User",
+    email: `user${userId}@ksemo.internal`,
+    role: "user",
+  }).catch(() => {});
 
-  // If Supabase is configured, sync the file to Supabase ensuring foreign key validity
-  if (isSupabaseConfigured) {
-    try {
-      const { data: existingUser } = await supabase
-        .from("users")
-        .select("id")
-        .eq("id", userId)
-        .maybeSingle();
-
-      if (!existingUser) {
-        const memUser = inMemoryStore.users.get(userId);
-        await supabase.from("users").upsert({
-          id: userId,
-          open_id: memUser?.openId || `user-${userId}`,
-          name: memUser?.name || "KSEMO User",
-          email: memUser?.email || `user${userId}@ksemo.internal`,
-          role: memUser?.role || "user",
-        });
-      }
-
-      const { error: insertError } = await supabase.from("files").insert({
-        id: fileId,
-        user_id: userId,
-        project_id: null,
-        storage_key: saved.key,
-        url: saved.url,
-        filename,
-        mime_type: mimeType,
-        size_bytes: buffer.length,
-        status: "ready",
-        content_text: metadataJson,
-      });
-
-      if (insertError) {
-        console.warn("[DocGen] Supabase insert warning (file saved locally):", insertError);
-      }
-    } catch (dbErr) {
-      console.warn("[DocGen] Supabase write caught error (file saved locally):", dbErr);
-    }
-  }
+  // Create the file record (Supabase or inMemoryStore)
+  await createFileForUser({
+    id: fileId,
+    userId,
+    projectId: null,
+    filename,
+    mimeType,
+    sizeBytes: buffer.length,
+    storageKey: saved.key,
+    url: saved.url,
+    contentText: metadataJson,
+    status: "ready",
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  }).catch(err => {
+    console.warn("[DocGen] file creation warning:", err);
+  });
 
   try {
     const attached = await attachFileToMessageForUser({

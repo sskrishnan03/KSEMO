@@ -10,9 +10,10 @@ import {
   removeFollowingAssistantDuplicatesForUser,
   updateConversationForUser,
   updateMessage,
+  DatabaseUnavailableError,
 } from "./supabase-db";
 import { streamLLM, type Message } from "./_core/llm";
-import { sdk } from "./_core/sdk";
+import { sdk, SessionLookupError } from "./_core/sdk";
 import { resolveStoragePath } from "./storage";
 import fs from "fs";
 import { buildUserMemoryContext } from "./memory/retrieval";
@@ -194,7 +195,19 @@ export function registerChatStream(app: Express) {
     let user;
     try {
       user = await sdk.authenticateRequest(req);
-    } catch {
+    } catch (error) {
+      if (
+        error instanceof DatabaseUnavailableError ||
+        error instanceof SessionLookupError
+      ) {
+        // Database/OAuth outage: the session may still be valid, so do NOT
+        // throw the user out. Report a server error and let them retry.
+        res.status(503).json({
+          error:
+            "KSEMO's data store is temporarily unavailable. Please try again.",
+        });
+        return;
+      }
       res.status(401).json({ error: "Authentication required" });
       return;
     }
@@ -457,7 +470,8 @@ export function registerChatStream(app: Express) {
                         });
                       }
                     } else if (file.mimeType === "application/pdf") {
-                      const text = await ensureExtractedContent(file);
+                      const text = await ensureExtractedContent({ ...file, userId: user.id });
+
                       if (text) {
                         contentParts.push({
                           type: "text",
@@ -470,7 +484,8 @@ export function registerChatStream(app: Express) {
                         });
                       }
                     } else {
-                      const text = await ensureExtractedContent(file);
+                      const text = await ensureExtractedContent({ ...file, userId: user.id });
+
                       if (text) {
                         contentParts.push({
                           type: "text",

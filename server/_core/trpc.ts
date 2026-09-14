@@ -14,6 +14,17 @@ const requireUser = t.middleware(async opts => {
   const { ctx, next } = opts;
 
   if (!ctx.user) {
+    // An unverifiable-but-present session due to a database/OAuth outage is an
+    // infrastructure problem, not a logged-out user. Report it as a server
+    // error so the client keeps its session instead of showing the sign-in
+    // screen.
+    if (ctx.authUnavailable) {
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message:
+          "KSEMO could not verify your session because its data store is temporarily unavailable. Please retry.",
+      });
+    }
     throw new TRPCError({ code: "UNAUTHORIZED", message: UNAUTHED_ERR_MSG });
   }
 

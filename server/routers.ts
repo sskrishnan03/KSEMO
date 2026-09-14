@@ -1,4 +1,5 @@
 import { COOKIE_NAME } from "@shared/const";
+import { TRPCError } from "@trpc/server";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
@@ -19,6 +20,16 @@ export const appRouter = router({
   system: systemRouter,
   auth: router({
     me: publicProcedure.query(opts => {
+      if (opts.ctx.authUnavailable) {
+        // The session could not be verified because the data store/OAuth
+        // server is down. Raising a server error (instead of returning null)
+        // lets the client tell "temporarily unavailable" apart from
+        // "signed out", so it keeps the session instead of redirecting.
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "KSEMO's data store is temporarily unavailable.",
+        });
+      }
       const user = opts.ctx.user;
       return user
         ? { id: user.id, name: user.name, email: user.email }

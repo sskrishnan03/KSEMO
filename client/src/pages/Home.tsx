@@ -166,7 +166,7 @@ function rememberNewChatIntent(userId: number): void {
 }
 
 export default function Home() {
-  const { user, loading, logout } = useAuth();
+  const { user, loading, authUnavailable, refresh, logout } = useAuth();
   const { closePdf, isOpen: isDocumentOpen } = usePdfViewer();
   const [, setLocation] = useLocation();
   const searchParams = useMemo(
@@ -2264,6 +2264,30 @@ export default function Home() {
   const voiceComposerElement = renderComposer({ hideVoiceInput: true });
 
   if (loading) return <Loading fullScreen />;
+
+  // The server could not verify the session (data store/OAuth temporarily
+  // down). Do NOT show the sign-in screen: the user may still be signed in,
+  // and bouncing them to login on an outage looks like a forced logout.
+  if (authUnavailable) {
+    return (
+      <main className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-background px-5 text-center">
+        <p className="text-sm font-medium text-foreground">
+          KSEMO could not verify your session because its data store is
+          temporarily unavailable.
+        </p>
+        <p className="max-w-sm text-xs leading-5 text-muted-foreground">
+          Please retry in a moment — you will not be signed out.
+        </p>
+        <button
+          type="button"
+          onClick={() => void refresh()}
+          className="inline-flex h-9 items-center rounded-lg border border-border bg-card px-4 text-sm font-medium text-foreground hover:bg-accent"
+        >
+          Retry
+        </button>
+      </main>
+    );
+  }
 
   if (!user || isSignedOutPreview) return <AuthStage />;
 

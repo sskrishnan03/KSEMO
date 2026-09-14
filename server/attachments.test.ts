@@ -90,7 +90,7 @@ describe("File Extraction & Attachment System", () => {
     expect(media[0].contentText).toBe("Sample data for test attachment");
 
     // 5. Check on-demand extraction via ensureExtractedContent
-    const extracted = await ensureExtractedContent(media[0]);
+    const extracted = await ensureExtractedContent({ ...media[0], userId: testUserId });
     expect(extracted).toBe("Sample data for test attachment");
   });
 

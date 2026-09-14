@@ -11,6 +11,7 @@ import type { Request } from "express";
 import { SignJWT, jwtVerify } from "jose";
 import type { User } from "../supabase-db";
 import * as db from "../supabase-db";
+import { DatabaseUnavailableError } from "../supabase-db";
 import { ENV } from "./env";
 import type {
   ExchangeTokenRequest,
@@ -28,6 +29,19 @@ export type SessionPayload = {
   appId: string;
   name: string;
 };
+
+/**
+ * The request carried a cryptographically-valid session JWT, but the account
+ * behind it could not be resolved (OAuth server unreachable, DB unavailable,
+ * unexpected lookup failure). This is an infrastructure problem, NOT a logged-
+ * out user: callers must preserve the session cookie instead of clearing it.
+ */
+export class SessionLookupError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "SessionLookupError";
+  }
+}
 
 const EXCHANGE_TOKEN_PATH = `/webdev.v1.WebDevAuthPublicService/ExchangeToken`;
 const GET_USER_INFO_PATH = `/webdev.v1.WebDevAuthPublicService/GetUserInfo`;
@@ -280,30 +294,43 @@ class SDKServer {
       }
     }
 
+    // No usable token, or the token failed signature/expiry verification:
+    // this is a definitively invalid session and the caller may clear it.
     if (!session || !sessionToken) {
       return null;
     }
 
     if (session.openId.startsWith(CRON_OPEN_ID_PREFIX)) {
-      const userInfo = await this.getUserInfoWithJwt(sessionToken ?? "");
-      const taskUid = userInfo.taskUid ?? null;
-      if (!taskUid) {
-        return null;
+      let userInfo;
+      try {
+        userInfo = await this.getUserInfoWithJwt(sessionToken);
+      } catch {
+        // Valid JWT but the OAuth server is not reachable right now. Preserve
+        // the session; this is an infrastructure problem, not a logout.
+        throw new SessionLookupError("OAuth user-info lookup failed for cron session");
       }
-      return buildCronUser(userInfo);
+      const taskUid = userInfo.taskUid ?? null;
+      if (taskUid) {
+        return buildCronUser(userInfo);
+      }
+      return null;
     }
 
     const sessionUserId = session.openId;
     const signedInAt = new Date();
-    let user = await db.getUserByOpenId(sessionUserId);
+
+    let user: User | null = null;
+    try {
+      user = (await db.getUserByOpenId(sessionUserId)) ?? null;
+    } catch (e) {
+      if (e instanceof DatabaseUnavailableError) throw e;
+      throw new SessionLookupError("user lookup failed");
+    }
 
     // A signed session whose account no longer exists (e.g. the account was
-    // deleted or the local store was reset) must NOT be turned into a phantom
-    // user: doing so leaves the client "signed in" with an invalid id (-1),
-    // which silently breaks signing in, profile updates, and account deletion.
-    // Fall through so an unknown user is treated as logged out instead.
-
-    // If user not in DB, sync from OAuth server automatically
+    // deleted) must NOT be turned into a phantom user. First try to
+    // re-sync from the OAuth server; only if that genuinely resolves an
+    // account do we recreate it.
     if (!user) {
       try {
         const userInfo = await this.getUserInfoWithJwt(sessionToken ?? "");
@@ -314,20 +341,33 @@ class SDKServer {
           loginMethod: userInfo.loginMethod ?? userInfo.platform ?? null,
           lastSignedIn: signedInAt,
         });
-        user = await db.getUserByOpenId(userInfo.openId);
-      } catch {
-        return null;
+        user = (await db.getUserByOpenId(userInfo.openId)) ?? null;
+      } catch (e) {
+        if (e instanceof DatabaseUnavailableError) throw e;
+        if (e instanceof SessionLookupError) throw e;
+        // The JWT is valid but neither the DB nor the OAuth server could
+        // resolve the account. Don't log the user out over an outage: surface
+        // an infrastructure error so the client keeps the session.
+        throw new SessionLookupError("account sync failed while resolving session");
       }
     }
 
     if (!user) {
+      // After a successful sync attempt the account still does not exist. The
+      // JWT was signed for an account that no longer exists — treat as logged
+      // out so the client returns to the sign-in screen.
       return null;
     }
 
-    await db.upsertUser({
-      openId: user.openId,
-      lastSignedIn: signedInAt,
-    });
+    try {
+      await db.upsertUser({
+        openId: user.openId,
+        lastSignedIn: signedInAt,
+      });
+    } catch (e) {
+      if (e instanceof DatabaseUnavailableError) throw e;
+      throw new SessionLookupError("session touch failed");
+    }
 
     return user;
   }

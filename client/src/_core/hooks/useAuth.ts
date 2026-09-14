@@ -53,12 +53,25 @@ export function useAuth(options?: UseAuthOptions) {
     }
   }, [logoutMutation, utils]);
 
+  /**
+   * True only when the server answered "no session" (auth.me returned null).
+   * A network/server/database error is NOT signed-out: showing the sign-in
+   * screen then would wipe the user's perceived session on a transient outage.
+   */
+  const definitelySignedOut = meQuery.isSuccess && !meQuery.data;
+
+  const authUnavailable =
+    Boolean(meQuery.error) ||
+    (meQuery.isError && !definitelySignedOut);
+
   const state = useMemo(() => {
     return {
       user: meQuery.data ?? null,
       loading: meQuery.isLoading || logoutMutation.isPending,
       error: meQuery.error ?? logoutMutation.error ?? null,
       isAuthenticated: Boolean(meQuery.data),
+      definitelySignedOut,
+      authUnavailable,
     };
   }, [
     meQuery.data,
@@ -66,6 +79,8 @@ export function useAuth(options?: UseAuthOptions) {
     meQuery.isLoading,
     logoutMutation.error,
     logoutMutation.isPending,
+    definitelySignedOut,
+    authUnavailable,
   ]);
 
   useEffect(() => {
@@ -74,6 +89,9 @@ export function useAuth(options?: UseAuthOptions) {
 
   useEffect(() => {
     if (!redirectOnUnauthenticated) return;
+    // During an outage we cannot tell signed-in from signed-out, so never boot
+    // the user out of the app to the login flow.
+    if (authUnavailable) return;
     if (meQuery.isLoading || logoutMutation.isPending) return;
     if (state.user) return;
     if (typeof window === "undefined") return;
@@ -91,6 +109,7 @@ export function useAuth(options?: UseAuthOptions) {
     logoutMutation.isPending,
     meQuery.isLoading,
     state.user,
+    authUnavailable,
   ]);
 
   const refresh = useCallback(() => meQuery.refetch(), [meQuery]);

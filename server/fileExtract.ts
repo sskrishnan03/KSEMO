@@ -5,7 +5,7 @@
 import jszip from "jszip";
 import fs from "fs";
 import { resolveStoragePath } from "./storage";
-import { inMemoryStore } from "./inMemoryStore";
+import { updateFileForUser } from "./supabase-db";
 
 export const MAX_EXTRACT_CHARS = 200_000;
 
@@ -262,6 +262,7 @@ export async function ensureExtractedContent(file: {
   mimeType: string;
   storageKey: string;
   contentText?: string | null;
+  userId?: number;
 }): Promise<string | null> {
   if (file.contentText && file.contentText.trim().length > 0) {
     return file.contentText;
@@ -276,8 +277,8 @@ export async function ensureExtractedContent(file: {
 
     const buffer = await fs.promises.readFile(absolutePath);
     const text = await extractFileText(file.filename, file.mimeType, buffer);
-    if (text) {
-      inMemoryStore.updateFile(String(file.id), { contentText: text });
+    if (text && file.userId !== undefined) {
+      await updateFileForUser(String(file.id), file.userId, { contentText: text }).catch(() => {});
     }
     return text;
   } catch (error) {
