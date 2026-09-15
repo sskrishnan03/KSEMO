@@ -22,7 +22,6 @@ import {
   ChevronsLeft,
   ChevronsRight,
   Copy,
-  CopyPlus,
   Download,
   Ellipsis,
   ExternalLink,
@@ -66,7 +65,6 @@ export const ConversationSidebar = memo(function ConversationSidebar({
   onRename,
   onRenameSubmit,
   onPin,
-  onDuplicate,
   onArchive,
   onShare,
   onExport,
@@ -90,7 +88,6 @@ export const ConversationSidebar = memo(function ConversationSidebar({
   onRename: (conversation: Conversation) => void;
   onRenameSubmit: (id: string, title: string) => void;
   onPin: (conversation: Conversation) => void;
-  onDuplicate: (conversation: Conversation) => void;
   onArchive: (conversation: Conversation) => void;
   onShare: (conversation: Conversation) => void;
   onExport: (conversation: Conversation, format: "pdf" | "word") => void;
@@ -247,7 +244,11 @@ export const ConversationSidebar = memo(function ConversationSidebar({
                     <ChevronsRight className="size-4" />
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent side="right" sideOffset={8} collisionPadding={12}>
+                <TooltipContent
+                  side="right"
+                  sideOffset={8}
+                  collisionPadding={12}
+                >
                   Expand sidebar
                 </TooltipContent>
               </Tooltip>
@@ -320,7 +321,6 @@ export const ConversationSidebar = memo(function ConversationSidebar({
                   onConfirmRename={confirmRename}
                   onCancelRename={cancelRename}
                   onPin={onPin}
-                  onDuplicate={onDuplicate}
                   onArchive={onArchive}
                   onShare={onShare}
                   onExport={onExport}
@@ -343,7 +343,6 @@ export const ConversationSidebar = memo(function ConversationSidebar({
                 onConfirmRename={confirmRename}
                 onCancelRename={cancelRename}
                 onPin={onPin}
-                onDuplicate={onDuplicate}
                 onArchive={onArchive}
                 onShare={onShare}
                 onExport={onExport}
@@ -359,9 +358,15 @@ export const ConversationSidebar = memo(function ConversationSidebar({
             {compact ? (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <DropdownMenuTrigger asChild>{accountButton}</DropdownMenuTrigger>
+                  <DropdownMenuTrigger asChild>
+                    {accountButton}
+                  </DropdownMenuTrigger>
                 </TooltipTrigger>
-                <TooltipContent side="right" sideOffset={8} collisionPadding={12}>
+                <TooltipContent
+                  side="right"
+                  sideOffset={8}
+                  collisionPadding={12}
+                >
                   Account
                 </TooltipContent>
               </Tooltip>
@@ -375,7 +380,8 @@ export const ConversationSidebar = memo(function ConversationSidebar({
               collisionPadding={12}
               className={cn(
                 "w-52 rounded-xl",
-                isMobile && "max-h-[calc(100dvh-1.5rem)] max-w-[calc(100vw-1.5rem)] overflow-y-auto shadow-xl"
+                isMobile &&
+                  "max-h-[calc(100dvh-1.5rem)] max-w-[calc(100vw-1.5rem)] overflow-y-auto shadow-xl"
               )}
             >
               <div className="px-2.5 py-2.5">
@@ -461,10 +467,7 @@ export const ConversationSidebar = memo(function ConversationSidebar({
                 </DropdownMenuSub>
               )}
               <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={onLogout}
-                variant="destructive"
-              >
+              <DropdownMenuItem onClick={onLogout} variant="destructive">
                 <LogOut className="mr-2 size-4" /> Sign out
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -488,7 +491,6 @@ const ConversationGroup = memo(function ConversationGroup({
   onConfirmRename,
   onCancelRename,
   onPin,
-  onDuplicate,
   onArchive,
   onShare,
   onExport,
@@ -510,7 +512,6 @@ const ConversationGroup = memo(function ConversationGroup({
   onConfirmRename: () => void;
   onCancelRename: () => void;
   onPin: (conversation: Conversation) => void;
-  onDuplicate: (conversation: Conversation) => void;
   onArchive: (conversation: Conversation) => void;
   onShare: (conversation: Conversation) => void;
   onExport: (conversation: Conversation, format: "pdf" | "word") => void;
@@ -536,9 +537,7 @@ const ConversationGroup = memo(function ConversationGroup({
         data-disclosure-group={label.toLowerCase()}
       >
         {label}
-        <span
-          className="max-lg:opacity-100 lg:opacity-0 lg:group-hover:opacity-100 lg:group-focus-visible:opacity-100 transition-opacity"
-        >
+        <span className="max-lg:opacity-100 lg:opacity-0 lg:group-hover:opacity-100 lg:group-focus-visible:opacity-100 transition-opacity">
           {expanded ? (
             <ChevronDown className="size-3.5" />
           ) : (
@@ -589,7 +588,6 @@ const ConversationGroup = memo(function ConversationGroup({
                       }
                       onRename={() => onStartRename(conversation)}
                       onPin={onPin}
-                      onDuplicate={onDuplicate}
                       onArchive={onArchive}
                       onShare={onShare}
                       onExport={onExport}
@@ -660,7 +658,6 @@ export const ConversationActionsMenu = memo(function ConversationActionsMenu({
   onMenuOpenChange,
   onRename,
   onPin,
-  onDuplicate,
   onArchive,
   onShare,
   onExport,
@@ -672,7 +669,6 @@ export const ConversationActionsMenu = memo(function ConversationActionsMenu({
   onMenuOpenChange: (open: boolean) => void;
   onRename: (conversation: Conversation) => void;
   onPin: (conversation: Conversation) => void;
-  onDuplicate: (conversation: Conversation) => void;
   onArchive: (conversation: Conversation) => void;
   onShare: (conversation: Conversation) => void;
   onExport: (conversation: Conversation, format: "pdf" | "word") => void;
@@ -706,14 +702,14 @@ export const ConversationActionsMenu = memo(function ConversationActionsMenu({
         collisionPadding={isMobile ? 12 : 8}
         className={cn(
           "w-44 rounded-xl",
-          isMobile && "max-h-[calc(100dvh-2rem)] max-w-[calc(100vw-1.5rem)] overflow-y-auto shadow-xl"
+          isMobile &&
+            "max-h-[calc(100dvh-2rem)] max-w-[calc(100vw-1.5rem)] overflow-y-auto shadow-xl"
         )}
       >
         <ConversationActionsMenuItems
           conversation={conversation}
           onRename={onRename}
           onPin={onPin}
-          onDuplicate={onDuplicate}
           onArchive={onArchive}
           onShare={onShare}
           onExport={onExport}
@@ -725,93 +721,89 @@ export const ConversationActionsMenu = memo(function ConversationActionsMenu({
   );
 });
 
-export const ConversationActionsMenuItems = memo(function ConversationActionsMenuItems({
-  conversation,
-  onRename,
-  onPin,
-  onDuplicate,
-  onArchive,
-  onShare,
-  onExport,
-  onDelete,
-  isMobile,
-}: {
-  conversation: Conversation;
-  onRename: (conversation: Conversation) => void;
-  onPin: (conversation: Conversation) => void;
-  onDuplicate: (conversation: Conversation) => void;
-  onArchive: (conversation: Conversation) => void;
-  onShare: (conversation: Conversation) => void;
-  onExport: (conversation: Conversation, format: "pdf" | "word") => void;
-  onDelete: (conversation: Conversation) => void;
-  isMobile: boolean;
-}) {
-  return (
-    <>
-      <DropdownMenuItem onClick={() => onRename(conversation)}>
-        <Pencil className="mr-2 size-4" />
-        Rename
-      </DropdownMenuItem>
-      <DropdownMenuItem onClick={() => onPin(conversation)}>
-        <Pin className="mr-2 size-4" />
-        {conversation.isPinned ? "Unpin" : "Pin"}
-      </DropdownMenuItem>
-      <DropdownMenuItem onClick={() => onShare(conversation)}>
-        <ShareIcon className="mr-2 size-4" />
-        Share
-      </DropdownMenuItem>
-      <DropdownMenuItem onClick={() => onArchive(conversation)}>
-        <Archive className="mr-2 size-4" />
-        Archive
-      </DropdownMenuItem>
-      <DropdownMenuItem onClick={() => onDuplicate(conversation)}>
-        <CopyPlus className="mr-2 size-4" />
-        Duplicate
-      </DropdownMenuItem>
-      {isMobile ? (
-        <>
-          <DropdownMenuItem onClick={() => onExport(conversation, "pdf")}>
-            <PdfFileIcon className="mr-2 size-4 shrink-0" />
-            Download PDF
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => onExport(conversation, "word")}>
-            <WordFileIcon className="mr-2 size-4 shrink-0" />
-            Download Word
-          </DropdownMenuItem>
-        </>
-      ) : (
-        <DropdownMenuSub>
-          <DropdownMenuSubTrigger>
-            <Download className="mr-2 size-4" />
-            Export
-          </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent
-            sideOffset={6}
-            collisionPadding={12}
-            className="w-44 rounded-xl"
-          >
+export const ConversationActionsMenuItems = memo(
+  function ConversationActionsMenuItems({
+    conversation,
+    onRename,
+    onPin,
+    onArchive,
+    onShare,
+    onExport,
+    onDelete,
+    isMobile,
+  }: {
+    conversation: Conversation;
+    onRename: (conversation: Conversation) => void;
+    onPin: (conversation: Conversation) => void;
+    onArchive: (conversation: Conversation) => void;
+    onShare: (conversation: Conversation) => void;
+    onExport: (conversation: Conversation, format: "pdf" | "word") => void;
+    onDelete: (conversation: Conversation) => void;
+    isMobile: boolean;
+  }) {
+    return (
+      <>
+        <DropdownMenuItem onClick={() => onRename(conversation)}>
+          <Pencil className="mr-2 size-4" />
+          Rename
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => onPin(conversation)}>
+          <Pin className="mr-2 size-4" />
+          {conversation.isPinned ? "Unpin" : "Pin"}
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => onShare(conversation)}>
+          <ShareIcon className="mr-2 size-4" />
+          Share
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => onArchive(conversation)}>
+          <Archive className="mr-2 size-4" />
+          Archive
+        </DropdownMenuItem>
+        {isMobile ? (
+          <>
             <DropdownMenuItem onClick={() => onExport(conversation, "pdf")}>
-              <PdfFileIcon className="mr-2 size-5" />
+              <PdfFileIcon className="mr-2 size-4 shrink-0" />
               Download PDF
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => onExport(conversation, "word")}>
-              <WordFileIcon className="mr-2 size-5" />
+              <WordFileIcon className="mr-2 size-4 shrink-0" />
               Download Word
             </DropdownMenuItem>
-          </DropdownMenuSubContent>
-        </DropdownMenuSub>
-      )}
-      <DropdownMenuSeparator />
-      <DropdownMenuItem
-        onClick={() => onDelete(conversation)}
-        variant="destructive"
-      >
-        <Trash2 className="mr-2 size-4" />
-        Delete
-      </DropdownMenuItem>
-    </>
-  );
-});
+          </>
+        ) : (
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger>
+              <Download className="mr-2 size-4" />
+              Export
+            </DropdownMenuSubTrigger>
+            <DropdownMenuSubContent
+              sideOffset={6}
+              collisionPadding={12}
+              className="w-44 rounded-xl"
+            >
+              <DropdownMenuItem onClick={() => onExport(conversation, "pdf")}>
+                <PdfFileIcon className="mr-2 size-5" />
+                Download PDF
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onExport(conversation, "word")}>
+                <WordFileIcon className="mr-2 size-5" />
+                Download Word
+              </DropdownMenuItem>
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
+        )}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          onClick={() => onDelete(conversation)}
+          variant="destructive"
+        >
+          <Trash2 className="mr-2 size-4" />
+          Delete
+        </DropdownMenuItem>
+      </>
+    );
+  }
+);
 
 export const MobileSupportMenuItems = memo(function MobileSupportMenuItems({
   onSupport,
@@ -928,7 +920,13 @@ const ConversationTitleButton = memo(function ConversationTitleButton({
       }
 
       el.textContent = truncated;
-      setDisplayTitle(words.length === 1 && overflowed ? "…" : overflowed ? truncated + "…" : truncated);
+      setDisplayTitle(
+        words.length === 1 && overflowed
+          ? "…"
+          : overflowed
+            ? truncated + "…"
+            : truncated
+      );
       setWasTruncated(overflowed);
       setIsOverflowing(el.scrollWidth > el.clientWidth);
     };
@@ -966,19 +964,20 @@ const ConversationTitleButton = memo(function ConversationTitleButton({
             onMouseLeave={handleMouseLeave}
             className={cn(
               "min-w-0 flex-1 overflow-hidden whitespace-nowrap cursor-pointer transition-[mask-image] duration-150",
-              isRowHovered && wasTruncated && [
-                "[-webkit-mask-image:linear-gradient(to_right,black_calc(100%_-_36px),transparent_100%)]",
-                "[mask-image:linear-gradient(to_right,black_calc(100%_-_36px),transparent_100%)]"
-              ]
+              isRowHovered &&
+                wasTruncated && [
+                  "[-webkit-mask-image:linear-gradient(to_right,black_calc(100%_-_36px),transparent_100%)]",
+                  "[mask-image:linear-gradient(to_right,black_calc(100%_-_36px),transparent_100%)]",
+                ]
             )}
           >
             {displayTitle}
           </span>
         </TooltipTrigger>
         {wasTruncated && (
-          <TooltipContent 
-            side="right" 
-            sideOffset={35} 
+          <TooltipContent
+            side="right"
+            sideOffset={35}
             collisionPadding={40}
             className="min-w-[80px] max-w-[150px] break-words whitespace-pre-wrap leading-tight px-2.5 py-1.5"
           >

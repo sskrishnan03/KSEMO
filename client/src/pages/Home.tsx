@@ -514,13 +514,6 @@ export default function Home() {
       utils.conversation.list.invalidate();
     },
   });
-  const duplicateMutation = trpc.conversation.duplicate.useMutation({
-    onSuccess: conversation => {
-      utils.conversation.list.invalidate();
-      setActiveConversationId(conversation.id);
-      activeConversationIdRef.current = conversation.id;
-    },
-  });
   const messageEditMutation = trpc.message.edit.useMutation({
     onSuccess: (_, variables) => {
       if (activeConversationId)
@@ -2253,9 +2246,6 @@ export default function Home() {
   const stableRenameSubmit = usePersistFn((id: string, title: string) => {
     renameMutation.mutate({ id, title });
   });
-  const stableOnDuplicate = usePersistFn((conversation: { id: string }) =>
-    duplicateMutation.mutate({ id: conversation.id })
-  );
   const stableOnArchive = usePersistFn((conversation: { id: string }) =>
     archiveMutation.mutate({ id: conversation.id, isArchived: true })
   );
@@ -2522,9 +2512,8 @@ export default function Home() {
         onSelect={stableSelectConversation}
         onRename={stableOnRename}
         onRenameSubmit={stableRenameSubmit}
-        onDuplicate={stableOnDuplicate}
-        onArchive={stableOnArchive}
         onPin={stableOnPin}
+        onArchive={stableOnArchive}
         onShare={stableOnShareConversation}
         onExport={stableOnExport}
         onDelete={stableOnDelete}

@@ -54,7 +54,6 @@ describe("KSEMO conversation sidebar disclosure", () => {
         onRename: () => undefined,
         onRenameSubmit: () => undefined,
         onPin: () => undefined,
-        onDuplicate: () => undefined,
         onArchive: () => undefined,
         onShare: () => undefined,
         onExport: () => undefined,
@@ -93,7 +92,6 @@ describe("KSEMO conversation sidebar disclosure", () => {
         onRename: () => undefined,
         onRenameSubmit: () => undefined,
         onPin: () => undefined,
-        onDuplicate: () => undefined,
         onArchive: () => undefined,
         onShare: () => undefined,
         onExport: () => undefined,
@@ -157,7 +155,6 @@ describe("KSEMO conversation sidebar disclosure", () => {
         onMenuOpenChange: () => undefined,
         onRename: () => undefined,
         onPin: () => undefined,
-        onDuplicate: () => undefined,
         onArchive: () => undefined,
         onShare: () => undefined,
         onExport: () => undefined,
@@ -180,7 +177,6 @@ describe("KSEMO conversation sidebar disclosure", () => {
         },
         onRename: () => undefined,
         onPin: () => undefined,
-        onDuplicate: () => undefined,
         onArchive: () => undefined,
         onShare: () => undefined,
         onExport: () => undefined,
@@ -191,12 +187,10 @@ describe("KSEMO conversation sidebar disclosure", () => {
     expect(markup).toContain("Download PDF");
     expect(markup).toContain("Download Word");
     expect(markup).toContain("Rename");
-    expect(markup).toContain("Duplicate");
     expect(markup).toContain("lucide-pencil");
     // PDF and Word get distinct branded marks (not the same generic icon).
-    expect(markup).toContain("role=\"img\"");
+    expect(markup).toContain('role="img"');
     expect(markup).toContain(">PDF<");
     expect(markup).toContain(">WORD<");
   });
 });
-
