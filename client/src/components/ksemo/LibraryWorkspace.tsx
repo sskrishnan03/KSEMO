@@ -394,7 +394,7 @@ export function LibraryWorkspace({
                     <ChevronsRight className="size-4 sm:size-5" />
                   </Button>
                 )}
-                <h1 className="text-xl sm:text-2xl font-semibold tracking-[-0.03em]">
+                <h1 className="text-2xl font-semibold tracking-[-0.03em]">
                   Library
                 </h1>
               </div>
