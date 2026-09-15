@@ -2550,7 +2550,7 @@ export default function Home() {
               variant="ghost"
               size="icon"
               onClick={() => setSidebarOpen(true)}
-              className="absolute left-3 top-3 z-10 size-9 rounded-xl lg:hidden"
+              className="absolute left-3 top-3 z-10 size-9 rounded-lg bg-neutral-900 text-neutral-50 hover:bg-neutral-800 lg:hidden"
               aria-label="Open conversations"
               data-testid="mobile-sidebar-toggle"
             >
