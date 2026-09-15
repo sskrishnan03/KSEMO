@@ -373,7 +373,10 @@ export const ConversationSidebar = memo(function ConversationSidebar({
               sideOffset={10}
               align={compact ? "end" : "start"}
               collisionPadding={12}
-              className="max-h-[calc(100dvh-1.5rem)] w-60 max-w-[calc(100vw-1.5rem)] overflow-y-auto rounded-2xl border-border/80 p-1.5 shadow-xl"
+              className={cn(
+                "w-52 rounded-xl",
+                isMobile && "max-h-[calc(100dvh-1.5rem)] max-w-[calc(100vw-1.5rem)] overflow-y-auto shadow-xl"
+              )}
             >
               <div className="px-2.5 py-2.5">
                 <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
@@ -698,8 +701,11 @@ export const ConversationActionsMenu = memo(function ConversationActionsMenu({
       <DropdownMenuContent
         align="end"
         sideOffset={4}
-        collisionPadding={12}
-        className="max-h-[calc(100dvh-2rem)] w-48 max-w-[calc(100vw-1.5rem)] overflow-y-auto rounded-xl shadow-xl"
+        collisionPadding={isMobile ? 12 : 8}
+        className={cn(
+          "w-44 rounded-xl",
+          isMobile && "max-h-[calc(100dvh-2rem)] max-w-[calc(100vw-1.5rem)] overflow-y-auto shadow-xl"
+        )}
       >
         <DropdownMenuItem onClick={() => onRename(conversation)}>
           <Pencil className="mr-2 size-4" />
