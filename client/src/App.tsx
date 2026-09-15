@@ -7,6 +7,7 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import { PdfViewerProvider } from "./contexts/PdfViewerContext";
 import Home from "./pages/Home";
 import ResetPassword from "@/pages/ResetPassword";
+import ChangePassword from "@/pages/ChangePassword";
 import SharedConversation from "./pages/SharedConversation";
 import { FaqPage, PrivacyPage, TermsPage } from "./pages/SupportPage";
 
@@ -23,6 +24,7 @@ function Router() {
       <Route path={"/signup"} component={AuthStage} />
       <Route path={"/forgot-password"} component={AuthStage} />
       <Route path={"/reset-password"} component={ResetPassword} />
+      <Route path={"/settings/password"} component={ChangePassword} />
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}
       <Route component={NotFound} />

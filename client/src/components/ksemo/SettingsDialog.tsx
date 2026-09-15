@@ -687,44 +687,6 @@ function SecuritySection({ user }: { user: User }) {
   const isGoogle = user.loginMethod === "google";
   const hasPassword =
     user.loginMethod === "password" || user.loginMethod === "email";
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [formError, setFormError] = useState<string | null>(null);
-
-  const changePasswordMutation = trpc.auth.changePassword.useMutation({
-    onSuccess: () => {
-      setCurrentPassword("");
-      setNewPassword("");
-      setConfirmPassword("");
-      setFormError(null);
-    },
-    onError: error => {
-      setFormError(error.message);
-    },
-  });
-
-  const canSubmit =
-    !changePasswordMutation.isPending &&
-    currentPassword.length >= 8 &&
-    newPassword.length >= 8 &&
-    confirmPassword.length >= 8;
-
-  const handleSubmitPassword = () => {
-    if (newPassword !== confirmPassword) {
-      setFormError("The new password and its confirmation don't match.");
-      return;
-    }
-    if (newPassword === currentPassword) {
-      setFormError("New password must be different from your current one.");
-      return;
-    }
-    setFormError(null);
-    changePasswordMutation.mutate({
-      currentPassword,
-      newPassword,
-    });
-  };
 
   return (
     <div className="space-y-4">
@@ -744,11 +706,20 @@ function SecuritySection({ user }: { user: User }) {
             <div className="min-w-0 flex-1">
               <p className="text-sm font-medium">Password</p>
               <p className="mt-0.5 text-xs text-muted-foreground">
-                {isGoogle
-                  ? "You sign in with Google. No local password is set, so a reset here doesn't apply."
-                  : "Reset your password below. Your new password will be used the next time you sign in."}
+                Reset your password on a dedicated secure page.
               </p>
             </div>
+            <button
+              type="button"
+              disabled={isGoogle}
+              onClick={() => {
+                window.location.href = "/settings/password";
+              }}
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-foreground px-3.5 py-2 text-xs font-semibold text-background transition-opacity hover:opacity-90 disabled:pointer-events-none disabled:opacity-50"
+            >
+              <KeyRound className="size-3.5" />
+              Reset password
+            </button>
           </div>
 
           {isGoogle ? (
@@ -759,89 +730,12 @@ function SecuritySection({ user }: { user: User }) {
               </p>
             </div>
           ) : (
-            <div className="mt-3.5 space-y-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="account-current-password" className="text-xs">
-                  Current password
-                </Label>
-                <Input
-                  id="account-current-password"
-                  type="password"
-                  value={currentPassword}
-                  onChange={e => setCurrentPassword(e.target.value)}
-                  className="h-9 rounded-lg text-sm"
-                  placeholder="Your current password"
-                  autoComplete="current-password"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="account-new-password" className="text-xs">
-                  New password
-                </Label>
-                <Input
-                  id="account-new-password"
-                  type="password"
-                  value={newPassword}
-                  onChange={e => setNewPassword(e.target.value)}
-                  className="h-9 rounded-lg text-sm"
-                  placeholder="At least 8 characters"
-                  autoComplete="new-password"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="account-confirm-password" className="text-xs">
-                  Confirm new password
-                </Label>
-                <Input
-                  id="account-confirm-password"
-                  type="password"
-                  value={confirmPassword}
-                  onChange={e => setConfirmPassword(e.target.value)}
-                  className="h-9 rounded-lg text-sm"
-                  placeholder="Repeat the new password"
-                  autoComplete="new-password"
-                  onKeyDown={e => {
-                    if (e.key === "Enter" && canSubmit) handleSubmitPassword();
-                  }}
-                />
-              </div>
-
-              {formError && (
-                <p className="text-xs font-medium text-destructive">
-                  {formError}
-                </p>
-              )}
-
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    disabled={!canSubmit}
-                    onClick={handleSubmitPassword}
-                    className="inline-flex items-center rounded-lg bg-foreground px-3.5 py-2 text-xs font-semibold text-background transition-opacity hover:opacity-90 disabled:pointer-events-none disabled:opacity-50"
-                  >
-                    {changePasswordMutation.isPending
-                      ? "Updating…"
-                      : "Reset password"}
-                  </button>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    window.location.href = "/forgot-password";
-                  }}
-                  className="text-xs font-medium text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline"
-                >
-                  Forgot password?
-                </button>
-              </div>
-
-              {!hasPassword && (
-                <p className="text-xs text-muted-foreground">
-                  No password is linked to this account yet. Use the password
-                  reset link to create one.
-                </p>
-              )}
+            <div className="mt-3 flex items-center justify-between gap-2">
+              <p className="text-xs leading-5 text-muted-foreground">
+                {hasPassword
+                  ? "You'll confirm your current password, then choose a new one."
+                  : "No password is linked to this account yet. Use the reset page to create one."}
+              </p>
             </div>
           )}
         </div>
