@@ -26,8 +26,10 @@ import { FileBrandMark, brandVariantForExt } from "./FileBrandIcons";
 import {
   ChevronLeft,
   ChevronRight,
+  ChevronsDown,
   ChevronsLeft,
   ChevronsRight,
+  ChevronsUp,
   Download,
   Minus,
   Pencil,
@@ -2379,7 +2381,7 @@ const PptCanonicalThumbnail = memo(function PptCanonicalThumbnail({
       data-testid={`pptx-sidebar-thumb-${slideNumber}`}
       aria-label={`Go to slide ${slideNumber}`}
       aria-current={isActive ? "true" : undefined}
-      className="group flex items-center gap-1.5 w-full text-left p-0.5 rounded-lg transition-colors focus:outline-none cursor-pointer bg-transparent active:bg-transparent hover:bg-transparent select-none"
+      className="group flex flex-col md:flex-row items-center gap-1 md:gap-1.5 w-24 sm:w-28 md:w-full shrink-0 text-left p-0.5 rounded-lg transition-colors focus:outline-none cursor-pointer bg-transparent active:bg-transparent hover:bg-transparent select-none"
     >
       <span
         className={cn(
@@ -2394,9 +2396,9 @@ const PptCanonicalThumbnail = memo(function PptCanonicalThumbnail({
       <div
         ref={containerRef}
         className={cn(
-          "relative aspect-[16/9] flex-1 rounded-lg overflow-hidden border transition-colors duration-150 select-none pointer-events-none",
+          "relative aspect-[16/9] w-full flex-1 rounded-lg overflow-hidden border transition-colors duration-150 select-none pointer-events-none",
           isActive
-            ? "border-border shadow-xs"
+            ? "border-border shadow-xs ring-2 ring-primary/40"
             : "border-border/70 group-hover:border-border"
         )}
         style={{
@@ -2451,7 +2453,7 @@ const PptFallbackThumbnail = memo(function PptFallbackThumbnail({
       data-testid={`pptx-sidebar-thumb-${slideNumber}`}
       aria-label={`Go to slide ${slideNumber}`}
       aria-current={isActive ? "true" : undefined}
-      className="group flex items-center gap-1.5 w-full text-left p-0.5 rounded-lg transition-colors focus:outline-none cursor-pointer bg-transparent active:bg-transparent hover:bg-transparent select-none"
+      className="group flex flex-col md:flex-row items-center gap-1 md:gap-1.5 w-24 sm:w-28 md:w-full shrink-0 text-left p-0.5 rounded-lg transition-colors focus:outline-none cursor-pointer bg-transparent active:bg-transparent hover:bg-transparent select-none"
     >
       <span
         className={cn(
@@ -2465,9 +2467,9 @@ const PptFallbackThumbnail = memo(function PptFallbackThumbnail({
       </span>
       <div
         className={cn(
-          "relative aspect-[16/9] flex-1 rounded-lg overflow-hidden border p-2 flex flex-col justify-between transition-colors duration-150 bg-card text-card-foreground select-none pointer-events-none",
+          "relative aspect-[16/9] w-full flex-1 rounded-lg overflow-hidden border p-1.5 md:p-2 flex flex-col justify-between transition-colors duration-150 bg-card text-card-foreground select-none pointer-events-none",
           isActive
-            ? "border-border shadow-xs"
+            ? "border-border shadow-xs ring-2 ring-primary/40"
             : "border-border/70 group-hover:border-border"
         )}
       >
@@ -2520,7 +2522,7 @@ export const PptSlideSidebar = memo(function PptSlideSidebar({
       `[data-testid="pptx-sidebar-thumb-${currentSlide}"]`
     );
     if (activeEl) {
-      activeEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      activeEl.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
     }
   }, [currentSlide]);
 
@@ -2531,10 +2533,10 @@ export const PptSlideSidebar = memo(function PptSlideSidebar({
       ref={sidebarRef}
       data-testid="pptx-sidebar"
       aria-label="Slide thumbnails"
-      className="w-44 sm:w-48 md:w-52 shrink-0 h-full flex flex-col border-r border-border bg-card/75 dark:bg-card/40 backdrop-blur-sm z-20 select-none transition-all"
+      className="w-full md:w-52 shrink-0 h-auto md:h-full flex flex-col border-t md:border-t-0 md:border-r border-border bg-card/85 dark:bg-card/60 backdrop-blur-md z-20 select-none transition-all"
     >
       {/* Sidebar Header */}
-      <div className="flex h-11 items-center justify-between px-3 border-b border-border shrink-0">
+      <div className="flex h-10 md:h-11 items-center justify-between px-3 border-b border-border shrink-0">
         <div className="flex items-center gap-2 min-w-0">
           <Presentation className="size-4 text-foreground/80 shrink-0 stroke-[2]" />
           <span className="text-sm font-semibold tracking-tight text-foreground truncate">
@@ -2558,16 +2560,17 @@ export const PptSlideSidebar = memo(function PptSlideSidebar({
                 aria-label="Collapse sidebar"
                 className="size-7 rounded-md text-muted-foreground hover:bg-accent hover:text-foreground active:scale-95 transition-all"
               >
-                <ChevronsLeft className="size-4" />
+                <ChevronsDown className="size-4 md:hidden" />
+                <ChevronsLeft className="size-4 hidden md:block" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent side="right">Collapse sidebar</TooltipContent>
+            <TooltipContent side="top">Collapse sidebar</TooltipContent>
           </Tooltip>
         )}
       </div>
 
       {/* Thumbnails Scroll List */}
-      <div className="flex-1 overflow-y-auto px-2 py-2.5 space-y-2">
+      <div className="overflow-x-auto md:overflow-x-hidden md:overflow-y-auto px-2 py-2 flex flex-row md:flex-col gap-2 shrink-0 md:shrink md:flex-1 [scrollbar-width:thin]">
         {Array.from({ length: count }, (_, idx) => {
           const slideNumber = idx + 1;
           const isActive = currentSlide === slideNumber;
@@ -3009,8 +3012,9 @@ export const PdfDrawer = memo(function PdfDrawer() {
   // In PowerPoint, "Fit" calculates the scale so the 16:9 slide fits both
   // horizontally and vertically inside the stage with comfortable margins.
   const pptFitScale = useMemo(() => {
-    const availW = Math.max(stageDimensions.width - 56, 320);
-    const availH = Math.max(stageDimensions.height - 56, 220);
+    const isMobile = stageDimensions.width < 768;
+    const availW = Math.max(stageDimensions.width - (isMobile ? 16 : 56), 240);
+    const availH = Math.max(stageDimensions.height - (isMobile ? 16 : 56), 180);
     return Math.min(availW / PPT_DESIGN_W, availH / PPT_DESIGN_H);
   }, [stageDimensions.width, stageDimensions.height]);
 
@@ -3722,47 +3726,68 @@ export const PdfDrawer = memo(function PdfDrawer() {
         className={cn(
           "relative min-h-0 flex-1 w-full overflow-hidden",
           isPowerPointDoc
-            ? "flex flex-row bg-neutral-900/10 dark:bg-neutral-950/40"
+            ? "flex flex-col md:flex-row bg-neutral-900/10 dark:bg-neutral-950/40"
             : isExcelDoc
               ? "bg-background flex flex-col"
               : "bg-neutral-900/10 dark:bg-neutral-950/40"
         )}
       >
-        {/* PowerPoint Left Thumbnail Sidebar */}
+        {/* PowerPoint Left Thumbnail Sidebar (Desktop) / Bottom Dock (Mobile) */}
         {!isLoading && !loadError && isPowerPointDoc && pptxCount > 0 && isPptSidebarOpen && (
-          <PptSlideSidebar
-            canonicalSpec={canonicalSpec}
-            slides={pptxSlides}
-            currentSlide={currentSlide}
-            filename={currentPdf?.filename}
-            onSelectSlide={scrollToSlide}
-            isOpen={isPptSidebarOpen}
-            onClose={() => setIsPptSidebarOpen(false)}
-          />
+          <div className="order-last md:order-first shrink-0">
+            <PptSlideSidebar
+              canonicalSpec={canonicalSpec}
+              slides={pptxSlides}
+              currentSlide={currentSlide}
+              filename={currentPdf?.filename}
+              onSelectSlide={scrollToSlide}
+              isOpen={isPptSidebarOpen}
+              onClose={() => setIsPptSidebarOpen(false)}
+            />
+          </div>
         )}
 
-        {/* PowerPoint Left Collapsed Sidebar Strip */}
+        {/* PowerPoint Left Collapsed Sidebar Strip (Desktop) / Bottom Expand Pill (Mobile) */}
         {!isLoading && !loadError && isPowerPointDoc && pptxCount > 0 && !isPptSidebarOpen && (
-          <div
-            data-testid="pptx-sidebar-collapsed"
-            className="shrink-0 h-full flex flex-col border-r border-border bg-card/75 dark:bg-card/40 backdrop-blur-sm z-20 py-2.5 px-1.5 items-center select-none transition-all"
-          >
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setIsPptSidebarOpen(true)}
-                  data-testid="pptx-sidebar-expand-btn"
-                  aria-label="Expand sidebar"
-                  className="size-8 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
-                >
-                  <ChevronsRight className="size-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="right">Expand sidebar</TooltipContent>
-            </Tooltip>
-          </div>
+          <>
+            <div
+              data-testid="pptx-sidebar-collapsed"
+              className="hidden md:flex shrink-0 h-full flex-col border-r border-border bg-card/75 dark:bg-card/40 backdrop-blur-sm z-20 py-2.5 px-1.5 items-center select-none transition-all"
+            >
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setIsPptSidebarOpen(true)}
+                    data-testid="pptx-sidebar-expand-btn"
+                    aria-label="Expand sidebar"
+                    className="size-8 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+                  >
+                    <ChevronsRight className="size-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="right">Expand sidebar</TooltipContent>
+              </Tooltip>
+            </div>
+            <div className="md:hidden absolute bottom-4 left-4 z-30 flex items-center select-none">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsPptSidebarOpen(true)}
+                data-testid="pptx-sidebar-expand-btn"
+                aria-label="Expand slides"
+                className="h-8 gap-1.5 rounded-full border-border/80 bg-card/95 px-3 text-xs font-semibold text-foreground shadow-md backdrop-blur-md hover:bg-accent"
+              >
+                <Presentation className="size-3.5 text-muted-foreground" />
+                <span>Slides</span>
+                <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                  {currentSlide}/{pptxCount}
+                </span>
+                <ChevronsUp className="size-3.5 text-muted-foreground" />
+              </Button>
+            </div>
+          </>
         )}
 
         <div
@@ -3772,7 +3797,7 @@ export const PdfDrawer = memo(function PdfDrawer() {
             isExcelDoc
               ? "p-0 overflow-hidden flex flex-col"
               : isPowerPointDoc
-                ? "flex-1 overflow-y-auto p-4 sm:p-8"
+                ? "flex-1 overflow-y-auto p-2 sm:p-6 md:p-8"
                 : "overflow-y-auto p-4 sm:p-6"
           )}
         >
@@ -3935,7 +3960,13 @@ export const PdfDrawer = memo(function PdfDrawer() {
         {hasPagination && !isLoading && !loadError && (
           <div
             data-testid="pdf-drawer-pagination-bar"
-            className="absolute bottom-4 left-4 z-30 flex items-center gap-0.5 rounded-full border border-border/70 bg-card px-2 py-1 shadow-lg [&_svg]:stroke-[2.5] animate-in fade-in-0 duration-200 select-none sm:bottom-5"
+            className={cn(
+              "absolute left-4 z-30 flex items-center gap-0.5 rounded-full border border-border/70 bg-card px-2 py-1 shadow-lg [&_svg]:stroke-[2.5] animate-in fade-in-0 duration-200 select-none",
+              isPowerPointDoc && isPptSidebarOpen
+                ? "bottom-[118px] md:bottom-5"
+                : "bottom-4 sm:bottom-5",
+              isPowerPointDoc && !isPptSidebarOpen && "max-md:left-32"
+            )}
           >
             <Tooltip>
               <TooltipTrigger asChild>
@@ -3984,7 +4015,9 @@ export const PdfDrawer = memo(function PdfDrawer() {
             data-testid="pdf-drawer-control-bar"
             className={cn(
               "absolute right-4 z-30 flex items-center gap-0.5 rounded-full border border-border/70 bg-card px-2 py-1 shadow-lg [&_svg]:stroke-[2.5] animate-in fade-in-0 duration-200 select-none",
-              "bottom-4 sm:bottom-5"
+              isPowerPointDoc && isPptSidebarOpen
+                ? "bottom-[118px] md:bottom-5"
+                : "bottom-4 sm:bottom-5"
             )}
           >
             <Tooltip>

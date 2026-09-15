@@ -679,7 +679,7 @@ export const ChatComposer = memo(function ChatComposer({
                     <button
                       type="button"
                       onClick={() => onClearAttachment(item.fileId)}
-                      className="absolute -right-1.5 -top-1.5 z-10 flex size-5 items-center justify-center rounded-full bg-white text-black shadow-md border border-neutral-300/80 outline-none opacity-0 scale-90 transition-all duration-150 group-hover:opacity-100 group-hover:scale-100 group-focus-within:opacity-100 group-focus-within:scale-100 focus-visible:opacity-100 focus-visible:scale-100 hover:scale-110 hover:bg-neutral-100 focus-visible:ring-2 focus-visible:ring-primary"
+                      className="absolute -right-1.5 -top-1.5 z-10 flex size-5 items-center justify-center rounded-full bg-white text-black shadow-md border border-neutral-300/80 outline-none max-md:opacity-100 max-md:scale-100 md:opacity-0 md:scale-90 transition-all duration-150 group-hover:opacity-100 group-hover:scale-100 group-focus-within:opacity-100 group-focus-within:scale-100 focus-visible:opacity-100 focus-visible:scale-100 hover:scale-110 hover:bg-neutral-100 focus-visible:ring-2 focus-visible:ring-primary"
                       aria-label="Remove screenshot"
                     >
                       <X className="size-3 stroke-[2.5]" />
@@ -709,7 +709,7 @@ export const ChatComposer = memo(function ChatComposer({
                     <button
                       type="button"
                       onClick={() => onClearAttachment(item.fileId)}
-                      className="ml-auto flex size-5 shrink-0 items-center justify-center rounded-full bg-white text-black shadow-md border border-neutral-300/80 outline-none opacity-0 scale-90 transition-all duration-150 group-hover:opacity-100 group-hover:scale-100 group-focus-within:opacity-100 group-focus-within:scale-100 focus-visible:opacity-100 focus-visible:scale-100 hover:scale-110 hover:bg-neutral-100 focus-visible:ring-2 focus-visible:ring-primary"
+                      className="ml-auto flex size-5 shrink-0 items-center justify-center rounded-full bg-white text-black shadow-md border border-neutral-300/80 outline-none max-md:opacity-100 max-md:scale-100 md:opacity-0 md:scale-90 transition-all duration-150 group-hover:opacity-100 group-hover:scale-100 group-focus-within:opacity-100 group-focus-within:scale-100 focus-visible:opacity-100 focus-visible:scale-100 hover:scale-110 hover:bg-neutral-100 focus-visible:ring-2 focus-visible:ring-primary"
                       aria-label="Remove screenshot"
                     >
                       <X className="size-3 stroke-[2.5]" />

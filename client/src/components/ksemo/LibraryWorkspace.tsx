@@ -374,17 +374,17 @@ export function LibraryWorkspace({
           </div>
         </div>
       )}
-      <div className="mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col px-5 pt-6 sm:px-8 sm:pt-8">
-        <header className="flex flex-col gap-4 border-b border-border pb-5 sm:flex-row sm:items-start sm:justify-between">
+      <div className="mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col px-3.5 pt-4 sm:px-8 sm:pt-8">
+        <header className="flex flex-col gap-3 border-b border-border pb-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex w-full items-start justify-between gap-3">
             <div>
-              <div className="flex items-center gap-3">
-                <Library className="size-6 text-muted-foreground" />
-                <h1 className="text-2xl font-semibold tracking-[-0.03em]">
+              <div className="flex items-center gap-2.5 sm:gap-3">
+                <Library className="size-5 sm:size-6 text-muted-foreground" />
+                <h1 className="text-xl sm:text-2xl font-semibold tracking-[-0.03em]">
                   Library
                 </h1>
               </div>
-              <p className="mt-1.5 max-w-xl text-sm text-muted-foreground">
+              <p className="mt-1 max-w-xl text-xs sm:text-sm text-muted-foreground">
                 Your private space for files and images you can chat about.
               </p>
             </div>
@@ -393,11 +393,11 @@ export function LibraryWorkspace({
                 variant="outline"
                 size="icon"
                 onClick={onClose}
-                className="size-9 shrink-0 rounded-xl border-border bg-card text-muted-foreground shadow-xs transition-colors hover:bg-accent hover:text-foreground active:scale-95 sm:hidden"
+                className="size-8 sm:size-9 shrink-0 rounded-xl border-border bg-card text-muted-foreground shadow-xs transition-colors hover:bg-accent hover:text-foreground active:scale-95 sm:hidden"
                 aria-label="Close library and return to chat"
                 title="Close"
               >
-                <X className="size-5" />
+                <X className="size-4 sm:size-5" />
               </Button>
             )}
           </div>
@@ -415,23 +415,24 @@ export function LibraryWorkspace({
               </Button>
             )}
             <Button
-              className="rounded-xl bg-foreground text-background hover:bg-foreground/90"
+              size="sm"
+              className="h-8 sm:h-9 rounded-xl bg-foreground text-xs sm:text-sm text-background hover:bg-foreground/90"
               onClick={() => fileInputRef.current?.click()}
               disabled={uploadMutation.isPending}
             >
-              <Upload className="mr-2 size-4" />
+              <Upload className="mr-1.5 sm:mr-2 size-3.5 sm:size-4" />
               {uploadMutation.isPending ? "Uploading…" : "Upload files"}
             </Button>
           </div>
         </header>
 
-        <section className="mt-6 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+        <section className="mt-3.5 sm:mt-6 flex flex-col gap-2.5 xl:flex-row xl:items-center xl:justify-between">
           <div className="relative w-full xl:max-w-md">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={query}
               onChange={event => setQuery(event.target.value)}
-              className={cn("h-10 rounded-xl pl-9", query && "pr-9")}
+              className={cn("h-9 sm:h-10 rounded-xl pl-9 text-xs sm:text-sm", query && "pr-9")}
               placeholder="Search your Library"
               aria-label="Search your Library"
             />
@@ -439,16 +440,16 @@ export function LibraryWorkspace({
               <button
                 type="button"
                 onClick={() => setQuery("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground transition-colors hover:text-foreground"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground transition-colors hover:text-foreground"
                 aria-label="Clear search query"
               >
-                <X className="size-4" />
+                <X className="size-3.5 sm:size-4" />
               </button>
             )}
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex items-center justify-between gap-1.5 sm:gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <div
-              className="flex rounded-xl border border-border bg-card p-1"
+              className="flex shrink-0 rounded-xl border border-border bg-card p-0.5 sm:p-1"
               role="group"
               aria-label="Filter Library"
             >
@@ -474,19 +475,19 @@ export function LibraryWorkspace({
               />
             </div>
             <div
-              className="flex rounded-xl border border-border bg-card p-1"
+              className="flex shrink-0 rounded-xl border border-border bg-card p-0.5 sm:p-1"
               role="group"
               aria-label="Library view"
             >
               <ViewButton
                 label="Grid"
-                icon={<Grid2X2 className="size-4" />}
+                icon={<Grid2X2 className="size-3.5 sm:size-4" />}
                 active={view === "grid"}
                 onClick={() => setView("grid")}
               />
               <ViewButton
                 label="List"
-                icon={<List className="size-4" />}
+                icon={<List className="size-3.5 sm:size-4" />}
                 active={view === "list"}
                 onClick={() => setView("list")}
               />
@@ -496,16 +497,16 @@ export function LibraryWorkspace({
 
         {selectedFiles.length > 0 && (
           <div
-            className="sticky top-3 z-20 mt-4 flex w-fit max-w-full flex-wrap items-center justify-center gap-1.5 rounded-[1.25rem] border border-border/70 bg-card/95 p-1.5 pl-2 shadow-xl shadow-black/5 backdrop-blur-lg"
+            className="fixed bottom-4 inset-x-3 sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2 z-40 flex items-center justify-between sm:justify-center gap-1 sm:gap-1.5 rounded-2xl border border-border/80 bg-card/95 p-1.5 sm:pl-2 shadow-2xl shadow-black/20 backdrop-blur-xl animate-in slide-in-from-bottom-3 duration-200 select-none"
             aria-label="Selected Library actions"
           >
-            <div className="flex h-9 min-w-0 items-center gap-1.5 rounded-full bg-foreground px-3.5 text-background shadow-md">
-              <CheckCircle2 className="size-4" />
-              <span className="text-sm font-bold tracking-[-0.02em]">
+            <div className="flex h-8 sm:h-9 shrink-0 items-center gap-1.5 rounded-full bg-foreground px-2.5 sm:px-3.5 text-background shadow-xs">
+              <CheckCircle2 className="size-3.5 sm:size-4" />
+              <span className="text-xs sm:text-sm font-bold tabular-nums tracking-[-0.02em]">
                 {selectedFiles.length}
               </span>
-              <span className="text-xs font-medium text-background/70">
-                {selectedFiles.length === 1 ? "selected" : "selected"}
+              <span className="hidden sm:inline text-xs font-medium text-background/70">
+                selected
               </span>
             </div>
 
@@ -513,36 +514,36 @@ export function LibraryWorkspace({
               type="button"
               onClick={selectVisibleFiles}
               disabled={allVisibleSelected}
-              className="flex h-9 items-center gap-1.5 rounded-full bg-muted/60 px-3.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
+              className="flex h-8 sm:h-9 items-center gap-1 rounded-full bg-muted/60 px-2.5 sm:px-3.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
             >
-              <CheckCheck className="size-4" />
+              <CheckCheck className="size-3.5 sm:size-4" />
               <span className="text-xs font-semibold">Select all</span>
             </button>
 
             <button
               type="button"
               onClick={() => setSelectedIds(new Set())}
-              className="flex h-9 items-center gap-1.5 rounded-full bg-muted/60 px-3.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              className="flex h-8 sm:h-9 items-center gap-1 rounded-full bg-muted/60 px-2.5 sm:px-3.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
             >
-              <X className="size-4" />
+              <X className="size-3.5 sm:size-4" />
               <span className="text-xs font-semibold">Clear</span>
             </button>
 
             <button
               type="button"
               onClick={chatWithSelected}
-              className="flex h-9 items-center gap-1.5 rounded-full bg-foreground px-4.5 text-background shadow-md transition-colors hover:bg-foreground/90"
+              className="flex h-8 sm:h-9 items-center gap-1.5 rounded-full bg-foreground px-3.5 sm:px-4.5 text-background shadow-xs transition-colors hover:bg-foreground/90"
             >
-              <MessageCircle className="size-4" />
+              <MessageCircle className="size-3.5 sm:size-4" />
               <span className="text-xs font-semibold">Chat</span>
             </button>
 
             <button
               type="button"
               onClick={() => setDeleteTarget(selectedFiles)}
-              className="flex h-9 items-center gap-1.5 rounded-full bg-muted/60 px-3.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+              className="flex h-8 sm:h-9 items-center gap-1 rounded-full bg-muted/60 px-2.5 sm:px-3.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
             >
-              <Trash2 className="size-4" />
+              <Trash2 className="size-3.5 sm:size-4" />
               <span className="text-xs font-semibold">
                 {selectedFiles.length === allFiles.length &&
                 allFiles.length > 1
@@ -553,7 +554,7 @@ export function LibraryWorkspace({
           </div>
         )}
 
-        <div className="mt-5 min-h-0 flex-1 overflow-y-auto pb-10">
+        <div className="mt-4 sm:mt-5 min-h-0 flex-1 overflow-y-auto pb-24 sm:pb-10">
           {filesQuery.isLoading ? (
             <Loading className="min-h-64" />
           ) : files.length ? (
@@ -686,7 +687,7 @@ function FilterButton({
     <button
       onClick={onClick}
       className={cn(
-        "rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
+        "rounded-lg px-2.5 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm font-medium transition-colors",
         active
           ? "bg-foreground text-background"
           : "text-muted-foreground hover:bg-accent hover:text-foreground"
@@ -711,7 +712,7 @@ function ViewButton({
     <button
       onClick={onClick}
       className={cn(
-        "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
+        "flex items-center gap-1 sm:gap-1.5 rounded-lg px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm font-medium transition-colors",
         active
           ? "bg-foreground text-background"
           : "text-muted-foreground hover:bg-accent hover:text-foreground"

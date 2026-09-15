@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/select";
 import { ThemeSlidePreview } from "./ThemeSlidePreview";
 import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/useIsMobile";
 
 const SLIDE_LABEL = (v: PptSlidesConfig): string =>
   v === "auto" ? "Slides" : v === 1 ? "1 slide" : `${v} slides`;
@@ -59,12 +60,17 @@ const PICKER_STYLES = PPT_STYLE_OPTIONS;
 function ThemeCard(props: {
   name: PptVisualStyle;
   selected: boolean;
+  isMobile?: boolean;
 }) {
-  const { name, selected } = props;
+  const { name, selected, isMobile } = props;
   return (
     <div
-      className="relative flex flex-col overflow-hidden rounded-xl border border-border bg-background box-border transition-transform duration-150 hover:scale-[1.03] hover:shadow-md"
-      style={{ width: CARD_W, height: CARD_H }}
+      className="relative flex flex-col overflow-hidden rounded-xl border border-border bg-background box-border transition-transform duration-150 hover:scale-[1.03] hover:shadow-md w-full"
+      style={{
+        width: isMobile ? undefined : CARD_W,
+        height: isMobile ? undefined : CARD_H,
+        minHeight: isMobile ? 96 : undefined,
+      }}
     >
       <div
         className="mx-1.5 mt-1.5 w-auto shrink-0 overflow-hidden rounded-lg bg-muted/30"
@@ -73,15 +79,15 @@ function ThemeCard(props: {
         <ThemeSlidePreview name={name} />
       </div>
       <div
-        className="mx-1.5 flex min-w-0 shrink-0 items-center justify-center gap-1 rounded-b-lg px-1 text-[12px] font-medium text-foreground"
+        className="mx-1.5 flex min-w-0 shrink-0 items-center justify-center gap-1 rounded-b-lg px-1 text-[11px] sm:text-[12px] font-medium text-foreground"
         style={{ height: LABEL_H, flex: "0 0 auto" }}
       >
         <span className="min-w-0 truncate leading-tight">
           {getStyleDisplayName(name)}
         </span>
         {selected && (
-          <span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-white text-black">
-            <svg viewBox="0 0 12 12" className="size-3 text-black" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+          <span className="flex size-3.5 sm:size-4 shrink-0 items-center justify-center rounded-full bg-white text-black">
+            <svg viewBox="0 0 12 12" className="size-2.5 sm:size-3 text-black" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
               <path d="M2.5 6.2 4.9 8.6 9.5 3.6" />
             </svg>
           </span>
@@ -96,8 +102,9 @@ function StylePicker(props: {
   onChange: (v: PptVisualStyle) => void;
   popupWidth: number;
   isCentered: boolean;
+  isMobile: boolean;
 }) {
-  const { value, onChange, popupWidth, isCentered } = props;
+  const { value, onChange, popupWidth, isCentered, isMobile } = props;
 
   const viewportH = typeof window !== "undefined" ? window.innerHeight : 760;
   // The Select control always renders up/down chevron bars (~48px of chrome)
@@ -108,30 +115,39 @@ function StylePicker(props: {
   // inside, and the popup never exceeds the visible page height.
   const visibleRows = isCentered ? 2 : 3;
   const scrollChrome = 48;
-  const maxHeight = Math.min(
-    visibleRows * CARD_H + (visibleRows - 1) * GAP + 8 + 16 + scrollChrome,
-    Math.max(viewportH - 24, 0)
-  );
+  const maxHeight = isMobile
+    ? Math.min(viewportH - 120, 380)
+    : Math.min(
+        visibleRows * CARD_H + (visibleRows - 1) * GAP + 8 + 16 + scrollChrome,
+        Math.max(viewportH - 24, 0)
+      );
 
   return (
-    <div className="min-w-0">
+    <div className="min-w-0 flex-1 sm:flex-initial">
       <Select value={value} onValueChange={v => onChange(v as PptVisualStyle)}>
         <SelectTrigger className="w-full rounded-full border border-border bg-popover">
-          <span className="whitespace-nowrap">
+          <span className="whitespace-nowrap truncate">
             {`Visual style${value ? ": " + getStyleDisplayName(value) : ""}`}
           </span>
         </SelectTrigger>
         <SelectContent
-          align="start"
-          style={{ width: popupWidth, maxWidth: popupWidth, maxHeight }}
+          align={isMobile ? "end" : "start"}
+          collisionPadding={12}
+          style={{
+            width: isMobile ? "calc(100vw - 24px)" : popupWidth,
+            maxWidth: isMobile ? "calc(100vw - 24px)" : popupWidth,
+            maxHeight,
+          }}
           className="max-w-[calc(100vw-24px)] overflow-y-auto"
         >
           <div
             className="p-2"
             style={{
               display: "grid",
-              gridTemplateColumns: `repeat(3, ${CARD_W}px)`,
-              gridAutoRows: CARD_H,
+              gridTemplateColumns: isMobile
+                ? "repeat(2, minmax(0, 1fr))"
+                : `repeat(3, ${CARD_W}px)`,
+              gridAutoRows: isMobile ? "auto" : CARD_H,
               gap: GAP,
               justifyContent: "center",
             }}
@@ -143,7 +159,7 @@ function StylePicker(props: {
                 data-selected={value === name}
                 className="p-0 focus:bg-transparent data-[highlighted]:bg-transparent data-[highlighted]:outline-none [&>span.absolute]:hidden"
               >
-                <ThemeCard name={name} selected={value === name} />
+                <ThemeCard name={name} selected={value === name} isMobile={isMobile} />
               </SelectItem>
             ))}
           </div>
@@ -159,6 +175,7 @@ export function PptConfigStrip(props: {
   isCentered?: boolean;
 }) {
   const { config, onChange, isCentered = false } = props;
+  const isMobile = useIsMobile(640);
   const [stripWidth, setStripWidth] = React.useState<number | null>(null);
   const stripRef = React.useRef<HTMLDivElement | null>(null);
 
@@ -173,7 +190,7 @@ export function PptConfigStrip(props: {
   }, []);
 
   // The popup is sized for exactly three landscape cards in a row; the
-// Select viewport adds its own small padding, so this accounts for that.
+  // Select viewport adds its own small padding, so this accounts for that.
   const popupWidth =
     Math.min(
       stripWidth ?? 0,
@@ -193,6 +210,7 @@ export function PptConfigStrip(props: {
         onChange={v => set("visualStyle", v)}
         popupWidth={popupWidth}
         isCentered={isCentered}
+        isMobile={isMobile}
       />
     </div>
   );

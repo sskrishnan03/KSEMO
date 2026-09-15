@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import * as DialogPrimitive from "@radix-ui/react-dialog";
 import {
   Dialog,
   DialogContent,
@@ -414,13 +415,32 @@ export const SettingsDialog = memo(function SettingsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex h-[70dvh] w-[60vw] !max-w-none max-md:h-[min(85dvh,520px)] max-md:w-[calc(100%-1rem)] flex-col gap-0 overflow-hidden rounded-2xl p-0">
+      <DialogContent showCloseButton={false} className="flex h-[70dvh] w-[60vw] !max-w-none max-md:h-[min(85dvh,540px)] max-md:w-[calc(100%-1rem)] flex-col gap-0 overflow-hidden rounded-2xl p-0">
         <DialogHeader className="sr-only">
           <DialogTitle>Settings</DialogTitle>
           <DialogDescription>
             Manage your KSEMO preferences and account.
           </DialogDescription>
         </DialogHeader>
+
+        {/* Dedicated Mobile Header Bar */}
+        <div className="flex h-12 shrink-0 items-center justify-between border-b border-border bg-card px-3.5 md:hidden">
+          <div className="flex items-center gap-2">
+            <Settings2 className="size-4 text-muted-foreground" />
+            <span className="text-sm font-semibold tracking-[-0.02em] text-foreground">
+              Settings
+            </span>
+          </div>
+          <DialogPrimitive.Close asChild>
+            <button
+              type="button"
+              className="flex size-7 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              aria-label="Close settings"
+            >
+              <X className="size-4" />
+            </button>
+          </DialogPrimitive.Close>
+        </div>
 
         <div className="flex min-h-0 flex-1 flex-col md:flex-row">
           <aside className="hidden md:flex w-56 shrink-0 flex-col border-r border-border bg-sidebar px-3 py-3">
@@ -466,10 +486,10 @@ export const SettingsDialog = memo(function SettingsDialog({
           </aside>
 
           <div className="flex flex-col border-b border-border bg-sidebar md:hidden">
-            <div className="px-3 pt-3 pb-1">
+            <div className="px-3 pt-2.5 pb-1.5">
               <SettingsSearch onSelect={setActiveTab} />
             </div>
-            <nav className="flex overflow-x-auto px-2 pb-2">
+            <nav className="flex overflow-x-auto px-2 pb-2 scrollbar-none">
               {settingsNavItems.map(item => {
                 const Icon = item.icon;
                 const active = activeTab === item.id;
@@ -491,7 +511,17 @@ export const SettingsDialog = memo(function SettingsDialog({
             </nav>
           </div>
 
-          <div className="flex min-h-0 flex-1 flex-col">
+          <div className="relative flex min-h-0 flex-1 flex-col">
+            {/* Desktop Close Button */}
+            <DialogPrimitive.Close asChild>
+              <button
+                type="button"
+                className="absolute top-3.5 right-3.5 z-20 hidden md:flex size-7 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                aria-label="Close settings"
+              >
+                <X className="size-4" />
+              </button>
+            </DialogPrimitive.Close>
             <div className="min-h-0 flex-1 overflow-y-auto p-4 md:p-5">
               {activeTab === "account" && (
                 <AccountSection
