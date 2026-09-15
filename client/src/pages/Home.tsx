@@ -2566,7 +2566,7 @@ export default function Home() {
                       <MoreHorizontal className="size-4" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-40 rounded-xl">
+                  <DropdownMenuContent align="end" className="w-44 rounded-xl">
                     <DropdownMenuItem
                       disabled={!activeConversationId}
                       onSelect={() => {
