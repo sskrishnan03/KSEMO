@@ -21,6 +21,7 @@ import { getFileKind, IMAGE_EXT } from "@/lib/fileKinds";
 import { CAPABILITY_SECTIONS, getCapabilityOption } from "@/lib/capabilities";
 import { type CapabilityMode } from "@shared/capabilities";
 import { type PresentationConfig } from "@shared/presentation";
+import { useIsMobile } from "@/hooks/useIsMobile";
 import { PptConfigStrip } from "./PptConfigStrip";
 import {
   ArrowUp,
@@ -277,6 +278,7 @@ export const ChatComposer = memo(function ChatComposer({
   const editorRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const libraryPanelRef = useRef<HTMLDivElement>(null);
+  const isMobile = useIsMobile();
   const [libraryOpen, setLibraryOpen] = useState(initialLibraryOpen);
   const [toolsOpen, setToolsOpen] = useState(initialToolsOpen);
   const [libraryQuery, setLibraryQuery] = useState("");
@@ -630,9 +632,9 @@ export const ChatComposer = memo(function ChatComposer({
             ref={libraryPanelRef}
             className={cn(
               getLibrarySubmenuClass(isCentered),
-              menuPlacement === "below"
-                ? "top-[calc(100%+0.5rem)]"
-                : "bottom-[calc(100%+0.5rem)]"
+              isMobile || menuPlacement !== "below"
+                ? "bottom-[calc(100%+0.5rem)]"
+                : "top-[calc(100%+0.5rem)]"
             )}
           >
             <LibraryPickerContent
@@ -877,7 +879,7 @@ export const ChatComposer = memo(function ChatComposer({
                   </Tooltip>
                   <DropdownMenuContent
                     align="start"
-                    side={menuPlacement === "below" ? "bottom" : "top"}
+                    side={isMobile ? "top" : (menuPlacement === "below" ? "bottom" : "top")}
                     sideOffset={8}
                     alignOffset={-8}
                     collisionPadding={12}
@@ -1183,10 +1185,10 @@ export const ChatComposer = memo(function ChatComposer({
           <div
             ref={slashPanelRef}
             className={cn(
-              "ksemo-thin-scroll absolute left-0 z-50 w-44 max-h-[16rem] overflow-y-auto rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-md",
-              menuPlacement === "below"
-                ? "top-[calc(100%+2px)]"
-                : "bottom-[calc(100%+2px)]"
+              "ksemo-thin-scroll absolute left-0 z-50 w-44 max-h-[min(16rem,40vh)] overflow-y-auto rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-md",
+              isMobile || menuPlacement === "above"
+                ? "bottom-[calc(100%+6px)]"
+                : "top-[calc(100%+6px)]"
             )}
           >
             {slashFiltered.length === 0 ? (
@@ -1203,6 +1205,10 @@ export const ChatComposer = memo(function ChatComposer({
                     role="menuitem"
                     tabIndex={-1}
                     onMouseEnter={() => setSlashHighlight(index)}
+                    onPointerDown={event => {
+                      event.preventDefault();
+                      selectSlashOption(option.mode);
+                    }}
                     onClick={() => selectSlashOption(option.mode)}
                     className={cn(
                       "flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-hidden transition-colors",

@@ -497,13 +497,13 @@ export function LibraryWorkspace({
 
         {selectedFiles.length > 0 && (
           <>
-            {/* Mobile Selection Toolbar: sleek single-line compact bar, never congests or wraps */}
+            {/* Mobile Selection Toolbar: Decent bottom-fixed action bar */}
             <div
-              className="flex sm:hidden w-full items-center justify-between gap-1.5 rounded-xl border border-border/80 bg-card/95 px-2.5 py-1.5 mt-2.5 shadow-xs select-none animate-in fade-in-0 duration-150"
+              className="fixed bottom-0 inset-x-0 z-40 flex sm:hidden items-center justify-between gap-2 border-t border-border/80 bg-card/95 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-2xl backdrop-blur-xl animate-in slide-in-from-bottom-5 duration-200 select-none"
               aria-label="Selected Library actions"
             >
-              <div className="flex items-center gap-1.5 min-w-0">
-                <div className="flex h-7 shrink-0 items-center gap-1 rounded-full bg-foreground px-2 text-background shadow-xs">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="flex h-8 shrink-0 items-center gap-1.5 rounded-full bg-foreground px-3 text-background shadow-xs">
                   <CheckCircle2 className="size-3.5" />
                   <span className="text-xs font-bold tabular-nums">
                     {selectedFiles.length}
@@ -512,40 +512,40 @@ export function LibraryWorkspace({
                 <button
                   type="button"
                   onClick={() => setSelectedIds(new Set())}
-                  className="flex h-7 items-center gap-1 rounded-full bg-muted/60 px-2 text-xs font-medium text-muted-foreground hover:text-foreground"
+                  className="flex h-8 items-center gap-1.5 rounded-full bg-muted/70 px-3 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground active:scale-95"
                 >
-                  <X className="size-3" />
+                  <X className="size-3.5" />
                   <span>Clear</span>
                 </button>
               </div>
 
-              <div className="flex items-center gap-1 shrink-0">
+              <div className="flex items-center gap-1.5 shrink-0">
                 <button
                   type="button"
                   onClick={selectVisibleFiles}
                   disabled={allVisibleSelected}
-                  className="flex h-7 items-center gap-1 rounded-full bg-muted/60 px-2 text-xs font-medium text-muted-foreground hover:text-foreground disabled:opacity-40"
+                  className="flex h-8 items-center gap-1.5 rounded-full bg-muted/70 px-3 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground disabled:opacity-40 active:scale-95"
                 >
-                  <CheckCheck className="size-3" />
+                  <CheckCheck className="size-3.5" />
                   <span>All</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={chatWithSelected}
-                  className="flex h-7 items-center gap-1 rounded-full bg-foreground px-2.5 text-xs font-semibold text-background shadow-xs transition-colors hover:bg-foreground/90"
+                  className="flex h-8 items-center gap-1.5 rounded-full bg-foreground px-4 text-xs font-semibold text-background shadow-sm transition-all hover:bg-foreground/90 active:scale-95"
                 >
-                  <MessageCircle className="size-3" />
+                  <MessageCircle className="size-3.5" />
                   <span>Chat</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setDeleteTarget(selectedFiles)}
-                  className="flex size-7 items-center justify-center rounded-full bg-muted/60 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                  className="flex size-8 items-center justify-center rounded-full bg-muted/70 text-muted-foreground transition-all hover:bg-destructive/10 hover:text-destructive active:scale-95"
                   aria-label="Remove selected"
                 >
-                  <Trash2 className="size-3.5" />
+                  <Trash2 className="size-4" />
                 </button>
               </div>
             </div>
@@ -610,7 +610,12 @@ export function LibraryWorkspace({
           </>
         )}
 
-        <div className="mt-4 sm:mt-5 min-h-0 flex-1 overflow-y-auto pb-10">
+        <div
+          className={cn(
+            "mt-4 sm:mt-5 min-h-0 flex-1 overflow-y-auto pb-10",
+            selectedFiles.length > 0 && "pb-24 sm:pb-10"
+          )}
+        >
           {filesQuery.isLoading ? (
             <Loading className="min-h-64" />
           ) : files.length ? (

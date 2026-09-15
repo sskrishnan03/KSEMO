@@ -58,6 +58,7 @@ import { detectFileRequest } from "@shared/docDetect";
 
 import { SettingsDialog } from "../components/ksemo/SettingsDialog";
 import { useGlobalShortcuts } from "../hooks/useGlobalShortcuts";
+import { useIsMobile } from "../hooks/useIsMobile";
 import { ShareConversationDialog } from "../components/ksemo/ShareConversationDialog";
 import { ConfirmDeleteDialog } from "../components/ksemo/ConfirmDeleteDialog";
 import { useVoiceInput } from "../hooks/useVoiceInput";
@@ -183,6 +184,7 @@ function rememberNewChatIntent(userId: number): void {
 }
 
 export default function Home() {
+  const isMobile = useIsMobile();
   const { user, loading, authUnavailable, refresh, logout } = useAuth();
   const { closePdf, isOpen: isDocumentOpen } = usePdfViewer();
   const [, setLocation] = useLocation();
@@ -2652,7 +2654,7 @@ export default function Home() {
               onScroll={handleMessagesScroll}
               className={cn(
                 "min-h-0 flex-1",
-                visibleMessages.length ? "overflow-y-auto" : "overflow-hidden"
+                visibleMessages.length ? "overflow-y-auto" : "overflow-y-auto lg:overflow-hidden"
               )}
               aria-label="Conversation"
             >
@@ -2789,7 +2791,7 @@ export default function Home() {
                       onLibraryFile={stableAttachLibraryFiles}
                       initialLibraryOpen={isLibraryPreview}
                       initialToolsOpen={isLibraryPreview}
-                      menuPlacement="below"
+                      menuPlacement={isMobile ? "above" : "below"}
                       isCentered={visibleMessages.length === 0}
                       onTakeScreenshot={stableCaptureScreenshot}
                       focusToken={composerFocusToken}

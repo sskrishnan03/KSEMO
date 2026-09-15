@@ -32,7 +32,6 @@ import {
   Headset,
   LogOut,
   MessageCircle,
-  PanelLeftClose,
   Pencil,
   Pin,
   Search,
@@ -283,10 +282,10 @@ export const ConversationSidebar = memo(function ConversationSidebar({
                   variant="ghost"
                   size="icon"
                   onClick={onClose}
-                  className="size-8 rounded-lg text-muted-foreground outline-none hover:bg-sidebar-accent hover:text-foreground focus-visible:ring-0 focus-visible:border-transparent lg:hidden"
+                  className="size-8 rounded-lg transition-transform duration-150 text-foreground outline-none hover:bg-sidebar-accent hover:text-foreground focus-visible:ring-0 focus-visible:border-transparent active:scale-95 lg:hidden"
                   aria-label="Close navigation"
                 >
-                  <PanelLeftClose className="size-4" />
+                  <ChevronsLeft className="size-4" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom">Close sidebar</TooltipContent>
