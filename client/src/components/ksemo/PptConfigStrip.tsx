@@ -60,17 +60,12 @@ const PICKER_STYLES = PPT_STYLE_OPTIONS;
 function ThemeCard(props: {
   name: PptVisualStyle;
   selected: boolean;
-  isMobile?: boolean;
 }) {
-  const { name, selected, isMobile } = props;
+  const { name, selected } = props;
   return (
     <div
-      className="relative flex flex-col overflow-hidden rounded-xl border border-border bg-background box-border transition-transform duration-150 hover:scale-[1.03] hover:shadow-md w-full"
-      style={{
-        width: isMobile ? undefined : CARD_W,
-        height: isMobile ? undefined : CARD_H,
-        minHeight: isMobile ? 96 : undefined,
-      }}
+      className="relative flex flex-col overflow-hidden rounded-xl border border-border bg-background box-border transition-transform duration-150 hover:scale-[1.03] hover:shadow-md"
+      style={{ width: CARD_W, height: CARD_H }}
     >
       <div
         className="mx-1.5 mt-1.5 w-auto shrink-0 overflow-hidden rounded-lg bg-muted/30"
@@ -79,15 +74,15 @@ function ThemeCard(props: {
         <ThemeSlidePreview name={name} />
       </div>
       <div
-        className="mx-1.5 flex min-w-0 shrink-0 items-center justify-center gap-1 rounded-b-lg px-1 text-[11px] sm:text-[12px] font-medium text-foreground"
+        className="mx-1.5 flex min-w-0 shrink-0 items-center justify-center gap-1 rounded-b-lg px-1 text-[12px] font-medium text-foreground"
         style={{ height: LABEL_H, flex: "0 0 auto" }}
       >
         <span className="min-w-0 truncate leading-tight">
           {getStyleDisplayName(name)}
         </span>
         {selected && (
-          <span className="flex size-3.5 sm:size-4 shrink-0 items-center justify-center rounded-full bg-white text-black">
-            <svg viewBox="0 0 12 12" className="size-2.5 sm:size-3 text-black" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+          <span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-white text-black">
+            <svg viewBox="0 0 12 12" className="size-3 text-black" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
               <path d="M2.5 6.2 4.9 8.6 9.5 3.6" />
             </svg>
           </span>
@@ -110,17 +105,18 @@ function StylePicker(props: {
   // The Select control always renders up/down chevron bars (~48px of chrome)
   // above and below its scrollable viewport, so the height budget must leave
   // room for those or the card labels get clipped. In the centered composer
-  // state show two full rows (6 cards, 3 per row); once the composer sits at
-  // the bottom show three full rows (9 cards). Everything after that scrolls
-  // inside, and the popup never exceeds the visible page height.
+  // state show two full rows (4 cards on mobile, 6 on desktop); once the
+  // composer sits at the bottom show three full rows (6 cards on mobile, 9 on desktop).
   const visibleRows = isCentered ? 2 : 3;
   const scrollChrome = 48;
-  const maxHeight = isMobile
-    ? Math.min(viewportH - 120, 380)
-    : Math.min(
-        visibleRows * CARD_H + (visibleRows - 1) * GAP + 8 + 16 + scrollChrome,
-        Math.max(viewportH - 24, 0)
-      );
+  const maxHeight = Math.min(
+    visibleRows * CARD_H + (visibleRows - 1) * GAP + 8 + 16 + scrollChrome,
+    Math.max(viewportH - 24, 0)
+  );
+
+  const columns = isMobile ? 2 : 3;
+  const mobileWidth = 2 * CARD_W + GAP + 24;
+  const effectiveWidth = isMobile ? mobileWidth : popupWidth;
 
   return (
     <div className="min-w-0 flex-1 sm:flex-initial">
@@ -134,8 +130,8 @@ function StylePicker(props: {
           align={isMobile ? "end" : "start"}
           collisionPadding={12}
           style={{
-            width: isMobile ? "calc(100vw - 24px)" : popupWidth,
-            maxWidth: isMobile ? "calc(100vw - 24px)" : popupWidth,
+            width: effectiveWidth,
+            maxWidth: effectiveWidth,
             maxHeight,
           }}
           className="max-w-[calc(100vw-24px)] overflow-y-auto"
@@ -144,10 +140,8 @@ function StylePicker(props: {
             className="p-2"
             style={{
               display: "grid",
-              gridTemplateColumns: isMobile
-                ? "repeat(2, minmax(0, 1fr))"
-                : `repeat(3, ${CARD_W}px)`,
-              gridAutoRows: isMobile ? "auto" : CARD_H,
+              gridTemplateColumns: `repeat(${columns}, ${CARD_W}px)`,
+              gridAutoRows: CARD_H,
               gap: GAP,
               justifyContent: "center",
             }}
@@ -159,7 +153,7 @@ function StylePicker(props: {
                 data-selected={value === name}
                 className="p-0 focus:bg-transparent data-[highlighted]:bg-transparent data-[highlighted]:outline-none [&>span.absolute]:hidden"
               >
-                <ThemeCard name={name} selected={value === name} isMobile={isMobile} />
+                <ThemeCard name={name} selected={value === name} />
               </SelectItem>
             ))}
           </div>

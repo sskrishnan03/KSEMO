@@ -2533,10 +2533,10 @@ export const PptSlideSidebar = memo(function PptSlideSidebar({
       ref={sidebarRef}
       data-testid="pptx-sidebar"
       aria-label="Slide thumbnails"
-      className="w-full md:w-52 shrink-0 h-auto md:h-full flex flex-col border-t md:border-t-0 md:border-r border-border bg-card/85 dark:bg-card/60 backdrop-blur-md z-20 select-none transition-all"
+      className="w-64 max-w-[80vw] md:w-52 shrink-0 h-full flex flex-col border-r border-border bg-card/95 dark:bg-card/90 backdrop-blur-md z-20 select-none transition-all"
     >
       {/* Sidebar Header */}
-      <div className="flex h-10 md:h-11 items-center justify-between px-3 border-b border-border shrink-0">
+      <div className="flex h-11 items-center justify-between px-3 border-b border-border shrink-0">
         <div className="flex items-center gap-2 min-w-0">
           <Presentation className="size-4 text-foreground/80 shrink-0 stroke-[2]" />
           <span className="text-sm font-semibold tracking-tight text-foreground truncate">
@@ -2560,7 +2560,7 @@ export const PptSlideSidebar = memo(function PptSlideSidebar({
                 aria-label="Collapse sidebar"
                 className="size-7 rounded-md text-muted-foreground hover:bg-accent hover:text-foreground active:scale-95 transition-all"
               >
-                <ChevronsDown className="size-4 md:hidden" />
+                <X className="size-4 md:hidden" />
                 <ChevronsLeft className="size-4 hidden md:block" />
               </Button>
             </TooltipTrigger>
@@ -2570,7 +2570,7 @@ export const PptSlideSidebar = memo(function PptSlideSidebar({
       </div>
 
       {/* Thumbnails Scroll List */}
-      <div className="overflow-x-auto md:overflow-x-hidden md:overflow-y-auto px-2 py-2 flex flex-row md:flex-col gap-2 shrink-0 md:shrink md:flex-1 [scrollbar-width:thin]">
+      <div className="overflow-y-auto px-2 py-2 flex flex-col gap-2 flex-1 [scrollbar-width:thin]">
         {Array.from({ length: count }, (_, idx) => {
           const slideNumber = idx + 1;
           const isActive = currentSlide === slideNumber;
@@ -3633,8 +3633,8 @@ export const PdfDrawer = memo(function PdfDrawer() {
     >
       {/* Top Header */}
       <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-border bg-card/90 px-3 sm:px-4 backdrop-blur-md">
-        {/* Left Side: Only the File Name and Brand mark */}
-        <div className="flex min-w-0 items-center gap-2.5">
+        {/* Left Side: Only the File Name, Brand mark, and mobile Slides toggle */}
+        <div className="flex min-w-0 items-center gap-2 sm:gap-2.5">
           <FileBrandMark variant={brandVariant} className="size-6 shrink-0" />
           <p
             className="truncate text-sm font-semibold text-foreground leading-normal"
@@ -3643,6 +3643,22 @@ export const PdfDrawer = memo(function PdfDrawer() {
           >
             {currentPdf.filename}
           </p>
+          {isPowerPointDoc && pptxCount > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsPptSidebarOpen(open => !open)}
+              data-testid="pptx-mobile-slides-btn"
+              aria-label="Toggle slides"
+              className="md:hidden h-7 gap-1 rounded-full border-border/80 bg-card px-2 text-xs font-semibold text-foreground shadow-xs hover:bg-accent shrink-0"
+            >
+              <Presentation className="size-3 text-muted-foreground" />
+              <span>Slides</span>
+              <span className="rounded-full bg-muted px-1.5 py-0.2 text-[10px] text-muted-foreground tabular-nums">
+                {currentSlide}/{pptxCount}
+              </span>
+            </Button>
+          )}
         </div>
 
         {/* Right Side: Edit (text only), Download, then Cancel (only icons, with hover) */}
@@ -3726,68 +3742,65 @@ export const PdfDrawer = memo(function PdfDrawer() {
         className={cn(
           "relative min-h-0 flex-1 w-full overflow-hidden",
           isPowerPointDoc
-            ? "flex flex-col md:flex-row bg-neutral-900/10 dark:bg-neutral-950/40"
+            ? "flex flex-row bg-neutral-900/10 dark:bg-neutral-950/40"
             : isExcelDoc
               ? "bg-background flex flex-col"
               : "bg-neutral-900/10 dark:bg-neutral-950/40"
         )}
       >
-        {/* PowerPoint Left Thumbnail Sidebar (Desktop) / Bottom Dock (Mobile) */}
+        {/* PowerPoint Left Thumbnail Sidebar:
+            - Desktop: standard inline left sidebar
+            - Mobile: overlay drawer with backdrop (never pushes slide stage off screen) */}
         {!isLoading && !loadError && isPowerPointDoc && pptxCount > 0 && isPptSidebarOpen && (
-          <div className="order-last md:order-first shrink-0">
-            <PptSlideSidebar
-              canonicalSpec={canonicalSpec}
-              slides={pptxSlides}
-              currentSlide={currentSlide}
-              filename={currentPdf?.filename}
-              onSelectSlide={scrollToSlide}
-              isOpen={isPptSidebarOpen}
-              onClose={() => setIsPptSidebarOpen(false)}
-            />
-          </div>
-        )}
-
-        {/* PowerPoint Left Collapsed Sidebar Strip (Desktop) / Bottom Expand Pill (Mobile) */}
-        {!isLoading && !loadError && isPowerPointDoc && pptxCount > 0 && !isPptSidebarOpen && (
           <>
+            {/* Mobile Backdrop */}
             <div
-              data-testid="pptx-sidebar-collapsed"
-              className="hidden md:flex shrink-0 h-full flex-col border-r border-border bg-card/75 dark:bg-card/40 backdrop-blur-sm z-20 py-2.5 px-1.5 items-center select-none transition-all"
-            >
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setIsPptSidebarOpen(true)}
-                    data-testid="pptx-sidebar-expand-btn"
-                    aria-label="Expand sidebar"
-                    className="size-8 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
-                  >
-                    <ChevronsRight className="size-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="right">Expand sidebar</TooltipContent>
-              </Tooltip>
-            </div>
-            <div className="md:hidden absolute bottom-4 left-4 z-30 flex items-center select-none">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setIsPptSidebarOpen(true)}
-                data-testid="pptx-sidebar-expand-btn"
-                aria-label="Expand slides"
-                className="h-8 gap-1.5 rounded-full border-border/80 bg-card/95 px-3 text-xs font-semibold text-foreground shadow-md backdrop-blur-md hover:bg-accent"
-              >
-                <Presentation className="size-3.5 text-muted-foreground" />
-                <span>Slides</span>
-                <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                  {currentSlide}/{pptxCount}
-                </span>
-                <ChevronsUp className="size-3.5 text-muted-foreground" />
-              </Button>
+              className="fixed inset-0 z-40 bg-black/50 backdrop-blur-xs md:hidden"
+              onClick={() => setIsPptSidebarOpen(false)}
+              aria-hidden="true"
+            />
+            {/* Sidebar Container */}
+            <div className="fixed inset-y-0 left-0 z-50 h-full md:relative md:z-20 shrink-0">
+              <PptSlideSidebar
+                canonicalSpec={canonicalSpec}
+                slides={pptxSlides}
+                currentSlide={currentSlide}
+                filename={currentPdf?.filename}
+                onSelectSlide={slideNum => {
+                  scrollToSlide(slideNum);
+                  if (typeof window !== "undefined" && window.innerWidth < 768) {
+                    setIsPptSidebarOpen(false);
+                  }
+                }}
+                isOpen={isPptSidebarOpen}
+                onClose={() => setIsPptSidebarOpen(false)}
+              />
             </div>
           </>
+        )}
+
+        {/* PowerPoint Left Collapsed Sidebar Strip (Desktop) */}
+        {!isLoading && !loadError && isPowerPointDoc && pptxCount > 0 && !isPptSidebarOpen && (
+          <div
+            data-testid="pptx-sidebar-collapsed"
+            className="hidden md:flex shrink-0 h-full flex-col border-r border-border bg-card/75 dark:bg-card/40 backdrop-blur-sm z-20 py-2.5 px-1.5 items-center select-none transition-all"
+          >
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setIsPptSidebarOpen(true)}
+                  data-testid="pptx-sidebar-expand-btn"
+                  aria-label="Expand sidebar"
+                  className="size-8 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+                >
+                  <ChevronsRight className="size-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right">Expand sidebar</TooltipContent>
+            </Tooltip>
+          </div>
         )}
 
         <div
@@ -3960,13 +3973,7 @@ export const PdfDrawer = memo(function PdfDrawer() {
         {hasPagination && !isLoading && !loadError && (
           <div
             data-testid="pdf-drawer-pagination-bar"
-            className={cn(
-              "absolute left-4 z-30 flex items-center gap-0.5 rounded-full border border-border/70 bg-card px-2 py-1 shadow-lg [&_svg]:stroke-[2.5] animate-in fade-in-0 duration-200 select-none",
-              isPowerPointDoc && isPptSidebarOpen
-                ? "bottom-[118px] md:bottom-5"
-                : "bottom-4 sm:bottom-5",
-              isPowerPointDoc && !isPptSidebarOpen && "max-md:left-32"
-            )}
+            className="absolute bottom-4 sm:bottom-5 left-4 z-30 flex items-center gap-0.5 rounded-full border border-border/70 bg-card px-2 py-1 shadow-lg [&_svg]:stroke-[2.5] animate-in fade-in-0 duration-200 select-none"
           >
             <Tooltip>
               <TooltipTrigger asChild>
@@ -4013,12 +4020,7 @@ export const PdfDrawer = memo(function PdfDrawer() {
         {!isLoading && !loadError && (
           <div
             data-testid="pdf-drawer-control-bar"
-            className={cn(
-              "absolute right-4 z-30 flex items-center gap-0.5 rounded-full border border-border/70 bg-card px-2 py-1 shadow-lg [&_svg]:stroke-[2.5] animate-in fade-in-0 duration-200 select-none",
-              isPowerPointDoc && isPptSidebarOpen
-                ? "bottom-[118px] md:bottom-5"
-                : "bottom-4 sm:bottom-5"
-            )}
+            className="absolute bottom-4 sm:bottom-5 right-4 z-30 flex items-center gap-0.5 rounded-full border border-border/70 bg-card px-2 py-1 shadow-lg [&_svg]:stroke-[2.5] animate-in fade-in-0 duration-200 select-none"
           >
             <Tooltip>
               <TooltipTrigger asChild>
