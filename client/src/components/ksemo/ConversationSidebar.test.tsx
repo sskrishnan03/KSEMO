@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import {
   ConversationSidebar,
   ConversationActionsMenu,
+  ConversationActionsMenuItems,
   MobileExportMenuItems,
   MobileSupportMenuItems,
 } from "./ConversationSidebar";
@@ -167,4 +168,32 @@ describe("KSEMO conversation sidebar disclosure", () => {
     expect(markup).toContain('aria-label="Actions for Test chat"');
     expect(markup).toContain("lucide-ellipsis");
   });
+
+  it("renders mobile ConversationActionsMenu with aligned Download PDF and Download Word matching other options", () => {
+    const markup = renderInMenu(
+      createElement(ConversationActionsMenuItems, {
+        conversation: {
+          id: "test-conv",
+          title: "Test chat",
+          isPinned: false,
+          isArchived: false,
+        },
+        onRename: () => undefined,
+        onPin: () => undefined,
+        onDuplicate: () => undefined,
+        onArchive: () => undefined,
+        onShare: () => undefined,
+        onExport: () => undefined,
+        onDelete: () => undefined,
+        isMobile: true,
+      })
+    );
+    expect(markup).toContain("Download PDF");
+    expect(markup).toContain("Download Word");
+    expect(markup).toContain("Rename");
+    expect(markup).toContain("Duplicate");
+    expect(markup).toContain("lucide-file-text");
+    expect(markup).toContain("lucide-pencil");
+  });
 });
+

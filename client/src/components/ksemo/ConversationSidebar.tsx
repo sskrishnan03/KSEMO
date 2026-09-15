@@ -707,75 +707,107 @@ export const ConversationActionsMenu = memo(function ConversationActionsMenu({
           isMobile && "max-h-[calc(100dvh-2rem)] max-w-[calc(100vw-1.5rem)] overflow-y-auto shadow-xl"
         )}
       >
-        <DropdownMenuItem onClick={() => onRename(conversation)}>
-          <Pencil className="mr-2 size-4" />
-          Rename
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => onPin(conversation)}>
-          <Pin className="mr-2 size-4" />
-          {conversation.isPinned ? "Unpin" : "Pin"}
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => onShare(conversation)}>
-          <ShareIcon className="mr-2 size-4" />
-          Share
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => onArchive(conversation)}>
-          <Archive className="mr-2 size-4" />
-          Archive
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => onDuplicate(conversation)}>
-          <CopyPlus className="mr-2 size-4" />
-          Duplicate
-        </DropdownMenuItem>
-        {isMobile ? (
-          <>
-            <DropdownMenuItem
-              onClick={() => onExport(conversation, "pdf")}
-              className="focus-visible:ring-0 focus-visible:outline-none"
-            >
+        <ConversationActionsMenuItems
+          conversation={conversation}
+          onRename={onRename}
+          onPin={onPin}
+          onDuplicate={onDuplicate}
+          onArchive={onArchive}
+          onShare={onShare}
+          onExport={onExport}
+          onDelete={onDelete}
+          isMobile={isMobile}
+        />
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+});
+
+export const ConversationActionsMenuItems = memo(function ConversationActionsMenuItems({
+  conversation,
+  onRename,
+  onPin,
+  onDuplicate,
+  onArchive,
+  onShare,
+  onExport,
+  onDelete,
+  isMobile,
+}: {
+  conversation: Conversation;
+  onRename: (conversation: Conversation) => void;
+  onPin: (conversation: Conversation) => void;
+  onDuplicate: (conversation: Conversation) => void;
+  onArchive: (conversation: Conversation) => void;
+  onShare: (conversation: Conversation) => void;
+  onExport: (conversation: Conversation, format: "pdf" | "word") => void;
+  onDelete: (conversation: Conversation) => void;
+  isMobile: boolean;
+}) {
+  return (
+    <>
+      <DropdownMenuItem onClick={() => onRename(conversation)}>
+        <Pencil className="mr-2 size-4" />
+        Rename
+      </DropdownMenuItem>
+      <DropdownMenuItem onClick={() => onPin(conversation)}>
+        <Pin className="mr-2 size-4" />
+        {conversation.isPinned ? "Unpin" : "Pin"}
+      </DropdownMenuItem>
+      <DropdownMenuItem onClick={() => onShare(conversation)}>
+        <ShareIcon className="mr-2 size-4" />
+        Share
+      </DropdownMenuItem>
+      <DropdownMenuItem onClick={() => onArchive(conversation)}>
+        <Archive className="mr-2 size-4" />
+        Archive
+      </DropdownMenuItem>
+      <DropdownMenuItem onClick={() => onDuplicate(conversation)}>
+        <CopyPlus className="mr-2 size-4" />
+        Duplicate
+      </DropdownMenuItem>
+      {isMobile ? (
+        <>
+          <DropdownMenuItem onClick={() => onExport(conversation, "pdf")}>
+            <FileText className="mr-2 size-4" />
+            Download PDF
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => onExport(conversation, "word")}>
+            <FileText className="mr-2 size-4" />
+            Download Word
+          </DropdownMenuItem>
+        </>
+      ) : (
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger>
+            <Download className="mr-2 size-4" />
+            Export
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent
+            sideOffset={6}
+            collisionPadding={12}
+            className="w-44 rounded-xl"
+          >
+            <DropdownMenuItem onClick={() => onExport(conversation, "pdf")}>
               <PdfFileIcon className="mr-2 size-5" />
               Download PDF
             </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => onExport(conversation, "word")}
-              className="focus-visible:ring-0 focus-visible:outline-none"
-            >
+            <DropdownMenuItem onClick={() => onExport(conversation, "word")}>
               <WordFileIcon className="mr-2 size-5" />
               Download Word
             </DropdownMenuItem>
-          </>
-        ) : (
-          <DropdownMenuSub>
-            <DropdownMenuSubTrigger>
-              <Download className="mr-2 size-4" />
-              Export
-            </DropdownMenuSubTrigger>
-            <DropdownMenuSubContent
-              sideOffset={6}
-              collisionPadding={12}
-              className="w-44 rounded-xl"
-            >
-              <DropdownMenuItem onClick={() => onExport(conversation, "pdf")}>
-                <PdfFileIcon className="mr-2 size-5" />
-                Download PDF
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onExport(conversation, "word")}>
-                <WordFileIcon className="mr-2 size-5" />
-                Download Word
-              </DropdownMenuItem>
-            </DropdownMenuSubContent>
-          </DropdownMenuSub>
-        )}
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          onClick={() => onDelete(conversation)}
-          variant="destructive"
-        >
-          <Trash2 className="mr-2 size-4" />
-          Delete
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
+      )}
+      <DropdownMenuSeparator />
+      <DropdownMenuItem
+        onClick={() => onDelete(conversation)}
+        variant="destructive"
+      >
+        <Trash2 className="mr-2 size-4" />
+        Delete
+      </DropdownMenuItem>
+    </>
   );
 });
 
@@ -833,14 +865,14 @@ export const MobileExportMenuItems = memo(function MobileExportMenuItems({
         onClick={() => onExport(conversation, "pdf")}
         className="flex cursor-pointer items-center gap-2 rounded-md py-2 pl-2.5 pr-2 text-xs font-medium"
       >
-        <PdfFileIcon className="mr-2 size-4 shrink-0" />
+        <FileText className="mr-2 size-4 shrink-0" />
         <span>Download PDF</span>
       </DropdownMenuItem>
       <DropdownMenuItem
         onClick={() => onExport(conversation, "word")}
         className="flex cursor-pointer items-center gap-2 rounded-md py-2 pl-2.5 pr-2 text-xs font-medium"
       >
-        <WordFileIcon className="mr-2 size-4 shrink-0" />
+        <FileText className="mr-2 size-4 shrink-0" />
         <span>Download Word</span>
       </DropdownMenuItem>
     </div>
