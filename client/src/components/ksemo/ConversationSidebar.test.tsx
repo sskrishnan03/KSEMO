@@ -2,10 +2,27 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { ConversationSidebar } from "./ConversationSidebar";
+import {
+  ConversationSidebar,
+  ConversationActionsMenu,
+  MobileExportMenuItems,
+  MobileSupportMenuItems,
+} from "./ConversationSidebar";
 
 function renderWithTooltip(element: React.ReactElement) {
   return renderToStaticMarkup(createElement(TooltipProvider, null, element));
+}
+
+import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu";
+
+function renderInMenu(element: React.ReactElement) {
+  return renderToStaticMarkup(
+    createElement(
+      DropdownMenuPrimitive.Root,
+      { open: true },
+      createElement(DropdownMenuPrimitive.Content, null, element)
+    )
+  );
 }
 
 describe("KSEMO conversation sidebar disclosure", () => {
@@ -91,5 +108,63 @@ describe("KSEMO conversation sidebar disclosure", () => {
     expect(markup).toContain('aria-label="Expand sidebar"');
     expect(markup).toContain("group/brand");
     expect(markup).toContain("group-focus-within/brand");
+  });
+
+  it("renders mobile Help & Support options with all three choices (FAQ, Privacy Policy, Terms of Service)", () => {
+    const markup = renderInMenu(
+      createElement(MobileSupportMenuItems, {
+        onSupport: () => undefined,
+      })
+    );
+    expect(markup).toContain('data-testid="mobile-support-menu-items"');
+    expect(markup).toContain("FAQ");
+    expect(markup).toContain("Privacy Policy");
+    expect(markup).toContain("Terms of Service");
+    expect(markup).toContain("lucide-circle-help");
+    expect(markup).toContain("lucide-shield-check");
+    expect(markup).toContain("lucide-file-text");
+    expect(markup).toContain("lucide-external-link");
+  });
+
+  it("renders mobile Export options with PDF and Word download options", () => {
+    const markup = renderInMenu(
+      createElement(MobileExportMenuItems, {
+        conversation: {
+          id: "test-conv",
+          title: "Test chat",
+          isPinned: false,
+          isArchived: false,
+        },
+        onExport: () => undefined,
+      })
+    );
+    expect(markup).toContain('data-testid="mobile-export-menu-items"');
+    expect(markup).toContain("Download PDF");
+    expect(markup).toContain("Download Word");
+  });
+
+  it("renders the 3-dots conversation actions trigger button", () => {
+    const markup = renderWithTooltip(
+      createElement(ConversationActionsMenu, {
+        conversation: {
+          id: "test-conv",
+          title: "Test chat",
+          isPinned: false,
+          isArchived: false,
+        },
+        isMenuOpen: false,
+        onMenuOpenChange: () => undefined,
+        onRename: () => undefined,
+        onPin: () => undefined,
+        onDuplicate: () => undefined,
+        onArchive: () => undefined,
+        onShare: () => undefined,
+        onExport: () => undefined,
+        onDelete: () => undefined,
+        isMobile: true,
+      })
+    );
+    expect(markup).toContain('aria-label="Actions for Test chat"');
+    expect(markup).toContain("lucide-ellipsis");
   });
 });

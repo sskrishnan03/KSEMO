@@ -43,6 +43,7 @@ import {
 } from "lucide-react";
 import { ShareIcon } from "./icons";
 import { PdfFileIcon, WordFileIcon } from "./FileBrandIcons";
+import { useIsMobile } from "@/hooks/useIsMobile";
 import React, { memo, useMemo, useRef, useState } from "react";
 
 type Conversation = {
@@ -112,10 +113,13 @@ export const ConversationSidebar = memo(function ConversationSidebar({
     [conversations]
   );
   const compact = collapsed;
+  const isMobile = useIsMobile(1024);
 
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [supportExpanded, setSupportExpanded] = useState(false);
+  const isSupportActive = supportExpanded || previewSupportOpen;
 
   const startRename = (conversation: Conversation) => {
     setRenamingId(conversation.id);
@@ -324,6 +328,7 @@ export const ConversationSidebar = memo(function ConversationSidebar({
                   onShare={onShare}
                   onExport={onExport}
                   onDelete={onDelete}
+                  isMobile={isMobile}
                 />
               )}
               <ConversationGroup
@@ -347,12 +352,18 @@ export const ConversationSidebar = memo(function ConversationSidebar({
                 onExport={onExport}
                 onDelete={onDelete}
                 emptyText="Your conversations will appear here."
+                isMobile={isMobile}
               />
             </>
           )}
         </nav>
         <div className="mt-3 border-t border-border pt-3">
-          <DropdownMenu open={previewSupportOpen || undefined}>
+          <DropdownMenu
+            open={previewSupportOpen || undefined}
+            onOpenChange={open => {
+              if (!open) setSupportExpanded(false);
+            }}
+          >
             {compact ? (
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -370,7 +381,7 @@ export const ConversationSidebar = memo(function ConversationSidebar({
               sideOffset={10}
               align={compact ? "end" : "start"}
               collisionPadding={12}
-              className="max-h-[calc(100dvh-1.5rem)] w-60 overflow-y-auto rounded-2xl border-border/80 p-1.5 shadow-xl"
+              className="max-h-[calc(100dvh-1.5rem)] w-60 max-w-[calc(100vw-1.5rem)] overflow-y-auto rounded-2xl border-border/80 p-1.5 shadow-xl"
             >
               <div className="px-2.5 py-2.5">
                 <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
@@ -389,42 +400,69 @@ export const ConversationSidebar = memo(function ConversationSidebar({
               >
                 <Settings2 className="mr-2 size-4" /> Settings
               </DropdownMenuItem>
-              <DropdownMenuSub open={previewSupportOpen || undefined}>
-                <DropdownMenuSubTrigger className="focus-visible:ring-0 focus-visible:outline-none">
-                  <Headset className="mr-2 size-4" />
-                  Help &amp; Support
-                </DropdownMenuSubTrigger>
-                <DropdownMenuSubContent
-                  sideOffset={8}
-                  collisionPadding={12}
-                  className="max-h-[calc(100dvh-1.5rem)] w-52 overflow-y-auto rounded-xl"
-                >
+              {isMobile ? (
+                <div className="space-y-0.5">
                   <DropdownMenuItem
-                    onClick={() => onSupport("faq")}
-                    className="focus-visible:ring-0 focus-visible:outline-none"
+                    onSelect={e => {
+                      e.preventDefault();
+                      setSupportExpanded(prev => !prev);
+                    }}
+                    className="flex cursor-pointer items-center justify-between focus-visible:ring-0 focus-visible:outline-none"
+                    aria-expanded={isSupportActive}
                   >
-                    <HelpCircle className="mr-2 size-4" />
-                    FAQ
-                    <ExternalLink className="ml-auto size-3.5 text-muted-foreground" />
+                    <div className="flex items-center">
+                      <Headset className="mr-2 size-4" />
+                      <span>Help &amp; Support</span>
+                    </div>
+                    <ChevronDown
+                      className={cn(
+                        "size-3.5 text-muted-foreground transition-transform duration-200",
+                        isSupportActive ? "rotate-180" : "rotate-0"
+                      )}
+                    />
                   </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => onSupport("privacy")}
-                    className="focus-visible:ring-0 focus-visible:outline-none"
+                  {isSupportActive && (
+                    <MobileSupportMenuItems onSupport={onSupport} />
+                  )}
+                </div>
+              ) : (
+                <DropdownMenuSub open={previewSupportOpen || undefined}>
+                  <DropdownMenuSubTrigger className="focus-visible:ring-0 focus-visible:outline-none">
+                    <Headset className="mr-2 size-4" />
+                    Help &amp; Support
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent
+                    sideOffset={8}
+                    collisionPadding={12}
+                    className="max-h-[calc(100dvh-1.5rem)] w-52 overflow-y-auto rounded-xl"
                   >
-                    <ShieldCheck className="mr-2 size-4" />
-                    Privacy Policy
-                    <ExternalLink className="ml-auto size-3.5 text-muted-foreground" />
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => onSupport("terms")}
-                    className="focus-visible:ring-0 focus-visible:outline-none"
-                  >
-                    <FileText className="mr-2 size-4" />
-                    Terms of Service
-                    <ExternalLink className="ml-auto size-3.5 text-muted-foreground" />
-                  </DropdownMenuItem>
-                </DropdownMenuSubContent>
-              </DropdownMenuSub>
+                    <DropdownMenuItem
+                      onClick={() => onSupport("faq")}
+                      className="focus-visible:ring-0 focus-visible:outline-none"
+                    >
+                      <HelpCircle className="mr-2 size-4" />
+                      FAQ
+                      <ExternalLink className="ml-auto size-3.5 text-muted-foreground" />
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => onSupport("privacy")}
+                      className="focus-visible:ring-0 focus-visible:outline-none"
+                    >
+                      <ShieldCheck className="mr-2 size-4" />
+                      Privacy Policy
+                      <ExternalLink className="ml-auto size-3.5 text-muted-foreground" />
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => onSupport("terms")}
+                      className="focus-visible:ring-0 focus-visible:outline-none"
+                    >
+                      <FileText className="mr-2 size-4" />
+                      Terms of Service
+                      <ExternalLink className="ml-auto size-3.5 text-muted-foreground" />
+                    </DropdownMenuItem>
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+              )}
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 onClick={onLogout}
@@ -461,6 +499,7 @@ const ConversationGroup = memo(function ConversationGroup({
   emptyText,
   openMenuId,
   onMenuOpenChange,
+  isMobile,
 }: {
   label: string;
   conversations: Conversation[];
@@ -482,6 +521,7 @@ const ConversationGroup = memo(function ConversationGroup({
   emptyText?: string;
   openMenuId?: string | null;
   onMenuOpenChange?: (id: string | null) => void;
+  isMobile?: boolean;
 }) {
   const [expanded, setExpanded] = useState(true);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
@@ -555,6 +595,7 @@ const ConversationGroup = memo(function ConversationGroup({
                       onShare={onShare}
                       onExport={onExport}
                       onDelete={onDelete}
+                      isMobile={isMobile}
                     />
                   </>
                 )}
@@ -614,7 +655,7 @@ const ConversationInlineRename = memo(function ConversationInlineRename({
   );
 });
 
-const ConversationActionsMenu = memo(function ConversationActionsMenu({
+export const ConversationActionsMenu = memo(function ConversationActionsMenu({
   conversation,
   isMenuOpen,
   onMenuOpenChange,
@@ -625,6 +666,7 @@ const ConversationActionsMenu = memo(function ConversationActionsMenu({
   onShare,
   onExport,
   onDelete,
+  isMobile: isMobileProp,
 }: {
   conversation: Conversation;
   isMenuOpen: boolean;
@@ -636,7 +678,19 @@ const ConversationActionsMenu = memo(function ConversationActionsMenu({
   onShare: (conversation: Conversation) => void;
   onExport: (conversation: Conversation, format: "pdf" | "word") => void;
   onDelete: (conversation: Conversation) => void;
+  isMobile?: boolean;
 }) {
+  const isMobileDetected = useIsMobile(1024);
+  const isMobile = isMobileProp ?? isMobileDetected;
+  const [isExportOpen, setIsExportOpen] = useState(false);
+
+  // Reset export expansion when menu closes
+  React.useEffect(() => {
+    if (!isMenuOpen) {
+      setIsExportOpen(false);
+    }
+  }, [isMenuOpen]);
+
   return (
     <DropdownMenu open={isMenuOpen} onOpenChange={onMenuOpenChange}>
       <DropdownMenuTrigger asChild>
@@ -658,8 +712,8 @@ const ConversationActionsMenu = memo(function ConversationActionsMenu({
       <DropdownMenuContent
         align="end"
         sideOffset={4}
-        collisionPadding={8}
-        className="w-44 rounded-xl"
+        collisionPadding={12}
+        className="max-h-[calc(100dvh-2rem)] w-48 max-w-[calc(100vw-1.5rem)] overflow-y-auto rounded-xl shadow-xl"
       >
         <DropdownMenuItem onClick={() => onRename(conversation)}>
           <Pencil className="mr-2 size-4" />
@@ -681,26 +735,56 @@ const ConversationActionsMenu = memo(function ConversationActionsMenu({
           <CopyPlus className="mr-2 size-4" />
           Duplicate
         </DropdownMenuItem>
-        <DropdownMenuSub>
-          <DropdownMenuSubTrigger>
-            <Download className="mr-2 size-4" />
-            Export
-          </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent
-            sideOffset={6}
-            collisionPadding={12}
-            className="w-44 rounded-xl"
-          >
-            <DropdownMenuItem onClick={() => onExport(conversation, "pdf")}>
-              <PdfFileIcon className="mr-2 size-5" />
-              Download PDF
+        {isMobile ? (
+          <div className="space-y-0.5">
+            <DropdownMenuItem
+              onSelect={e => {
+                e.preventDefault();
+                setIsExportOpen(prev => !prev);
+              }}
+              className="flex cursor-pointer items-center justify-between"
+              aria-expanded={isExportOpen}
+            >
+              <div className="flex items-center">
+                <Download className="mr-2 size-4" />
+                <span>Export</span>
+              </div>
+              <ChevronDown
+                className={cn(
+                  "size-3.5 text-muted-foreground transition-transform duration-200",
+                  isExportOpen ? "rotate-180" : "rotate-0"
+                )}
+              />
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => onExport(conversation, "word")}>
-              <WordFileIcon className="mr-2 size-5" />
-              Download Word
-            </DropdownMenuItem>
-          </DropdownMenuSubContent>
-        </DropdownMenuSub>
+            {isExportOpen && (
+              <MobileExportMenuItems
+                conversation={conversation}
+                onExport={onExport}
+              />
+            )}
+          </div>
+        ) : (
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger>
+              <Download className="mr-2 size-4" />
+              Export
+            </DropdownMenuSubTrigger>
+            <DropdownMenuSubContent
+              sideOffset={6}
+              collisionPadding={12}
+              className="w-44 rounded-xl"
+            >
+              <DropdownMenuItem onClick={() => onExport(conversation, "pdf")}>
+                <PdfFileIcon className="mr-2 size-5" />
+                Download PDF
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onExport(conversation, "word")}>
+                <WordFileIcon className="mr-2 size-5" />
+                Download Word
+              </DropdownMenuItem>
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
+        )}
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onClick={() => onDelete(conversation)}
@@ -711,6 +795,74 @@ const ConversationActionsMenu = memo(function ConversationActionsMenu({
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
+  );
+});
+
+export const MobileSupportMenuItems = memo(function MobileSupportMenuItems({
+  onSupport,
+}: {
+  onSupport: (topic: "faq" | "privacy" | "terms") => void;
+}) {
+  return (
+    <div
+      className="mx-1 my-1 space-y-0.5 rounded-lg border border-border/40 bg-accent/35 p-1"
+      data-testid="mobile-support-menu-items"
+    >
+      <DropdownMenuItem
+        onClick={() => onSupport("faq")}
+        className="flex cursor-pointer items-center gap-2 rounded-md py-2 pl-2.5 pr-2 text-xs font-medium focus-visible:ring-0 focus-visible:outline-none"
+      >
+        <HelpCircle className="mr-2 size-3.5 text-muted-foreground" />
+        <span>FAQ</span>
+        <ExternalLink className="ml-auto size-3 text-muted-foreground" />
+      </DropdownMenuItem>
+      <DropdownMenuItem
+        onClick={() => onSupport("privacy")}
+        className="flex cursor-pointer items-center gap-2 rounded-md py-2 pl-2.5 pr-2 text-xs font-medium focus-visible:ring-0 focus-visible:outline-none"
+      >
+        <ShieldCheck className="mr-2 size-3.5 text-muted-foreground" />
+        <span>Privacy Policy</span>
+        <ExternalLink className="ml-auto size-3 text-muted-foreground" />
+      </DropdownMenuItem>
+      <DropdownMenuItem
+        onClick={() => onSupport("terms")}
+        className="flex cursor-pointer items-center gap-2 rounded-md py-2 pl-2.5 pr-2 text-xs font-medium focus-visible:ring-0 focus-visible:outline-none"
+      >
+        <FileText className="mr-2 size-3.5 text-muted-foreground" />
+        <span>Terms of Service</span>
+        <ExternalLink className="ml-auto size-3 text-muted-foreground" />
+      </DropdownMenuItem>
+    </div>
+  );
+});
+
+export const MobileExportMenuItems = memo(function MobileExportMenuItems({
+  conversation,
+  onExport,
+}: {
+  conversation: Conversation;
+  onExport: (conversation: Conversation, format: "pdf" | "word") => void;
+}) {
+  return (
+    <div
+      className="mx-1 my-1 space-y-0.5 rounded-lg border border-border/40 bg-accent/35 p-1"
+      data-testid="mobile-export-menu-items"
+    >
+      <DropdownMenuItem
+        onClick={() => onExport(conversation, "pdf")}
+        className="flex cursor-pointer items-center gap-2 rounded-md py-2 pl-2.5 pr-2 text-xs font-medium"
+      >
+        <PdfFileIcon className="mr-2 size-4 shrink-0" />
+        <span>Download PDF</span>
+      </DropdownMenuItem>
+      <DropdownMenuItem
+        onClick={() => onExport(conversation, "word")}
+        className="flex cursor-pointer items-center gap-2 rounded-md py-2 pl-2.5 pr-2 text-xs font-medium"
+      >
+        <WordFileIcon className="mr-2 size-4 shrink-0" />
+        <span>Download Word</span>
+      </DropdownMenuItem>
+    </div>
   );
 });
 
