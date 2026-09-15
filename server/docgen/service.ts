@@ -12,7 +12,8 @@ import {
 } from "../supabase-db";
 import { generateDocument, type GeneratedArtifact } from "./generate";
 import type { DocBlock, DocumentSpec, DocFormat, SourceReference } from "./spec";
-import { DEFAULT_PRESENTATION_CONFIG } from "@shared/presentation";
+import { DEFAULT_PRESENTATION_CONFIG, normalizeStyleId, type PptVisualStyle, type PptConcreteStyle } from "@shared/presentation";
+import { pickAutoTheme } from "@shared/pptThemes";
 import { sanitizePresentationConfig, sanitizeStyleName } from "./presentation/config";
 import { sanitizeFilename, FORMAT_MIME, coerceBlocks, coerceSheets, coerceSlides } from "./spec";
 import type { DocumentPlan } from "./plan";
@@ -166,13 +167,28 @@ export async function runDocumentPipeline(input: {
   // Sanitize the user's PowerPoint preferences once at the pipeline boundary.
   // Every pptx goes through the canonical engine, so when no config was sent
   // the safe default is used — the artifact always embeds ppt/canonical.json
-  // and the in-project preview always renders the real design.
-  const pptxConfig =
-    format === "pptx"
-      ? sanitizePresentationConfig(presentationConfig ?? DEFAULT_PRESENTATION_CONFIG)
-      : undefined;
-  const pptxStyle =
-    format === "pptx" ? sanitizeStyleName(presentationStyle) : undefined;
+  let lockedStyle: PptConcreteStyle | undefined;
+  let pptxConfig: import("@shared/presentation").PresentationConfig | undefined;
+
+  if (format === "pptx") {
+    pptxConfig = sanitizePresentationConfig(presentationConfig ?? DEFAULT_PRESENTATION_CONFIG);
+
+    let selectedStyle: PptVisualStyle = "auto";
+    if (presentationStyle && presentationStyle !== "auto") {
+      selectedStyle = normalizeStyleId(presentationStyle);
+    } else if (pptxConfig.visualStyle && pptxConfig.visualStyle !== "auto") {
+      selectedStyle = normalizeStyleId(pptxConfig.visualStyle);
+    }
+
+    if (selectedStyle !== "auto") {
+      lockedStyle = selectedStyle as PptConcreteStyle;
+    } else {
+      lockedStyle = pickAutoTheme(userMessage).key as PptConcreteStyle;
+    }
+
+    pptxConfig.visualStyle = lockedStyle;
+    console.log(`[PPT Pipeline] Style selected: "${selectedStyle}" -> Authoritatively locked to: "${lockedStyle}"`);
+  }
 
   const plan = await planDocument(
     userMessage,
@@ -182,6 +198,7 @@ export async function runDocumentPipeline(input: {
     {
       slideTarget:
         pptxConfig && pptxConfig.slides !== "auto" ? pptxConfig.slides : undefined,
+      visualStyle: lockedStyle,
     }
   );
 
@@ -201,7 +218,7 @@ export async function runDocumentPipeline(input: {
   // Carry the user's PowerPoint design choices into the spec so the canonical
   // layout engine and the exported file honor them.
   if (plan.format === "pptx" && pptxConfig) {
-    spec.pptx = { config: pptxConfig, styleName: pptxStyle };
+    spec.pptx = { config: pptxConfig, styleName: lockedStyle };
   }
 
   // Attach research sources to the spec

@@ -29,8 +29,29 @@ export type PptSlidesConfig =
   | 14
   | 15;
 
+export type PptConcreteStyle =
+  | "minimal"
+  | "visual"
+  | "classic"
+  | "consultant"
+  | "editorial"
+  | "modern"
+  | "bold"
+  | "elegant"
+  | "professional"
+  | "creative"
+  | "tech"
+  | "cinematic"
+  | "playful"
+  | "luxury"
+  | "academic"
+  | "futuristic"
+  | "storytelling";
+
 export type PptVisualStyle =
   | "auto"
+  | PptConcreteStyle
+  // Backward compatibility with capitalized input
   | "Minimal"
   | "Visual"
   | "Classic"
@@ -48,6 +69,65 @@ export type PptVisualStyle =
   | "Academic"
   | "Futuristic"
   | "Storytelling";
+
+export const PPT_CONCRETE_STYLES: readonly PptConcreteStyle[] = [
+  "minimal",
+  "visual",
+  "classic",
+  "consultant",
+  "editorial",
+  "modern",
+  "bold",
+  "elegant",
+  "professional",
+  "creative",
+  "tech",
+  "cinematic",
+  "playful",
+  "luxury",
+  "academic",
+  "futuristic",
+  "storytelling",
+] as const;
+
+export const PPT_STYLE_OPTIONS: PptVisualStyle[] = [
+  "auto",
+  ...PPT_CONCRETE_STYLES,
+];
+
+/** Normalizes any style string to the canonical lowercase identifier. */
+export function normalizeStyleId(raw: unknown): PptVisualStyle {
+  if (!raw || typeof raw !== "string") return "auto";
+  const lower = raw.trim().toLowerCase();
+  if (lower === "auto") return "auto";
+  if ((PPT_CONCRETE_STYLES as readonly string[]).includes(lower)) {
+    return lower as PptConcreteStyle;
+  }
+  return "auto";
+}
+
+/** Returns the user-facing display label for a style ID. */
+export function getStyleDisplayName(style: PptVisualStyle): string {
+  const norm = normalizeStyleId(style);
+  if (norm === "auto") return "Auto";
+  return norm.charAt(0).toUpperCase() + norm.slice(1);
+}
+
+/** Guarantees a hex string is valid CSS with leading '#' if not already prefixed. */
+export function asCssColor(color?: string): string {
+  if (!color) return "transparent";
+  const trimmed = color.trim();
+  if (
+    trimmed.startsWith("#") ||
+    trimmed.startsWith("rgb") ||
+    trimmed.startsWith("hsl") ||
+    trimmed === "transparent" ||
+    trimmed === "inherit"
+  ) {
+    return trimmed;
+  }
+  return `#${trimmed}`;
+}
 
 export type PptLayoutStrategy =
   | "auto"
@@ -102,28 +182,6 @@ export const PPT_SLIDES_OPTIONS: PptSlidesConfig[] = [
   14,
   15,
 ];
-
-export const PPT_STYLE_OPTIONS: PptVisualStyle[] = [
-  "auto",
-  "Minimal",
-  "Visual",
-  "Classic",
-  "Consultant",
-  "Editorial",
-  "Modern",
-  "Bold",
-  "Elegant",
-  "Professional",
-  "Creative",
-  "Tech",
-  "Cinematic",
-  "Playful",
-  "Luxury",
-  "Academic",
-  "Futuristic",
-  "Storytelling",
-];
-
 
 export const PPT_LAYOUT_OPTIONS: PptLayoutStrategy[] = [
   "auto",
@@ -245,6 +303,9 @@ export type PptPresentationSpec = {
   title: string;
   themeKey: string;
   style: string;
+  selectedStyle?: string;
+  resolvedStyle?: string;
+  styleVersion?: string;
   config: PresentationConfig;
   slides: PptSlideSpec[];
 };

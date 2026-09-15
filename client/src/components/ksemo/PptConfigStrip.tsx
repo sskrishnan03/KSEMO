@@ -2,6 +2,7 @@ import * as React from "react";
 import {
   PPT_SLIDES_OPTIONS,
   PPT_STYLE_OPTIONS,
+  getStyleDisplayName,
   type PptVisualStyle,
   type PptSlidesConfig,
   type PresentationConfig,
@@ -76,7 +77,7 @@ function ThemeCard(props: {
         style={{ height: LABEL_H, flex: "0 0 auto" }}
       >
         <span className="min-w-0 truncate leading-tight">
-          {name === "auto" ? "Auto" : name}
+          {getStyleDisplayName(name)}
         </span>
         {selected && (
           <span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-white text-black">
@@ -117,7 +118,7 @@ function StylePicker(props: {
       <Select value={value} onValueChange={v => onChange(v as PptVisualStyle)}>
         <SelectTrigger className="w-full rounded-full border border-border bg-popover">
           <span className="whitespace-nowrap">
-            {`Visual style${value ? ": " + (value === "auto" ? "Auto" : value) : ""}`}
+            {`Visual style${value ? ": " + getStyleDisplayName(value) : ""}`}
           </span>
         </SelectTrigger>
         <SelectContent

@@ -9,6 +9,7 @@ import {
   type PptPresentationSpec,
   type PptVisualStyle,
   type PresentationConfig,
+  DEFAULT_PRESENTATION_CONFIG,
 } from "@shared/presentation";
 import type { SlideDefinition } from "../spec";
 import { buildPresentationSpec } from "./layout";
@@ -37,13 +38,14 @@ export function buildDeckSpec(args: BuildDeckArgs): {
   violations: Violation[];
   repairs: number;
 } {
-  const target = typeof args.config.slides === "number" ? args.config.slides : undefined;
+  const cfg = args.config ?? DEFAULT_PRESENTATION_CONFIG;
+  const target = typeof cfg?.slides === "number" ? cfg.slides : undefined;
   const slides = target ? adjustSlideCount(args.slides, target) : args.slides;
 
   let spec = buildPresentationSpec({
     title: args.title,
     slides,
-    config: args.config,
+    config: cfg,
     styleName: args.styleName,
     footerLabel: args.footerLabel,
     notes: args.notes,

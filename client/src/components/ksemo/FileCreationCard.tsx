@@ -27,7 +27,14 @@ import {
   type SheetPreview,
   type SlidePreview,
 } from "@/lib/filePreview";
+import {
+  asCssColor,
+  type PptPresentationSpec,
+  SLIDE_WIDTH_IN,
+  SLIDE_HEIGHT_IN,
+} from "@shared/presentation";
 import { usePdfViewer, isViewableDocument } from "@/contexts/PdfViewerContext";
+import { isLightOrWhiteBorder } from "@/components/ksemo/PdfDrawer";
 
 export type FileCreationStage =
   | "analyzing"
@@ -899,44 +906,139 @@ function CsvMini({ rows, width }: { rows: string[][]; width: number }) {
 
 function SlideMini({
   slides,
+  spec,
   width,
 }: {
   slides: SlidePreview[];
+  spec?: PptPresentationSpec;
   width: number;
 }) {
+  if (spec && spec.slides && spec.slides.length > 0) {
+    const firstSlide = spec.slides[0];
+    const bg = asCssColor(firstSlide.background);
+    return (
+      <MiniPage
+        width={width}
+        contentWidth={640}
+        contentHeight={360}
+        className="shadow-2xl ring-1 ring-black/10"
+      >
+        <div
+          style={{ width: 640, height: 360, background: bg }}
+          className="relative overflow-hidden select-none"
+        >
+          {firstSlide.elements.map((el, idx) => {
+            const xPct = (el.box.x / SLIDE_WIDTH_IN) * 100;
+            const yPct = (el.box.y / SLIDE_HEIGHT_IN) * 100;
+            const wPct = (el.box.w / SLIDE_WIDTH_IN) * 100;
+            const hPct = (el.box.h / SLIDE_HEIGHT_IN) * 100;
+
+            if (el.kind === "text") {
+              return (
+                <div
+                  key={idx}
+                  style={{
+                    position: "absolute",
+                    left: `${xPct}%`,
+                    top: `${yPct}%`,
+                    width: `${wPct}%`,
+                    height: `${hPct}%`,
+                    color: asCssColor(el.color),
+                    fontSize: `${Math.max(el.fontSize * 0.5, 7.5)}px`,
+                    fontWeight: el.bold ? 700 : 400,
+                    fontFamily: el.font,
+                    fontStyle: el.italic ? "italic" : "normal",
+                    opacity: (el.opacity ?? 100) / 100,
+                    lineHeight: 1.15,
+                    overflow: "hidden",
+                    display: "flex",
+                    alignItems:
+                      el.valign === "bottom"
+                        ? "flex-end"
+                        : el.valign === "middle"
+                          ? "center"
+                          : "flex-start",
+                    justifyContent:
+                      el.align === "center"
+                        ? "center"
+                        : el.align === "right"
+                          ? "flex-end"
+                          : "flex-start",
+                    textAlign: el.align ?? "left",
+                  }}
+                >
+                  <span className="truncate">{el.text}</span>
+                </div>
+              );
+            }
+
+            if (el.kind === "shape") {
+              const fill = el.fill
+                ? asCssColor(el.fill)
+                : el.lineColor
+                  ? "transparent"
+                  : "#000";
+              const hasWhiteOrLightBorder = isLightOrWhiteBorder(el.lineColor);
+              const shouldRenderBorder = Boolean(
+                el.lineColor &&
+                !hasWhiteOrLightBorder &&
+                (el.shape === "line" || !el.fill)
+              );
+              return (
+                <div
+                  key={idx}
+                  style={{
+                    position: "absolute",
+                    left: `${xPct}%`,
+                    top: `${yPct}%`,
+                    width: `${wPct}%`,
+                    height: `${hPct}%`,
+                    background: el.shape === "line" ? undefined : fill,
+                    border: shouldRenderBorder
+                      ? `1px solid ${asCssColor(el.lineColor)}`
+                      : undefined,
+                    borderRadius:
+                      el.shape === "ellipse"
+                        ? "50%"
+                        : el.shape === "roundRect"
+                          ? "4px"
+                          : undefined,
+                    opacity:
+                      el.opacity !== undefined ? el.opacity / 100 : undefined,
+                  }}
+                />
+              );
+            }
+
+            return null;
+          })}
+        </div>
+      </MiniPage>
+    );
+  }
+
   const slide = slides[0];
   if (!slide) return null;
   const bullets = slide.items.filter(item => !item.isTitle);
 
   return (
     <MiniPage width={width} contentWidth={320} contentHeight={180}>
-      <div className="flex h-full flex-col justify-between p-4">
+      <div className="flex h-full flex-col justify-between p-4 bg-neutral-900 text-neutral-100">
         <div>
-          <div className="mb-2 flex items-center gap-1.5">
-            <span className="h-1 w-6 rounded-full bg-orange-500" />
-            <span className="text-[8px] font-semibold tracking-widest text-neutral-400 uppercase">
-              Slide 1
-            </span>
-          </div>
-          <h2 className="text-[19px] leading-tight font-bold text-neutral-900">
+          <h2 className="text-[17px] leading-tight font-bold text-white truncate">
             {slide.title}
           </h2>
         </div>
 
-        <div className="mt-2 space-y-1.5">
-          {bullets.slice(0, 4).map((item, idx) => (
+        <div className="mt-2 space-y-1.5 flex-1">
+          {bullets.slice(0, 3).map((item, idx) => (
             <div key={idx} className="flex items-start gap-1.5">
-              <span className="mt-[2px] h-1 w-1 shrink-0 rounded-full bg-orange-500/80" />
-              <p className="text-[12px] leading-snug text-neutral-600">
+              <span className="mt-[3px] h-1 w-1 shrink-0 rounded-full bg-neutral-400" />
+              <p className="text-[11px] leading-snug text-neutral-300 truncate">
                 {item.text}
               </p>
             </div>
           ))}
-        </div>
-
-        <div className="flex items-center justify-between border-t border-neutral-200 pt-1.5 text-[8px] font-medium text-neutral-400">
-          <span>Presentation</span>
-          <span>1 of {slides.length}</span>
         </div>
       </div>
     </MiniPage>
@@ -1045,8 +1147,12 @@ function FileDocumentPreview({
       );
       break;
     case "pptx":
-      body = data.slides.length ? (
-        <SlideMini slides={data.slides} width={pageWidth} />
+      body = data.slides.length || data.spec ? (
+        <SlideMini
+          slides={data.slides}
+          spec={data.spec}
+          width={pageWidth}
+        />
       ) : (
         <PreviewFallback
           variant={variant}

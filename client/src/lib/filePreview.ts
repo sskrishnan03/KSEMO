@@ -18,6 +18,10 @@
  */
 
 import { getDocumentProxy } from "unpdf";
+import {
+  CANONICAL_PART_NAME,
+  type PptPresentationSpec,
+} from "@shared/presentation";
 
 export type SlidePreviewItem = {
   text: string;
@@ -40,7 +44,7 @@ export type FilePreviewData =
   | { kind: "pdf"; pageImageUrl: string; pageCount: number }
   | { kind: "docx"; html: string }
   | { kind: "xlsx"; sheets: SheetPreview[] }
-  | { kind: "pptx"; slides: SlidePreview[] }
+  | { kind: "pptx"; slides: SlidePreview[]; spec?: PptPresentationSpec }
   | { kind: "csv"; rows: string[][] }
   | { kind: "text"; text: string; isMarkdown: boolean }
   | { kind: "error"; message: string };
@@ -172,6 +176,23 @@ async function loadPptxPreview(response: Response): Promise<FilePreviewData> {
   const buffer = await response.arrayBuffer();
   const JSZip = (await import("jszip")).default;
   const zip = await JSZip.loadAsync(buffer);
+
+  // If the .pptx embeds its canonical presentation spec at ppt/canonical.json,
+  // parse and preserve it so the preview can faithfully render the exact design.
+  let canonicalSpec: PptPresentationSpec | undefined;
+  const canonicalFile = zip.files[CANONICAL_PART_NAME] || zip.files["ppt/canonical.json"];
+  if (canonicalFile) {
+    try {
+      const raw = await canonicalFile.async("string");
+      const parsed = JSON.parse(raw) as PptPresentationSpec;
+      if (parsed && parsed.version === 1 && Array.isArray(parsed.slides)) {
+        canonicalSpec = parsed;
+      }
+    } catch {
+      // Non-critical, fall back to XML parsing
+    }
+  }
+
   const slideFileNames = Object.keys(zip.files)
     .filter(name => /^ppt\/slides\/slide\d+\.xml$/.test(name))
     .sort((a, b) => {
@@ -214,7 +235,7 @@ async function loadPptxPreview(response: Response): Promise<FilePreviewData> {
     });
   }
 
-  return { kind: "pptx", slides };
+  return { kind: "pptx", slides, spec: canonicalSpec };
 }
 
 async function loadCsvPreview(response: Response): Promise<FilePreviewData> {

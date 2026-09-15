@@ -8,11 +8,11 @@
 
 import {
   DEFAULT_PRESENTATION_CONFIG,
-  PPT_STYLE_OPTIONS,
   PPT_LAYOUT_OPTIONS,
   PPT_DENSITY_OPTIONS,
   PPT_VISUALS_OPTIONS,
   PPT_SLIDES_OPTIONS,
+  normalizeStyleId,
   type PptVisualStyle,
   type PresentationConfig,
   type PptSlidesConfig,
@@ -45,7 +45,7 @@ export function sanitizePresentationConfig(raw: unknown): PresentationConfig {
         : DEFAULT_PRESENTATION_CONFIG.slides;
   return {
     slides,
-    visualStyle: pick(src.visualStyle, PPT_STYLE_OPTIONS, DEFAULT_PRESENTATION_CONFIG.visualStyle),
+    visualStyle: normalizeStyleId(src.visualStyle),
     layout: pick(src.layout, PPT_LAYOUT_OPTIONS, DEFAULT_PRESENTATION_CONFIG.layout),
     density: pick(src.density, PPT_DENSITY_OPTIONS, DEFAULT_PRESENTATION_CONFIG.density),
     visuals: pick(src.visuals, PPT_VISUALS_OPTIONS, DEFAULT_PRESENTATION_CONFIG.visuals),
@@ -53,7 +53,7 @@ export function sanitizePresentationConfig(raw: unknown): PresentationConfig {
 }
 
 export function sanitizeStyleName(raw: unknown): PptVisualStyle | undefined {
-  if (raw === "auto" || raw === undefined || raw === null) return undefined;
-  const picked = pick(raw, PPT_STYLE_OPTIONS, "auto" as PptVisualStyle);
-  return picked === "auto" ? undefined : picked;
+  if (raw === "auto" || raw === undefined || raw === null || raw === "") return undefined;
+  const norm = normalizeStyleId(raw);
+  return norm === "auto" ? undefined : norm;
 }

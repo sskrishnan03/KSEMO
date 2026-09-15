@@ -554,7 +554,6 @@ export async function generatePptx(spec: DocumentSpec): Promise<Buffer> {
     slides,
     config: spec.pptx?.config ?? DEFAULT_PRESENTATION_CONFIG,
     styleName: spec.pptx?.styleName,
-    footerLabel: spec.title || "KSEMO",
   });
   return deck.buffer;
 

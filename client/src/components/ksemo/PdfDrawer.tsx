@@ -1,4 +1,4 @@
-﻿import React, {
+import React, {
   memo,
   useCallback,
   useEffect,
@@ -26,10 +26,13 @@ import { FileBrandMark, brandVariantForExt } from "./FileBrandIcons";
 import {
   ChevronLeft,
   ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
   Download,
   Minus,
   Pencil,
   Plus,
+  Presentation,
   Redo2,
   Save,
   Undo2,
@@ -41,8 +44,10 @@ import {
   CANONICAL_PART_NAME,
   SLIDE_WIDTH_IN,
   SLIDE_HEIGHT_IN,
+  asCssColor,
   type PptElement,
   type PptPresentationSpec,
+  type PptSlideSpec,
 } from "@shared/presentation";
 
 interface LinkAnnotation {
@@ -455,9 +460,56 @@ async function parseCanonicalSpec(buffer: ArrayBuffer): Promise<PptPresentationS
   }
 }
 
-interface PresentationPreviewProps {
+export function isPageNumberOrFileFooter(
+  text?: string,
+  filename?: string
+): boolean {
+  if (!text) return false;
+  const trimmed = text.trim();
+  if (!trimmed) return false;
+  // Match pure numbers, e.g. "1", "01"
+  if (/^\d+$/.test(trimmed)) return true;
+  // Match "1 of 5", "Slide 1 of 5", "Page 2 / 10", "1/5", etc.
+  if (/^(slide|page)?\s*#?\d+(\s*(of|\/)\s*\d+)?\.?$/i.test(trimmed)) return true;
+  if (/^\d+\s*[\/of]\s*\d+$/i.test(trimmed)) return true;
+  if (/^(slide|page)\s*#?\d+$/i.test(trimmed)) return true;
+  if (filename) {
+    const fnLower = filename.toLowerCase();
+    const baseFn = filename.replace(/\.[^.]+$/, "").toLowerCase();
+    const tLower = trimmed.toLowerCase();
+    if (tLower === fnLower || tLower === baseFn) return true;
+    if (
+      baseFn.length >= 3 &&
+      (tLower.startsWith(baseFn) || tLower.endsWith(baseFn))
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+export function isLightOrWhiteBorder(color?: string): boolean {
+  if (!color) return true;
+  const c = color.trim().toLowerCase().replace(/^#/, "");
+  if (c === "white" || c === "fff" || c === "ffffff" || c === "transparent") return true;
+  if (/^(e4e7ec|e2e5ea|d7e2ee|e2dcd1|e3daca|dcdfe8|e2dfd3|e1e7f0|cfe0f5|d6e2ee|e4dcc8|e0dfe6|d9e2dc|e6ddce)$/i.test(c)) {
+    return true;
+  }
+  if (/^[0-9a-f]{6}$/i.test(c)) {
+    const r = parseInt(c.slice(0, 2), 16);
+    const g = parseInt(c.slice(2, 4), 16);
+    const b = parseInt(c.slice(4, 6), 16);
+    if (r > 210 && g > 210 && b > 210) return true;
+  }
+  return false;
+}
+
+export interface PresentationPreviewProps {
   spec: PptPresentationSpec;
-  scale: number;
+  scale?: number;
+  slideWidth?: number;
+  slideHeight?: number;
+  filename?: string;
   onPageVisible?: (slideNumber: number) => void;
 }
 
@@ -503,7 +555,7 @@ function renderPptElement(
                 : el.align === "right"
                   ? "flex-end"
                   : "flex-start",
-            color: el.color,
+            color: asCssColor(el.color),
             fontSize: fontPx(el.fontSize),
             fontWeight: el.bold ? "700" : "400",
             fontFamily: el.font,
@@ -526,13 +578,23 @@ function renderPptElement(
       );
     }
     case "shape": {
-      const fill = el.fill ?? (el.lineColor ? "transparent" : "#000");
+      const fill = el.fill
+        ? asCssColor(el.fill)
+        : el.lineColor
+          ? "transparent"
+          : "#000";
+      const hasWhiteOrLightBorder = isLightOrWhiteBorder(el.lineColor);
+      const shouldDrawBorder = Boolean(
+        el.lineColor &&
+        !hasWhiteOrLightBorder &&
+        (el.shape === "line" || !el.fill)
+      );
       const base: React.CSSProperties = {
         ...style,
         background:
           el.shape === "line" ? undefined : fill,
-        border: el.lineColor
-          ? `calc(var(--s) * ${scl(Math.max(el.lineWidth ?? 1, 1))}) solid ${el.lineColor}`
+        border: shouldDrawBorder
+          ? `calc(var(--s) * ${scl(Math.max(el.lineWidth ?? 1, 1))}) solid ${asCssColor(el.lineColor)}`
           : undefined,
         // opacity is a 0-100 alpha; express the true alpha in CSS form.
         opacity: el.opacity !== undefined ? el.opacity / 100 : undefined,
@@ -615,12 +677,14 @@ function renderPptElement(
                   <th
                     key={i}
                     style={{
-                      background: el.headerFill,
-                      color: el.headerColor,
+                      background: asCssColor(el.headerFill),
+                      color: asCssColor(el.headerColor),
                       textAlign: "left",
                       padding: `calc(var(--s) * ${scl(3)}) calc(var(--s) * ${scl(5)})`,
                       fontWeight: "700",
-                      border: `1px solid ${el.borderColor}`,
+                      border: isLightOrWhiteBorder(el.borderColor)
+                        ? undefined
+                        : `1px solid ${asCssColor(el.borderColor)}`,
                     }}
                   >
                     {h}
@@ -630,14 +694,16 @@ function renderPptElement(
             </thead>
             <tbody>
               {el.rows.map((row, r) => (
-                <tr key={r} style={{ background: r % 2 === 1 ? el.altRowFill : el.rowFill }}>
+                <tr key={r} style={{ background: r % 2 === 1 ? asCssColor(el.altRowFill) : asCssColor(el.rowFill) }}>
                   {row.map((cell, c) => (
                     <td
                       key={c}
                       style={{
-                        color: el.textColor,
+                        color: asCssColor(el.textColor),
                         padding: `calc(var(--s) * ${scl(3)}) calc(var(--s) * ${scl(5)})`,
-                        border: `1px solid ${el.borderColor}`,
+                        border: isLightOrWhiteBorder(el.borderColor)
+                          ? undefined
+                          : `1px solid ${asCssColor(el.borderColor)}`,
                       }}
                     >
                       {cell}
@@ -665,7 +731,7 @@ function renderPptElement(
         >
           {el.data.map((d, i) => {
             const ratio = d.value / maxVal;
-            const fill = i % 2 === 0 ? el.color : el.secondaryColor;
+            const fill = i % 2 === 0 ? asCssColor(el.color) : asCssColor(el.secondaryColor);
             return (
               <div
                 key={i}
@@ -683,7 +749,7 @@ function renderPptElement(
                 <div
                   style={{
                     fontSize: `calc(var(--s) * ${scl(7)})`,
-                    color: el.valueColor,
+                    color: asCssColor(el.valueColor),
                     marginBottom: `calc(var(--s) * ${scl(2)})`,
                     lineHeight: 1.1,
                     overflow: "hidden",
@@ -705,7 +771,7 @@ function renderPptElement(
                 <div
                   style={{
                     fontSize: `calc(var(--s) * ${scl(7)})`,
-                    color: el.labelColor,
+                    color: asCssColor(el.labelColor),
                     marginTop: `calc(var(--s) * ${scl(3)})`,
                     lineHeight: 1.1,
                     overflow: "hidden",
@@ -1968,7 +2034,14 @@ export const ExcelViewer = memo(function ExcelViewer({
 // Faithful preview: re-renders the canonical presentation spec used by the
 // server engine, so the in-app preview matches the downloaded .pptx exactly.
 export const PresentationPreview = memo(
-  function PresentationPreview({ spec, scale, onPageVisible }: PresentationPreviewProps) {
+  function PresentationPreview({
+    spec,
+    scale = 1.0,
+    slideWidth,
+    slideHeight,
+    filename,
+    onPageVisible,
+  }: PresentationPreviewProps) {
     const slideElsRef = useRef<Array<HTMLDivElement | null>>([]);
 
     useEffect(() => {
@@ -2019,7 +2092,7 @@ export const PresentationPreview = memo(
             bestIdx = i;
           }
         }
-        const visibleSlide = spec.slides[bestIdx]?.index ?? bestIdx + 1;
+        const visibleSlide = bestIdx + 1;
         if (visibleSlide !== lastVisibleSlide) {
           lastVisibleSlide = visibleSlide;
           onPageVisible(visibleSlide);
@@ -2042,28 +2115,50 @@ export const PresentationPreview = memo(
     return (
       <div
         data-testid="ksemo-presentation-viewer"
-        className="mx-auto flex flex-col items-center gap-4 py-4 w-full"
+        className="mx-auto flex flex-col items-center gap-6 py-4 w-full"
       >
-        {spec.slides.map((slide, idx) => (
-          <div
-            key={slide.index ?? idx}
-            ref={el => {
-              slideElsRef.current[idx] = el;
+        {spec.slides.map((slide, idx) => {
+          const slideNumber = idx + 1;
+          return (
+            <div
+              key={slide.index ?? idx}
+              ref={el => {
+                slideElsRef.current[idx] = el;
+              }}
+              data-testid={`ksemo-ppt-slide-${slideNumber}`}
+              data-slide={slideNumber}
+            className={cn(
+              "relative aspect-[16/9] shadow-2xl rounded-2xl border border-border overflow-hidden select-text transition-all duration-150 shrink-0",
+              slideWidth ? "" : "w-full max-w-[850px] min-h-[460px]"
+            )}
+            style={{
+              width: slideWidth ? `${slideWidth}px` : undefined,
+              height: slideHeight ? `${slideHeight}px` : undefined,
+              zoom: (!slideWidth && scale !== 1.0) ? scale : undefined,
+              background: asCssColor(slide.background),
             }}
-            data-testid={`ksemo-ppt-slide-${idx + 1}`}
-            data-slide={slide.index ?? idx + 1}
-            className="relative aspect-[16/9] w-full max-w-[850px] min-h-[460px] bg-white shadow-2xl rounded-2xl border border-neutral-200/80 overflow-hidden select-text"
-            style={{ zoom: scale !== 1.0 ? scale : undefined }}
           >
             <div
               className="relative h-full w-full"
-              style={{ background: slide.background }}
+              style={{
+                background: asCssColor(slide.background),
+                "--s": slideWidth ? `${slideWidth}px` : undefined,
+              } as React.CSSProperties}
             >
               <ScaleScaler />
-              {slide.elements.map((el, i) => renderPptElement(el, i))}
+              {slide.elements
+                .filter(
+                  el =>
+                    !(
+                      el.kind === "text" &&
+                      isPageNumberOrFileFooter(el.text, filename)
+                    )
+                )
+                .map((el, i) => renderPptElement(el, i))}
             </div>
           </div>
-        ))}
+        );
+      })}
       </div>
     );
   }
@@ -2079,7 +2174,12 @@ function ScaleScaler() {
     const observer = new ResizeObserver(entries => {
       for (const entry of entries) {
         const width = entry.contentRect.width;
-        if (width > 0) el.style.setProperty("--s", `${width}px`);
+        if (width > 0) {
+          el.style.setProperty("--s", `${width}px`);
+          if (el.parentElement) {
+            el.parentElement.style.setProperty("--s", `${width}px`);
+          }
+        }
       }
     });
     observer.observe(el);
@@ -2090,11 +2190,17 @@ function ScaleScaler() {
 
 const PowerPointViewer = memo(function PowerPointViewer({
   slides,
-  scale,
+  scale = 1.0,
+  slideWidth,
+  slideHeight,
+  filename,
   onPageVisible,
 }: {
   slides: SlideData[];
-  scale: number;
+  scale?: number;
+  slideWidth?: number;
+  slideHeight?: number;
+  filename?: string;
   onPageVisible?: (slideNumber: number) => void;
 }) {
   const slideElsRef = useRef<Array<HTMLDivElement | null>>([]);
@@ -2153,7 +2259,7 @@ const PowerPointViewer = memo(function PowerPointViewer({
           bestIdx = i;
         }
       }
-      const visibleSlide = slides[bestIdx]?.slideNumber ?? bestIdx + 1;
+      const visibleSlide = bestIdx + 1;
       if (visibleSlide !== lastVisibleSlide) {
         lastVisibleSlide = visibleSlide;
         onPageVisible(visibleSlide);
@@ -2178,56 +2284,322 @@ const PowerPointViewer = memo(function PowerPointViewer({
   return (
     <div
       data-testid="powerpoint-document-viewer"
-      className="mx-auto flex flex-col items-center gap-4 py-4 w-full"
+      className="mx-auto flex flex-col items-center gap-6 py-4 w-full"
     >
-      {slides.map((slide, idx) => (
-        <div
-          key={slide.slideNumber}
-          ref={el => {
-            slideElsRef.current[idx] = el;
-          }}
-          data-testid={`pptx-slide-${slide.slideNumber}`}
-          data-slide={slide.slideNumber}
-          className="aspect-[16/9] w-full max-w-[850px] min-h-[460px] bg-white text-neutral-900 shadow-2xl rounded-2xl border border-neutral-200/80 p-8 sm:p-14 flex flex-col justify-between select-text transition-transform relative overflow-hidden"
-          style={{ zoom: scale !== 1.0 ? scale : undefined }}
-        >
-          {/* Header */}
-          <div>
-            <div className="flex items-center gap-2 mb-3">
-              <span className="h-1.5 w-6 rounded-full bg-orange-500" />
-              <span className="text-xs uppercase tracking-widest font-semibold text-neutral-400">
-                Slide {slide.slideNumber}
-              </span>
+      {slides.map((slide, idx) => {
+        const slideNumber = idx + 1;
+        return (
+          <div
+            key={slide.slideNumber ?? slideNumber}
+            ref={el => {
+              slideElsRef.current[idx] = el;
+            }}
+            data-testid={`pptx-slide-${slideNumber}`}
+            data-slide={slideNumber}
+            className={cn(
+              "aspect-[16/9] bg-white text-neutral-900 shadow-2xl rounded-2xl border border-border p-8 sm:p-14 flex flex-col justify-between select-text transition-all relative overflow-hidden shrink-0",
+              slideWidth ? "" : "w-full max-w-[850px] min-h-[460px]"
+            )}
+            style={{
+              width: slideWidth ? `${slideWidth}px` : undefined,
+              height: slideHeight ? `${slideHeight}px` : undefined,
+              zoom: !slideWidth && scale !== 1.0 ? scale : undefined,
+            }}
+          >
+            {/* Header */}
+            <div>
+              <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-neutral-900 leading-snug">
+                {slide.title}
+              </h2>
             </div>
-            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-neutral-900 leading-snug">
-              {slide.title}
-            </h2>
-          </div>
 
-          {/* Body */}
-          <div className="my-6 space-y-3.5 flex-1 flex flex-col justify-center">
-            {slide.items
-              .filter(it => !it.isTitle)
-              .map((item, idx) => (
-                <div key={idx} className="flex items-start gap-3">
-                  <span className="size-2 rounded-full bg-orange-500/80 mt-2 shrink-0" />
-                  <p className="text-sm sm:text-base text-neutral-700 leading-relaxed font-normal">
-                    {item.text}
-                  </p>
-                </div>
-              ))}
+            {/* Body */}
+            <div className="my-6 space-y-3.5 flex-1 flex flex-col justify-center">
+              {slide.items
+                .filter(
+                  it =>
+                    !it.isTitle &&
+                    !isPageNumberOrFileFooter(it.text, filename)
+                )
+                .map((item, idx) => (
+                  <div key={idx} className="flex items-start gap-3">
+                    <span className="size-2 rounded-full bg-neutral-400 mt-2 shrink-0" />
+                    <p className="text-sm sm:text-base text-neutral-700 leading-relaxed font-normal">
+                      {item.text}
+                    </p>
+                  </div>
+                ))}
+            </div>
           </div>
-
-          {/* Footer */}
-          <div className="flex items-center justify-between border-t border-neutral-100 pt-3 text-xs text-neutral-400 font-medium select-none">
-            <span>PowerPoint Presentation</span>
-            <span>
-              {slide.slideNumber} of {slides.length}
-            </span>
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
+  );
+});
+
+// Miniature slide thumbnail using canonical spec rendering
+const PptCanonicalThumbnail = memo(function PptCanonicalThumbnail({
+  slideNumber,
+  slide,
+  isActive,
+  filename,
+  onClick,
+}: {
+  slideNumber: number;
+  slide?: PptSlideSpec;
+  isActive: boolean;
+  filename?: string;
+  onClick: () => void;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [scaleRatio, setScaleRatio] = useState<number>(0.14);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const update = () => {
+      const w = el.clientWidth;
+      if (w > 0) setScaleRatio(w / 1280);
+    };
+    update();
+    const ro = new ResizeObserver(entries => {
+      for (const entry of entries) {
+        const w = entry.contentRect.width;
+        if (w > 0) setScaleRatio(w / 1280);
+      }
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      data-testid={`pptx-sidebar-thumb-${slideNumber}`}
+      aria-label={`Go to slide ${slideNumber}`}
+      aria-current={isActive ? "true" : undefined}
+      className="group flex items-center gap-1.5 w-full text-left p-0.5 rounded-lg transition-colors focus:outline-none cursor-pointer bg-transparent active:bg-transparent hover:bg-transparent select-none"
+    >
+      <span
+        className={cn(
+          "w-4 text-center text-xs tabular-nums font-semibold shrink-0 select-none transition-colors",
+          isActive
+            ? "text-primary font-bold"
+            : "text-muted-foreground/70 group-hover:text-foreground"
+        )}
+      >
+        {slideNumber}
+      </span>
+      <div
+        ref={containerRef}
+        className={cn(
+          "relative aspect-[16/9] flex-1 rounded-lg overflow-hidden border transition-colors duration-150 select-none pointer-events-none",
+          isActive
+            ? "border-border shadow-xs"
+            : "border-border/70 group-hover:border-border"
+        )}
+        style={{
+          background: slide ? asCssColor(slide.background) : "#ffffff",
+        }}
+      >
+        {slide && (
+          <div
+            style={{
+              width: 1280,
+              height: 720,
+              transform: `scale(${scaleRatio})`,
+              transformOrigin: "top left",
+              background: asCssColor(slide.background),
+            }}
+            className="relative h-[720px] w-[1280px]"
+          >
+            {slide.elements
+              .filter(
+                el =>
+                  !(
+                    el.kind === "text" &&
+                    isPageNumberOrFileFooter(el.text, filename)
+                  )
+              )
+              .map((el, i) => renderPptElement(el, i))}
+          </div>
+        )}
+      </div>
+    </button>
+  );
+});
+
+// Miniature slide thumbnail for fallback parsed PPTX
+const PptFallbackThumbnail = memo(function PptFallbackThumbnail({
+  slideNumber,
+  slide,
+  isActive,
+  filename,
+  onClick,
+}: {
+  slideNumber: number;
+  slide?: SlideData;
+  isActive: boolean;
+  filename?: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      data-testid={`pptx-sidebar-thumb-${slideNumber}`}
+      aria-label={`Go to slide ${slideNumber}`}
+      aria-current={isActive ? "true" : undefined}
+      className="group flex items-center gap-1.5 w-full text-left p-0.5 rounded-lg transition-colors focus:outline-none cursor-pointer bg-transparent active:bg-transparent hover:bg-transparent select-none"
+    >
+      <span
+        className={cn(
+          "w-4 text-center text-xs tabular-nums font-semibold shrink-0 select-none transition-colors",
+          isActive
+            ? "text-primary font-bold"
+            : "text-muted-foreground/70 group-hover:text-foreground"
+        )}
+      >
+        {slideNumber}
+      </span>
+      <div
+        className={cn(
+          "relative aspect-[16/9] flex-1 rounded-lg overflow-hidden border p-2 flex flex-col justify-between transition-colors duration-150 bg-card text-card-foreground select-none pointer-events-none",
+          isActive
+            ? "border-border shadow-xs"
+            : "border-border/70 group-hover:border-border"
+        )}
+      >
+        <p className="text-[10px] font-bold truncate text-foreground leading-tight">
+          {slide?.title || `Slide ${slideNumber}`}
+        </p>
+        <div className="space-y-1 flex-1 mt-1 overflow-hidden">
+          {slide?.items
+            ?.filter(
+              it =>
+                !it.isTitle &&
+                !isPageNumberOrFileFooter(it.text, filename)
+            )
+            .slice(0, 3)
+            .map((_, idx) => (
+              <div key={idx} className="h-1 bg-muted rounded w-full" />
+            ))}
+        </div>
+      </div>
+    </button>
+  );
+});
+
+export interface PptSlideSidebarProps {
+  canonicalSpec?: PptPresentationSpec | null;
+  slides?: SlideData[];
+  currentSlide: number;
+  filename?: string;
+  onSelectSlide: (slideNumber: number) => void;
+  isOpen: boolean;
+  onClose?: () => void;
+}
+
+export const PptSlideSidebar = memo(function PptSlideSidebar({
+  canonicalSpec,
+  slides,
+  currentSlide,
+  filename,
+  onSelectSlide,
+  isOpen,
+  onClose,
+}: PptSlideSidebarProps) {
+  const sidebarRef = useRef<HTMLDivElement>(null);
+  const count = canonicalSpec ? canonicalSpec.slides.length : (slides?.length ?? 0);
+
+  // Auto-scroll the active thumbnail into view in the sidebar
+  useEffect(() => {
+    if (!sidebarRef.current) return;
+    const activeEl = sidebarRef.current.querySelector(
+      `[data-testid="pptx-sidebar-thumb-${currentSlide}"]`
+    );
+    if (activeEl) {
+      activeEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  }, [currentSlide]);
+
+  if (!isOpen || count === 0) return null;
+
+  return (
+    <aside
+      ref={sidebarRef}
+      data-testid="pptx-sidebar"
+      aria-label="Slide thumbnails"
+      className="w-44 sm:w-48 md:w-52 shrink-0 h-full flex flex-col border-r border-border bg-card/75 dark:bg-card/40 backdrop-blur-sm z-20 select-none transition-all"
+    >
+      {/* Sidebar Header */}
+      <div className="flex h-11 items-center justify-between px-3 border-b border-border shrink-0">
+        <div className="flex items-center gap-2 min-w-0">
+          <Presentation className="size-4 text-foreground/80 shrink-0 stroke-[2]" />
+          <span className="text-sm font-semibold tracking-tight text-foreground truncate">
+            Slides
+          </span>
+          <span
+            data-testid="pptx-sidebar-count-badge"
+            className="inline-flex items-center justify-center px-2 py-0.5 text-xs font-medium tabular-nums text-muted-foreground bg-muted/60 dark:bg-muted/40 rounded-full shrink-0"
+          >
+            {count}
+          </span>
+        </div>
+        {onClose && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onClose}
+                data-testid="pptx-sidebar-collapse-btn"
+                aria-label="Collapse sidebar"
+                className="size-7 rounded-md text-muted-foreground hover:bg-accent hover:text-foreground active:scale-95 transition-all"
+              >
+                <ChevronsLeft className="size-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right">Collapse sidebar</TooltipContent>
+          </Tooltip>
+        )}
+      </div>
+
+      {/* Thumbnails Scroll List */}
+      <div className="flex-1 overflow-y-auto px-2 py-2.5 space-y-2">
+        {Array.from({ length: count }, (_, idx) => {
+          const slideNumber = idx + 1;
+          const isActive = currentSlide === slideNumber;
+
+          if (canonicalSpec) {
+            const slideSpec = canonicalSpec.slides[idx];
+            return (
+              <PptCanonicalThumbnail
+                key={slideSpec?.index ?? idx}
+                slideNumber={slideNumber}
+                slide={slideSpec}
+                isActive={isActive}
+                filename={filename}
+                onClick={() => onSelectSlide(slideNumber)}
+              />
+            );
+          }
+
+          const slideData = slides?.[idx];
+          return (
+            <PptFallbackThumbnail
+              key={slideData?.slideNumber ?? idx}
+              slideNumber={slideNumber}
+              slide={slideData}
+              isActive={isActive}
+              filename={filename}
+              onClick={() => onSelectSlide(slideNumber)}
+            />
+          );
+        })}
+      </div>
+    </aside>
   );
 });
 
@@ -2532,6 +2904,7 @@ export const PdfDrawer = memo(function PdfDrawer() {
     null
   );
   const [currentSlide, setCurrentSlide] = useState<number>(1);
+  const [isPptSidebarOpen, setIsPptSidebarOpen] = useState<boolean>(true);
   const [numPages, setNumPages] = useState<number>(0);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -2596,6 +2969,81 @@ export const PdfDrawer = memo(function PdfDrawer() {
     window.addEventListener("resize", updateWidth);
     return () => window.removeEventListener("resize", updateWidth);
   }, [isOpen, updateWidth]);
+
+  // PowerPoint 16:9 Canvas & Zoom Management (authentic PPT presentation scaling)
+  const PPT_DESIGN_W = 1280;
+  const PPT_DESIGN_H = 720;
+  const PPT_ZOOM_STEPS = [0.4, 0.5, 0.67, 0.8, 1.0, 1.25, 1.5, 1.75, 2.0, 2.5];
+  const [pptZoomMultiplier, setPptZoomMultiplier] = useState<number>(1.0);
+  const [isPptFit, setIsPptFit] = useState<boolean>(true);
+  const [stageDimensions, setStageDimensions] = useState<{
+    width: number;
+    height: number;
+  }>({
+    width: 900,
+    height: 600,
+  });
+
+  // Track stage container size for true PowerPoint 16:9 Fit
+  useEffect(() => {
+    if (!isOpen || !isPowerPointDoc || !scrollContainerRef.current) return;
+    const el = scrollContainerRef.current;
+    const update = () => {
+      if (el.clientWidth > 0 && el.clientHeight > 0) {
+        setStageDimensions({ width: el.clientWidth, height: el.clientHeight });
+      }
+    };
+    update();
+    const ro = new ResizeObserver(entries => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect;
+        if (width > 0 && height > 0) {
+          setStageDimensions({ width, height });
+        }
+      }
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [isOpen, isPowerPointDoc, isPptSidebarOpen]);
+
+  // In PowerPoint, "Fit" calculates the scale so the 16:9 slide fits both
+  // horizontally and vertically inside the stage with comfortable margins.
+  const pptFitScale = useMemo(() => {
+    const availW = Math.max(stageDimensions.width - 56, 320);
+    const availH = Math.max(stageDimensions.height - 56, 220);
+    return Math.min(availW / PPT_DESIGN_W, availH / PPT_DESIGN_H);
+  }, [stageDimensions.width, stageDimensions.height]);
+
+  const effectivePptScale = isPptFit ? pptFitScale : pptZoomMultiplier;
+  const pptSlideWidth = Math.round(PPT_DESIGN_W * effectivePptScale);
+  const pptSlideHeight = Math.round(PPT_DESIGN_H * effectivePptScale);
+
+  const handlePptZoomIn = useCallback(() => {
+    setIsPptFit(false);
+    setPptZoomMultiplier(curr => {
+      const base = isPptFit ? pptFitScale : curr;
+      const next = PPT_ZOOM_STEPS.find(s => s > base + 0.05);
+      return next ?? PPT_ZOOM_STEPS[PPT_ZOOM_STEPS.length - 1];
+    });
+  }, [isPptFit, pptFitScale]);
+
+  const handlePptZoomOut = useCallback(() => {
+    setIsPptFit(false);
+    setPptZoomMultiplier(curr => {
+      const base = isPptFit ? pptFitScale : curr;
+      const prev = [...PPT_ZOOM_STEPS].reverse().find(s => s < base - 0.05);
+      return prev ?? PPT_ZOOM_STEPS[0];
+    });
+  }, [isPptFit, pptFitScale]);
+
+  const handlePptToggleFit = useCallback(() => {
+    if (isPptFit) {
+      setIsPptFit(false);
+      setPptZoomMultiplier(1.0);
+    } else {
+      setIsPptFit(true);
+    }
+  }, [isPptFit]);
 
   // Load Document (PDF, Word, Excel, PowerPoint, or Text) in-project
   useEffect(() => {
@@ -2914,11 +3362,19 @@ export const PdfDrawer = memo(function PdfDrawer() {
     const handleWheel = (e: WheelEvent) => {
       if (e.ctrlKey) {
         e.preventDefault();
-        setIsFit(false);
-        const zoomDelta = e.deltaY < 0 ? 0.08 : -0.08;
-        setScale(prev =>
-          Math.min(Math.max(Number((prev + zoomDelta).toFixed(2)), 0.25), 3.0)
-        );
+        if (isPowerPointDoc) {
+          if (e.deltaY < 0) {
+            handlePptZoomIn();
+          } else {
+            handlePptZoomOut();
+          }
+        } else {
+          setIsFit(false);
+          const zoomDelta = e.deltaY < 0 ? 0.08 : -0.08;
+          setScale(prev =>
+            Math.min(Math.max(Number((prev + zoomDelta).toFixed(2)), 0.25), 3.0)
+          );
+        }
       }
     };
 
@@ -2926,16 +3382,26 @@ export const PdfDrawer = memo(function PdfDrawer() {
     return () => {
       container.removeEventListener("wheel", handleWheel);
     };
-  }, [isOpen]);
+  }, [isOpen, isPowerPointDoc, handlePptZoomIn, handlePptZoomOut]);
 
   // Scroll to a specific PowerPoint slide
   const scrollToSlide = useCallback((slideNum: number) => {
-    if (!scrollContainerRef.current) return;
-    const target = scrollContainerRef.current.querySelector(
-      `[data-slide="${slideNum}"]`
-    );
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const target =
+      container.querySelector<HTMLElement>(`[data-slide="${slideNum}"]`) ||
+      container.querySelectorAll<HTMLElement>("[data-slide]")[slideNum - 1];
     if (target) {
-      target.scrollIntoView({ behavior: "smooth", block: "start" });
+      if (typeof container.scrollTo === "function") {
+        const containerRect = container.getBoundingClientRect();
+        const targetRect = target.getBoundingClientRect();
+        const targetTop =
+          targetRect.top - containerRect.top + container.scrollTop;
+        const offsetTop = Math.max(0, targetTop - 24);
+        container.scrollTo({ top: offsetTop, behavior: "smooth" });
+      } else {
+        target.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
       setCurrentSlide(slideNum);
     }
   }, []);
@@ -2978,16 +3444,28 @@ export const PdfDrawer = memo(function PdfDrawer() {
         (!isCtrlOrCmd && (event.key === "+" || event.key === "="))
       ) {
         event.preventDefault();
-        handleZoomIn();
+        if (isPowerPointDoc) {
+          handlePptZoomIn();
+        } else {
+          handleZoomIn();
+        }
       } else if (
         (isCtrlOrCmd && (event.key === "-" || event.key === "_")) ||
         (!isCtrlOrCmd && (event.key === "-" || event.key === "_"))
       ) {
         event.preventDefault();
-        handleZoomOut();
+        if (isPowerPointDoc) {
+          handlePptZoomOut();
+        } else {
+          handleZoomOut();
+        }
       } else if (isCtrlOrCmd && (event.key === "0" || event.key === "Digit0")) {
         event.preventDefault();
-        handleToggleFit();
+        if (isPowerPointDoc) {
+          handlePptToggleFit();
+        } else {
+          handleToggleFit();
+        }
       }
 
       // Word document arrow key page navigation
@@ -3045,6 +3523,9 @@ export const PdfDrawer = memo(function PdfDrawer() {
     handleZoomIn,
     handleZoomOut,
     handleToggleFit,
+    handlePptZoomIn,
+    handlePptZoomOut,
+    handlePptToggleFit,
     isWordDoc,
     numPages,
     currentPage,
@@ -3148,7 +3629,7 @@ export const PdfDrawer = memo(function PdfDrawer() {
     >
       {/* Top Header */}
       <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-border bg-card/90 px-3 sm:px-4 backdrop-blur-md">
-        {/* Left Side: Only the File Name and Brand mark (no subtitles, no file size) */}
+        {/* Left Side: Only the File Name and Brand mark */}
         <div className="flex min-w-0 items-center gap-2.5">
           <FileBrandMark variant={brandVariant} className="size-6 shrink-0" />
           <p
@@ -3240,18 +3721,59 @@ export const PdfDrawer = memo(function PdfDrawer() {
       <div
         className={cn(
           "relative min-h-0 flex-1 w-full overflow-hidden",
-          isExcelDoc
-            ? "bg-background flex flex-col"
-            : "bg-neutral-900/10 dark:bg-neutral-950/40"
+          isPowerPointDoc
+            ? "flex flex-row bg-neutral-900/10 dark:bg-neutral-950/40"
+            : isExcelDoc
+              ? "bg-background flex flex-col"
+              : "bg-neutral-900/10 dark:bg-neutral-950/40"
         )}
       >
+        {/* PowerPoint Left Thumbnail Sidebar */}
+        {!isLoading && !loadError && isPowerPointDoc && pptxCount > 0 && isPptSidebarOpen && (
+          <PptSlideSidebar
+            canonicalSpec={canonicalSpec}
+            slides={pptxSlides}
+            currentSlide={currentSlide}
+            filename={currentPdf?.filename}
+            onSelectSlide={scrollToSlide}
+            isOpen={isPptSidebarOpen}
+            onClose={() => setIsPptSidebarOpen(false)}
+          />
+        )}
+
+        {/* PowerPoint Left Collapsed Sidebar Strip */}
+        {!isLoading && !loadError && isPowerPointDoc && pptxCount > 0 && !isPptSidebarOpen && (
+          <div
+            data-testid="pptx-sidebar-collapsed"
+            className="shrink-0 h-full flex flex-col border-r border-border bg-card/75 dark:bg-card/40 backdrop-blur-sm z-20 py-2.5 px-1.5 items-center select-none transition-all"
+          >
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setIsPptSidebarOpen(true)}
+                  data-testid="pptx-sidebar-expand-btn"
+                  aria-label="Expand sidebar"
+                  className="size-8 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+                >
+                  <ChevronsRight className="size-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right">Expand sidebar</TooltipContent>
+            </Tooltip>
+          </div>
+        )}
+
         <div
           ref={scrollContainerRef}
           className={cn(
             "h-full w-full",
             isExcelDoc
               ? "p-0 overflow-hidden flex flex-col"
-              : "overflow-y-auto p-4 sm:p-6"
+              : isPowerPointDoc
+                ? "flex-1 overflow-y-auto p-4 sm:p-8"
+                : "overflow-y-auto p-4 sm:p-6"
           )}
         >
           {isLoading && (
@@ -3325,13 +3847,19 @@ export const PdfDrawer = memo(function PdfDrawer() {
             (canonicalSpec ? (
               <PresentationPreview
                 spec={canonicalSpec}
-                scale={scale}
+                scale={effectivePptScale}
+                slideWidth={pptSlideWidth}
+                slideHeight={pptSlideHeight}
+                filename={currentPdf?.filename}
                 onPageVisible={setCurrentSlide}
               />
             ) : (
               <PowerPointViewer
                 slides={pptxSlides}
-                scale={scale}
+                scale={effectivePptScale}
+                slideWidth={pptSlideWidth}
+                slideHeight={pptSlideHeight}
+                filename={currentPdf?.filename}
                 onPageVisible={setCurrentSlide}
               />
             ))}
@@ -3464,8 +3992,12 @@ export const PdfDrawer = memo(function PdfDrawer() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  disabled={scale <= 0.35}
-                  onClick={handleZoomOut}
+                  disabled={
+                    isPowerPointDoc
+                      ? effectivePptScale <= 0.4
+                      : scale <= 0.35
+                  }
+                  onClick={isPowerPointDoc ? handlePptZoomOut : handleZoomOut}
                   aria-label="Zoom out"
                   className="size-9 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-30 transition-colors"
                 >
@@ -3478,10 +4010,16 @@ export const PdfDrawer = memo(function PdfDrawer() {
             {/* Fit / Percentage toggle */}
             <button
               type="button"
-              onClick={handleToggleFit}
+              onClick={isPowerPointDoc ? handlePptToggleFit : handleToggleFit}
               className="h-9 min-w-[52px] rounded-lg px-2.5 text-sm font-bold tabular-nums text-muted-foreground transition-colors cursor-pointer hover:bg-accent hover:text-foreground"
             >
-              {isFit ? "Fit" : `${Math.round(scale * 100)}%`}
+              {isPowerPointDoc
+                ? isPptFit
+                  ? "Fit"
+                  : `${Math.round(effectivePptScale * 100)}%`
+                : isFit
+                  ? "Fit"
+                  : `${Math.round(scale * 100)}%`}
             </button>
 
             <Tooltip>
@@ -3489,8 +4027,12 @@ export const PdfDrawer = memo(function PdfDrawer() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  disabled={scale >= 2.8}
-                  onClick={handleZoomIn}
+                  disabled={
+                    isPowerPointDoc
+                      ? effectivePptScale >= 2.5
+                      : scale >= 2.8
+                  }
+                  onClick={isPowerPointDoc ? handlePptZoomIn : handleZoomIn}
                   aria-label="Zoom in"
                   className="size-9 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-30 transition-colors"
                 >

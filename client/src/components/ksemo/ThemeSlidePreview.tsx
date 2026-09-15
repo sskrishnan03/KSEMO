@@ -1,4 +1,5 @@
 import { VISUAL_THEMES, type ThemeSpec } from "@shared/pptThemes";
+import { isLightOrWhiteBorder } from "./PdfDrawer";
 
 const hex = (c: string) => `#${c}`;
 
@@ -80,6 +81,7 @@ function Line(props: {
   h?: number;
   o?: number;
 }) {
+  if (isLightOrWhiteBorder(props.c)) return null;
   return (
     <div
       className="absolute"
@@ -172,11 +174,12 @@ function Panel(props: {
   w: number;
   h: number;
   c: string;
-  b: string;
+  b?: string;
   radius?: number;
   opacity?: number;
   children?: React.ReactNode;
 }) {
+  const showBorder = props.b && !isLightOrWhiteBorder(props.b);
   return (
     <div
       className="absolute overflow-hidden"
@@ -186,7 +189,7 @@ function Panel(props: {
         width: `${props.w}%`,
         height: `${props.h}%`,
         background: props.c,
-        border: `1px solid ${props.b}`,
+        border: showBorder ? `1px solid ${props.b}` : undefined,
         borderRadius: props.radius != null ? `${props.radius}px` : "3px",
         opacity: props.opacity,
       }}
@@ -253,7 +256,6 @@ function Metric(props: {
         width: `${w}%`,
         height: "20%",
         background: hex(theme.panel),
-        border: `1px solid ${hex(theme.panelBorder)}`,
       }}
     >
       <div
@@ -312,7 +314,7 @@ function MiniLineChart(props: {
  *  presentation engine will generate. Each style renders its own archetype:
  *  the composition itself differs per style, not just the colors. */
 export function ThemeSlidePreview({ name }: { name: string }) {
-  const theme = VISUAL_THEMES[name];
+  const theme = VISUAL_THEMES[name] || VISUAL_THEMES[name.toLowerCase()];
   if (!theme) {
     return (
       <div

@@ -124,6 +124,49 @@ describe("presentation engine", () => {
     }
   });
 
+  it("honors an explicitly requested style, never silently swapping it", () => {
+    const { spec } = buildDeckSpec({
+      title: "Statement of Work",
+      slides: sampleSlides(),
+      config: DEFAULT_PRESENTATION_CONFIG,
+      styleName: "Cinematic",
+      footerLabel: "KSEMO",
+    });
+    expect(spec.style).toBe(VISUAL_THEMES["Cinematic"].name);
+    expect(spec.themeKey).toBe(VISUAL_THEMES["Cinematic"].key);
+    const colors = new Set(
+      spec.slides.flatMap(s =>
+        s.elements
+          .map(e => (e.kind === "text" ? e.color : e.fill))
+          .filter((c): c is string => typeof c === "string")
+      )
+    );
+    const styleColors = [
+      VISUAL_THEMES["Cinematic"].primary,
+      VISUAL_THEMES["Cinematic"].secondary,
+      VISUAL_THEMES["Cinematic"].accent,
+      VISUAL_THEMES["Cinematic"].accent2,
+      VISUAL_THEMES["Cinematic"].text,
+      VISUAL_THEMES["Cinematic"].muted,
+      VISUAL_THEMES["Cinematic"].invertedText,
+    ];
+    expect([...colors].some(c => styleColors.includes(c.toUpperCase()))).toBe(
+      true
+    );
+  });
+
+  it("fails loudly when an explicit style cannot be resolved", () => {
+    expect(() =>
+      buildDeckSpec({
+        title: "Should not fall back",
+        slides: sampleSlides(),
+        config: DEFAULT_PRESENTATION_CONFIG,
+        styleName: "NoSuchStyle" as PptPresentationSpec["style"],
+        footerLabel: "KSEMO",
+      })
+    ).toThrow(/NoSuchStyle/);
+  });
+
   it("expands a short deck to the requested slide count without empty slides", () => {
     const base = sampleSlides().slice(0, 3); // title + section + stats
     const grown = adjustSlideCount(base, 8);
@@ -244,5 +287,81 @@ describe("presentation engine", () => {
     const buffer = await exportPptx(spec);
     const roundTrip = await readCanonicalFromBuffer(buffer);
     expect(roundTrip).toEqual(spec);
+  });
+
+  it("never contains page number text (e.g. '1 / 5') or footer title labels inside slide elements", () => {
+    const { spec } = buildDeckSpec({
+      title: "Clean Deck",
+      slides: sampleSlides(),
+      config: DEFAULT_PRESENTATION_CONFIG,
+      footerLabel: "KSEMO",
+    });
+    for (const slide of spec.slides) {
+      const pageNumRegex = /^\d+\s*\/\s*\d+$/;
+      const slideTextRegex = /^slide\s+\d+$/i;
+      for (const el of slide.elements) {
+        if (el.kind === "text") {
+          expect(pageNumRegex.test(el.text.trim())).toBe(false);
+          expect(slideTextRegex.test(el.text.trim())).toBe(false);
+          // Verify footer labels / filename are never stamped at the bottom of slides
+          expect(el.text.trim()).not.toBe("KSEMO");
+          if (slide.kind !== "title") {
+            expect(el.text.trim()).not.toBe("Clean Deck");
+          }
+        }
+      }
+    }
+  });
+
+  it("supports lowercase canonical style IDs and case-insensitivity", () => {
+    const lower = buildDeckSpec({
+      title: "Lower test",
+      slides: sampleSlides(),
+      config: DEFAULT_PRESENTATION_CONFIG,
+      styleName: "minimal",
+      footerLabel: "KSEMO",
+    });
+    expect(lower.spec.style).toBe("Minimal");
+    expect(lower.spec.resolvedStyle).toBe("minimal");
+
+    const upper = buildDeckSpec({
+      title: "Upper test",
+      slides: sampleSlides(),
+      config: DEFAULT_PRESENTATION_CONFIG,
+      styleName: "TECH" as any,
+      footerLabel: "KSEMO",
+    });
+    expect(upper.spec.style).toBe("Tech");
+    expect(upper.spec.resolvedStyle).toBe("tech");
+  });
+
+  it("generates distinct layouts and backgrounds across styles", () => {
+    const minimal = buildDeckSpec({
+      title: "Minimal Deck",
+      slides: sampleSlides(),
+      config: DEFAULT_PRESENTATION_CONFIG,
+      styleName: "minimal",
+    });
+    const tech = buildDeckSpec({
+      title: "Tech Deck",
+      slides: sampleSlides(),
+      config: DEFAULT_PRESENTATION_CONFIG,
+      styleName: "tech",
+    });
+    const cinematic = buildDeckSpec({
+      title: "Cinematic Deck",
+      slides: sampleSlides(),
+      config: DEFAULT_PRESENTATION_CONFIG,
+      styleName: "cinematic",
+    });
+
+    // Minimal is light background, Cinematic is dark background
+    expect(minimal.spec.slides[0].background).not.toBe(cinematic.spec.slides[0].background);
+    expect(tech.spec.slides[0].background).toBe(VISUAL_THEMES["tech"].titleBackground);
+    expect(minimal.spec.slides[0].background).toBe(VISUAL_THEMES["minimal"].titleBackground);
+
+    // Tech contains telemetry elements
+    const techTexts = tech.spec.slides.flatMap(s => s.elements.filter(e => e.kind === "text").map(e => (e as any).text));
+    expect(techTexts.some(t => t.includes("TELEMETRY") || t.includes("METRIC"))).toBe(true);
   });
 });

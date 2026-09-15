@@ -12,6 +12,7 @@ import {
   SLIDE_WIDTH_IN,
   SLIDE_HEIGHT_IN,
   SAFE_MARGIN,
+  normalizeStyleId,
   type PptBox,
   type PptElement,
   type PptPresentationSpec,
@@ -21,10 +22,40 @@ import {
 } from "@shared/presentation";
 import type { SlideDefinition } from "../spec";
 import { fitText, measureLines, PROFESSIONAL_MIN_FONT } from "./textFit";
-import { VISUAL_THEMES, pickAutoTheme, type ThemeSpec } from "./themes";
+import {
+  VISUAL_THEMES,
+  THEME_KEYS,
+  pickAutoTheme,
+  getThemeSpec,
+  type ThemeSpec,
+} from "./themes";
 
 const W = SLIDE_WIDTH_IN;
 const H = SLIDE_HEIGHT_IN;
+
+/**
+ * Resolves the authoritative theme for a deck. `auto` (or an absent style)
+ * is the ONLY case where the engine may choose a theme itself. An explicitly
+ * requested style must exist in the registry — if it doesn't, we fail loudly
+ * instead of silently generating a generic deck, because the user's visual
+ * style is the authoritative design system.
+ */
+export function resolveTheme(
+  styleName: PptVisualStyle | undefined,
+  title: string
+): ThemeSpec {
+  if (!styleName || styleName === "auto") return pickAutoTheme(title);
+  const theme =
+    getThemeSpec(styleName) ||
+    VISUAL_THEMES[styleName] ||
+    VISUAL_THEMES[normalizeStyleId(styleName)];
+  if (!theme) {
+    throw new Error(
+      `Unknown visual style "${styleName}". Valid styles: ${THEME_KEYS.join(", ")}.`
+    );
+  }
+  return theme;
+}
 
 type Strategy = PresentationConfig["layout"];
 type Density = PresentationConfig["density"];
@@ -177,14 +208,187 @@ function addVisualPanel(
   box: PptBox,
   seed: number
 ): void {
-  // Decorative abstract composition used for "image" slots. Composed purely
-  // from theme shapes so the deck stays professional and never depends on
-  // external image URLs that could break or stretch.
   const t = ctx.theme;
+  const styleKey = t.key;
+
+  if (styleKey === "tech" || styleKey === "futuristic") {
+    // Technical telemetry / system architecture panel
+    addShapeEl(els, box, "roundRect", {
+      fill: t.panel,
+      lineColor: t.accent,
+      lineWidth: 1.2,
+      radius: Math.max(t.radius, 0.06),
+    });
+    // Technical header strip
+    addShapeEl(els, { x: box.x, y: box.y, w: box.w, h: 0.32 }, "rect", {
+      fill: t.accent,
+      opacity: 25,
+    });
+    addShapeEl(els, { x: box.x + 0.15, y: box.y + 0.11, w: 0.1, h: 0.1 }, "ellipse", {
+      fill: t.accent,
+    });
+    els.push({
+      kind: "text",
+      box: { x: box.x + 0.32, y: box.y + 0.05, w: box.w - 0.4, h: 0.22 },
+      text: styleKey === "futuristic" ? "QUANTUM // TELEMETRY" : "SYS.ARCH // TELEMETRY",
+      fontSize: 8.5,
+      color: t.accent,
+      font: t.bodyFont,
+      bold: true,
+      valign: "middle",
+    });
+    // System grid nodes
+    const gridRows = 3;
+    const gridCols = 3;
+    const gw = (box.w - 0.6) / gridCols;
+    const gh = (box.h - 0.7) / gridRows;
+    for (let r = 0; r < gridRows; r++) {
+      for (let c = 0; c < gridCols; c++) {
+        const nx = box.x + 0.3 + c * gw;
+        const ny = box.y + 0.45 + r * gh;
+        addShapeEl(els, { x: nx, y: ny + gh / 2 - 0.01, w: gw * 0.75, h: 0.01 }, "line", {
+          lineColor: t.accent,
+          lineWidth: 1,
+          opacity: 30,
+        });
+        addShapeEl(els, { x: nx + gw * 0.35, y: ny + gh / 2 - 0.05, w: 0.1, h: 0.1 }, "ellipse", {
+          fill: (r + c + seed) % 2 === 0 ? t.accent : t.accent2,
+          opacity: 85,
+        });
+      }
+    }
+    return;
+  }
+
+  if (styleKey === "consultant") {
+    // Executive analytical exhibit / chart mockup
+    addShapeEl(els, box, "roundRect", {
+      fill: t.panel,
+      radius: t.radius,
+    });
+    // Header banner
+    els.push({
+      kind: "text",
+      box: { x: box.x + 0.2, y: box.y + 0.16, w: box.w - 0.4, h: 0.26 },
+      text: "EXHIBIT: STRATEGIC BENCHMARK",
+      fontSize: 9,
+      bold: true,
+      color: t.accent,
+      font: t.titleFont,
+    });
+    addShapeEl(els, { x: box.x + 0.2, y: box.y + 0.44, w: box.w - 0.4, h: 0.02 }, "rect", {
+      fill: t.accent,
+      opacity: 30,
+    });
+    // Comparative exhibit bars
+    const barH = 0.24;
+    const barWMax = box.w - 0.6;
+    const vals = [0.85, 0.62, 0.94];
+    vals.forEach((v, idx) => {
+      const by = box.y + 0.65 + idx * 0.45;
+      if (by + barH > box.y + box.h - 0.2) return;
+      addShapeEl(els, { x: box.x + 0.2, y: by, w: barWMax * v, h: barH }, "roundRect", {
+        fill: idx === 0 ? t.accent : idx === 2 ? t.accent2 : t.secondary,
+        radius: 0.04,
+      });
+    });
+    return;
+  }
+
+  if (styleKey === "minimal") {
+    // Generous whitespace with a subtle architectural ring
+    addShapeEl(els, box, "rect", {
+      fill: t.panel,
+    });
+    const ring = Math.min(box.w, box.h) * 0.55;
+    addShapeEl(
+      els,
+      { x: box.x + (box.w - ring) / 2, y: box.y + (box.h - ring) / 2, w: ring, h: ring },
+      "ellipse",
+      { lineColor: t.accent, lineWidth: 1, opacity: 50 }
+    );
+    addShapeEl(
+      els,
+      { x: box.x + box.w * 0.25, y: box.y + box.h * 0.75, w: box.w * 0.5, h: 0.02 },
+      "rect",
+      { fill: t.accent, opacity: 70 }
+    );
+    return;
+  }
+
+  if (styleKey === "cinematic") {
+    // Atmospheric visual frame with widescreen aperture
+    addShapeEl(els, box, "roundRect", {
+      fill: t.panel,
+      lineColor: t.accent,
+      lineWidth: 1.5,
+      radius: t.radius,
+    });
+    // Cinematic horizon line
+    addShapeEl(
+      els,
+      { x: box.x + 0.1, y: box.y + box.h * 0.55, w: box.w - 0.2, h: 0.02 },
+      "rect",
+      { fill: t.accent, opacity: 40 }
+    );
+    const rad = Math.min(box.w, box.h) * 0.45;
+    addShapeEl(
+      els,
+      { x: box.x + (box.w - rad) / 2, y: box.y + box.h * 0.55 - rad / 2, w: rad, h: rad },
+      "ellipse",
+      { lineColor: t.accent, lineWidth: 1.5, opacity: 80 }
+    );
+    return;
+  }
+
+  if (styleKey === "editorial" || styleKey === "academic") {
+    // Magazine/academic plate
+    addShapeEl(els, box, "rect", {
+      fill: t.panel,
+    });
+    addShapeEl(
+      els,
+      { x: box.x + 0.12, y: box.y + 0.12, w: box.w - 0.24, h: box.h - 0.55 },
+      "rect",
+      { fill: t.secondary, opacity: 15 }
+    );
+    els.push({
+      kind: "text",
+      box: { x: box.x + 0.15, y: box.y + box.h - 0.38, w: box.w - 0.3, h: 0.26 },
+      text: styleKey === "academic" ? "[Figure 1.0 — Analytical Representation]" : "[Plate I — Editorial Perspective]",
+      fontSize: 9,
+      italic: true,
+      color: t.muted,
+      font: t.bodyFont,
+      align: "center",
+      valign: "middle",
+    });
+    return;
+  }
+
+  if (styleKey === "bold") {
+    // High-impact dramatic block
+    addShapeEl(els, box, "rect", {
+      fill: t.primary,
+    });
+    addShapeEl(
+      els,
+      { x: box.x, y: box.y, w: 0.25, h: box.h },
+      "rect",
+      { fill: t.accent }
+    );
+    addShapeEl(
+      els,
+      { x: box.x + 0.5, y: box.y + box.h * 0.3, w: box.w - 0.8, h: box.h * 0.4 },
+      "rect",
+      { fill: t.accent2, opacity: 90 }
+    );
+    return;
+  }
+
+  // Refined base composition for other styles
   addShapeEl(els, box, "roundRect", {
     fill: t.panel,
-    lineColor: t.panelBorder,
-    lineWidth: 1,
     radius: t.radius,
   });
   const ring = Math.min(box.w, box.h) * (0.5 + (seed % 3) * 0.09);
@@ -212,55 +416,18 @@ function addVisualPanel(
     els,
     { x: box.x + box.w * 0.12, y: box.y + box.h * 0.6, w: box.w * 0.38, h: box.h * 0.07 },
     "rect",
-    { fill: t.panelBorder, opacity: 80 }
-  );
-  addShapeEl(
-    els,
-    { x: box.x + box.w * 0.12, y: box.y + box.h * 0.72, w: box.w * 0.42, h: box.h * 0.07 },
-    "rect",
-    { fill: t.accent2, opacity: 55 }
+    { fill: t.secondary, opacity: 30 }
   );
 }
 
 function addFooter(
-  ctx: SlideContext,
-  els: PptElement[],
-  slideIndex: number,
-  label: string
+  _ctx: SlideContext,
+  _els: PptElement[],
+  _slideIndex: number,
+  _label?: string
 ): void {
-  const t = ctx.theme;
-  const fy = 6.8;
-  if (t.kind === "dark") {
-    addShapeEl(
-      els,
-      { x: SAFE_MARGIN.left, y: fy + 0.02, w: 0.5, h: 0.035 },
-      "rect",
-      { fill: t.accent, opacity: 70 }
-    );
-  }
-  els.push({
-    kind: "text",
-    box: { x: SAFE_MARGIN.left + 0.55, y: fy - 0.03, w: 7, h: 0.24 },
-    text: label,
-    fontSize: 8.5,
-    color: t.muted,
-    font: t.bodyFont,
-    lineSpacing: 1,
-    valign: "middle",
-    opacity: 85,
-  });
-  els.push({
-    kind: "text",
-    box: { x: W - SAFE_MARGIN.right - 1.1, y: fy - 0.03, w: 1.1, h: 0.24 },
-    text: `${slideIndex} / ${ctx.totalSlides}`,
-    fontSize: 8.5,
-    color: t.muted,
-    font: t.bodyFont,
-    align: "right",
-    valign: "middle",
-    lineSpacing: 1,
-    opacity: 85,
-  });
+  // NOTE: Footers containing file names, titles, or page numbers inside the
+  // slide canvas are intentionally omitted to keep presentations clean.
 }
 
 function addHeader(
@@ -275,7 +442,7 @@ function addHeader(
   const title = split.title;
   const effSubtitle = split.subtitle || subtitle;
 
-  if (t.useKicker) {
+  if (t.useKicker && heading) {
     addFittedText(
       ctx,
       els,
@@ -419,12 +586,248 @@ function addMetricCards(
   const gap = 0.24;
   const cardW = (box.w - (count - 1) * gap) / count;
   const cardH = box.h;
+  const styleKey = t.key;
+
   metrics.slice(0, count).forEach((m, i) => {
     const x = box.x + i * (cardW + gap);
+
+    if (styleKey === "minimal") {
+      // Minimal: open, airy, no heavy box border, just delicate top accent rule and elegant typography
+      addShapeEl(els, { x, y: box.y + 0.1, w: Math.min(cardW * 0.4, 0.8), h: 0.02 }, "rect", {
+        fill: t.accent,
+      });
+      addFittedText(
+        ctx,
+        els,
+        { x, y: box.y + 0.25, w: cardW, h: cardH * 0.45 },
+        m.value,
+        {
+          size: Math.min(38, cardH * 4.0) * ctx.ext.scale,
+          minSize: 18,
+          color: t.primary,
+          font: t.titleFont,
+          bold: true,
+          valign: "middle",
+          lineSpacing: 1,
+        }
+      );
+      addFittedText(
+        ctx,
+        els,
+        { x, y: box.y + cardH * 0.54, w: cardW, h: cardH * 0.24 },
+        m.label,
+        {
+          size: 13.5 * ctx.ext.scale,
+          minSize: 11,
+          color: t.text,
+          font: t.bodyFont,
+          valign: "top",
+          lineSpacing: 1.1,
+        }
+      );
+      if (m.change) {
+        addFittedText(
+          ctx,
+          els,
+          { x, y: box.y + cardH * 0.78, w: cardW, h: cardH * 0.18 },
+          m.change,
+          {
+            size: 11,
+            minSize: 9.5,
+            color: t.muted,
+            font: t.bodyFont,
+            lineSpacing: 1,
+          }
+        );
+      }
+      return;
+    }
+
+    if (styleKey === "tech" || styleKey === "futuristic") {
+      // Tech: crisp telemetry terminal badge card with top badge & high-contrast border
+      addShapeEl(els, { x, y: box.y, w: cardW, h: cardH }, "rect", {
+        fill: t.panel,
+        lineColor: t.accent,
+        lineWidth: 1.2,
+      });
+      addShapeEl(els, { x, y: box.y, w: cardW, h: 0.22 }, "rect", {
+        fill: t.accent,
+        opacity: 20,
+      });
+      addShapeEl(els, { x: x + 0.12, y: box.y + 0.07, w: 0.08, h: 0.08 }, "ellipse", {
+        fill: t.accent,
+      });
+      els.push({
+        kind: "text",
+        box: { x: x + 0.26, y: box.y + 0.02, w: cardW - 0.3, h: 0.18 },
+        text: `METRIC.0${i + 1}`,
+        fontSize: 8,
+        color: t.accent,
+        font: t.bodyFont,
+        bold: true,
+        valign: "middle",
+      });
+
+      addFittedText(
+        ctx,
+        els,
+        { x: x + 0.15, y: box.y + 0.32, w: cardW - 0.3, h: cardH * 0.38 },
+        m.value,
+        {
+          size: Math.min(34, cardH * 3.6) * ctx.ext.scale,
+          minSize: 16,
+          color: t.accent,
+          font: t.titleFont,
+          bold: true,
+          valign: "middle",
+          lineSpacing: 1,
+        }
+      );
+      addFittedText(
+        ctx,
+        els,
+        { x: x + 0.15, y: box.y + cardH * 0.52, w: cardW - 0.3, h: cardH * 0.24 },
+        m.label,
+        {
+          size: 13 * ctx.ext.scale,
+          minSize: 10.5,
+          color: t.primary,
+          font: t.bodyFont,
+          bold: true,
+          valign: "top",
+          lineSpacing: 1.1,
+        }
+      );
+      if (m.change) {
+        addFittedText(
+          ctx,
+          els,
+          { x: x + 0.15, y: box.y + cardH * 0.76, w: cardW - 0.3, h: cardH * 0.18 },
+          m.change,
+          {
+            size: 10.5,
+            minSize: 9,
+            color: t.secondary,
+            font: t.bodyFont,
+            lineSpacing: 1,
+          }
+        );
+      }
+      return;
+    }
+
+    if (styleKey === "bold") {
+      // Bold: heavy filled panel or accent background, giant contrast
+      addShapeEl(els, { x, y: box.y, w: cardW, h: cardH }, "roundRect", {
+        fill: i === 0 ? t.accent : t.panel,
+        radius: 0.12,
+      });
+      const isPrimary = i === 0;
+      addFittedText(
+        ctx,
+        els,
+        { x: x + 0.2, y: box.y + 0.2, w: cardW - 0.4, h: cardH * 0.46 },
+        m.value,
+        {
+          size: Math.min(40, cardH * 4.2) * ctx.ext.scale,
+          minSize: 18,
+          color: isPrimary ? (t.kind === "dark" ? "000000" : "FFFFFF") : t.accent,
+          font: t.titleFont,
+          bold: true,
+          valign: "middle",
+          lineSpacing: 0.95,
+        }
+      );
+      addFittedText(
+        ctx,
+        els,
+        { x: x + 0.2, y: box.y + cardH * 0.52, w: cardW - 0.4, h: cardH * 0.24 },
+        m.label,
+        {
+          size: 14 * ctx.ext.scale,
+          minSize: 11,
+          color: isPrimary ? (t.kind === "dark" ? "111827" : "F9FAFB") : t.primary,
+          font: t.bodyFont,
+          bold: true,
+          valign: "top",
+          lineSpacing: 1.1,
+        }
+      );
+      if (m.change) {
+        addFittedText(
+          ctx,
+          els,
+          { x: x + 0.2, y: box.y + cardH * 0.76, w: cardW - 0.4, h: cardH * 0.18 },
+          m.change,
+          {
+            size: 11.5,
+            minSize: 10,
+            color: isPrimary ? (t.kind === "dark" ? "1F2937" : "E5E7EB") : t.secondary,
+            font: t.bodyFont,
+            lineSpacing: 1,
+          }
+        );
+      }
+      return;
+    }
+
+    if (styleKey === "editorial" || styleKey === "luxury" || styleKey === "academic") {
+      // Editorial / Luxury: thin elegant hairline borders top and bottom, refined serif style
+      addShapeEl(els, { x, y: box.y, w: cardW, h: 0.02 }, "rect", {
+        fill: t.accent,
+      });
+      addFittedText(
+        ctx,
+        els,
+        { x: x + 0.1, y: box.y + 0.15, w: cardW - 0.2, h: cardH * 0.45 },
+        m.value,
+        {
+          size: Math.min(36, cardH * 3.8) * ctx.ext.scale,
+          minSize: 16,
+          color: t.accent,
+          font: t.titleFont,
+          bold: true,
+          valign: "middle",
+          lineSpacing: 1,
+        }
+      );
+      addFittedText(
+        ctx,
+        els,
+        { x: x + 0.1, y: box.y + cardH * 0.54, w: cardW - 0.2, h: cardH * 0.24 },
+        m.label,
+        {
+          size: 13.5 * ctx.ext.scale,
+          minSize: 11,
+          color: t.primary,
+          font: t.bodyFont,
+          bold: true,
+          valign: "top",
+          lineSpacing: 1.1,
+        }
+      );
+      if (m.change) {
+        addFittedText(
+          ctx,
+          els,
+          { x: x + 0.1, y: box.y + cardH * 0.78, w: cardW - 0.2, h: cardH * 0.18 },
+          m.change,
+          {
+            size: 11,
+            minSize: 9.5,
+            color: t.muted,
+            font: t.bodyFont,
+            italic: true,
+            lineSpacing: 1,
+          }
+        );
+      }
+      return;
+    }
+
+    // Default (consultant, modern, classic, professional, playful, etc.)
     addShapeEl(els, { x, y: box.y, w: cardW, h: cardH }, "roundRect", {
       fill: t.panel,
-      lineColor: t.panelBorder,
-      lineWidth: 1,
       radius: Math.max(t.radius * 1.6, 0.1),
     });
     addShapeEl(els, { x: x + 0.22, y: box.y + 0.24, w: 0.42, h: 0.035 }, "rect", {
@@ -547,14 +950,37 @@ function addColumnPanels(
   const t = ctx.theme;
   const gap = 0.26;
   const colW = (box.w - (colCount - 1) * gap) / colCount;
+  const styleKey = t.key;
+
   columns.slice(0, colCount).forEach((c, i) => {
     const x = box.x + i * (colW + gap);
-    addShapeEl(els, { x, y: box.y, w: colW, h: box.h }, "roundRect", {
-      fill: t.panel,
-      lineColor: t.panelBorder,
-      lineWidth: 1,
-      radius: Math.max(t.radius * 1.4, 0.08),
-    });
+
+    if (styleKey === "minimal") {
+      // Minimal: no heavy card background or border, just pure clean column structure
+      addShapeEl(els, { x, y: box.y, w: Math.min(colW * 0.3, 0.6), h: 0.02 }, "rect", {
+        fill: t.accent,
+      });
+    } else if (styleKey === "tech" || styleKey === "futuristic") {
+      // Tech: sharp rect card with top indicator bar
+      addShapeEl(els, { x, y: box.y, w: colW, h: box.h }, "rect", {
+        fill: t.panel,
+      });
+      addShapeEl(els, { x, y: box.y, w: colW, h: 0.06 }, "rect", {
+        fill: i % 2 === 0 ? t.accent : t.accent2,
+      });
+    } else if (styleKey === "editorial" || styleKey === "luxury" || styleKey === "academic") {
+      // Editorial: hairline top divider
+      addShapeEl(els, { x, y: box.y, w: colW, h: 0.02 }, "rect", {
+        fill: t.accent,
+      });
+    } else {
+      // Default rounded panel
+      addShapeEl(els, { x, y: box.y, w: colW, h: box.h }, "roundRect", {
+        fill: t.panel,
+        radius: Math.max(t.radius * 1.4, 0.08),
+      });
+    }
+
     let innerY = box.y + 0.24;
     if (c.title) {
       addFittedText(
@@ -620,8 +1046,6 @@ function addProcessSteps(
     const x = box.x + i * (cardW + gap);
     addShapeEl(els, { x, y: box.y, w: cardW, h: box.h }, "roundRect", {
       fill: t.panel,
-      lineColor: t.panelBorder,
-      lineWidth: 1,
       radius: Math.max(t.radius * 1.4, 0.08),
     });
     addShapeEl(els, { x, y: box.y, w: cardW, h: 0.09 }, "rect", {
@@ -775,7 +1199,7 @@ function addTable(
         els,
         { x, y: rowY, w: colW, h: rowH },
         "rect",
-        { fill: isAlt ? st.altRowFill : st.rowFill, lineColor: st.borderColor, lineWidth: 0.5 }
+        { fill: isAlt ? st.altRowFill : st.rowFill }
       );
       els.push({
         kind: "text",
@@ -801,8 +1225,6 @@ function addQuote(
   const t = ctx.theme;
   addShapeEl(els, { x: box.x, y: box.y, w: box.w, h: box.h }, "roundRect", {
     fill: t.panel,
-    lineColor: t.panelBorder,
-    lineWidth: 1,
     radius: Math.max(t.radius * 1.2, 0.08),
   });
   addShapeEl(els, { x: box.x + 0.25, y: box.y + 0.28, w: 0.09, h: box.h - 0.56 }, "rect", {
@@ -848,9 +1270,9 @@ function addQuote(
   }
 }
 
-function slideHeadingFor(slide: SlideDefinition, index: number): string {
+function slideHeadingFor(slide: SlideDefinition, _index: number): string {
   const title = slide.title?.trim();
-  return title && title.length <= 52 ? title : `Section ${index + 1}`;
+  return title && title.length <= 52 ? title : "";
 }
 
 function buildColumnsFromBullets(
@@ -876,10 +1298,7 @@ export function buildPresentationSpec(input: {
   notes?: Array<string | undefined>;
 }): PptPresentationSpec {
   const styleName = input.styleName;
-  const theme: ThemeSpec =
-    !styleName || styleName === "auto"
-      ? pickAutoTheme(input.title)
-      : VISUAL_THEMES[styleName] ?? pickAutoTheme(input.title);
+  const theme: ThemeSpec = resolveTheme(styleName, input.title);
   const density = densityOf(input.config.density);
   const strategy = strategyOf(input.config.layout);
   // "Dense Professional" compresses like Detailed density; "Minimal" hides
@@ -922,7 +1341,7 @@ export function buildPresentationSpec(input: {
     }
 
     if (kind === "title") {
-      // Hero slide — full-bleed composition by style.
+      // Hero slide — style-specific composition
       const split = splitLongTitle(rawSlide.title || input.title);
       const kicker =
         rawSlide.subtitle && rawSlide.subtitle.length <= 68
@@ -930,76 +1349,350 @@ export function buildPresentationSpec(input: {
           : undefined;
       const heroTitle = split.title || "Presentation";
       const heroSub = split.subtitle || (kicker ? undefined : rawSlide.subtitle);
-      const titleTop = 2.2;
+      const styleKey = theme.key;
 
-      if (theme.heroBand === "left") {
-        addShapeEl(els, { x: 0, y: 0, w: 0.28, h: H }, "rect", { fill: t.accent });
-      } else if (theme.heroBand === "right") {
-        addShapeEl(els, { x: W - 0.28, y: 0, w: 0.28, h: H }, "rect", { fill: t.accent });
+      if (styleKey === "minimal") {
+        // Minimal Title: Open whitespace, no sideband, spacious typography
+        if (kicker) {
+          addFittedText(
+            ctx,
+            els,
+            { x: 1.2, y: 2.1, w: 8, h: 0.3 },
+            kicker.toUpperCase(),
+            {
+              size: 11,
+              minSize: 9,
+              color: t.accent,
+              font: t.bodyFont,
+              bold: true,
+              letterSpacing: 1.5,
+            }
+          );
+        }
+        addFittedText(ctx, els, { x: 1.2, y: 2.5, w: 10.8, h: 1.8 }, heroTitle, {
+          size: 40,
+          minSize: 28,
+          color: t.primary,
+          font: t.titleFont,
+          bold: true,
+          valign: "top",
+          lineSpacing: 1.05,
+          letterSpacing: -0.4,
+        });
+        addShapeEl(els, { x: 1.2, y: 4.4, w: 1.4, h: 0.035 }, "rect", {
+          fill: t.accent,
+        });
+        if (heroSub) {
+          addFittedText(
+            ctx,
+            els,
+            { x: 1.2, y: 4.6, w: 10.5, h: 0.7 },
+            heroSub,
+            {
+              size: 16,
+              minSize: 13,
+              color: t.muted,
+              font: t.bodyFont,
+              lineSpacing: 1.2,
+            }
+          );
+        }
+      } else if (styleKey === "cinematic") {
+        // Cinematic Title: Dark dramatic centered widescreen frame with glowing aura
         addShapeEl(
           els,
-          { x: W - 3.6, y: H - 2.9, w: 2.6, h: 2.6 },
-          "ellipse",
-          { lineColor: t.accent, lineWidth: 2, opacity: 55 }
+          { x: W / 2 - 1.8, y: 1.8, w: 3.6, h: 0.03 },
+          "rect",
+          { fill: t.accent, opacity: 80 }
         );
-      } else if (theme.heroBand === "full") {
-        addShapeEl(els, { x: 0, y: 0, w: W, h: 0.22 }, "rect", { fill: t.accent });
-        addShapeEl(
-          els,
-          { x: W - 5.2, y: -2.3, w: 5.8, h: 5.8 },
-          "ellipse",
-          { fill: t.accent, opacity: 14 }
-        );
+        if (kicker) {
+          addFittedText(
+            ctx,
+            els,
+            { x: 1.5, y: 2.0, w: W - 3.0, h: 0.35 },
+            kicker.toUpperCase(),
+            {
+              size: 11.5,
+              minSize: 9,
+              color: t.accent,
+              font: t.bodyFont,
+              bold: true,
+              align: "center",
+              letterSpacing: 2.0,
+            }
+          );
+        }
+        addFittedText(ctx, els, { x: 1.5, y: 2.45, w: W - 3.0, h: 1.9 }, heroTitle, {
+          size: 42,
+          minSize: 28,
+          color: t.primary,
+          font: t.titleFont,
+          bold: true,
+          align: "center",
+          valign: "top",
+          lineSpacing: 1.05,
+          letterSpacing: -0.3,
+        });
+        if (heroSub) {
+          addFittedText(
+            ctx,
+            els,
+            { x: 2.0, y: 4.45, w: W - 4.0, h: 0.7 },
+            heroSub,
+            {
+              size: 16,
+              minSize: 13,
+              color: t.muted,
+              font: t.bodyFont,
+              align: "center",
+              lineSpacing: 1.2,
+            }
+          );
+        }
+      } else if (styleKey === "tech" || styleKey === "futuristic") {
+        // Tech Title: Status telemetry header, technical grid, right telemetry panel
+        addShapeEl(els, { x: 0.85, y: 1.2, w: 3.6, h: 0.34 }, "roundRect", {
+          fill: t.panel,
+          lineColor: t.accent,
+          lineWidth: 1,
+          radius: 0.04,
+        });
+        els.push({
+          kind: "text",
+          box: { x: 1.0, y: 1.22, w: 3.3, h: 0.28 },
+          text: styleKey === "futuristic" ? "SYS // QUANTUM PROTOCOL" : "STATUS: VERIFIED // ACTIVE",
+          fontSize: 9,
+          bold: true,
+          color: t.accent,
+          font: t.bodyFont,
+        });
+        addShapeEl(els, { x: 0.85, y: 1.7, w: W - 1.7, h: 0.02 }, "rect", {
+          fill: t.accent,
+          opacity: 40,
+        });
+        addFittedText(ctx, els, { x: 0.85, y: 2.0, w: 7.8, h: 1.9 }, heroTitle, {
+          size: 38,
+          minSize: 26,
+          color: t.primary,
+          font: t.titleFont,
+          bold: true,
+          valign: "top",
+          lineSpacing: 1.05,
+        });
+        if (heroSub) {
+          addFittedText(
+            ctx,
+            els,
+            { x: 0.85, y: 4.0, w: 7.8, h: 0.8 },
+            heroSub,
+            {
+              size: 15,
+              minSize: 12,
+              color: t.muted,
+              font: t.bodyFont,
+              lineSpacing: 1.15,
+            }
+          );
+        }
+        // Right side tech exhibit box
+        addVisualPanel(ctx, els, { x: 9.0, y: 2.0, w: 3.5, h: 4.2 }, 42);
+      } else if (styleKey === "visual") {
+        // Visual Title: Large visual hero slot on right, punchy title on left
+        if (kicker) {
+          addFittedText(
+            ctx,
+            els,
+            { x: 0.85, y: 1.8, w: 6.2, h: 0.32 },
+            kicker.toUpperCase(),
+            {
+              size: 11,
+              minSize: 9,
+              color: t.accent,
+              font: t.bodyFont,
+              bold: true,
+              letterSpacing: 1.2,
+            }
+          );
+        }
+        addFittedText(ctx, els, { x: 0.85, y: 2.2, w: 6.2, h: 2.0 }, heroTitle, {
+          size: 38,
+          minSize: 26,
+          color: t.primary,
+          font: t.titleFont,
+          bold: true,
+          valign: "top",
+          lineSpacing: 1.05,
+        });
+        if (heroSub) {
+          addFittedText(
+            ctx,
+            els,
+            { x: 0.85, y: 4.3, w: 6.2, h: 0.8 },
+            heroSub,
+            {
+              size: 16,
+              minSize: 13,
+              color: t.muted,
+              font: t.bodyFont,
+              lineSpacing: 1.2,
+            }
+          );
+        }
+        addVisualPanel(ctx, els, { x: 7.4, y: 1.2, w: 5.1, h: 5.2 }, 99);
+      } else if (styleKey === "consultant") {
+        // Consultant Title: Executive Briefing banner + structured layout
+        addShapeEl(els, { x: 0.85, y: 1.2, w: 0.28, h: H - 2.4 }, "rect", { fill: t.accent });
+        addShapeEl(els, { x: 1.35, y: 1.2, w: 4.2, h: 0.32 }, "roundRect", {
+          fill: t.panel,
+          radius: 0.04,
+        });
+        els.push({
+          kind: "text",
+          box: { x: 1.5, y: 1.23, w: 3.9, h: 0.26 },
+          text: "EXECUTIVE BRIEFING // STRATEGIC REVIEW",
+          fontSize: 9,
+          bold: true,
+          color: t.accent,
+          font: t.titleFont,
+        });
+        addFittedText(ctx, els, { x: 1.35, y: 1.75, w: 11.0, h: 1.9 }, heroTitle, {
+          size: 38,
+          minSize: 26,
+          color: t.primary,
+          font: t.titleFont,
+          bold: true,
+          valign: "top",
+          lineSpacing: 1.05,
+        });
+        if (heroSub) {
+          addFittedText(
+            ctx,
+            els,
+            { x: 1.35, y: 3.75, w: 11.0, h: 0.8 },
+            heroSub,
+            {
+              size: 16,
+              minSize: 13,
+              color: t.muted,
+              font: t.bodyFont,
+              lineSpacing: 1.2,
+            }
+          );
+        }
+      } else if (styleKey === "editorial") {
+        // Editorial Title: Magazine headline with Georgia serif & asymmetric rule
+        addFittedText(ctx, els, { x: 1.1, y: 1.8, w: 11.0, h: 2.0 }, heroTitle, {
+          size: 42,
+          minSize: 28,
+          color: t.primary,
+          font: t.titleFont,
+          bold: true,
+          valign: "top",
+          lineSpacing: 1.05,
+        });
+        addShapeEl(els, { x: 1.1, y: 3.9, w: 2.8, h: 0.02 }, "rect", {
+          fill: t.accent,
+        });
+        if (heroSub) {
+          addFittedText(
+            ctx,
+            els,
+            { x: 1.1, y: 4.15, w: 10.5, h: 0.8 },
+            heroSub,
+            {
+              size: 16,
+              minSize: 13,
+              color: t.muted,
+              font: t.bodyFont,
+              italic: true,
+              lineSpacing: 1.2,
+            }
+          );
+        }
+      } else if (styleKey === "bold") {
+        // Bold Title: High-contrast oversized title with solid accent block
+        addShapeEl(els, { x: 0, y: 0, w: 0.35, h: H }, "rect", { fill: t.accent });
+        addFittedText(ctx, els, { x: 0.9, y: 1.6, w: 11.5, h: 2.4 }, heroTitle, {
+          size: 46,
+          minSize: 30,
+          color: t.primary,
+          font: t.titleFont,
+          bold: true,
+          valign: "top",
+          lineSpacing: 1.0,
+        });
+        if (heroSub) {
+          addFittedText(
+            ctx,
+            els,
+            { x: 0.9, y: 4.1, w: 11.5, h: 0.8 },
+            heroSub,
+            {
+              size: 18,
+              minSize: 14,
+              color: t.muted,
+              font: t.bodyFont,
+              lineSpacing: 1.2,
+            }
+          );
+        }
+      } else {
+        // Standard / Professional Hero Slide with theme heroBand
+        if (theme.heroBand === "left") {
+          addShapeEl(els, { x: 0, y: 0, w: 0.28, h: H }, "rect", { fill: t.accent });
+        } else if (theme.heroBand === "right") {
+          addShapeEl(els, { x: W - 0.28, y: 0, w: 0.28, h: H }, "rect", { fill: t.accent });
+        } else if (theme.heroBand === "full") {
+          addShapeEl(els, { x: 0, y: 0, w: W, h: 0.22 }, "rect", { fill: t.accent });
+        }
+        const titleTop = 2.2;
+        if (kicker) {
+          addFittedText(
+            ctx,
+            els,
+            { x: 0.85, y: titleTop - 0.55, w: 8, h: 0.32 },
+            kicker.toUpperCase(),
+            {
+              size: 11.5,
+              minSize: 9,
+              color: t.accent,
+              font: t.bodyFont,
+              bold: true,
+              letterSpacing: 1.4,
+            }
+          );
+        }
+        addFittedText(ctx, els, { x: 0.85, y: titleTop, w: 11.6, h: 1.7 }, heroTitle, {
+          size: 38,
+          minSize: 26,
+          color: t.primary,
+          font: t.titleFont,
+          bold: true,
+          valign: "top",
+          lineSpacing: 1.05,
+          letterSpacing: -0.4,
+        });
+        if (heroSub) {
+          addFittedText(
+            ctx,
+            els,
+            { x: 0.85, y: titleTop + 1.72, w: 11.6, h: 0.62 },
+            heroSub,
+            {
+              size: 17,
+              minSize: 14,
+              color: t.muted,
+              font: t.bodyFont,
+              lineSpacing: 1.2,
+            }
+          );
+        }
       }
 
-      if (kicker) {
-        addFittedText(
-          ctx,
-          els,
-          { x: 0.85, y: titleTop - 0.55, w: 8, h: 0.32 },
-          kicker.toUpperCase(),
-          {
-            size: 11.5,
-            minSize: 9,
-            color: t.accent,
-            font: t.bodyFont,
-            bold: true,
-            letterSpacing: 1.4,
-          }
-        );
-      }
-
-      addFittedText(ctx, els, { x: 0.85, y: titleTop, w: 11.6, h: 1.7 }, heroTitle, {
-        size: 38,
-        minSize: 26,
-        color: t.primary,
-        font: t.titleFont,
-        bold: true,
-        valign: "top",
-        lineSpacing: 1.05,
-        letterSpacing: -0.4,
-      });
-
-      if (heroSub) {
-        addFittedText(
-          ctx,
-          els,
-          { x: 0.85, y: titleTop + 1.72, w: 11.6, h: 0.62 },
-          heroSub,
-          {
-            size: 17,
-            minSize: 14,
-            color: t.muted,
-            font: t.bodyFont,
-            lineSpacing: 1.2,
-          }
-        );
-      }
-
-      if (rawSlide.bullets?.length) {
+      if (rawSlide.bullets?.length && styleKey !== "minimal") {
         rawSlide.bullets.slice(0, 3).forEach((b, i) => {
-          const by = titleTop + 2.55 + i * 0.44;
-          if (by + 0.4 > 6.9) return;
+          const by = 4.8 + i * 0.44;
+          if (by + 0.4 > 6.7) return;
           addShapeEl(els, { x: 0.85, y: by + 0.07, w: 0.1, h: 0.1 }, "ellipse", {
             fill: t.accent,
           });
@@ -1307,18 +2000,28 @@ export function buildPresentationSpec(input: {
     }
 
     if (rawSlide.footnote) {
-      addFittedText(
-        ctx,
-        els,
-        { x: SAFE_MARGIN.left, y: 6.62, w: W - SAFE_MARGIN.left - SAFE_MARGIN.right, h: 0.26 },
-        rawSlide.footnote,
-        {
-          size: 9.5,
-          minSize: 8.5,
-          color: t.muted,
-          font: t.bodyFont,
-        }
-      );
+      const fn = rawSlide.footnote.trim();
+      const isPageOrMeta =
+        /^(slide|page)?\s*\d+(\s*(of|\/)\s*\d+)?$/i.test(fn) ||
+        /\b(page|slide)\s+\d+\b/i.test(fn) ||
+        /^\d+\s*[\/of]\s*\d+$/i.test(fn) ||
+        (input.title && fn.toLowerCase().includes(input.title.toLowerCase())) ||
+        (footerLabel && fn.toLowerCase().includes(footerLabel.toLowerCase()));
+
+      if (!isPageOrMeta) {
+        addFittedText(
+          ctx,
+          els,
+          { x: SAFE_MARGIN.left, y: 6.62, w: W - SAFE_MARGIN.left - SAFE_MARGIN.right, h: 0.26 },
+          fn,
+          {
+            size: 9.5,
+            minSize: 8.5,
+            color: t.muted,
+            font: t.bodyFont,
+          }
+        );
+      }
     }
 
     addFooter(ctx, els, index + 1, footerLabel);
@@ -1334,6 +2037,9 @@ export function buildPresentationSpec(input: {
     title: input.title,
     themeKey: theme.key,
     style: theme.name,
+    selectedStyle: input.styleName || input.config.visualStyle || "auto",
+    resolvedStyle: theme.key,
+    styleVersion: "1.0",
     config: input.config,
     slides: specSlides,
   };

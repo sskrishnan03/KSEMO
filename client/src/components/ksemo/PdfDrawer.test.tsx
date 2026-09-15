@@ -10,8 +10,14 @@ import {
   PdfDrawer,
   ExcelViewer,
   PresentationPreview,
+  PptSlideSidebar,
+  isPageNumberOrFileFooter,
+  isLightOrWhiteBorder,
 } from "./PdfDrawer";
-import type { PptPresentationSpec } from "@shared/presentation";
+import {
+  DEFAULT_PRESENTATION_CONFIG,
+  type PptPresentationSpec,
+} from "@shared/presentation";
 import {
   PdfViewerProvider,
   isExcel,
@@ -307,6 +313,326 @@ describe("PdfDrawer", () => {
     expect(markup).toContain("Our Growth Story");
     expect(markup).toContain("Q2");
     expect(markup).toContain("180");
+    // Verify slide canvas has NO page numbers or file name footers
+    expect(markup).not.toContain("1 / 1");
+    expect(markup).not.toContain("Slide 1");
+    expect(markup).not.toContain("PowerPoint Presentation");
+  });
+
+  it("renders PptSlideSidebar with slide numbers, thumbnails, and active indicator", () => {
+    const spec: PptPresentationSpec = {
+      version: 1,
+      widthIn: 13.333,
+      heightIn: 7.5,
+      title: "Quarterly Review",
+      themeKey: "modern",
+      style: "Modern",
+      config: {
+        ...DEFAULT_PRESENTATION_CONFIG,
+        visualStyle: "modern",
+        slides: 3,
+      },
+      slides: [
+        {
+          index: 1,
+          kind: "title",
+          background: "#111827",
+          elements: [
+            {
+              kind: "text",
+              box: { x: 1, y: 2, w: 10, h: 2 },
+              text: "Quarterly Review",
+              fontSize: 32,
+              color: "#FFFFFF",
+            },
+          ],
+        },
+        {
+          index: 2,
+          kind: "content",
+          background: "#1F2937",
+          elements: [
+            {
+              kind: "text",
+              box: { x: 1, y: 1, w: 10, h: 1 },
+              text: "Key Objectives",
+              fontSize: 24,
+              color: "#FFFFFF",
+            },
+          ],
+        },
+      ],
+    };
+
+    const markup = renderToStaticMarkup(
+      createElement(
+        TooltipProvider,
+        null,
+        createElement(PptSlideSidebar, {
+          canonicalSpec: spec,
+          currentSlide: 1,
+          onSelectSlide: () => {},
+          isOpen: true,
+          onClose: () => {},
+        })
+      )
+    );
+
+    // Sidebar container and header
+    expect(markup).toContain('data-testid="pptx-sidebar"');
+    expect(markup).toContain("Slides");
+    expect(markup).toContain('data-testid="pptx-sidebar-count-badge"');
+    expect(markup).toContain(">2<");
+    // Collapse button with ChevronsLeft
+    expect(markup).toContain('data-testid="pptx-sidebar-collapse-btn"');
+
+    // Thumbnails for both slides
+    expect(markup).toContain('data-testid="pptx-sidebar-thumb-1"');
+    expect(markup).toContain('data-testid="pptx-sidebar-thumb-2"');
+
+    // Slide numbers
+    expect(markup).toContain("1");
+    expect(markup).toContain("2");
+
+    // Active slide 1 has aria-current="true"
+    expect(markup).toContain('aria-current="true"');
+
+    // When closed, sidebar returns null
+    const closedMarkup = renderToStaticMarkup(
+      createElement(PptSlideSidebar, {
+        canonicalSpec: spec,
+        currentSlide: 1,
+        onSelectSlide: () => {},
+        isOpen: false,
+      })
+    );
+    expect(closedMarkup).toBe("");
+  });
+
+  it("isPageNumberOrFileFooter detects and suppresses page numbers and filenames", () => {
+    // Pure numbers
+    expect(isPageNumberOrFileFooter("1")).toBe(true);
+    expect(isPageNumberOrFileFooter("05")).toBe(true);
+    // Slide and page patterns
+    expect(isPageNumberOrFileFooter("Slide 1")).toBe(true);
+    expect(isPageNumberOrFileFooter("slide 2")).toBe(true);
+    expect(isPageNumberOrFileFooter("Page 3")).toBe(true);
+    expect(isPageNumberOrFileFooter("1 of 10")).toBe(true);
+    expect(isPageNumberOrFileFooter("Slide 1 of 5")).toBe(true);
+    expect(isPageNumberOrFileFooter("Page 2 / 8")).toBe(true);
+    expect(isPageNumberOrFileFooter("3/5")).toBe(true);
+    expect(isPageNumberOrFileFooter("Slide #4")).toBe(true);
+    // Filename patterns
+    expect(isPageNumberOrFileFooter("Presentation.pptx", "Presentation.pptx")).toBe(true);
+    expect(isPageNumberOrFileFooter("Presentation", "Presentation.pptx")).toBe(true);
+    expect(isPageNumberOrFileFooter("presentation", "Presentation.pptx")).toBe(true);
+    // Legitimate content should NOT be filtered
+    expect(isPageNumberOrFileFooter("Key Takeaways for 2026")).toBe(false);
+    expect(isPageNumberOrFileFooter("Revenue increased by 45%")).toBe(false);
+    expect(isPageNumberOrFileFooter("3 key strategic priorities")).toBe(false);
+  });
+
+  it("PresentationPreview scales slide proportionally at 16:9 and suppresses slide numbers", () => {
+    const spec: PptPresentationSpec = {
+      version: 1,
+      widthIn: 13.333,
+      heightIn: 7.5,
+      title: "Clean Deck",
+      themeKey: "modern",
+      style: "Modern",
+      config: {
+        ...DEFAULT_PRESENTATION_CONFIG,
+        visualStyle: "modern",
+        slides: 1,
+      },
+      slides: [
+        {
+          index: 1,
+          kind: "title",
+          background: "#FFFFFF",
+          elements: [
+            {
+              kind: "text",
+              box: { x: 1, y: 1, w: 10, h: 2 },
+              text: "Clean Title",
+              fontSize: 32,
+              color: "#111827",
+            },
+            {
+              kind: "text",
+              box: { x: 1, y: 6.5, w: 5, h: 0.5 },
+              text: "Slide 1 of 1",
+              fontSize: 10,
+              color: "#999999",
+            },
+            {
+              kind: "text",
+              box: { x: 6, y: 6.5, w: 5, h: 0.5 },
+              text: "Clean Deck.pptx",
+              fontSize: 10,
+              color: "#999999",
+            },
+          ],
+        },
+      ],
+    };
+
+    const markup = renderToStaticMarkup(
+      createElement(PresentationPreview, {
+        spec,
+        slideWidth: 1024,
+        slideHeight: 576,
+        filename: "Clean Deck.pptx",
+      })
+    );
+
+    // 16:9 proportional dimensions are set
+    expect(markup).toContain("width:1024px");
+    expect(markup).toContain("height:576px");
+    expect(markup).toContain("--s:1024px");
+    // Title is present
+    expect(markup).toContain("Clean Title");
+    // Page number and filename footers are stripped
+    expect(markup).not.toContain("Slide 1 of 1");
+    expect(markup).not.toContain("Clean Deck.pptx");
+  });
+
+  it("PresentationPreview sets exact 1-based data-slide attributes matching sidebar thumbnails", () => {
+    const spec: PptPresentationSpec = {
+      version: 1,
+      widthIn: 13.333,
+      heightIn: 7.5,
+      title: "Multi-slide Pitch",
+      themeKey: "modern",
+      style: "Modern",
+      config: {
+        ...DEFAULT_PRESENTATION_CONFIG,
+        visualStyle: "modern",
+        slides: 5,
+      },
+      slides: [
+        { index: 0, kind: "title", background: "#FFFFFF", elements: [] },
+        { index: 1, kind: "content", background: "#FFFFFF", elements: [] },
+        { index: 2, kind: "content", background: "#FFFFFF", elements: [] },
+        { index: 3, kind: "content", background: "#FFFFFF", elements: [] },
+        { index: 4, kind: "content", background: "#FFFFFF", elements: [] },
+      ],
+    };
+
+    const markup = renderToStaticMarkup(
+      createElement(PresentationPreview, {
+        spec,
+      })
+    );
+
+    // Each slide MUST have 1-based data-slide matching human thumbnail numbers (1 to 5)
+    // and NEVER 0-based data-slide="0" which causes off-by-one scroll jumps!
+    expect(markup).not.toContain('data-slide="0"');
+    expect(markup).toContain('data-slide="1"');
+    expect(markup).toContain('data-slide="2"');
+    expect(markup).toContain('data-slide="3"');
+    expect(markup).toContain('data-slide="4"');
+    expect(markup).toContain('data-slide="5"');
+
+    // Also verify data-testid matching 1-based slide numbers
+    expect(markup).toContain('data-testid="ksemo-ppt-slide-1"');
+    expect(markup).toContain('data-testid="ksemo-ppt-slide-4"');
+    expect(markup).toContain('data-testid="ksemo-ppt-slide-5"');
+
+    // Verify sidebar thumbnail selection for slide 4
+    let selectedSlide = -1;
+    const sidebarMarkup = renderToStaticMarkup(
+      createElement(
+        TooltipProvider,
+        null,
+        createElement(PptSlideSidebar, {
+          canonicalSpec: spec,
+          currentSlide: 4,
+          onSelectSlide: (n: number) => {
+            selectedSlide = n;
+          },
+          isOpen: true,
+        })
+      )
+    );
+
+    expect(sidebarMarkup).toContain('data-testid="pptx-sidebar-thumb-4"');
+    // Slide 4 thumbnail is active
+    expect(sidebarMarkup).toContain('data-testid="pptx-sidebar-thumb-4" aria-label="Go to slide 4" aria-current="true"');
+  });
+
+  it("verifies presentation slides and thumbnails use chat box border styling (border-border) with zero white borderlines or white fade", () => {
+    expect(isLightOrWhiteBorder("FFFFFF")).toBe(true);
+    expect(isLightOrWhiteBorder("#fff")).toBe(true);
+    expect(isLightOrWhiteBorder("white")).toBe(true);
+    expect(isLightOrWhiteBorder("E4E7EC")).toBe(true);
+    expect(isLightOrWhiteBorder("E2E5EA")).toBe(true);
+    expect(isLightOrWhiteBorder("23408F")).toBe(false);
+
+    const spec: PptPresentationSpec = {
+      version: 1,
+      widthIn: 13.333,
+      heightIn: 7.5,
+      title: "Clean Deck",
+      themeKey: "modern",
+      style: "Modern",
+      config: {
+        ...DEFAULT_PRESENTATION_CONFIG,
+        visualStyle: "modern",
+        slides: 2,
+      },
+      slides: [
+        {
+          index: 0,
+          kind: "title",
+          background: "#FFFFFF",
+          elements: [
+            {
+              kind: "shape",
+              shape: "roundRect",
+              box: { x: 1, y: 1, w: 5, h: 3 },
+              fill: "F5F6F8",
+              lineColor: "E4E7EC", // near-white border color must be suppressed
+            },
+          ],
+        },
+      ],
+    };
+
+    const previewMarkup = renderToStaticMarkup(
+      createElement(PresentationPreview, { spec })
+    );
+    // Slide container uses chat box border (border-border), NOT white border-neutral-200/80
+    expect(previewMarkup).toContain("border-border");
+    expect(previewMarkup).not.toContain("border-neutral-200/80");
+
+    // Ensure the shape inside has NO white border style
+    expect(previewMarkup).not.toContain("solid rgb(228, 231, 236)");
+    expect(previewMarkup).not.toContain("solid #E4E7EC");
+
+    const sidebarMarkup = renderToStaticMarkup(
+      createElement(
+        TooltipProvider,
+        null,
+        createElement(PptSlideSidebar, {
+          canonicalSpec: spec,
+          currentSlide: 1,
+          onSelectSlide: () => {},
+          isOpen: true,
+        })
+      )
+    );
+
+    // Sidebar header has no background container for the icon
+    expect(sidebarMarkup).not.toContain("bg-primary/10");
+    expect(sidebarMarkup).toContain("Slides");
+    expect(sidebarMarkup).toContain("text-sm font-semibold");
+
+    // Thumbnails use chat box border styling without white borderlines or white fade
+    expect(sidebarMarkup).not.toContain("border-primary");
+    expect(sidebarMarkup).not.toContain("shadow-primary/25");
+    expect(sidebarMarkup).not.toContain("focus-visible:bg-accent");
+    expect(sidebarMarkup).toContain("border-border");
   });
 
   it("renders drawer with clean filename and controls for PowerPoint (.pptx) presentation", () => {

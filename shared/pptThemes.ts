@@ -502,7 +502,24 @@ export const VISUAL_THEMES: Record<string, ThemeSpec> = {
   },
 };
 
+// Register lowercase keys into VISUAL_THEMES for stable ID lookup
+for (const key of Object.keys(VISUAL_THEMES)) {
+  const spec = VISUAL_THEMES[key];
+  if (spec.key && !VISUAL_THEMES[spec.key]) {
+    VISUAL_THEMES[spec.key] = spec;
+  }
+}
+
 export const THEME_KEYS = Object.keys(VISUAL_THEMES);
+
+/**
+ * Resolves any style name or ID into the canonical ThemeSpec.
+ */
+export function getThemeSpec(styleId: unknown): ThemeSpec | undefined {
+  if (!styleId || typeof styleId !== "string") return undefined;
+  const lower = styleId.trim().toLowerCase();
+  return VISUAL_THEMES[lower] || VISUAL_THEMES[styleId];
+}
 
 /**
  * Selects a style for `Auto` using semantic cues from the topic/title.
@@ -512,19 +529,35 @@ export function pickAutoTheme(title: string): ThemeSpec {
   const t = title.toLowerCase();
   const match = (words: string[]): boolean =>
     words.some(w => t.includes(w));
-  if (match(["finance", "financial", "revenue", "market", "investment", "growth", "analy"]))
-    return VISUAL_THEMES["Classic"];
-  if (match(["ai", "artificial intelligence", "machine learning", "cloud", "software", "tech", "digital", "startup", "innovation", "data"]))
-    return VISUAL_THEMES["Tech"];
-  if (match(["science", "research", "study", "university", "academic", "paper", "healthcare", "medicine"]))
-    return VISUAL_THEMES["Academic"];
-  if (match(["strategy", "consulting", "framework", "transformation", "roadmap", "organization"]))
-    return VISUAL_THEMES["Consultant"];
-  if (match(["pitch", "investor", "funding", "launch", "product"]))
-    return VISUAL_THEMES["Creative"];
-  if (match(["car", "auto", "automotive", "luxury", "travel", "tourism", "design"]))
-    return VISUAL_THEMES["Luxury"];
-  if (match(["report", "annual", "corporate", "company ", "enterprise"]))
-    return VISUAL_THEMES["Classic"];
-  return VISUAL_THEMES["Minimal"];
+  if (match(["finance", "financial", "revenue", "market", "investment", "growth", "banking", "fiscal"]))
+    return VISUAL_THEMES["classic"];
+  if (match(["ai", "artificial intelligence", "machine learning", "cloud", "software", "tech", "digital", "startup", "innovation", "data", "system", "architecture"]))
+    return VISUAL_THEMES["tech"];
+  if (match(["space", "astronomy", "cosmos", "universe", "film", "cinema", "cinematic", "epic"]))
+    return VISUAL_THEMES["cinematic"];
+  if (match(["science", "research", "study", "university", "academic", "paper", "healthcare", "medicine", "clinical"]))
+    return VISUAL_THEMES["academic"];
+  if (match(["strategy", "consulting", "framework", "transformation", "roadmap", "organization", "advisory"]))
+    return VISUAL_THEMES["consultant"];
+  if (match(["magazine", "editorial", "journalism", "article", "publishing", "fashion"]))
+    return VISUAL_THEMES["editorial"];
+  if (match(["pitch", "investor", "funding", "launch", "product", "creative"]))
+    return VISUAL_THEMES["creative"];
+  if (match(["luxury", "premium", "prestige", "jewelry", "watch", "haute", "wealth"]))
+    return VISUAL_THEMES["luxury"];
+  if (match(["fun", "kids", "game", "gaming", "playful", "youth", "humor"]))
+    return VISUAL_THEMES["playful"];
+  if (match(["future", "futuristic", "cyber", "robot", "crypto", "quantum", "neon"]))
+    return VISUAL_THEMES["futuristic"];
+  if (match(["story", "storytelling", "narrative", "journey", "biography", "chronicle", "mission"]))
+    return VISUAL_THEMES["storytelling"];
+  if (match(["bold", "impact", "power", "aggressive", "loud", "heavy"]))
+    return VISUAL_THEMES["bold"];
+  if (match(["elegant", "subtle", "refined", "gentle", "poise", "chic"]))
+    return VISUAL_THEMES["elegant"];
+  if (match(["modern", "clean", "app", "saas", "ui"]))
+    return VISUAL_THEMES["modern"];
+  if (match(["corporate", "company", "enterprise", "business", "professional", "executive", "board", "governance"]))
+    return VISUAL_THEMES["professional"];
+  return VISUAL_THEMES["minimal"];
 }

@@ -175,7 +175,8 @@ function buildForcedSystemPrompt(
     lengthDirective = `GENERATE AT LEAST ${minSheets} DETAILED, REALISTIC SPREADSHEETS with rich data rows, column headers, numbers, formulas, and operational categories (including an Overview sheet and detailed domain-specific breakdown sheets).`;
   } else if (format === "pptx") {
     const minSlides = lengthIntent.targetSlides ?? (lengthIntent.isExtensive ? 15 : 8);
-    lengthDirective = `GENERATE AT LEAST ${minSlides} SUBSTANTIVE SLIDES with professional layouts, informative bullet points, tables, and footnotes.`;
+    lengthDirective = `GENERATE AT LEAST ${minSlides} SUBSTANTIVE SLIDES with professional layouts, informative bullet points, tables, and research citations.
+CRITICAL PROHIBITION: NEVER write page numbers (e.g. "Page 1", "Slide 1", "1 of 5", "1/5"), slide counters, document titles, or file names inside slide titles, subtitles, bullets, or footnotes. The slide canvas must contain only the presentation topic content without meta page numbers or file names.`;
   } else {
     // pdf, docx, txt
     if (lengthIntent.targetPages) {
@@ -401,14 +402,27 @@ export async function planDocument(
   history: Message[],
   forcedFormat?: Extract<DocumentPlan, { kind: "file" }>["format"] | null,
   research?: ResearchResult,
-  opts?: { slideTarget?: number }
+  opts?: { slideTarget?: number; visualStyle?: string }
 ): Promise<DocumentPlan> {
   const forced = normalizeFormat(forcedFormat);
 
   if (forced) {
     let systemContent = buildForcedSystemPrompt(forced, userMessage, research);
-    if (forced === "pptx" && typeof opts?.slideTarget === "number") {
-      systemContent += `\n\nThe user selected a target presentation size of ${opts.slideTarget} slides. Generate approximately ${opts.slideTarget} substantive slides (title, section dividers, metric layouts, tables, process flows, and comparisons) so the final deck is neither padded nor overcrowded. Never produce empty or placeholder slides.`;
+    if (forced === "pptx") {
+      if (typeof opts?.slideTarget === "number") {
+        systemContent += `\n\nThe user selected a target presentation size of ${opts.slideTarget} slides. Generate approximately ${opts.slideTarget} substantive slides (title, section dividers, metric layouts, tables, process flows, and comparisons) so the final deck is neither padded nor overcrowded. Never produce empty or placeholder slides.`;
+      }
+      if (opts?.visualStyle) {
+        const styleName = opts.visualStyle.toUpperCase();
+        systemContent += `\n\nAUTHORITATIVE PRESENTATION STYLE: ${styleName}.
+You MUST tailor slide content, tone, layouts, and data storytelling directly to this visual style:
+- Minimal: Crisp, punchy statements, high signal-to-noise ratio, focused single ideas per slide, avoid clutter.
+- Tech / Futuristic: Precise technical terminology, system architecture blocks, telemetry/metrics, quantitative benchmarks.
+- Consultant: Clear executive takeaways, problem-solution-impact structure, scorecard metrics, strategic frameworks.
+- Editorial / Academic: Thoughtful narrative flow, deep context, clear citations, analytical depth.
+- Bold / Cinematic: Punchy dramatic headlines, high-impact numbers, decisive calls-to-action.
+Produce substantive, authentic slides reflecting this design archetype.`;
+      }
     }
     const researchHint = research?.needed
       ? `\n\nResearch was performed. Findings: ${research.findings.length} topics, ${research.sourceCount} sources. Use the provided research findings to create an accurate, well-sourced document.`
