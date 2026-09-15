@@ -19,7 +19,14 @@ import {
 import { startLogin } from "@/const";
 import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
-import { ChevronsRight, FolderOpen, Menu, MoreHorizontal, Pin, Trash2 } from "lucide-react";
+import {
+  ChevronsRight,
+  FolderOpen,
+  Menu,
+  MoreHorizontal,
+  Pin,
+  Trash2,
+} from "lucide-react";
 import { ShareIcon } from "../components/ksemo/icons";
 import React, {
   Fragment,
@@ -2644,7 +2651,9 @@ export default function Home() {
               onScroll={handleMessagesScroll}
               className={cn(
                 "min-h-0 flex-1",
-                visibleMessages.length ? "overflow-y-auto" : "overflow-y-auto lg:overflow-hidden"
+                visibleMessages.length
+                  ? "overflow-y-auto"
+                  : "overflow-y-auto lg:overflow-hidden"
               )}
               aria-label="Conversation"
             >
@@ -2746,52 +2755,54 @@ export default function Home() {
                 <EmptyState
                   greeting={greeting}
                   composer={
-                    <ChatComposer
-                      onSend={stableComposerSend}
-                      onCancel={stableStopGeneration}
-                      onVoice={stableVoiceAction}
-                      onVoiceChat={stableOpenVoiceChat}
-                      onCancelRecording={stableVoiceCancel}
-                      isGenerating={isGenerating}
-                      isRecording={voice.state === "recording"}
-                      isTranscribing={voice.state === "transcribing"}
-                      recordingSeconds={voice.seconds}
-                      audioBars={voice.audioBars}
-                      audioLevel={voice.audioLevel}
-                      value={composerValue}
-                      onValueChange={setComposerValue}
-                      activeMode={activeMode}
-                      onModeChange={mode => setActiveMode(mode || "chat")}
-                      pptConfig={pptConfig}
-                      onPptConfigChange={setPptConfig}
-                      onAttachment={stableAttachFromComposer}
-                      attachmentNotices={
-                        isAttachmentPreview
-                          ? [
-                              {
-                                fileId: "preview-file",
-                                name: "project-brief.pdf",
-                                linked: true,
-                              },
-                            ]
-                          : attachmentNotices
-                      }
-                      onClearAttachment={stableOnClearAttachment}
-                      libraryFiles={libraryFilesQuery.data}
-                      onLibraryFile={stableAttachLibraryFiles}
-                      initialLibraryOpen={isLibraryPreview}
-                      initialToolsOpen={isLibraryPreview}
-                      menuPlacement={isMobile ? "above" : "below"}
-                      isCentered={visibleMessages.length === 0}
-                      onTakeScreenshot={stableCaptureScreenshot}
-                      focusToken={composerFocusToken}
-                    />
+                    isMobile ? null : (
+                      <ChatComposer
+                        onSend={stableComposerSend}
+                        onCancel={stableStopGeneration}
+                        onVoice={stableVoiceAction}
+                        onVoiceChat={stableOpenVoiceChat}
+                        onCancelRecording={stableVoiceCancel}
+                        isGenerating={isGenerating}
+                        isRecording={voice.state === "recording"}
+                        isTranscribing={voice.state === "transcribing"}
+                        recordingSeconds={voice.seconds}
+                        audioBars={voice.audioBars}
+                        audioLevel={voice.audioLevel}
+                        value={composerValue}
+                        onValueChange={setComposerValue}
+                        activeMode={activeMode}
+                        onModeChange={mode => setActiveMode(mode || "chat")}
+                        pptConfig={pptConfig}
+                        onPptConfigChange={setPptConfig}
+                        onAttachment={stableAttachFromComposer}
+                        attachmentNotices={
+                          isAttachmentPreview
+                            ? [
+                                {
+                                  fileId: "preview-file",
+                                  name: "project-brief.pdf",
+                                  linked: true,
+                                },
+                              ]
+                            : attachmentNotices
+                        }
+                        onClearAttachment={stableOnClearAttachment}
+                        libraryFiles={libraryFilesQuery.data}
+                        onLibraryFile={stableAttachLibraryFiles}
+                        initialLibraryOpen={isLibraryPreview}
+                        initialToolsOpen={isLibraryPreview}
+                        menuPlacement={isMobile ? "above" : "below"}
+                        isCentered={visibleMessages.length === 0}
+                        onTakeScreenshot={stableCaptureScreenshot}
+                        focusToken={composerFocusToken}
+                      />
+                    )
                   }
                 />
               )}
             </section>
 
-            {visibleMessages.length > 0 && (
+            {(visibleMessages.length > 0 || isMobile) && (
               <div className="relative z-10">
                 <div
                   aria-hidden="true"
@@ -2896,9 +2907,10 @@ export default function Home() {
 
 function timeGreeting() {
   const hour = new Date().getHours();
-  if (hour < 12) return "Good morning — what can I help you with?";
-  if (hour < 18) return "Good afternoon — what can I help you with?";
-  return "Good evening — what can I help you with?";
+  if (hour >= 5 && hour < 12) return "Hey, what's sparking today?";
+  if (hour >= 12 && hour < 17) return "Hey, what's your next move?";
+  if (hour >= 17 && hour < 21) return "Hey, what's on your mind?";
+  return "Hey, what are you thinking?";
 }
 
 const EmptyState = memo(function EmptyState({
