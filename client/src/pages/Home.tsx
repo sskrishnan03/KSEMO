@@ -74,6 +74,10 @@ import { createPublicConversationUrl } from "../lib/ksemoInteraction";
 import { saveEditedUserMessageAndRegenerate } from "../lib/editRegeneration";
 import { buildStreamingDrafts } from "../lib/streamingDrafts";
 import { type CapabilityMode } from "@shared/capabilities";
+import {
+  DEFAULT_PRESENTATION_CONFIG,
+  type PresentationConfig,
+} from "@shared/presentation";
 type StreamConversation = {
   conversationId: string;
   title: string;
@@ -253,6 +257,9 @@ export default function Home() {
     fileId?: string;
   } | null>(null);
   const [activeMode, setActiveMode] = useState<CapabilityMode>("chat");
+  const [pptConfig, setPptConfig] = useState<PresentationConfig>({
+    ...DEFAULT_PRESENTATION_CONFIG,
+  });
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsInitialTab, setSettingsInitialTab] = useState<
     "account" | "security" | "appearance" | "data" | "memory" | "feedback"
@@ -1072,6 +1079,15 @@ export default function Home() {
             : undefined,
           mode: resolvedMode ?? "chat",
           activeMode: resolvedMode ?? "chat",
+          ...(resolvedMode === "pptx"
+            ? {
+                pptConfig,
+                pptStyle:
+                  pptConfig.visualStyle !== "auto"
+                    ? pptConfig.visualStyle
+                    : undefined,
+              }
+            : {}),
         }),
       });
       if (!response.ok || !response.body) {
@@ -1083,6 +1099,11 @@ export default function Home() {
         throw new Error(
           serverError || "The response stream could not be started."
         );
+      }
+      // A PPT is being created now: reset the slides/style so the next PPT
+      // always starts fresh from the defaults instead of reusing this one.
+      if (resolvedMode === "pptx") {
+        setPptConfig({ ...DEFAULT_PRESENTATION_CONFIG });
       }
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
@@ -2421,6 +2442,8 @@ export default function Home() {
       onValueChange={setComposerValue}
       activeMode={activeMode}
       onModeChange={mode => setActiveMode(mode || "chat")}
+      pptConfig={pptConfig}
+      onPptConfigChange={setPptConfig}
       onAttachment={stableAttachFromComposer}
       attachmentNotices={
         isAttachmentPreview
@@ -2747,6 +2770,8 @@ export default function Home() {
                       onValueChange={setComposerValue}
                       activeMode={activeMode}
                       onModeChange={mode => setActiveMode(mode || "chat")}
+                      pptConfig={pptConfig}
+                      onPptConfigChange={setPptConfig}
                       onAttachment={stableAttachFromComposer}
                       attachmentNotices={
                         isAttachmentPreview
@@ -2765,7 +2790,7 @@ export default function Home() {
                       initialLibraryOpen={isLibraryPreview}
                       initialToolsOpen={isLibraryPreview}
                       menuPlacement="below"
-                      isCentered={true}
+                      isCentered={visibleMessages.length === 0}
                       onTakeScreenshot={stableCaptureScreenshot}
                       focusToken={composerFocusToken}
                     />

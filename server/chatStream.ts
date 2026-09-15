@@ -224,6 +224,9 @@ export function registerChatStream(app: Express) {
       mode?: string;
       /** Backward-compatible alias sent by older clients (`activeMode`). */
       activeMode?: string;
+      /** User-selected PowerPoint options (per shared/presentation.ts). */
+      pptConfig?: Record<string, unknown>;
+      pptStyle?: string;
     };
     let content = body.content?.trim();
     const hasAttachments = (body.attachmentFileIds?.length ?? 0) > 0;
@@ -595,6 +598,8 @@ export function registerChatStream(app: Express) {
               userMessage: cleanUserMessage || content || "",
               format: targetFormat,
               history: filteredAssistantContext,
+              presentationConfig: targetFormat === "pptx" ? body.pptConfig : undefined,
+              presentationStyle: targetFormat === "pptx" ? body.pptStyle : undefined,
               onProgress: (event: PipelineProgressEvent) => {
                 writeEvent(res, "file.progress", {
                   messageId: assistantMessageId,

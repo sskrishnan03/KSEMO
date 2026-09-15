@@ -3,6 +3,8 @@
 // builder constructs one from a request), and the generators translate it into
 // a real .docx / .xlsx / .pptx / .pdf / .txt file.
 
+import type { PresentationConfig, PptVisualStyle } from "@shared/presentation";
+
 export type DocFormat =
   | "pdf"
   | "docx"
@@ -261,6 +263,12 @@ export type DocumentSpec = {
   sheets?: SheetDefinition[];
   // For pptx: one or more slides.
   slides?: SlideDefinition[];
+  // For pptx: user-selected presentation configuration that is embedded into
+  // the canonical spec and honored by the professional layout engine.
+  pptx?: {
+    config: PresentationConfig;
+    styleName?: PptVisualStyle;
+  };
   // Optional orienting description shown as the AI's chat reply.
   summary?: string;
   // Web sources used to research and ground the document content.

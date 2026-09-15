@@ -12,6 +12,8 @@ import {
 } from "../supabase-db";
 import { generateDocument, type GeneratedArtifact } from "./generate";
 import type { DocBlock, DocumentSpec, DocFormat, SourceReference } from "./spec";
+import { DEFAULT_PRESENTATION_CONFIG } from "@shared/presentation";
+import { sanitizePresentationConfig, sanitizeStyleName } from "./presentation/config";
 import { sanitizeFilename, FORMAT_MIME, coerceBlocks, coerceSheets, coerceSlides } from "./spec";
 import type { DocumentPlan } from "./plan";
 import { planDocument } from "./plan";
@@ -89,6 +91,9 @@ export async function runDocumentPipeline(input: {
   history: Message[];
   onProgress: PipelineProgressCallback;
   signal?: AbortSignal;
+  /** User-selected PowerPoint options (slides/visual/layout/density/visuals). */
+  presentationConfig?: unknown;
+  presentationStyle?: unknown;
 }): Promise<GeneratedFileResult> {
   const {
     userId,
@@ -99,6 +104,8 @@ export async function runDocumentPipeline(input: {
     history,
     onProgress,
     signal,
+    presentationConfig,
+    presentationStyle,
   } = input;
 
   // ── Stage 1: Analyzing ────────────────────────────────────────────────
@@ -156,11 +163,26 @@ export async function runDocumentPipeline(input: {
     .filter(msg => msg.role === "user" || msg.role === "assistant")
     .slice(-8);
 
+  // Sanitize the user's PowerPoint preferences once at the pipeline boundary.
+  // Every pptx goes through the canonical engine, so when no config was sent
+  // the safe default is used — the artifact always embeds ppt/canonical.json
+  // and the in-project preview always renders the real design.
+  const pptxConfig =
+    format === "pptx"
+      ? sanitizePresentationConfig(presentationConfig ?? DEFAULT_PRESENTATION_CONFIG)
+      : undefined;
+  const pptxStyle =
+    format === "pptx" ? sanitizeStyleName(presentationStyle) : undefined;
+
   const plan = await planDocument(
     userMessage,
     plannerHistory,
     format,
-    research
+    research,
+    {
+      slideTarget:
+        pptxConfig && pptxConfig.slides !== "auto" ? pptxConfig.slides : undefined,
+    }
   );
 
   if (plan.kind !== "file") {
@@ -175,6 +197,12 @@ export async function runDocumentPipeline(input: {
   });
 
   const spec = buildDocumentSpec(plan);
+
+  // Carry the user's PowerPoint design choices into the spec so the canonical
+  // layout engine and the exported file honor them.
+  if (plan.format === "pptx" && pptxConfig) {
+    spec.pptx = { config: pptxConfig, styleName: pptxStyle };
+  }
 
   // Attach research sources to the spec
   if (research?.sources && research.sources.length > 0) {

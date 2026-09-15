@@ -400,12 +400,16 @@ export async function planDocument(
   userMessage: string,
   history: Message[],
   forcedFormat?: Extract<DocumentPlan, { kind: "file" }>["format"] | null,
-  research?: ResearchResult
+  research?: ResearchResult,
+  opts?: { slideTarget?: number }
 ): Promise<DocumentPlan> {
   const forced = normalizeFormat(forcedFormat);
 
   if (forced) {
-    const systemContent = buildForcedSystemPrompt(forced, userMessage, research);
+    let systemContent = buildForcedSystemPrompt(forced, userMessage, research);
+    if (forced === "pptx" && typeof opts?.slideTarget === "number") {
+      systemContent += `\n\nThe user selected a target presentation size of ${opts.slideTarget} slides. Generate approximately ${opts.slideTarget} substantive slides (title, section dividers, metric layouts, tables, process flows, and comparisons) so the final deck is neither padded nor overcrowded. Never produce empty or placeholder slides.`;
+    }
     const researchHint = research?.needed
       ? `\n\nResearch was performed. Findings: ${research.findings.length} topics, ${research.sourceCount} sources. Use the provided research findings to create an accurate, well-sourced document.`
       : "";

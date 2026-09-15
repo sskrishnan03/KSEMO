@@ -37,6 +37,13 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getDocumentProxy } from "unpdf";
+import {
+  CANONICAL_PART_NAME,
+  SLIDE_WIDTH_IN,
+  SLIDE_HEIGHT_IN,
+  type PptElement,
+  type PptPresentationSpec,
+} from "@shared/presentation";
 
 interface LinkAnnotation {
   url?: string;
@@ -428,6 +435,296 @@ async function parsePptxSlides(buffer: ArrayBuffer): Promise<SlideData[]> {
   }
 
   return slides;
+}
+
+// If the .pptx was produced by the KSEMO engine it embeds its canonical
+// presentation spec at ppt/canonical.json. Prefer faithfully re-rendering that
+// spec over text-only sniffing of the raw slides.
+async function parseCanonicalSpec(buffer: ArrayBuffer): Promise<PptPresentationSpec | null> {
+  try {
+    const JSZip = (await import("jszip")).default;
+    const zip = await JSZip.loadAsync(buffer);
+    const file = zip.files[CANONICAL_PART_NAME];
+    if (!file) return null;
+    const raw = await file.async("string");
+    const spec = JSON.parse(raw) as PptPresentationSpec;
+    if (!spec || spec.version !== 1 || !Array.isArray(spec.slides)) return null;
+    return spec;
+  } catch {
+    return null;
+  }
+}
+
+interface PresentationPreviewProps {
+  spec: PptPresentationSpec;
+  scale: number;
+  onPageVisible?: (slideNumber: number) => void;
+}
+
+function renderPptElement(
+  el: PptElement,
+  key: number
+): React.ReactNode {
+  const box = el.box;
+  const style: React.CSSProperties = {
+    position: "absolute",
+    left: `${(box.x / SLIDE_WIDTH_IN) * 100}%`,
+    top: `${(box.y / SLIDE_HEIGHT_IN) * 100}%`,
+    width: `${(box.w / SLIDE_WIDTH_IN) * 100}%`,
+    height: `${(box.h / SLIDE_HEIGHT_IN) * 100}%`,
+  };
+  // Design canvas is SLIDE_WIDTH_IN*96 ≈ 1280px wide. `--s` holds the rendered
+  // slide width in px, so every metric must be scaled by s/1280 (unitless).
+  const scl = (px: number) => (px / 1280).toFixed(6);
+  const fontOf = (pt: number) => (pt / 960).toFixed(6);
+  const fontPx = (pt: number) => `calc(var(--s) * ${fontOf(pt)})`;
+
+  switch (el.kind) {
+    case "text": {
+      const verticalAlignMap: Record<string, string> = {
+        top: "flex-start",
+        middle: "center",
+        bottom: "flex-end",
+      };
+      const textAlignMap: Record<string, string> = {
+        center: "center",
+        right: "right",
+      };
+      return (
+        <div
+          key={key}
+          style={{
+            ...style,
+            display: "flex",
+            alignItems: verticalAlignMap[el.valign ?? "top"] ?? "flex-start",
+            justifyContent:
+              el.align === "center"
+                ? "center"
+                : el.align === "right"
+                  ? "flex-end"
+                  : "flex-start",
+            color: el.color,
+            fontSize: fontPx(el.fontSize),
+            fontWeight: el.bold ? "700" : "400",
+            fontFamily: el.font,
+            fontStyle: el.italic ? "italic" : "normal",
+            lineHeight: `${el.lineSpacing ?? 1.15}`,
+            letterSpacing: el.letterSpacing
+              ? `calc(var(--s) * ${(el.letterSpacing / 960).toFixed(6)})`
+              : undefined,
+            opacity: (el.opacity ?? 100) / 100,
+            whiteSpace: "pre-wrap",
+            overflow: "hidden",
+            padding: "0 0.05em",
+          }}
+        >
+          <span>
+            {el.bullet ? "• " : ""}
+            {el.text}
+          </span>
+        </div>
+      );
+    }
+    case "shape": {
+      const fill = el.fill ?? (el.lineColor ? "transparent" : "#000");
+      const base: React.CSSProperties = {
+        ...style,
+        background:
+          el.shape === "line" ? undefined : fill,
+        border: el.lineColor
+          ? `calc(var(--s) * ${scl(Math.max(el.lineWidth ?? 1, 1))}) solid ${el.lineColor}`
+          : undefined,
+        // opacity is a 0-100 alpha; express the true alpha in CSS form.
+        opacity: el.opacity !== undefined ? el.opacity / 100 : undefined,
+        transform: el.flipV ? "scaleY(-1)" : undefined,
+      };
+      if (el.shape === "ellipse") {
+        return <div key={key} style={{ ...base, borderRadius: "50%" }} />;
+      }
+      if (el.shape === "roundRect") {
+        return (
+          <div
+            key={key}
+            style={{
+              ...base,
+              borderRadius: `calc(var(--s) * ${scl(Math.max(el.radius ?? 0.1, 0) * 96)})`,
+            }}
+          />
+        );
+      }
+      if (el.shape === "chevron") {
+        return (
+          <div
+            key={key}
+            style={{
+              ...base,
+              clipPath:
+                "polygon(0 0, 62% 0, 100% 50%, 62% 100%, 0 100%, 38% 50%)",
+            }}
+          />
+        );
+      }
+      return <div key={key} style={base} />;
+    }
+    case "image": {
+      const isRenderable = /^(data:|https?:|blob:)/i.test(el.src ?? "");
+      return (
+        <div
+          key={key}
+          style={{
+            ...style,
+            overflow: "hidden",
+            borderRadius: el.radius
+              ? `calc(var(--s) * ${scl(el.radius * 96)})`
+              : undefined,
+            background:
+              "repeating-linear-gradient(135deg, rgba(127,127,127,0.12) 0, rgba(127,127,127,0.12) 8px, transparent 8px, transparent 16px)",
+          }}
+        >
+          {isRenderable ? (
+            <img
+              src={el.src}
+              alt=""
+              style={{
+                width: "100%",
+                height: "100%",
+                objectFit: el.fit === "contain" ? "contain" : "cover",
+              }}
+            />
+          ) : null}
+        </div>
+      );
+    }
+    case "table": {
+      const fontSize = fontPx(Math.min(el.fontSize, 12));
+      return (
+        <div
+          key={key}
+          style={{
+            ...style,
+            overflow: "hidden",
+            fontSize,
+            display: "flex",
+            flexDirection: "column",
+          }}
+        >
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr>
+                {el.headers.map((h, i) => (
+                  <th
+                    key={i}
+                    style={{
+                      background: el.headerFill,
+                      color: el.headerColor,
+                      textAlign: "left",
+                      padding: `calc(var(--s) * ${scl(3)}) calc(var(--s) * ${scl(5)})`,
+                      fontWeight: "700",
+                      border: `1px solid ${el.borderColor}`,
+                    }}
+                  >
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {el.rows.map((row, r) => (
+                <tr key={r} style={{ background: r % 2 === 1 ? el.altRowFill : el.rowFill }}>
+                  {row.map((cell, c) => (
+                    <td
+                      key={c}
+                      style={{
+                        color: el.textColor,
+                        padding: `calc(var(--s) * ${scl(3)}) calc(var(--s) * ${scl(5)})`,
+                        border: `1px solid ${el.borderColor}`,
+                      }}
+                    >
+                      {cell}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
+    }
+    case "barChart": {
+      const maxVal = Math.max(el.max, ...el.data.map(d => d.value), 1);
+      return (
+        <div
+          key={key}
+          style={{
+            ...style,
+            display: "flex",
+            alignItems: "flex-end",
+            gap: `calc(var(--s) * ${scl(6)})`,
+            padding: `calc(var(--s) * ${scl(6)})`,
+          }}
+        >
+          {el.data.map((d, i) => {
+            const ratio = d.value / maxVal;
+            const fill = i % 2 === 0 ? el.color : el.secondaryColor;
+            return (
+              <div
+                key={i}
+                style={{
+                  flex: 1,
+                  height: "100%",
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "flex-end",
+                  alignItems: "center",
+                  textAlign: "center",
+                  minWidth: 0,
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: `calc(var(--s) * ${scl(7)})`,
+                    color: el.valueColor,
+                    marginBottom: `calc(var(--s) * ${scl(2)})`,
+                    lineHeight: 1.1,
+                    overflow: "hidden",
+                    whiteSpace: "nowrap",
+                    textOverflow: "ellipsis",
+                    width: "100%",
+                  }}
+                >
+                  {d.value}
+                </div>
+                <div
+                  style={{
+                    width: "100%",
+                    height: `${ratio * 100}%`,
+                    background: fill,
+                    borderRadius: `calc(var(--s) * ${scl(2)}) calc(var(--s) * ${scl(2)}) 0 0`,
+                  }}
+                />
+                <div
+                  style={{
+                    fontSize: `calc(var(--s) * ${scl(7)})`,
+                    color: el.labelColor,
+                    marginTop: `calc(var(--s) * ${scl(3)})`,
+                    lineHeight: 1.1,
+                    overflow: "hidden",
+                    whiteSpace: "nowrap",
+                    textOverflow: "ellipsis",
+                    width: "100%",
+                  }}
+                >
+                  {d.label}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      );
+    }
+    default:
+      return null;
+  }
 }
 
 export const ExcelViewer = memo(function ExcelViewer({
@@ -1668,6 +1965,129 @@ export const ExcelViewer = memo(function ExcelViewer({
   );
 });
 
+// Faithful preview: re-renders the canonical presentation spec used by the
+// server engine, so the in-app preview matches the downloaded .pptx exactly.
+export const PresentationPreview = memo(
+  function PresentationPreview({ spec, scale, onPageVisible }: PresentationPreviewProps) {
+    const slideElsRef = useRef<Array<HTMLDivElement | null>>([]);
+
+    useEffect(() => {
+      const els = slideElsRef.current;
+      if (els.length === 0 || !onPageVisible) return;
+      let raf = 0;
+      const findScrollParent = (el: HTMLDivElement | null): HTMLElement => {
+        let node = el?.parentElement ?? null;
+        while (node) {
+          const style = getComputedStyle(node);
+          if (
+            style.overflowY === "auto" ||
+            style.overflowY === "scroll" ||
+            style.overflow === "auto" ||
+            style.overflow === "scroll"
+          )
+            return node;
+          node = node.parentElement;
+        }
+        return document.documentElement;
+      };
+      const scrollParent = findScrollParent(els[0]);
+      let lastVisibleSlide = 0;
+      const intersectionArea = (
+        a: { top: number; bottom: number },
+        b: { top: number; bottom: number }
+      ) => Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
+      const updateCurrentSlide = () => {
+        const viewport =
+          scrollParent === document.documentElement
+            ? { top: 0, bottom: window.innerHeight }
+            : (() => {
+                const r = scrollParent.getBoundingClientRect();
+                return { top: r.top, bottom: r.bottom };
+              })();
+        let bestIdx = 0;
+        let bestArea = -1;
+        for (let i = 0; i < els.length; i++) {
+          const el = els[i];
+          if (!el) continue;
+          const rc = el.getBoundingClientRect();
+          const area = intersectionArea(
+            { top: rc.top, bottom: rc.bottom },
+            viewport
+          );
+          if (area > bestArea) {
+            bestArea = area;
+            bestIdx = i;
+          }
+        }
+        const visibleSlide = spec.slides[bestIdx]?.index ?? bestIdx + 1;
+        if (visibleSlide !== lastVisibleSlide) {
+          lastVisibleSlide = visibleSlide;
+          onPageVisible(visibleSlide);
+        }
+      };
+      const onScrollTick = () => {
+        cancelAnimationFrame(raf);
+        raf = requestAnimationFrame(updateCurrentSlide);
+      };
+      updateCurrentSlide();
+      scrollParent.addEventListener("scroll", onScrollTick, { passive: true });
+      window.addEventListener("resize", onScrollTick);
+      return () => {
+        cancelAnimationFrame(raf);
+        scrollParent.removeEventListener("scroll", onScrollTick);
+        window.removeEventListener("resize", onScrollTick);
+      };
+    }, [spec, onPageVisible]);
+
+    return (
+      <div
+        data-testid="ksemo-presentation-viewer"
+        className="mx-auto flex flex-col items-center gap-4 py-4 w-full"
+      >
+        {spec.slides.map((slide, idx) => (
+          <div
+            key={slide.index ?? idx}
+            ref={el => {
+              slideElsRef.current[idx] = el;
+            }}
+            data-testid={`ksemo-ppt-slide-${idx + 1}`}
+            data-slide={slide.index ?? idx + 1}
+            className="relative aspect-[16/9] w-full max-w-[850px] min-h-[460px] bg-white shadow-2xl rounded-2xl border border-neutral-200/80 overflow-hidden select-text"
+            style={{ zoom: scale !== 1.0 ? scale : undefined }}
+          >
+            <div
+              className="relative h-full w-full"
+              style={{ background: slide.background }}
+            >
+              <ScaleScaler />
+              {slide.elements.map((el, i) => renderPptElement(el, i))}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+);
+
+// Measures the slide box and sets the `--s` custom property so absolutely
+// positioned elements can scale fonts/proportions with the rendered width.
+function ScaleScaler() {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const observer = new ResizeObserver(entries => {
+      for (const entry of entries) {
+        const width = entry.contentRect.width;
+        if (width > 0) el.style.setProperty("--s", `${width}px`);
+      }
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+  return <div ref={ref} className="absolute inset-0" aria-hidden />;
+}
+
 const PowerPointViewer = memo(function PowerPointViewer({
   slides,
   scale,
@@ -2108,6 +2528,9 @@ export const PdfDrawer = memo(function PdfDrawer() {
   const [textContent, setTextContent] = useState<string | null>(null);
   const [excelSheets, setExcelSheets] = useState<ExcelSheetData[]>([]);
   const [pptxSlides, setPptxSlides] = useState<SlideData[]>([]);
+  const [canonicalSpec, setCanonicalSpec] = useState<PptPresentationSpec | null>(
+    null
+  );
   const [currentSlide, setCurrentSlide] = useState<number>(1);
   const [numPages, setNumPages] = useState<number>(0);
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -2151,6 +2574,9 @@ export const PdfDrawer = memo(function PdfDrawer() {
     : false;
   const ext = currentPdf?.filename.split(".").pop() || "";
   const brandVariant = brandVariantForExt(ext);
+  const pptxCount = canonicalSpec
+    ? canonicalSpec.slides.length
+    : pptxSlides.length;
 
   // Measure container width to dynamically calculate "Fit" scale
   const updateWidth = useCallback(() => {
@@ -2179,6 +2605,7 @@ export const PdfDrawer = memo(function PdfDrawer() {
       setTextContent(null);
       setExcelSheets([]);
       setPptxSlides([]);
+      setCanonicalSpec(null);
       setNumPages(0);
       setCurrentPage(1);
       setCurrentSlide(1);
@@ -2197,6 +2624,7 @@ export const PdfDrawer = memo(function PdfDrawer() {
     setTextContent(null);
     setExcelSheets([]);
     setPptxSlides([]);
+    setCanonicalSpec(null);
 
     async function loadDocument() {
       try {
@@ -2266,6 +2694,21 @@ export const PdfDrawer = memo(function PdfDrawer() {
         } else if (isPowerPointDoc) {
           const buffer = await response.arrayBuffer();
           if (isCancelled) return;
+
+          const canonical = await parseCanonicalSpec(buffer);
+          if (isCancelled) return;
+
+          setCanonicalSpec(canonical);
+          if (canonical) {
+            setPptxSlides([]);
+            setCurrentSlide(1);
+            basePageWidthRef.current = 850;
+            const available = Math.max(containerWidth - 64, 280);
+            setScale(Math.min(available / 850, 1.25));
+            setIsFit(true);
+            setIsLoading(false);
+            return;
+          }
 
           const slides = await parsePptxSlides(buffer);
           if (isCancelled) return;
@@ -2571,14 +3014,14 @@ export const PdfDrawer = memo(function PdfDrawer() {
       }
 
       // PowerPoint slide arrow key navigation
-      if (isPowerPointDoc && pptxSlides.length > 0) {
+      if (isPowerPointDoc && pptxCount > 0) {
         if (
           event.key === "ArrowRight" ||
           event.key === "ArrowDown" ||
           event.key === "PageDown"
         ) {
           event.preventDefault();
-          if (currentSlide < pptxSlides.length) {
+          if (currentSlide < pptxCount) {
             scrollToSlide(currentSlide + 1);
           }
         } else if (
@@ -2607,7 +3050,7 @@ export const PdfDrawer = memo(function PdfDrawer() {
     currentPage,
     scrollToPage,
     isPowerPointDoc,
-    pptxSlides.length,
+    pptxCount,
     currentSlide,
     scrollToSlide,
   ]);
@@ -2668,9 +3111,9 @@ export const PdfDrawer = memo(function PdfDrawer() {
   const hasPagination =
     (isPdfDoc && numPages > 0) ||
     (isWordDoc && numPages > 0) ||
-    (isPowerPointDoc && pptxSlides.length > 0);
+    (isPowerPointDoc && pptxCount > 0);
   const currentIdx = isPdfDoc || isWordDoc ? currentPage : currentSlide;
-  const totalCount = isPdfDoc || isWordDoc ? numPages : pptxSlides.length;
+  const totalCount = isPdfDoc || isWordDoc ? numPages : pptxCount;
   const navLabel = isPdfDoc || isWordDoc ? "page" : "slide";
   const isAtPrevBoundary = hasPagination
     ? isPdfDoc || isWordDoc
@@ -2680,7 +3123,7 @@ export const PdfDrawer = memo(function PdfDrawer() {
   const isAtNextBoundary = hasPagination
     ? isPdfDoc || isWordDoc
       ? currentPage >= numPages
-      : currentSlide >= pptxSlides.length
+      : currentSlide >= pptxCount
     : true;
   const navPrevious = () => {
     if (isPdfDoc || isWordDoc) scrollToPage(currentPage - 1);
@@ -2878,13 +3321,20 @@ export const PdfDrawer = memo(function PdfDrawer() {
           {!isLoading &&
             !loadError &&
             isPowerPointDoc &&
-            pptxSlides.length > 0 && (
+            pptxCount > 0 &&
+            (canonicalSpec ? (
+              <PresentationPreview
+                spec={canonicalSpec}
+                scale={scale}
+                onPageVisible={setCurrentSlide}
+              />
+            ) : (
               <PowerPointViewer
                 slides={pptxSlides}
                 scale={scale}
                 onPageVisible={setCurrentSlide}
               />
-            )}
+            ))}
 
           {/* Text Document (.txt, .md, .json, etc.) Rendering */}
           {!isLoading &&

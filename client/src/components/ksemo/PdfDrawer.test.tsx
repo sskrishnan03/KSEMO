@@ -6,7 +6,12 @@ import { describe, expect, it } from "vitest";
 import superjson from "superjson";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { trpc } from "@/lib/trpc";
-import { PdfDrawer, ExcelViewer } from "./PdfDrawer";
+import {
+  PdfDrawer,
+  ExcelViewer,
+  PresentationPreview,
+} from "./PdfDrawer";
+import type { PptPresentationSpec } from "@shared/presentation";
 import {
   PdfViewerProvider,
   isExcel,
@@ -232,6 +237,76 @@ describe("PdfDrawer", () => {
     expect(markup).toContain("Q1");
     expect(markup).toContain("100");
     expect(markup).toContain('data-row="49"');
+  });
+
+  it("renders a PowerPoint preview faithfully straight from the canonical presentation spec", () => {
+    const spec: PptPresentationSpec = {
+      version: 1,
+      widthIn: 13.333,
+      heightIn: 7.5,
+      title: "Growth Report",
+      themeKey: "Classic",
+      style: "Classic",
+      config: {
+        slides: "auto",
+        visualStyle: "auto",
+        layout: "Balanced",
+        density: "Standard",
+        visuals: "Balanced",
+      },
+      slides: [
+        {
+          index: 1,
+          kind: "title",
+          background: "#0B0F19",
+          elements: [
+            {
+              kind: "text",
+              box: { x: 0.6, y: 0.55, w: 8, h: 1 },
+              text: "Our Growth Story",
+              fontSize: 40,
+              bold: true,
+              color: "#FFFFFF",
+            },
+            {
+              kind: "shape",
+              box: { x: 0.6, y: 6.6, w: 2, h: 0.5 },
+              shape: "rect",
+              fill: "#FF7A45",
+            },
+            {
+              kind: "barChart",
+              box: { x: 8.9, y: 2, w: 4.2, h: 4 },
+              data: [
+                { label: "Q1", value: 100 },
+                { label: "Q2", value: 180 },
+              ],
+              color: "#FF7A45",
+              secondaryColor: "#4E7AFF",
+              labelColor: "#A8B2C1",
+              valueColor: "#FFFFFF",
+              max: 200,
+            },
+          ],
+        },
+      ],
+    };
+
+    const markup = renderToStaticMarkup(
+      createElement(PresentationPreview, { spec, scale: 1.0 })
+    );
+
+    // Faithful canvas rendering, not the text-only legacy viewer
+    expect(markup).toContain('data-testid="ksemo-presentation-viewer"');
+    expect(markup).toContain('data-testid="ksemo-ppt-slide-1"');
+    expect(markup).not.toContain('data-testid="powerpoint-document-viewer"');
+    // Slide background and element colors carry through from the spec
+    expect(markup).toContain("#0B0F19");
+    expect(markup).toContain("#FF7A45");
+    // Title text and chart data/labels are present
+    expect(markup).toContain("Our Growth Story");
+    expect(markup).toContain("Q2");
+    expect(markup).toContain("180");
   });
 
   it("renders drawer with clean filename and controls for PowerPoint (.pptx) presentation", () => {

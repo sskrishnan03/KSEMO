@@ -20,6 +20,8 @@ import { filterLibraryItems } from "@/lib/ksemoInteraction";
 import { getFileKind, IMAGE_EXT } from "@/lib/fileKinds";
 import { CAPABILITY_SECTIONS, getCapabilityOption } from "@/lib/capabilities";
 import { type CapabilityMode } from "@shared/capabilities";
+import { type PresentationConfig } from "@shared/presentation";
+import { PptConfigStrip } from "./PptConfigStrip";
 import {
   ArrowUp,
   AudioLines,
@@ -188,6 +190,8 @@ export const ChatComposer = memo(function ChatComposer({
   onTakeScreenshot,
   activeMode,
   onModeChange,
+  pptConfig,
+  onPptConfigChange,
   hideVoiceInput = false,
   voiceChatActive = false,
   voiceChatMuted = false,
@@ -254,6 +258,9 @@ export const ChatComposer = memo(function ChatComposer({
   onTakeScreenshot?: () => void;
   activeMode?: CapabilityMode;
   onModeChange?: (mode: CapabilityMode | null) => void;
+  /** PowerPoint design options for the strip shown above the composer. */
+  pptConfig?: PresentationConfig;
+  onPptConfigChange?: (config: PresentationConfig) => void;
   hideVoiceInput?: boolean;
   voiceChatActive?: boolean;
   voiceChatMuted?: boolean;
@@ -601,6 +608,13 @@ export const ChatComposer = memo(function ChatComposer({
         compactBottomSpacing ? "pb-5" : "pb-4"
       )}
     >
+      {activeMode === "pptx" && pptConfig && onPptConfigChange && (
+        <PptConfigStrip
+          config={pptConfig}
+          onChange={onPptConfigChange}
+          isCentered={isCentered}
+        />
+      )}
       <div className="relative rounded-[20px] border border-border bg-popover p-1.5 shadow-sm text-popover-foreground">
         {isDragActive && (
           <div className="pointer-events-none fixed inset-0 z-[100] flex items-center justify-center bg-card/80 backdrop-blur-sm">

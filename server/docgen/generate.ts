@@ -36,6 +36,8 @@ import type {
   ThemeColors,
 } from "./spec";
 import { sanitizeFilename, THEME_PALETTES } from "./spec";
+import { DEFAULT_PRESENTATION_CONFIG } from "@shared/presentation";
+import { generateDeck } from "./presentation/engine";
 
 // ---------------------------------------------------------------------------
 // Shared helpers
@@ -538,13 +540,29 @@ export function generateXlsx(spec: DocumentSpec): Buffer {
 // ---------------------------------------------------------------------------
 
 export async function generatePptx(spec: DocumentSpec): Promise<Buffer> {
-  const pptx = new PptxGenJS();
-  pptx.layout = "LAYOUT_16x9";
-  const theme = getTheme(spec.theme);
-
   const slides = spec.slides?.length
     ? spec.slides
     : buildSlidesFromBlocks(spec.blocks ?? []);
+
+  // Canonical presentation path: route every .pptx through the shared
+  // layout/validation/export engine so the artifact always embeds
+  // ppt/canonical.json and the in-project preview renders the exact design
+  // the user picked (visual style, slide count, density). When no config was
+  // carried on the spec, the safe default is used.
+  const deck = await generateDeck({
+    title: spec.title || "Presentation",
+    slides,
+    config: spec.pptx?.config ?? DEFAULT_PRESENTATION_CONFIG,
+    styleName: spec.pptx?.styleName,
+    footerLabel: spec.title || "KSEMO",
+  });
+  return deck.buffer;
+
+  // Legacy deterministic generator below is no longer used for exports; the
+  // canonical engine above is the single .pptx renderer.
+  const pptx = new PptxGenJS();
+  pptx.layout = "LAYOUT_16x9";
+  const theme = getTheme(spec.theme);
 
   slides.forEach((slide, index) => {
     const s = pptx.addSlide();
