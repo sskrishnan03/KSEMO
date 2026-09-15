@@ -117,8 +117,6 @@ export const ConversationSidebar = memo(function ConversationSidebar({
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
-  const [supportExpanded, setSupportExpanded] = useState(false);
-  const isSupportActive = supportExpanded || previewSupportOpen;
 
   const startRename = (conversation: Conversation) => {
     setRenamingId(conversation.id);
@@ -357,12 +355,7 @@ export const ConversationSidebar = memo(function ConversationSidebar({
           )}
         </nav>
         <div className="mt-3 border-t border-border pt-3">
-          <DropdownMenu
-            open={previewSupportOpen || undefined}
-            onOpenChange={open => {
-              if (!open) setSupportExpanded(false);
-            }}
-          >
+          <DropdownMenu open={previewSupportOpen || undefined}>
             {compact ? (
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -400,30 +393,32 @@ export const ConversationSidebar = memo(function ConversationSidebar({
                 <Settings2 className="mr-2 size-4" /> Settings
               </DropdownMenuItem>
               {isMobile ? (
-                <div className="space-y-0.5">
+                <>
                   <DropdownMenuItem
-                    onSelect={e => {
-                      e.preventDefault();
-                      setSupportExpanded(prev => !prev);
-                    }}
-                    className="flex cursor-pointer items-center justify-between focus-visible:ring-0 focus-visible:outline-none"
-                    aria-expanded={isSupportActive}
+                    onClick={() => onSupport("faq")}
+                    className="focus-visible:ring-0 focus-visible:outline-none"
                   >
-                    <div className="flex items-center">
-                      <Headset className="mr-2 size-4" />
-                      <span>Help &amp; Support</span>
-                    </div>
-                    <ChevronDown
-                      className={cn(
-                        "size-3.5 text-muted-foreground transition-transform duration-200",
-                        isSupportActive ? "rotate-180" : "rotate-0"
-                      )}
-                    />
+                    <HelpCircle className="mr-2 size-4" />
+                    FAQ
+                    <ExternalLink className="ml-auto size-3.5 text-muted-foreground" />
                   </DropdownMenuItem>
-                  {isSupportActive && (
-                    <MobileSupportMenuItems onSupport={onSupport} />
-                  )}
-                </div>
+                  <DropdownMenuItem
+                    onClick={() => onSupport("privacy")}
+                    className="focus-visible:ring-0 focus-visible:outline-none"
+                  >
+                    <ShieldCheck className="mr-2 size-4" />
+                    Privacy Policy
+                    <ExternalLink className="ml-auto size-3.5 text-muted-foreground" />
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => onSupport("terms")}
+                    className="focus-visible:ring-0 focus-visible:outline-none"
+                  >
+                    <FileText className="mr-2 size-4" />
+                    Terms of Service
+                    <ExternalLink className="ml-auto size-3.5 text-muted-foreground" />
+                  </DropdownMenuItem>
+                </>
               ) : (
                 <DropdownMenuSub open={previewSupportOpen || undefined}>
                   <DropdownMenuSubTrigger className="focus-visible:ring-0 focus-visible:outline-none">
@@ -681,14 +676,6 @@ export const ConversationActionsMenu = memo(function ConversationActionsMenu({
 }) {
   const isMobileDetected = useIsMobile(1024);
   const isMobile = isMobileProp ?? isMobileDetected;
-  const [isExportOpen, setIsExportOpen] = useState(false);
-
-  // Reset export expansion when menu closes
-  React.useEffect(() => {
-    if (!isMenuOpen) {
-      setIsExportOpen(false);
-    }
-  }, [isMenuOpen]);
 
   return (
     <DropdownMenu open={isMenuOpen} onOpenChange={onMenuOpenChange}>
@@ -735,33 +722,22 @@ export const ConversationActionsMenu = memo(function ConversationActionsMenu({
           Duplicate
         </DropdownMenuItem>
         {isMobile ? (
-          <div className="space-y-0.5">
+          <>
             <DropdownMenuItem
-              onSelect={e => {
-                e.preventDefault();
-                setIsExportOpen(prev => !prev);
-              }}
-              className="flex cursor-pointer items-center justify-between"
-              aria-expanded={isExportOpen}
+              onClick={() => onExport(conversation, "pdf")}
+              className="focus-visible:ring-0 focus-visible:outline-none"
             >
-              <div className="flex items-center">
-                <Download className="mr-2 size-4" />
-                <span>Export</span>
-              </div>
-              <ChevronDown
-                className={cn(
-                  "size-3.5 text-muted-foreground transition-transform duration-200",
-                  isExportOpen ? "rotate-180" : "rotate-0"
-                )}
-              />
+              <PdfFileIcon className="mr-2 size-5" />
+              Download PDF
             </DropdownMenuItem>
-            {isExportOpen && (
-              <MobileExportMenuItems
-                conversation={conversation}
-                onExport={onExport}
-              />
-            )}
-          </div>
+            <DropdownMenuItem
+              onClick={() => onExport(conversation, "word")}
+              className="focus-visible:ring-0 focus-visible:outline-none"
+            >
+              <WordFileIcon className="mr-2 size-5" />
+              Download Word
+            </DropdownMenuItem>
+          </>
         ) : (
           <DropdownMenuSub>
             <DropdownMenuSubTrigger>
