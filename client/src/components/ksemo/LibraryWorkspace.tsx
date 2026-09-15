@@ -24,6 +24,7 @@ import {
   Check,
   CheckCheck,
   CheckCircle2,
+  ChevronsRight,
   Download,
   FolderOpen,
   Grid2X2,
@@ -119,10 +120,12 @@ export function LibraryWorkspace({
   onChatWithFiles,
   initialFileId,
   onClose,
+  onOpenSidebar,
 }: {
   onChatWithFiles?: (files: LibraryWorkspaceFile[]) => void;
   initialFileId?: string | null;
   onClose?: () => void;
+  onOpenSidebar?: () => void;
 }) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<LibraryFilter>("all");
@@ -378,7 +381,19 @@ export function LibraryWorkspace({
         <header className="flex flex-col gap-3 border-b border-border pb-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex w-full items-start justify-between gap-3">
             <div>
-              <div className="flex items-center gap-2.5 sm:gap-3">
+              <div className="flex items-center gap-2 sm:gap-3">
+                {onOpenSidebar && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={onOpenSidebar}
+                    className="size-8 sm:size-9 shrink-0 rounded-xl text-foreground transition-colors hover:bg-accent active:scale-95 lg:hidden"
+                    aria-label="Open conversations"
+                    title="Open sidebar"
+                  >
+                    <ChevronsRight className="size-4 sm:size-5" />
+                  </Button>
+                )}
                 <h1 className="text-xl sm:text-2xl font-semibold tracking-[-0.03em]">
                   Library
                 </h1>
@@ -387,32 +402,17 @@ export function LibraryWorkspace({
                 Your private space for files and images you can chat about.
               </p>
             </div>
-            {onClose && (
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={onClose}
-                className="size-8 sm:size-9 shrink-0 rounded-xl border-border bg-card text-muted-foreground shadow-xs transition-colors hover:bg-accent hover:text-foreground active:scale-95 sm:hidden"
-                aria-label="Close library and return to chat"
-                title="Close"
-              >
-                <X className="size-4 sm:size-5" />
-              </Button>
-            )}
+            <Button
+              size="sm"
+              className="h-8 rounded-xl bg-foreground text-xs text-background hover:bg-foreground/90 sm:hidden"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploadMutation.isPending}
+            >
+              <Upload className="mr-1.5 size-3.5" />
+              {uploadMutation.isPending ? "Uploading…" : "Upload files"}
+            </Button>
           </div>
-          <div className="flex shrink-0 flex-wrap items-center gap-2">
-            {onClose && (
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={onClose}
-                className="hidden size-9 shrink-0 rounded-xl border-border bg-card text-muted-foreground shadow-xs transition-colors hover:bg-accent hover:text-foreground active:scale-95 sm:inline-flex lg:hidden"
-                aria-label="Close library and return to chat"
-                title="Close"
-              >
-                <X className="size-5" />
-              </Button>
-            )}
+          <div className="hidden shrink-0 flex-wrap items-center gap-2 sm:flex">
             <Button
               size="sm"
               className="h-8 sm:h-9 rounded-xl bg-foreground text-xs sm:text-sm text-background hover:bg-foreground/90"

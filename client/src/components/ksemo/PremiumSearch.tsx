@@ -15,6 +15,7 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronsRight,
   MessageCircle,
   Search,
   Pin,
@@ -298,10 +299,12 @@ function SearchCalendar({
 
 export function SearchWorkspace({
   onBackToChat,
+  onOpenSidebar,
   conversations,
   onSelectConversation,
 }: {
   onBackToChat: () => void;
+  onOpenSidebar?: () => void;
   conversations: Array<{
     id: string;
     title: string;
@@ -456,9 +459,21 @@ export function SearchWorkspace({
     <main className="flex min-h-0 flex-1 flex-col bg-background">
       <div className="mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col px-5 pt-6 sm:px-8 sm:pt-8">
         <header className="flex flex-col gap-4 border-b border-border pb-5 sm:flex-row sm:items-start sm:justify-between">
-          <div className="flex w-full items-start justify-between gap-3">
+          <div className="flex w-full items-start gap-3">
             <div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                {onOpenSidebar && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={onOpenSidebar}
+                    className="size-9 shrink-0 rounded-xl text-foreground transition-colors hover:bg-accent active:scale-95 lg:hidden"
+                    aria-label="Open conversations"
+                    title="Open sidebar"
+                  >
+                    <ChevronsRight className="size-5" />
+                  </Button>
+                )}
                 <h1 className="text-2xl font-semibold tracking-[-0.03em]">
                   Search
                 </h1>
@@ -467,18 +482,6 @@ export function SearchWorkspace({
                 Find anything across your conversations and messages.
               </p>
             </div>
-            {onBackToChat && (
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={onBackToChat}
-                className="size-9 shrink-0 rounded-xl border-border bg-card text-muted-foreground shadow-xs transition-colors hover:bg-accent hover:text-foreground active:scale-95 lg:hidden"
-                aria-label="Close search and return to chat"
-                title="Close"
-              >
-                <X className="size-5" />
-              </Button>
-            )}
           </div>
         </header>
 

@@ -2535,11 +2535,13 @@ export default function Home() {
         {activePrimaryWorkspace === "library" ? (
           <LibraryWorkspace
             onClose={stableCloseWorkspace}
+            onOpenSidebar={() => setSidebarOpen(true)}
             onChatWithFiles={startChatWithLibraryFiles}
           />
         ) : activePrimaryWorkspace === "search" ? (
           <SearchWorkspace
             onBackToChat={stableCloseWorkspace}
+            onOpenSidebar={() => setSidebarOpen(true)}
             conversations={conversationQuery.data ?? []}
             onSelectConversation={stableOnSearchSelect}
           />
