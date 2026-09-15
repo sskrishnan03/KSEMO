@@ -2909,11 +2909,13 @@ const EmptyState = memo(function EmptyState({
   composer: React.ReactNode;
 }) {
   return (
-    <div className="mx-auto flex h-full w-full max-w-3xl flex-col justify-center px-0 pb-4 sm:px-5">
-      <div className="mb-4 px-5 text-center sm:mb-5 sm:px-0">
-        <p className="whitespace-nowrap text-[17px] font-bold tracking-[-0.04em] text-foreground sm:text-xl sm:tracking-[-0.025em]">
-          {greeting}
-        </p>
+    <div className="mx-auto flex h-full w-full max-w-3xl flex-col px-0 pb-4 sm:px-5 lg:justify-center">
+      <div className="flex min-h-0 flex-1 flex-col justify-center lg:flex-none">
+        <div className="mb-4 px-5 text-center sm:mb-5 sm:px-0">
+          <p className="whitespace-nowrap text-[17px] font-bold tracking-[-0.04em] text-foreground sm:text-xl sm:tracking-[-0.025em]">
+            {greeting}
+          </p>
+        </div>
       </div>
       <div className="mx-auto w-full max-w-3xl">{composer}</div>
     </div>
