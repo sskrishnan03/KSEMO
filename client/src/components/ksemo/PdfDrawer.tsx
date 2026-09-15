@@ -2533,7 +2533,7 @@ export const PptSlideSidebar = memo(function PptSlideSidebar({
       ref={sidebarRef}
       data-testid="pptx-sidebar"
       aria-label="Slide thumbnails"
-      className="w-64 max-w-[80vw] md:w-52 shrink-0 h-full flex flex-col border-r border-border bg-card/95 dark:bg-card/90 backdrop-blur-md z-20 select-none transition-all"
+      className="w-64 max-w-[80vw] md:w-52 shrink-0 h-full flex flex-col border-r border-border bg-card/95 dark:bg-card/90 backdrop-blur-md z-20 select-none transition-all [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
     >
       {/* Sidebar Header */}
       <div className="flex h-11 items-center justify-between px-3 border-b border-border shrink-0">
@@ -2570,7 +2570,7 @@ export const PptSlideSidebar = memo(function PptSlideSidebar({
       </div>
 
       {/* Thumbnails Scroll List */}
-      <div className="overflow-y-auto px-2 py-2 flex flex-col gap-2 flex-1 [scrollbar-width:thin]">
+      <div className="overflow-y-auto px-2 py-2 flex flex-col gap-2 flex-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
         {Array.from({ length: count }, (_, idx) => {
           const slideNumber = idx + 1;
           const isActive = currentSlide === slideNumber;
