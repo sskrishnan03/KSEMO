@@ -47,7 +47,6 @@ import type { DocFormat } from "@/lib/docFormats";
 import { usePdfViewer } from "@/contexts/PdfViewerContext";
 import AuthStage from "./AuthStage";
 import { ConversationSidebar } from "../components/ksemo/ConversationSidebar";
-import { MobileChatNavBar } from "../components/ksemo/MobileChatNavBar";
 import {
   MessageContent,
   type KsemoMessage,
@@ -2547,36 +2546,25 @@ export default function Home() {
           />
         ) : (
           <>
-            {visibleMessages.length > 0 ? (
-              <MobileChatNavBar
-                conversation={activeConversation}
-                activeConversationId={activeConversationId}
-                onOpenSidebar={() => setSidebarOpen(true)}
-                onPin={stableOnPin}
-                onShare={stableOnShareConversation}
-                onViewFiles={() => setChatFilesOpen(true)}
-                onDelete={stableOnDelete}
-              />
-            ) : (
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setSidebarOpen(true)}
-                className="absolute left-3 top-3 z-10 size-9 rounded-xl lg:hidden"
-                aria-label="Open conversations"
-              >
-                <ChevronsRight className="size-4" />
-              </Button>
-            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setSidebarOpen(true)}
+              className="absolute left-3 top-3 z-10 size-9 rounded-xl lg:hidden"
+              aria-label="Open conversations"
+              data-testid="mobile-sidebar-toggle"
+            >
+              <ChevronsRight className="size-4" />
+            </Button>
 
             {visibleMessages.length > 0 && (
-              <div className="absolute right-2 top-2 z-10 hidden lg:block">
+              <div className="absolute right-2 top-2 z-10">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="size-9 rounded-lg"
+                      className="size-9 rounded-lg bg-neutral-900 text-neutral-50 hover:bg-neutral-800"
                       aria-label="Chat actions"
                     >
                       <MoreHorizontal className="size-4" />
