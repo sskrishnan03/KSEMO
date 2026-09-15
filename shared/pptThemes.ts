@@ -15,13 +15,27 @@
 
 export type ThemeKind = "light" | "dark";
 
-/** Which miniature slide composition the theme picker should render. */
+/** Which miniature slide composition the theme picker should render. Each
+ *  style maps to its own archetype so every thumbnail is structurally
+ *  distinct, not just differently colored. */
 export type ThemePreviewComposition =
-  | "hero"
-  | "minimal"
-  | "columns"
-  | "editorial"
-  | "data";
+  | "hero" // Visual: image-led, one big visual block + short headline
+  | "minimal" // Minimal: one heading, one accent, whitespace dominates
+  | "classic" // Classic: traditional title + structured panels
+  | "consultant" // Consultant: takeaway + metrics + evidence chart
+  | "editorial" // Editorial: asymmetric magazine spread
+  | "modern" // Modern: clean rounded SaaS card grid
+  | "bold" // Bold: giant number, high contrast, dramatic
+  | "elegant" // Elegant: refined sparse typography + hairline details
+  | "professional" // Professional: corporate bullets + chart
+  | "creative" // Creative: asymmetric shapes, collage feel
+  | "tech" // Tech: dashboard / system diagram
+  | "cinematic" // Cinematic: full-bleed dark frame, dramatic type
+  | "playful" // Playful: rounded blobs, energetic
+  | "luxury" // Luxury: framed whitespace, serif, diamonds
+  | "academic" // Academic: figure + references, structured
+  | "futuristic" // Futuristic: layered geometric, glowing data
+  | "storytelling"; // Storytelling: narrative progression
 
 export type ThemeSpec = {
   key: string;
@@ -134,7 +148,7 @@ export const VISUAL_THEMES: Record<string, ThemeSpec> = {
     heroBand: "full",
     useKicker: true,
     chartColors: ["0B7A8F", "0E2A47"],
-    preview: "columns",
+    preview: "classic",
   },
   Consultant: {
     key: "consultant",
@@ -159,7 +173,7 @@ export const VISUAL_THEMES: Record<string, ThemeSpec> = {
     heroBand: "left",
     useKicker: true,
     chartColors: ["C8A24A", "26415E"],
-    preview: "columns",
+    preview: "consultant",
   },
   Editorial: {
     key: "editorial",
@@ -209,7 +223,7 @@ export const VISUAL_THEMES: Record<string, ThemeSpec> = {
     heroBand: "full",
     useKicker: true,
     chartColors: ["4456C6", "34B3C6"],
-    preview: "columns",
+    preview: "modern",
   },
   Bold: {
     key: "bold",
@@ -234,7 +248,7 @@ export const VISUAL_THEMES: Record<string, ThemeSpec> = {
     heroBand: "left",
     useKicker: true,
     chartColors: ["FF5A1F", "F9E000"],
-    preview: "hero",
+    preview: "bold",
   },
   Elegant: {
     key: "elegant",
@@ -259,7 +273,7 @@ export const VISUAL_THEMES: Record<string, ThemeSpec> = {
     heroBand: "none",
     useKicker: true,
     chartColors: ["9B8A5A", "C9A227"],
-    preview: "minimal",
+    preview: "elegant",
   },
   Professional: {
     key: "professional",
@@ -284,7 +298,7 @@ export const VISUAL_THEMES: Record<string, ThemeSpec> = {
     heroBand: "none",
     useKicker: true,
     chartColors: ["6687C4", "42577A"],
-    preview: "columns",
+    preview: "professional",
   },
   Creative: {
     key: "creative",
@@ -309,7 +323,7 @@ export const VISUAL_THEMES: Record<string, ThemeSpec> = {
     heroBand: "full",
     useKicker: true,
     chartColors: ["6C4CF1", "F15D96"],
-    preview: "hero",
+    preview: "creative",
   },
   Tech: {
     key: "tech",
@@ -334,7 +348,7 @@ export const VISUAL_THEMES: Record<string, ThemeSpec> = {
     heroBand: "right",
     useKicker: true,
     chartColors: ["22A7F0", "7C5CFF"],
-    preview: "hero",
+    preview: "tech",
   },
   Cinematic: {
     key: "cinematic",
@@ -359,7 +373,7 @@ export const VISUAL_THEMES: Record<string, ThemeSpec> = {
     heroBand: "left",
     useKicker: true,
     chartColors: ["5B8CFF", "7FD1AE"],
-    preview: "hero",
+    preview: "cinematic",
   },
   Playful: {
     key: "playful",
@@ -384,7 +398,7 @@ export const VISUAL_THEMES: Record<string, ThemeSpec> = {
     heroBand: "left",
     useKicker: true,
     chartColors: ["D62828", "1F1A16"],
-    preview: "editorial",
+    preview: "playful",
   },
   Luxury: {
     key: "luxury",
@@ -409,7 +423,7 @@ export const VISUAL_THEMES: Record<string, ThemeSpec> = {
     heroBand: "left",
     useKicker: true,
     chartColors: ["B3473E", "4A4E69"],
-    preview: "minimal",
+    preview: "luxury",
   },
   Academic: {
     key: "academic",
@@ -434,7 +448,7 @@ export const VISUAL_THEMES: Record<string, ThemeSpec> = {
     heroBand: "none",
     useKicker: false,
     chartColors: ["2E7D52", "C0503A"],
-    preview: "editorial",
+    preview: "academic",
   },
   Futuristic: {
     key: "futuristic",
@@ -459,7 +473,7 @@ export const VISUAL_THEMES: Record<string, ThemeSpec> = {
     heroBand: "right",
     useKicker: true,
     chartColors: ["7A5CFF", "00D4FF"],
-    preview: "data",
+    preview: "futuristic",
   },
   Storytelling: {
     key: "storytelling",
@@ -484,7 +498,7 @@ export const VISUAL_THEMES: Record<string, ThemeSpec> = {
     heroBand: "left",
     useKicker: true,
     chartColors: ["D95A2F", "2F6B5B"],
-    preview: "editorial",
+    preview: "storytelling",
   },
 };
 
