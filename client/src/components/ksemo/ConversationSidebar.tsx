@@ -26,6 +26,7 @@ import {
   Download,
   Ellipsis,
   ExternalLink,
+  FileDown,
   FileText,
   HelpCircle,
   Library,
@@ -370,7 +371,7 @@ export const ConversationSidebar = memo(function ConversationSidebar({
             )}
             <DropdownMenuContent
               side={compact ? "right" : "top"}
-              sideOffset={10}
+              sideOffset={6}
               align={compact ? "end" : "start"}
               collisionPadding={12}
               className={cn(
@@ -429,7 +430,7 @@ export const ConversationSidebar = memo(function ConversationSidebar({
                     Help &amp; Support
                   </DropdownMenuSubTrigger>
                   <DropdownMenuSubContent
-                    sideOffset={8}
+                    sideOffset={6}
                     collisionPadding={12}
                     className="max-h-[calc(100dvh-1.5rem)] w-52 overflow-y-auto rounded-xl"
                   >
@@ -536,7 +537,14 @@ const ConversationGroup = memo(function ConversationGroup({
         data-disclosure-group={label.toLowerCase()}
       >
         {label}
-        <span className="opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+        <span
+          className={cn(
+            "transition-opacity",
+            isMobile
+              ? "opacity-100"
+              : "opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100"
+          )}
+        >
           {expanded ? (
             <ChevronDown className="size-3.5" />
           ) : (
@@ -769,7 +777,7 @@ export const ConversationActionsMenuItems = memo(function ConversationActionsMen
       {isMobile ? (
         <>
           <DropdownMenuItem onClick={() => onExport(conversation, "pdf")}>
-            <FileText className="mr-2 size-4" />
+            <FileDown className="mr-2 size-4" />
             Download PDF
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => onExport(conversation, "word")}>
@@ -865,7 +873,7 @@ export const MobileExportMenuItems = memo(function MobileExportMenuItems({
         onClick={() => onExport(conversation, "pdf")}
         className="flex cursor-pointer items-center gap-2 rounded-md py-2 pl-2.5 pr-2 text-xs font-medium"
       >
-        <FileText className="mr-2 size-4 shrink-0" />
+        <FileDown className="mr-2 size-4 shrink-0" />
         <span>Download PDF</span>
       </DropdownMenuItem>
       <DropdownMenuItem

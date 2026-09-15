@@ -324,6 +324,7 @@ export const ChatComposer = memo(function ChatComposer({
     !voiceChatActive &&
     activeMode === "chat" &&
     value.startsWith("/") &&
+    !value.startsWith("//") &&
     value.length >= 1;
   const slashQuery = isSlashActive ? value.slice(1) : "";
   const slashFiltered = useMemo(() => {
@@ -1187,8 +1188,8 @@ export const ChatComposer = memo(function ChatComposer({
             className={cn(
               "ksemo-thin-scroll absolute left-0 z-50 w-44 max-h-[min(16rem,40vh)] overflow-y-auto rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-md",
               isMobile || menuPlacement === "above"
-                ? "bottom-[calc(100%+6px)]"
-                : "top-[calc(100%+6px)]"
+                ? "bottom-[calc(100%+2px)]"
+                : "top-[calc(100%+2px)]"
             )}
           >
             {slashFiltered.length === 0 ? (

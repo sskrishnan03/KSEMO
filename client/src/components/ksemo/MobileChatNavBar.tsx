@@ -7,8 +7,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  ChevronsRight,
   FolderOpen,
-  Menu,
   MoreHorizontal,
   Pin,
   Trash2,
