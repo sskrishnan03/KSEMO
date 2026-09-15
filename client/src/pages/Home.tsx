@@ -19,7 +19,7 @@ import {
 import { startLogin } from "@/const";
 import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
-import { FolderOpen, Menu, MoreHorizontal, Pin, Trash2 } from "lucide-react";
+import { ChevronsRight, FolderOpen, Menu, MoreHorizontal, Pin, Trash2 } from "lucide-react";
 import { ShareIcon } from "../components/ksemo/icons";
 import React, {
   Fragment,
@@ -2563,7 +2563,7 @@ export default function Home() {
                 className="absolute left-3 top-3 z-10 size-9 rounded-xl lg:hidden"
                 aria-label="Open conversations"
               >
-                <Menu className="size-4" />
+                <ChevronsRight className="size-4" />
               </Button>
             )}
 

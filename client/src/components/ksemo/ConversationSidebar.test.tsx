@@ -192,8 +192,11 @@ describe("KSEMO conversation sidebar disclosure", () => {
     expect(markup).toContain("Download Word");
     expect(markup).toContain("Rename");
     expect(markup).toContain("Duplicate");
-    expect(markup).toContain("lucide-file-text");
     expect(markup).toContain("lucide-pencil");
+    // PDF and Word get distinct branded marks (not the same generic icon).
+    expect(markup).toContain("role=\"img\"");
+    expect(markup).toContain(">PDF<");
+    expect(markup).toContain(">WORD<");
   });
 });
 

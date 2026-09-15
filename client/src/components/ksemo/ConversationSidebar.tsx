@@ -26,7 +26,6 @@ import {
   Download,
   Ellipsis,
   ExternalLink,
-  FileDown,
   FileText,
   HelpCircle,
   Library,
@@ -228,7 +227,7 @@ export const ConversationSidebar = memo(function ConversationSidebar({
           )}
         >
           {compact ? (
-            <div className="group/brand relative hidden size-8 lg:block">
+            <div className="group/brand relative size-8">
               <div className="size-8 overflow-hidden rounded-lg border border-border bg-card shadow-sm transition-all duration-150 group-hover/brand:scale-90 group-hover/brand:opacity-0 group-focus-within/brand:scale-90 group-focus-within/brand:opacity-0">
                 <img
                   src="/KSEMOlogo.png"
@@ -242,7 +241,7 @@ export const ConversationSidebar = memo(function ConversationSidebar({
                     variant="ghost"
                     size="icon"
                     onClick={onToggleCollapsed}
-                    className="absolute inset-0 size-8 rounded-xl opacity-0 transition-all duration-150 group-hover/brand:scale-100 group-hover/brand:opacity-100 group-focus-within/brand:scale-100 group-focus-within/brand:opacity-100 hover:bg-sidebar-accent active:scale-95"
+                    className="absolute inset-0 size-8 rounded-xl opacity-100 transition-all duration-150 group-hover/brand:scale-100 max-lg:opacity-100 lg:opacity-0 lg:group-hover/brand:opacity-100 lg:group-focus-within/brand:opacity-100 hover:bg-sidebar-accent active:scale-95"
                     aria-label="Expand sidebar"
                   >
                     <ChevronsRight className="size-4" />
@@ -538,12 +537,7 @@ const ConversationGroup = memo(function ConversationGroup({
       >
         {label}
         <span
-          className={cn(
-            "transition-opacity",
-            isMobile
-              ? "opacity-100"
-              : "opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100"
-          )}
+          className="max-lg:opacity-100 lg:opacity-0 lg:group-hover:opacity-100 lg:group-focus-visible:opacity-100 transition-opacity"
         >
           {expanded ? (
             <ChevronDown className="size-3.5" />
@@ -777,11 +771,11 @@ export const ConversationActionsMenuItems = memo(function ConversationActionsMen
       {isMobile ? (
         <>
           <DropdownMenuItem onClick={() => onExport(conversation, "pdf")}>
-            <FileDown className="mr-2 size-4" />
+            <PdfFileIcon className="mr-2 size-4 shrink-0" />
             Download PDF
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => onExport(conversation, "word")}>
-            <FileText className="mr-2 size-4" />
+            <WordFileIcon className="mr-2 size-4 shrink-0" />
             Download Word
           </DropdownMenuItem>
         </>
@@ -873,14 +867,14 @@ export const MobileExportMenuItems = memo(function MobileExportMenuItems({
         onClick={() => onExport(conversation, "pdf")}
         className="flex cursor-pointer items-center gap-2 rounded-md py-2 pl-2.5 pr-2 text-xs font-medium"
       >
-        <FileDown className="mr-2 size-4 shrink-0" />
+        <PdfFileIcon className="mr-2 size-4 shrink-0" />
         <span>Download PDF</span>
       </DropdownMenuItem>
       <DropdownMenuItem
         onClick={() => onExport(conversation, "word")}
         className="flex cursor-pointer items-center gap-2 rounded-md py-2 pl-2.5 pr-2 text-xs font-medium"
       >
-        <FileText className="mr-2 size-4 shrink-0" />
+        <WordFileIcon className="mr-2 size-4 shrink-0" />
         <span>Download Word</span>
       </DropdownMenuItem>
     </div>

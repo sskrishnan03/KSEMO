@@ -381,8 +381,6 @@ describe("PdfDrawer", () => {
     // Sidebar container and header
     expect(markup).toContain('data-testid="pptx-sidebar"');
     expect(markup).toContain("Slides");
-    expect(markup).toContain('data-testid="pptx-sidebar-count-badge"');
-    expect(markup).toContain(">2<");
     // Collapse button with ChevronsLeft
     expect(markup).toContain('data-testid="pptx-sidebar-collapse-btn"');
 

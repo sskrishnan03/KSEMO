@@ -2542,12 +2542,6 @@ export const PptSlideSidebar = memo(function PptSlideSidebar({
           <span className="text-sm font-semibold tracking-tight text-foreground truncate">
             Slides
           </span>
-          <span
-            data-testid="pptx-sidebar-count-badge"
-            className="inline-flex items-center justify-center px-2 py-0.5 text-xs font-medium tabular-nums text-muted-foreground bg-muted/60 dark:bg-muted/40 rounded-full shrink-0"
-          >
-            {count}
-          </span>
         </div>
         {onClose && (
           <Tooltip>

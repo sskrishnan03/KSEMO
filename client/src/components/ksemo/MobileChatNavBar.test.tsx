@@ -32,6 +32,7 @@ describe("MobileChatNavBar", () => {
 
     expect(markup).toContain('data-testid="mobile-chat-navbar"');
     expect(markup).toContain('data-testid="mobile-sidebar-toggle"');
+    expect(markup).toContain("lucide-chevrons-right");
     expect(markup).toContain('data-testid="mobile-chat-actions-trigger"');
     // Does NOT render conversation title or "New chat" in the center
     expect(markup).not.toContain("Marketing Strategy");

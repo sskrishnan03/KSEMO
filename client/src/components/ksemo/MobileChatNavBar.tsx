@@ -63,7 +63,7 @@ export const MobileChatNavBar = memo(function MobileChatNavBar({
         aria-label="Open conversations"
         data-testid="mobile-sidebar-toggle"
       >
-        <Menu className="size-5" />
+        <ChevronsRight className="size-5" />
       </Button>
 
       {/* Center is clean without title or name */}
