@@ -22,14 +22,14 @@ import { format, isToday, isYesterday, isThisYear } from "date-fns";
 import { cn } from "@/lib/utils";
 import {
   Check,
+  CheckCheck,
   CheckCircle2,
   Download,
   FolderOpen,
   Grid2X2,
   Library,
   List,
-  ListChecks,
-  MessageSquareText,
+  MessageCircle,
   MoreVertical,
   Pencil,
   Search,
@@ -495,59 +495,62 @@ export function LibraryWorkspace({
         </section>
 
         {selectedFiles.length > 0 && (
-          <section
-            className="sticky top-3 z-20 mt-4 flex flex-col gap-3 rounded-2xl border border-muted-foreground/20 bg-card/95 p-3 shadow-lg backdrop-blur sm:flex-row sm:items-center sm:justify-between"
+          <div
+            className="sticky top-3 z-20 mt-4 flex w-fit max-w-full flex-wrap items-center justify-center gap-1.5 rounded-[1.25rem] border border-border/70 bg-card/95 p-1.5 pl-2 shadow-xl shadow-black/5 backdrop-blur-lg"
             aria-label="Selected Library actions"
           >
-            <div className="flex items-center gap-2">
+            <div className="flex h-9 min-w-0 items-center gap-1.5 rounded-full bg-foreground px-3.5 text-background shadow-md">
               <CheckCircle2 className="size-4" />
-              <p className="text-sm font-medium">
-                {selectedFiles.length}{" "}
-                {selectedFiles.length === 1 ? "item" : "items"} selected
-              </p>
+              <span className="text-sm font-bold tracking-[-0.02em]">
+                {selectedFiles.length}
+              </span>
+              <span className="text-xs font-medium text-background/70">
+                {selectedFiles.length === 1 ? "selected" : "selected"}
+              </span>
             </div>
-            <div className="flex flex-wrap items-center gap-1.5">
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                className="rounded-lg bg-muted/30 hover:bg-muted/60 hover:text-foreground"
-                onClick={selectVisibleFiles}
-                disabled={allVisibleSelected}
-              >
-                <ListChecks className="size-3.5" />
-                Select all
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="rounded-lg bg-muted/30 hover:bg-muted/60 hover:text-foreground"
-                onClick={() => setSelectedIds(new Set())}
-              >
-                <X className="size-3.5" />
-                Clear
-              </Button>
-              <Button
-                size="sm"
-                className="rounded-lg bg-foreground text-background hover:bg-foreground/90"
-                onClick={chatWithSelected}
-              >
-                <MessageSquareText className="size-3.5" />
-                Chat
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="rounded-lg bg-muted/30 hover:bg-destructive/10 hover:text-destructive"
-                onClick={() => setDeleteTarget(selectedFiles)}
-              >
-                <Trash2 className="size-3.5" />
-                {selectedFiles.length === allFiles.length && allFiles.length > 1
+
+            <button
+              type="button"
+              onClick={selectVisibleFiles}
+              disabled={allVisibleSelected}
+              className="flex h-9 items-center gap-1.5 rounded-full bg-muted/60 px-3.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
+            >
+              <CheckCheck className="size-4" />
+              <span className="text-xs font-semibold">Select all</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSelectedIds(new Set())}
+              className="flex h-9 items-center gap-1.5 rounded-full bg-muted/60 px-3.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            >
+              <X className="size-4" />
+              <span className="text-xs font-semibold">Clear</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={chatWithSelected}
+              className="flex h-9 items-center gap-1.5 rounded-full bg-foreground px-4.5 text-background shadow-md transition-colors hover:bg-foreground/90"
+            >
+              <MessageCircle className="size-4" />
+              <span className="text-xs font-semibold">Chat</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setDeleteTarget(selectedFiles)}
+              className="flex h-9 items-center gap-1.5 rounded-full bg-muted/60 px-3.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+            >
+              <Trash2 className="size-4" />
+              <span className="text-xs font-semibold">
+                {selectedFiles.length === allFiles.length &&
+                allFiles.length > 1
                   ? "Remove all"
                   : "Remove"}
-              </Button>
-            </div>
-          </section>
+              </span>
+            </button>
+          </div>
         )}
 
         <div className="mt-5 min-h-0 flex-1 overflow-y-auto pb-10">
@@ -833,7 +836,7 @@ const LibraryGridCard = memo(function LibraryGridCard({
       aria-pressed={selected}
       className={cn(
         "group relative cursor-pointer overflow-hidden rounded-2xl border bg-card transition-colors focus-visible:outline-none",
-        selected ? "border-muted-foreground" : "border-border"
+        selected ? "border-muted-foreground/50" : "border-border"
       )}
     >
       <button
