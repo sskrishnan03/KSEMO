@@ -644,9 +644,9 @@ const ConversationActionsMenu = memo(function ConversationActionsMenu({
           variant="ghost"
           size="icon"
           className={cn(
-            "size-8 shrink-0 rounded-md text-muted-foreground opacity-0 ml-0 mr-1.5",
+            "size-8 shrink-0 rounded-md text-muted-foreground ml-0 mr-1.5",
             "transition-[opacity,background-color,color] duration-150",
-            "group-hover:opacity-100 group-hover:text-foreground",
+            "max-lg:opacity-100 lg:opacity-0 lg:group-hover:opacity-100 group-hover:text-foreground",
             "hover:bg-accent hover:text-foreground",
             "data-[state=open]:bg-accent data-[state=open]:opacity-100"
           )}

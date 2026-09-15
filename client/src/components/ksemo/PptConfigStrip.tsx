@@ -119,9 +119,9 @@ function StylePicker(props: {
   const effectiveWidth = isMobile ? mobileWidth : popupWidth;
 
   return (
-    <div className="min-w-0 flex-1 sm:flex-initial">
+    <div className="min-w-0 shrink-0">
       <Select value={value} onValueChange={v => onChange(v as PptVisualStyle)}>
-        <SelectTrigger className="w-full rounded-full border border-border bg-popover">
+        <SelectTrigger className="w-auto rounded-full border border-border bg-popover">
           <span className="whitespace-nowrap truncate">
             {`Visual style${value ? ": " + getStyleDisplayName(value) : ""}`}
           </span>

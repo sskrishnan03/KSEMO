@@ -2381,7 +2381,7 @@ const PptCanonicalThumbnail = memo(function PptCanonicalThumbnail({
       data-testid={`pptx-sidebar-thumb-${slideNumber}`}
       aria-label={`Go to slide ${slideNumber}`}
       aria-current={isActive ? "true" : undefined}
-      className="group flex flex-col md:flex-row items-center gap-1 md:gap-1.5 w-24 sm:w-28 md:w-full shrink-0 text-left p-0.5 rounded-lg transition-colors focus:outline-none cursor-pointer bg-transparent active:bg-transparent hover:bg-transparent select-none"
+      className="group flex flex-row items-center gap-2 md:gap-1.5 w-full shrink-0 text-left p-1 md:p-0.5 rounded-lg transition-colors focus:outline-none cursor-pointer bg-transparent active:bg-transparent hover:bg-transparent select-none"
     >
       <span
         className={cn(
@@ -2453,7 +2453,7 @@ const PptFallbackThumbnail = memo(function PptFallbackThumbnail({
       data-testid={`pptx-sidebar-thumb-${slideNumber}`}
       aria-label={`Go to slide ${slideNumber}`}
       aria-current={isActive ? "true" : undefined}
-      className="group flex flex-col md:flex-row items-center gap-1 md:gap-1.5 w-24 sm:w-28 md:w-full shrink-0 text-left p-0.5 rounded-lg transition-colors focus:outline-none cursor-pointer bg-transparent active:bg-transparent hover:bg-transparent select-none"
+      className="group flex flex-row items-center gap-2 md:gap-1.5 w-full shrink-0 text-left p-1 md:p-0.5 rounded-lg transition-colors focus:outline-none cursor-pointer bg-transparent active:bg-transparent hover:bg-transparent select-none"
     >
       <span
         className={cn(
@@ -2533,7 +2533,7 @@ export const PptSlideSidebar = memo(function PptSlideSidebar({
       ref={sidebarRef}
       data-testid="pptx-sidebar"
       aria-label="Slide thumbnails"
-      className="w-64 max-w-[80vw] md:w-52 shrink-0 h-full flex flex-col border-r border-border bg-card/95 dark:bg-card/90 backdrop-blur-md z-20 select-none transition-all [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+      className="w-60 sm:w-56 md:w-52 max-w-[80vw] shrink-0 h-full flex flex-col border-r border-border bg-card/95 dark:bg-card/90 backdrop-blur-md z-20 select-none transition-all [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
     >
       {/* Sidebar Header */}
       <div className="flex h-11 items-center justify-between px-3 border-b border-border shrink-0">
@@ -2907,7 +2907,9 @@ export const PdfDrawer = memo(function PdfDrawer() {
     null
   );
   const [currentSlide, setCurrentSlide] = useState<number>(1);
-  const [isPptSidebarOpen, setIsPptSidebarOpen] = useState<boolean>(true);
+  const [isPptSidebarOpen, setIsPptSidebarOpen] = useState<boolean>(
+    () => (typeof window !== "undefined" ? window.innerWidth >= 768 : true)
+  );
   const [numPages, setNumPages] = useState<number>(0);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [isLoading, setIsLoading] = useState<boolean>(true);
