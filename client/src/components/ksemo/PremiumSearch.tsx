@@ -459,7 +459,6 @@ export function SearchWorkspace({
           <div className="flex w-full items-start justify-between gap-3">
             <div>
               <div className="flex items-center gap-3">
-                <Search className="size-6 text-muted-foreground" />
                 <h1 className="text-2xl font-semibold tracking-[-0.03em]">
                   Search
                 </h1>

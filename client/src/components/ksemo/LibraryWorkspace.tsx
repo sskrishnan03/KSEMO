@@ -379,7 +379,6 @@ export function LibraryWorkspace({
           <div className="flex w-full items-start justify-between gap-3">
             <div>
               <div className="flex items-center gap-2.5 sm:gap-3">
-                <Library className="size-5 sm:size-6 text-muted-foreground" />
                 <h1 className="text-xl sm:text-2xl font-semibold tracking-[-0.03em]">
                   Library
                 </h1>
