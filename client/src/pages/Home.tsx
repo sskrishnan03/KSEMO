@@ -2803,7 +2803,14 @@ export default function Home() {
             </section>
 
             {(visibleMessages.length > 0 || isMobile) && (
-              <div className="relative z-10">
+              <div
+                className={cn(
+                  "z-10",
+                  isMobile && visibleMessages.length === 0
+                    ? "absolute inset-x-0 bottom-0"
+                    : "relative"
+                )}
+              >
                 <div
                   aria-hidden="true"
                   className="pointer-events-none absolute -top-8 left-0 right-0 h-8 bg-gradient-to-b from-transparent to-background"
@@ -2924,7 +2931,7 @@ const EmptyState = memo(function EmptyState({
     <div className="mx-auto flex h-full w-full max-w-3xl flex-col px-0 pb-4 sm:px-5 lg:justify-center">
       <div className="flex min-h-0 flex-1 flex-col justify-center lg:flex-none">
         <div className="mb-4 px-5 text-center sm:mb-5 sm:px-0">
-          <p className="text-xl font-bold tracking-[-0.04em] text-balance text-foreground sm:text-[22px] sm:tracking-[-0.025em]">
+          <p className="text-[22px] font-bold tracking-[-0.04em] text-balance text-foreground sm:tracking-[-0.025em]">
             {greeting}
           </p>
         </div>
