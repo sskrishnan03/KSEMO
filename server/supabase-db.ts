@@ -30,6 +30,10 @@ import {
   dbToMemorySettings,
   dbToMemory,
 } from "../supabase-schema/04-types";
+import {
+  EPHEMERAL_TITLE_PREFIX,
+  isEphemeralConversationTitle,
+} from "./conversationTypes";
 
 export type {
   User,
@@ -256,7 +260,13 @@ export async function listConversationsForUser(
   if (useMemoryFallback()) {
     return inMemoryStore.listConversationsForUser(userId, scope);
   }
-  let query = supabase.from("conversations").select("*").eq("user_id", userId);
+  let query = supabase
+    .from("conversations")
+    .select("*")
+    .eq("user_id", userId)
+    // Temporary (ephemeral) chats are tagged with a title prefix and must never
+    // surface in any listing.
+    .not("title", "like", `${EPHEMERAL_TITLE_PREFIX}%`);
   if (scope === "active") {
     query = query.is("deleted_at", null).eq("is_archived", false);
   } else if (scope === "archived") {
@@ -293,16 +303,21 @@ export async function createConversationForUser(input: {
   userId: number;
   title?: string;
   conversationType?: "text" | "voice" | "mixed";
+  ephemeral?: boolean;
 }): Promise<Conversation> {
   if (useMemoryFallback()) {
     return inMemoryStore.createConversationForUser(input);
   }
+  const baseTitle = input.title || "New Chat";
+  const storedTitle = input.ephemeral
+    ? `${EPHEMERAL_TITLE_PREFIX}${baseTitle}`
+    : baseTitle;
   const { data, error } = await supabase
     .from("conversations")
     .insert({
       id: input.id,
       user_id: input.userId,
-      title: input.title || "New Chat",
+      title: storedTitle,
       conversation_type: input.conversationType || "text",
       is_pinned: false,
       is_archived: false,

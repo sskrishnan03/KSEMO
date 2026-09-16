@@ -40,11 +40,19 @@ describe("TemporaryChatIcon", () => {
     expect(markup).not.toContain('<linearGradient');
   });
 
-  it("renders active state with subtle monochrome treatment", () => {
+  it("keeps the monochrome outline in active state and adds loading animations instead", () => {
     const defaultMarkup = renderToStaticMarkup(<TemporaryChatIcon active={false} />);
     const activeMarkup = renderToStaticMarkup(<TemporaryChatIcon active={true} />);
 
+    // The icon never tints its own bubble/clock (no white wash on click);
+    // active state only differs by the loading animations.
     expect(defaultMarkup).toContain('fill-opacity="0"');
-    expect(activeMarkup).toContain('fill-opacity="0.16"');
+    expect(activeMarkup).toContain('fill-opacity="0"');
+
+    // Active adds the dots loading animation and the spinning clock.
+    expect(defaultMarkup).not.toContain("animateTransform");
+    expect(activeMarkup).toContain("animateTransform");
+    expect(activeMarkup).toContain('type="translate"');
+    expect(activeMarkup).toContain('type="rotate"');
   });
 });

@@ -207,6 +207,7 @@ export const ChatComposer = memo(function ChatComposer({
   audioBars,
   audioLevel,
   focusToken = 0,
+  temporary = false,
 }: {
   onSend: (content: string) => void;
   onCancel: () => void;
@@ -274,6 +275,8 @@ export const ChatComposer = memo(function ChatComposer({
   onSaveEdit?: () => void;
   onCancelEdit?: () => void;
   focusToken?: number;
+  /** Temporary ("incognito") chat: renders a soft white glow around the input. */
+  temporary?: boolean;
 }) {
   const editorRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -618,7 +621,15 @@ export const ChatComposer = memo(function ChatComposer({
           isCentered={isCentered}
         />
       )}
-      <div className="relative rounded-[20px] border border-border bg-popover p-1.5 shadow-sm text-popover-foreground">
+      <div
+        className={cn(
+          "relative rounded-[20px] border border-border bg-popover p-1.5 shadow-sm text-popover-foreground",
+          // Temporary "incognito" mode: no hard border line at all; only a
+          // soft white glow hugs the edge of the box.
+          temporary &&
+            "border-transparent shadow-[0_0_12px_3px_rgba(255,255,255,0.14)]"
+        )}
+      >
         {isDragActive && (
           <div className="pointer-events-none fixed inset-0 z-[100] flex items-center justify-center bg-card/80 backdrop-blur-sm">
             <div className="rounded-2xl border-2 border-dashed border-primary/60 bg-card px-10 py-8 shadow-xl">

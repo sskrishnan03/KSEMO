@@ -37,7 +37,9 @@ export interface TemporaryChatIconProps extends React.SVGProps<SVGSVGElement> {
 // radiating marks were removed. The bubble outline is clipped exactly where it
 // would pass under the clock so the clock always reads as a clean, perfect
 // circle. Tightened viewBox and heavier strokes make the glyph read larger and
-// bolder at small sizes.
+// bolder at small sizes. When `active` (temporary mode on) the three dots
+// bounce like a loading indicator and the clock hands spin around like a
+// running timer.
 export function TemporaryChatIcon({
   className,
   active = false,
@@ -83,14 +85,61 @@ export function TemporaryChatIcon({
           strokeWidth="28"
           strokeLinecap="round"
           strokeLinejoin="round"
-          fill={active ? "currentColor" : "none"}
-          fillOpacity={active ? 0.16 : 0}
+          fill="none"
+          fillOpacity={0}
         />
 
-        {/* Three Horizontal Dots Inside Chat Bubble */}
-        <circle cx="445.4" cy="490.4" r="19" fill="currentColor" />
-        <circle cx="501.3" cy="490.4" r="19" fill="currentColor" />
-        <circle cx="558.2" cy="490.4" r="19" fill="currentColor" />
+        {/* Three Horizontal Dots Inside Chat Bubble. In temporary (active)
+            mode they bounce up and down in sequence like a loading indicator,
+            staying in their full bold color. Eased motion keeps it smooth. */}
+        <g>
+          {active && (
+            <animateTransform
+              attributeName="transform"
+              type="translate"
+              values="0 0; 0 -8; 0 0"
+              keyTimes="0; 0.5; 1"
+              calcMode="spline"
+              keySplines="0.3 0 0.7 1; 0.3 0 0.7 1"
+              dur="1s"
+              begin="0s"
+              repeatCount="indefinite"
+            />
+          )}
+          <circle cx="445.4" cy="490.4" r="19" fill="currentColor" />
+        </g>
+        <g>
+          {active && (
+            <animateTransform
+              attributeName="transform"
+              type="translate"
+              values="0 0; 0 -8; 0 0"
+              keyTimes="0; 0.5; 1"
+              calcMode="spline"
+              keySplines="0.3 0 0.7 1; 0.3 0 0.7 1"
+              dur="1s"
+              begin="0.33s"
+              repeatCount="indefinite"
+            />
+          )}
+          <circle cx="501.3" cy="490.4" r="19" fill="currentColor" />
+        </g>
+        <g>
+          {active && (
+            <animateTransform
+              attributeName="transform"
+              type="translate"
+              values="0 0; 0 -8; 0 0"
+              keyTimes="0; 0.5; 1"
+              calcMode="spline"
+              keySplines="0.3 0 0.7 1; 0.3 0 0.7 1"
+              dur="1s"
+              begin="0.66s"
+              repeatCount="indefinite"
+            />
+          )}
+          <circle cx="558.2" cy="490.4" r="19" fill="currentColor" />
+        </g>
       </g>
 
       {/* Clock Circle overlapping lower-right, drawn on top (perfect circle) */}
@@ -100,20 +149,33 @@ export function TemporaryChatIcon({
         r="59"
         stroke="currentColor"
         strokeWidth="22"
-        fill={active ? "currentColor" : "none"}
-        fillOpacity={active ? 0.12 : 0}
+        fill="none"
+        fillOpacity={0}
       />
 
-      {/* Clock Hands (L-shape) */}
-      <path
-        d="M 604.5 556 
-           L 604.5 580.2 
-           L 628.5 580.2"
-        stroke="currentColor"
-        strokeWidth="17"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
+      {/* Clock Hands (L-shape). In temporary mode they spin around the clock
+          like a running timer. */}
+      <g>
+        {active && (
+          <animateTransform
+            attributeName="transform"
+            type="rotate"
+            from="0 604.5 580.2"
+            to="360 604.5 580.2"
+            dur="5s"
+            repeatCount="indefinite"
+          />
+        )}
+        <path
+          d="M 604.5 556 
+             L 604.5 580.2 
+             L 628.5 580.2"
+          stroke="currentColor"
+          strokeWidth="17"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </g>
     </svg>
   );
 }

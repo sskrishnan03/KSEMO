@@ -273,6 +273,11 @@ export default function Home() {
     string | null
   >(null);
   const [isTemporaryChat, setIsTemporaryChat] = useState(false);
+  // Mirrors isTemporaryChat for use inside async stream callbacks, where the
+  // captured state may be stale. Tracks which server conversations belong to
+  // the current temporary session so they can be purged when it ends.
+  const isTemporaryChatRef = useRef(false);
+  const temporaryConversationIdsRef = useRef<Set<string>>(new Set());
   const [chatMessages, setChatMessages] = useState<KsemoMessage[]>([]);
   const [composerValue, setComposerValue] = useState("");
   const [composerFocusToken, setComposerFocusToken] = useState(0);
@@ -545,6 +550,22 @@ export default function Home() {
       utils.conversation.list.invalidate();
     },
   });
+  // Hard-delete every conversation created during the temporary session. These
+  // are already hidden from all listings on the server; this removes the rows.
+  // Uses the vanilla client so it is also safe to call from an unmount cleanup.
+  const purgeTemporaryConversations = () => {
+    const ids = Array.from(temporaryConversationIdsRef.current);
+    if (ids.length === 0) return;
+    temporaryConversationIdsRef.current.clear();
+    for (const id of ids) {
+      utils.client.conversation.remove.mutate({ id });
+    }
+  };
+  // Best-effort cleanup if the user navigates away mid-session.
+  useEffect(() => {
+    return () => purgeTemporaryConversations();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const messageEditMutation = trpc.message.edit.useMutation({
     onSuccess: (_, variables) => {
       if (activeConversationId)
@@ -1009,6 +1030,9 @@ export default function Home() {
     } = {}
   ) {
     const conversationId = activeConversationId;
+    // Snapshot the temporary flag at send time: the toggle may change while the
+    // stream is in flight.
+    const temporary = isTemporaryChatRef.current;
     // Per-conversation double-submit guard: let other chats keep generating in
     // the background, but never start a second stream in the same conversation.
     if (
@@ -1118,6 +1142,7 @@ export default function Home() {
             : undefined,
           mode: resolvedMode ?? "chat",
           activeMode: resolvedMode ?? "chat",
+          ...(temporary ? { temporary: true } : {}),
           ...(resolvedMode === "pptx"
             ? {
                 pptConfig,
@@ -1177,12 +1202,17 @@ export default function Home() {
             streamEntry.conversationId = conv.conversationId;
             streamEntry.userMessageId = conv.userMessageId;
             streamEntry.assistantMessageId = conv.assistantMessageId;
+            if (temporary) {
+              // Remember this conversation so it can be purged when the
+              // temporary session ends. Never surface it in recents/history.
+              temporaryConversationIdsRef.current.add(conv.conversationId);
+            }
             if (wasViewing) {
               // Stay on this (fresh) conversation so the optimistic drafts keep
               // rendering here with their real server ids.
               setActiveConversationId(conv.conversationId);
               activeConversationIdRef.current = conv.conversationId;
-              if (user?.id)
+              if (user?.id && !temporary)
                 storeActiveConversationId(user.id, conv.conversationId);
               // The local drafts below are authoritative, so the seed effect
               // must not overwrite them with a mid-stream database snapshot.
@@ -1197,7 +1227,7 @@ export default function Home() {
                 )
               );
             }
-            utils.conversation.list.invalidate();
+            if (!temporary) utils.conversation.list.invalidate();
           } else if (eventName === "assistant.delta") {
             lastProgressAt = Date.now();
             const delta = str(data.delta);
@@ -1706,6 +1736,11 @@ export default function Home() {
   }
 
   function newChat() {
+    // Ending the view also ends any temporary session: purge its chats so
+    // nothing lingers, and return to normal chat.
+    purgeTemporaryConversations();
+    isTemporaryChatRef.current = false;
+    setIsTemporaryChat(false);
     // Starting a fresh chat aborts any stream targeting the current view so the
     // composer is free, but never touches background streams in other chats.
     closePdf();
@@ -2175,6 +2210,13 @@ export default function Home() {
     // Switching is always allowed, even while another conversation's response
     // is still streaming in the background. That stream keeps running and the
     // finished response is saved to its original conversation.
+    // Selecting a saved conversation ends any temporary session: its chats are
+    // tucked away (and purged) and this chat is a normal, persisted one.
+    if (isTemporaryChatRef.current) {
+      purgeTemporaryConversations();
+      isTemporaryChatRef.current = false;
+      setIsTemporaryChat(false);
+    }
     setChatMessages([]);
     seededConversationIdRef.current = null;
     isNearBottomRef.current = true;
@@ -2504,6 +2546,7 @@ export default function Home() {
       isEditingMessage={Boolean(editingMessage)}
       onSaveEdit={stableEditAction}
       onCancelEdit={stableCancelEdit}
+      temporary={isTemporaryChat}
     />
   );
   const composerElement = renderComposer();
@@ -2601,26 +2644,33 @@ export default function Home() {
                       data-testid="temporary-chat-toggle"
                       aria-label={
                         isTemporaryChat
-                          ? "Temporary chat (active)"
-                          : "Temporary chat"
+                          ? "Turn off temporary chat"
+                          : "Turn on temporary chat"
                       }
                       aria-pressed={isTemporaryChat}
-                      onClick={() => setIsTemporaryChat(prev => !prev)}
+                      onClick={() => {
+                        const next = !isTemporaryChatRef.current;
+                        isTemporaryChatRef.current = next;
+                        setIsTemporaryChat(next);
+                        if (!next) purgeTemporaryConversations();
+                      }}
+                      // Hover effect is always the same (ghost default);
+                      // active state adds a staying rounded-square highlight.
                       className={cn(
-                        "size-10 rounded-xl text-foreground transition-colors hover:bg-foreground/10",
-                        isTemporaryChat && "bg-foreground/15 text-foreground hover:bg-foreground/20"
+                        "size-10 rounded-xl text-foreground transition-colors",
+                        isTemporaryChat && "bg-foreground/10"
                       )}
                     >
                       <TemporaryChatIcon
-                        active={isTemporaryChat}
+                        active={false}
                         className="size-[26px]"
                       />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent side="bottom" sideOffset={6}>
                     {isTemporaryChat
-                      ? "Temporary chat (active)"
-                      : "Temporary chat"}
+                      ? "Turn off temporary chat"
+                      : "Turn on temporary chat"}
                   </TooltipContent>
                 </Tooltip>
               </div>
@@ -2816,6 +2866,7 @@ export default function Home() {
               ) : (
                 <EmptyState
                   greeting={greeting}
+                  temporary={isTemporaryChat}
                   composer={
                     isMobile ? null : (
                       <ChatComposer
@@ -2857,6 +2908,7 @@ export default function Home() {
                         isCentered={visibleMessages.length === 0}
                         onTakeScreenshot={stableCaptureScreenshot}
                         focusToken={composerFocusToken}
+                        temporary={isTemporaryChat}
                       />
                     )
                   }
@@ -2985,20 +3037,41 @@ function timeGreeting() {
 const EmptyState = memo(function EmptyState({
   greeting,
   composer,
+  temporary = false,
 }: {
   greeting: string;
   composer: React.ReactNode;
+  temporary?: boolean;
 }) {
   return (
     <div className="mx-auto flex h-full w-full max-w-3xl flex-col px-0 pb-16 sm:px-5 sm:pb-4 lg:justify-center">
       <div className="flex min-h-0 flex-1 flex-col justify-center lg:flex-none">
         <div className="mb-4 px-5 text-center sm:mb-5 sm:px-0">
-          <p className="text-[22px] font-bold tracking-[-0.04em] text-balance text-foreground sm:tracking-[-0.025em]">
-            {greeting}
-          </p>
+          {temporary ? (
+            <div className="flex items-center justify-center gap-3 animate-in fade-in duration-200">
+              <TemporaryChatIcon
+                active={temporary}
+                className="size-8 shrink-0 text-foreground"
+              />
+              <p className="text-[22px] font-bold tracking-[-0.04em] text-balance text-foreground sm:tracking-[-0.025em]">
+                Temporary chat
+              </p>
+            </div>
+          ) : (
+            <p className="text-[22px] font-bold tracking-[-0.04em] text-balance text-foreground sm:tracking-[-0.025em]">
+              {greeting}
+            </p>
+          )}
         </div>
       </div>
-      <div className="mx-auto w-full max-w-3xl">{composer}</div>
+      <div className="relative mx-auto w-full max-w-3xl">
+        {composer}
+        {temporary && (
+          <p className="pointer-events-none absolute inset-x-0 top-full mt-1 px-5 text-center text-[13px] font-medium leading-snug text-muted-foreground sm:px-0 animate-in fade-in duration-200">
+            Your messages in this chat won't be saved to your history.
+          </p>
+        )}
+      </div>
     </div>
   );
 });

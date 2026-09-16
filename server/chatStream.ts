@@ -17,6 +17,7 @@ import { sdk, SessionLookupError } from "./_core/sdk";
 import { storageDownload } from "./storage";
 import { buildUserMemoryContext } from "./memory/retrieval";
 import { memorizeConversation } from "./memory/autoMemorize";
+import { isEphemeralConversationTitle } from "./conversationTypes";
 import {
   detectFileRequest,
   likelyFormatHint,
@@ -227,7 +228,10 @@ export function registerChatStream(app: Express) {
       /** User-selected PowerPoint options (per shared/presentation.ts). */
       pptConfig?: Record<string, unknown>;
       pptStyle?: string;
+      /** Temporary ("incognito") chat: hidden from all listings and not memorized. */
+      temporary?: boolean;
     };
+    const temporary = body.temporary === true;
     let content = body.content?.trim();
     const hasAttachments = (body.attachmentFileIds?.length ?? 0) > 0;
     if (
@@ -267,10 +271,13 @@ export function registerChatStream(app: Express) {
           id: crypto.randomUUID(),
           userId: user.id,
           title: createInitialTitle(content),
+          ephemeral: temporary,
         });
       }
 
       if (!conversation) throw new Error("Conversation creation failed");
+      const ephemeralConversation =
+        temporary || isEphemeralConversationTitle(conversation.title);
       if (conversation.title === "New conversation" && content) {
         await updateConversationForUser(conversation.id, user.id, {
           title: createInitialTitle(content),
@@ -756,7 +763,11 @@ export function registerChatStream(app: Express) {
 
             // Generate intelligent title after first assistant response
             // Only do this for new conversations (not regenerations)
-            if (!body.regenerateAssistantMessageId && content) {
+            if (
+              !body.regenerateAssistantMessageId &&
+              content &&
+              !ephemeralConversation
+            ) {
               const messages = await listMessagesForConversation(conversation.id);
               const userMessages = messages.filter(m => m.role === "user");
               const assistantMessages = messages.filter(m => m.role === "assistant");
@@ -783,7 +794,9 @@ export function registerChatStream(app: Express) {
 
             // Capture durable facts from this conversation in the background;
             // this never blocks the response (see memorizeConversation).
-            void memorizeConversation(user.id, conversation.id);
+            if (!ephemeralConversation) {
+              void memorizeConversation(user.id, conversation.id);
+            }
           }
         }
       } catch (error) {

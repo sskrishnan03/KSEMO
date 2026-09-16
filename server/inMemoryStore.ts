@@ -22,6 +22,10 @@ import type {
   DbConversation,
   DbMessage,
 } from "../supabase-schema/04-types";
+import {
+  EPHEMERAL_TITLE_PREFIX,
+  isEphemeralConversationTitle,
+} from "./conversationTypes";
 
 // Durable snapshot persistence: the store keeps the exact same in-memory
 // behavior but mirrors itself to .ksemo-data/store.json on every mutation so
@@ -398,6 +402,7 @@ class InMemoryStore {
     const list: Conversation[] = [];
     for (const conv of this.conversations.values()) {
       if (conv.userId !== userId) continue;
+      if (isEphemeralConversationTitle(conv.title)) continue;
       if (scope === "active" && conv.deletedAt === null && !conv.isArchived) {
         list.push(conv);
       } else if (scope === "archived" && conv.isArchived && conv.deletedAt === null) {
@@ -425,12 +430,16 @@ class InMemoryStore {
     userId: number;
     title?: string;
     conversationType?: "text" | "voice" | "mixed";
+    ephemeral?: boolean;
   }): Promise<Conversation> {
     const now = new Date();
+    const baseTitle = input.title || "New Chat";
     const conv: Conversation = {
       id: input.id,
       userId: input.userId,
-      title: input.title || "New Chat",
+      title: input.ephemeral
+        ? `${EPHEMERAL_TITLE_PREFIX}${baseTitle}`
+        : baseTitle,
       conversationType: input.conversationType || "text",
       isPinned: false,
       isArchived: false,

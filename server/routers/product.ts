@@ -15,6 +15,7 @@ import {
   isSupabaseConfigured,
 } from "../supabase-db";
 import type { KsemoFile } from "../../supabase-schema/04-types";
+import { EPHEMERAL_TITLE_PREFIX } from "../conversationTypes";
 
 const entityId = z.string().min(8).max(36);
 const projectInput = z.object({
@@ -540,6 +541,8 @@ export const workspaceRouter = router({
             .from("conversations")
             .select("*")
             .eq("user_id", userId)
+            // Temporary chats are never persisted to the user's data export.
+            .not("title", "like", `${EPHEMERAL_TITLE_PREFIX}%`)
             .order("updated_at", { ascending: false }),
           supabase
             .from("projects")
