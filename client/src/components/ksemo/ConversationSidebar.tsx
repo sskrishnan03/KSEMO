@@ -238,7 +238,7 @@ export const ConversationSidebar = memo(function ConversationSidebar({
                     variant="ghost"
                     size="icon"
                     onClick={onToggleCollapsed}
-                    className="absolute inset-0 size-[2.125rem] rounded-xl opacity-100 transition-all duration-150 group-hover/brand:scale-100 max-lg:opacity-100 lg:opacity-0 lg:group-hover/brand:opacity-100 lg:group-focus-within/brand:opacity-100 hover:bg-sidebar-accent active:scale-95"
+                    className="absolute inset-0 size-[2.125rem] rounded-lg opacity-100 transition-all duration-150 group-hover/brand:scale-100 max-lg:opacity-100 lg:opacity-0 lg:group-hover/brand:opacity-100 lg:group-focus-within/brand:opacity-100 hover:bg-sidebar-accent active:scale-95"
                     aria-label="Expand sidebar"
                   >
                     <ChevronsRight className="size-[1.125rem]" />
