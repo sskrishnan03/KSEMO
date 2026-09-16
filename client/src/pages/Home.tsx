@@ -2834,7 +2834,11 @@ export default function Home() {
                       className="size-10 rounded-lg bg-neutral-900 text-neutral-50 hover:bg-neutral-800"
                       aria-label="Chat actions"
                     >
-                      <MoreHorizontal className="size-5" strokeWidth={2.75} />
+                      <MoreHorizontal
+                        className="size-5"
+                        strokeWidth={2.75}
+                        fill="currentColor"
+                      />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-44 rounded-xl">
