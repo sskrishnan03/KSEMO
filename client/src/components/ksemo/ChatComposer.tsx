@@ -307,6 +307,10 @@ export const ChatComposer = memo(function ChatComposer({
       (attachmentNotice
         ? [{ fileId: attachmentNotice.name, ...attachmentNotice }]
         : []));
+  const canSend =
+    Boolean(value.trim()) ||
+    visibleAttachmentNotices.length > 0 ||
+    Boolean(activeMode && activeMode !== "chat");
 
   useEffect(() => {
     if (isEditingMessage) {
@@ -1174,18 +1178,19 @@ export const ChatComposer = memo(function ChatComposer({
                         Start voice chat
                       </TooltipContent>
                     </Tooltip>
-                  ) : !isRecording &&
-                    !isTranscribing &&
-                    (value.trim() ||
-                      visibleAttachmentNotices.length ||
-                      Boolean(activeMode && activeMode !== "chat")) ? (
+                  ) : !isRecording && !isTranscribing ? (
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Button
                           onClick={submit}
                           disabled={isRecording || isTranscribing}
                           size="icon"
-                          className="size-10 rounded-full bg-foreground text-background hover:bg-foreground/90 disabled:bg-muted disabled:text-muted-foreground transition-colors"
+                          className={cn(
+                            "size-10 rounded-full transition-colors",
+                            canSend
+                              ? "bg-foreground text-background hover:bg-foreground/90"
+                              : "bg-muted text-muted-foreground hover:bg-accent"
+                          )}
                           aria-label="Send message"
                         >
                           <ArrowUp className="size-4.5" />
