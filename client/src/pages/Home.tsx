@@ -2644,8 +2644,8 @@ export default function Home() {
                       data-testid="temporary-chat-toggle"
                       aria-label={
                         isTemporaryChat
-                          ? "Turn off temporary chat"
-                          : "Turn on temporary chat"
+                          ? "Close temporary chat"
+                          : "Open temporary chat"
                       }
                       aria-pressed={isTemporaryChat}
                       onClick={() => {
@@ -2669,14 +2669,16 @@ export default function Home() {
                   </TooltipTrigger>
                   <TooltipContent side="bottom" sideOffset={6}>
                     {isTemporaryChat
-                      ? "Turn off temporary chat"
-                      : "Turn on temporary chat"}
+                      ? "End temporary chat"
+                      : "Start a temporary chat"}
                   </TooltipContent>
                 </Tooltip>
               </div>
             )}
 
-            {visibleMessages.length > 0 && (
+            {/* Chat action menu has no place in a temporary chat, so the
+                three-dots button is hidden there entirely. */}
+            {visibleMessages.length > 0 && !isTemporaryChat && (
               <div className="absolute right-2 top-2 z-10">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -3068,7 +3070,7 @@ const EmptyState = memo(function EmptyState({
         {composer}
         {temporary && (
           <p className="pointer-events-none absolute inset-x-0 top-full mt-1 px-5 text-center text-[13px] font-medium leading-snug text-muted-foreground sm:px-0 animate-in fade-in duration-200">
-            Your messages in this chat won't be saved to your history.
+            This conversation won't be saved to your chat history.
           </p>
         )}
       </div>

@@ -54,7 +54,8 @@ import { FileResultCard } from "./FileResultCard";
 export const getLibrarySubmenuClass = (isCentered: boolean) =>
   `absolute left-1/2 -translate-x-1/2 z-50 max-h-[calc(100dvh-${isCentered ? "12rem" : "6rem"})] w-full max-w-3xl rounded-xl border border-border bg-popover p-0 text-popover-foreground shadow-xl`;
 
-const CHAT_PLACEHOLDER = "Ask KSEMO anything you need...";
+const CHAT_PLACEHOLDER = "Ask KSEMO anything...";
+const TEMP_PLACEHOLDER = "Start a temporary conversation...";
 
 const VOICE_PLACEHOLDER = "Ask me out loud or type your question here...";
 
@@ -849,9 +850,11 @@ export const ChatComposer = memo(function ChatComposer({
                     ? "edit"
                     : voiceChatActive
                       ? "voice"
-                      : activeMode && activeMode !== "chat"
-                        ? activeMode
-                        : "chat"
+                      : temporary
+                        ? "temporary"
+                        : activeMode && activeMode !== "chat"
+                          ? activeMode
+                          : "chat"
                 }
                 className="pointer-events-none absolute left-2.5 top-[7px] text-[15px] leading-6 text-muted-foreground animate-[ksemo-placeholder-rise_800ms_ease-out]"
                 aria-hidden="true"
@@ -860,7 +863,9 @@ export const ChatComposer = memo(function ChatComposer({
                   ? "Edit your message…"
                   : voiceChatActive
                     ? VOICE_PLACEHOLDER
-                    : CHAT_PLACEHOLDER}
+                    : temporary
+                      ? TEMP_PLACEHOLDER
+                      : CHAT_PLACEHOLDER}
               </span>
             )}
           </div>
