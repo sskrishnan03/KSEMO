@@ -189,6 +189,78 @@
   font-size: 0.84em;
 }
 
+/* ── Markdown list layout ─────────────────────────────────────────────────
+   Replace native list markers with absolutely-positioned pseudo-elements
+   so that:
+   • The marker never protrudes outside the assistant message boundary.
+   • Wrapped continuation lines align with the list item text (not the marker).
+   • Each nesting level is progressively indented while staying inside the
+     available response width.
+   • Long URLs, code strings, and other unbreakable content wrap via
+     overflow-wrap: anywhere. */
+
+.ksemo-markdown ul,
+.ksemo-markdown ol {
+  list-style: none;
+  margin: 0;
+  padding-left: 0;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.ksemo-markdown li {
+  position: relative;
+  padding-left: 1.25em;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+/* Unordered list bullet */
+.ksemo-markdown ul > li::before {
+  content: "•";
+  position: absolute;
+  left: 0;
+  line-height: inherit;
+}
+
+/* Ordered list number via CSS counter */
+.ksemo-markdown ol {
+  counter-reset: ksemo-counter;
+}
+.ksemo-markdown ol > li {
+  counter-increment: ksemo-counter;
+}
+.ksemo-markdown ol > li::before {
+  content: counter(ksemo-counter) ".";
+  position: absolute;
+  left: 0;
+  line-height: inherit;
+}
+
+/* Nested lists — progressive indent via parent padding */
+.ksemo-markdown li > ul,
+.ksemo-markdown li > ol {
+  margin-top: 0.25em;
+  margin-bottom: 0.25em;
+}
+
+/* Nested ordered lists reset the counter */
+.ksemo-markdown li > ol {
+  counter-reset: ksemo-counter;
+}
+
+/* Overflow safety for any markdown block inside the response */
+.ksemo-markdown {
+  overflow-wrap: anywhere;
+  word-break: normal;
+  min-width: 0;
+}
+
 /* ── KSEMO Code Block (client/src/components/ksemo/code-block.tsx) ─────────
    Clean, simple code blocks with Shiki syntax highlighting.
 
