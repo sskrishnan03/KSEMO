@@ -467,11 +467,11 @@ export function SearchWorkspace({
                     variant="ghost"
                     size="icon"
                     onClick={onOpenSidebar}
-                    className="size-9 shrink-0 rounded-xl text-foreground transition-colors hover:bg-accent active:scale-95 lg:hidden"
+                    className="size-10 sm:size-9 shrink-0 rounded-xl text-foreground transition-colors hover:bg-accent active:scale-95 lg:hidden"
                     aria-label="Open conversations"
                     title="Open sidebar"
                   >
-                    <ChevronsRight className="size-5" />
+                    <ChevronsRight className="size-5 sm:size-5" />
                   </Button>
                 )}
                 <h1 className="text-2xl font-semibold tracking-[-0.03em]">

@@ -2417,7 +2417,10 @@ export default function Home() {
     voice.state === "recording" ? voice.stop : voice.start
   );
   const stableVoiceCancel = usePersistFn(voice.cancel);
-  const stableOpenVoiceChat = usePersistFn(() => setVoiceChatOpen(true));
+  const stableOpenVoiceChat = usePersistFn(() => {
+    if (isTemporaryChatRef.current) return;
+    setVoiceChatOpen(true);
+  });
   const stableCloseVoiceChat = usePersistFn(() => {
     setVoiceChatOpen(false);
     if (activeConversationId) {
@@ -3085,7 +3088,7 @@ export default function Home() {
                 {composerElement}
               </div>
             )}
-            {voiceChatOpen && (
+            {voiceChatOpen && !isTemporaryChat && (
               <VoiceChat
                 conversationId={activeConversationId}
                 onConversation={stableSelectConversation}

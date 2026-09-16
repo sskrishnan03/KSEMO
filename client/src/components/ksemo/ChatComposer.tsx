@@ -1141,7 +1141,8 @@ export const ChatComposer = memo(function ChatComposer({
                         Stop generating
                       </TooltipContent>
                     </Tooltip>
-                  ) : !value.trim() &&
+                  ) : !temporary &&
+                    !value.trim() &&
                     !visibleAttachmentNotices.length &&
                     (!activeMode || activeMode === "chat") &&
                     !isRecording &&
@@ -1173,7 +1174,11 @@ export const ChatComposer = memo(function ChatComposer({
                         Start voice chat
                       </TooltipContent>
                     </Tooltip>
-                  ) : !isRecording && !isTranscribing ? (
+                  ) : !isRecording &&
+                    !isTranscribing &&
+                    (value.trim() ||
+                      visibleAttachmentNotices.length ||
+                      Boolean(activeMode && activeMode !== "chat")) ? (
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Button
