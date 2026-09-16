@@ -198,6 +198,55 @@ function rememberNewChatIntent(userId: number): void {
   } catch {}
 }
 
+// Temporary ("incognito") chats are session-scoped, but a same-tab refresh
+// (F5 / back-forward) must not silently drop the user back into a normal chat.
+// The mode, the active temporary conversation, and its conversation ids are
+// remembered so a reload reopens the exact same thread. A fresh tab/session,
+// "New Chat", or opening a saved conversation always ends temporary mode.
+type StoredTemporaryChat = {
+  active: boolean;
+  activeConversationId: string | null;
+  ids: string[];
+};
+
+function temporaryChatStorageKey(userId: string | number): string {
+  return `ksemo-temporary-chat:${String(userId)}`;
+}
+
+function readStoredTemporaryChat(userId: string | number): StoredTemporaryChat {
+  try {
+    const raw = localStorage.getItem(temporaryChatStorageKey(userId));
+    if (raw) {
+      const parsed = JSON.parse(raw) as Partial<StoredTemporaryChat>;
+      return {
+        active: parsed.active === true,
+        activeConversationId:
+          typeof parsed.activeConversationId === "string"
+            ? parsed.activeConversationId
+            : null,
+        ids: Array.isArray(parsed.ids)
+          ? parsed.ids.filter((id): id is string => typeof id === "string")
+          : [],
+      };
+    }
+  } catch {}
+  return { active: false, activeConversationId: null, ids: [] };
+}
+
+function writeStoredTemporaryChat(
+  userId: string | number | undefined,
+  state: StoredTemporaryChat
+): void {
+  if (userId == null) return;
+  try {
+    if (!state.active) {
+      localStorage.removeItem(temporaryChatStorageKey(userId));
+      return;
+    }
+    localStorage.setItem(temporaryChatStorageKey(userId), JSON.stringify(state));
+  } catch {}
+}
+
 // Distinguishes a refresh of the same tab (F5/reload, back/forward) from a
 // fresh open of the app (new tab / new session). A reload reuses the current
 // tab and its in-memory/storage session, so the last conversation can be
@@ -390,6 +439,12 @@ export default function Home() {
   // Server data only seeds it ONCE per conversation id (when it is opened) and
   // is never allowed to overwrite messages that are currently streaming.
   const seededConversationIdRef = useRef<string | null>(null);
+  // State mirror of seededConversationIdRef so rendering can tell whether the
+  // currently-viewed conversation has been loaded yet (prevents the empty
+  // "new chat" screen from flashing while switching between saved chats).
+  const [seededConversationId, setSeededConversationId] = useState<
+    string | null
+  >(null);
   // Tracks whether the current user already auto-selected an initial
   // conversation so the auto-open effect runs once per session.
   const initialSelectionUserIdRef = useRef<string | null>(null);
@@ -444,6 +499,15 @@ export default function Home() {
   const activeQuery = trpc.conversation.get.useQuery(
     { id: activeConversationId ?? "unselected" },
     { enabled: Boolean(activeConversationId) }
+  );
+  // While the user is switching between saved conversations, the server data
+  // loads instantly from the cache but the seed effect still needs one frame
+  // to call setChatMessages. Show a small loader instead of the empty "new
+  // chat" greeting so nothing flashes.
+  const isPendingSeed = Boolean(
+    activeConversationId &&
+      seededConversationId !== activeConversationId &&
+      !activeQuery.isError
   );
   const activeConversation = useMemo(() => {
     if (!activeConversationId) return null;
@@ -509,11 +573,15 @@ export default function Home() {
   useEffect(() => {
     if (user) return;
     seededConversationIdRef.current = null;
+    setSeededConversationId(null);
     initialSelectionUserIdRef.current = null;
     setChatMessages([]);
     setActiveConversationId(null);
     activeConversationIdRef.current = null;
     setAttachmentNotices([]);
+    isTemporaryChatRef.current = false;
+    setIsTemporaryChat(false);
+    temporaryConversationIdsRef.current.clear();
   }, [user]);
   const renameMutation = trpc.conversation.rename.useMutation({
     onSuccess: () => utils.conversation.list.invalidate(),
@@ -606,6 +674,7 @@ export default function Home() {
     if (activeQuery.isLoading || !activeQuery.data) return;
     if (activeQuery.data.conversation?.id !== activeConversationId) return;
     seededConversationIdRef.current = activeConversationId;
+    setSeededConversationId(activeConversationId);
     // The conversation's full history is about to render into an empty thread,
     // so the next scroll must snap to the newest message rather than animate.
     pendingOpenScrollRef.current = true;
@@ -835,6 +904,38 @@ export default function Home() {
     }
     return files;
   }, [chatMessages]);
+
+  // Restore the temporary ("incognito") session across a same-tab refresh so a
+  // reload reopens the same thread instead of silently bouncing the user back
+  // into a normal chat. Only a genuine reload (F5 / back-forward) restores it;
+  // a fresh open has the stored flag cleared by whichever branch runs below
+  // while "New Chat" and saved-conversation selection already clear it.
+  useEffect(() => {
+    if (user?.id == null) return;
+    const userId = user.id;
+    if (isSameTabReload()) {
+      const stored = readStoredTemporaryChat(userId);
+      isTemporaryChatRef.current = stored.active;
+      setIsTemporaryChat(stored.active);
+      temporaryConversationIdsRef.current = new Set(stored.ids);
+      if (stored.active && stored.activeConversationId) {
+        seededConversationIdRef.current = null;
+        setSeededConversationId(null);
+        setChatMessages([]);
+        setActiveConversationId(stored.activeConversationId);
+        activeConversationIdRef.current = stored.activeConversationId;
+      }
+    } else {
+      isTemporaryChatRef.current = false;
+      setIsTemporaryChat(false);
+      temporaryConversationIdsRef.current.clear();
+      writeStoredTemporaryChat(userId, {
+        active: false,
+        activeConversationId: null,
+        ids: [],
+      });
+    }
+  }, [user?.id]);
 
   useEffect(() => {
     if (!user?.id || !conversationQuery.data) return;
@@ -1208,6 +1309,14 @@ export default function Home() {
               // Remember this conversation so it can be purged when the
               // temporary session ends. Never surface it in recents/history.
               temporaryConversationIdsRef.current.add(conv.conversationId);
+              // Persist the temporary session across a same-tab refresh so a
+              // reload reopens the exact same thread instead of bouncing back
+              // to a normal chat.
+              writeStoredTemporaryChat(user?.id, {
+                active: true,
+                activeConversationId: conv.conversationId,
+                ids: Array.from(temporaryConversationIdsRef.current),
+              });
             }
             if (wasViewing) {
               // Stay on this (fresh) conversation so the optimistic drafts keep
@@ -1219,6 +1328,7 @@ export default function Home() {
               // The local drafts below are authoritative, so the seed effect
               // must not overwrite them with a mid-stream database snapshot.
               seededConversationIdRef.current = conv.conversationId;
+              setSeededConversationId(conv.conversationId);
               setChatMessages(current =>
                 current.map(message =>
                   message.id.startsWith("local-user")
@@ -1743,6 +1853,11 @@ export default function Home() {
     purgeTemporaryConversations();
     isTemporaryChatRef.current = false;
     setIsTemporaryChat(false);
+    writeStoredTemporaryChat(user?.id, {
+      active: false,
+      activeConversationId: null,
+      ids: [],
+    });
     // Starting a fresh chat aborts any stream targeting the current view so the
     // composer is free, but never touches background streams in other chats.
     closePdf();
@@ -1758,6 +1873,7 @@ export default function Home() {
       }
     }
     seededConversationIdRef.current = null;
+    setSeededConversationId(null);
     isNearBottomRef.current = true;
     pendingOpenScrollRef.current = true;
     setChatMessages([]);
@@ -2203,6 +2319,7 @@ export default function Home() {
       // newest message (e.g. after scrolling up to read older messages).
       if (chatMessages.length === 0 && activeQuery.data?.messages) {
         seededConversationIdRef.current = null;
+    setSeededConversationId(null);
       }
       isNearBottomRef.current = true;
       scrollChatToEnd("auto");
@@ -2218,9 +2335,15 @@ export default function Home() {
       purgeTemporaryConversations();
       isTemporaryChatRef.current = false;
       setIsTemporaryChat(false);
+      writeStoredTemporaryChat(user?.id, {
+        active: false,
+        activeConversationId: null,
+        ids: [],
+      });
     }
     setChatMessages([]);
     seededConversationIdRef.current = null;
+    setSeededConversationId(null);
     isNearBottomRef.current = true;
     pendingOpenScrollRef.current = true;
     setActiveConversationId(id);
@@ -2302,6 +2425,7 @@ export default function Home() {
       // Spoken turns stream straight to the server, so the open chat must
       // re-seed from the database for the exchange to read as a normal chat.
       seededConversationIdRef.current = null;
+    setSeededConversationId(null);
       void utils.conversation.get.refetch({ id: activeConversationId });
     }
     utils.conversation.list.invalidate();
@@ -2661,7 +2785,21 @@ export default function Home() {
                         const next = !isTemporaryChatRef.current;
                         isTemporaryChatRef.current = next;
                         setIsTemporaryChat(next);
-                        if (!next) purgeTemporaryConversations();
+                        if (next) {
+                          temporaryConversationIdsRef.current = new Set();
+                          writeStoredTemporaryChat(user?.id, {
+                            active: true,
+                            activeConversationId: null,
+                            ids: [],
+                          });
+                        } else {
+                          purgeTemporaryConversations();
+                          writeStoredTemporaryChat(user?.id, {
+                            active: false,
+                            activeConversationId: null,
+                            ids: [],
+                          });
+                        }
                       }}
                       // Hover effect is always the same (ghost default);
                       // active state adds a staying rounded-square highlight.
@@ -2870,9 +3008,10 @@ export default function Home() {
                   })}
                   <div ref={messagesEndRef} />
                 </div>
-              ) : activeQuery.isLoading &&
-                activeConversationId &&
-                !isGenerating ? (
+              ) : isPendingSeed ||
+                (activeQuery.isLoading &&
+                  activeConversationId &&
+                  !isGenerating) ? (
                 <Loading />
               ) : (
                 <EmptyState
