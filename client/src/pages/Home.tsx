@@ -20,8 +20,8 @@ import { startLogin } from "@/const";
 import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
 import {
+  ChevronsRight,
   FolderOpen,
-  Menu,
   MoreHorizontal,
   Pin,
   Trash2,
@@ -2767,7 +2767,7 @@ export default function Home() {
                 aria-label="Open conversations"
                 data-testid="mobile-sidebar-toggle"
               >
-                <Menu className="size-5" />
+                <ChevronsRight className="size-4" />
               </Button>
 
               <div className="flex items-center">
@@ -2903,7 +2903,7 @@ export default function Home() {
 
               <div
                 aria-hidden="true"
-                className="pointer-events-none absolute inset-x-0 top-full h-5 bg-gradient-to-b from-background to-transparent lg:hidden"
+                className="pointer-events-none absolute inset-x-0 top-full h-px bg-gradient-to-b from-background to-transparent lg:hidden"
               />
             </nav>
             <ChatFilesDialog
