@@ -3,6 +3,13 @@
 
 @custom-variant dark (&:is(.dark *));
 
+@theme {
+  /* Mobile browsers in "Desktop site" mode report a ~980px viewport. Lower the
+     lg breakpoint so that width renders the full desktop layout instead of
+     falling into the mobile/tablet design. */
+  --breakpoint-lg: 60rem;
+}
+
 @theme inline {
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);

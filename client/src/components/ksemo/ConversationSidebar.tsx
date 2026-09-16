@@ -109,7 +109,7 @@ export const ConversationSidebar = memo(function ConversationSidebar({
     [conversations]
   );
   const compact = collapsed;
-  const isMobile = useIsMobile(1024);
+  const isMobile = useIsMobile(960);
 
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
@@ -675,7 +675,7 @@ export const ConversationActionsMenu = memo(function ConversationActionsMenu({
   onDelete: (conversation: Conversation) => void;
   isMobile?: boolean;
 }) {
-  const isMobileDetected = useIsMobile(1024);
+  const isMobileDetected = useIsMobile(960);
   const isMobile = isMobileProp ?? isMobileDetected;
 
   return (

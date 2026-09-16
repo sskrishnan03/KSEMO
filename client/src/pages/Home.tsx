@@ -73,6 +73,7 @@ import { detectFileRequest } from "@shared/docDetect";
 import { SettingsDialog } from "../components/ksemo/SettingsDialog";
 import { useGlobalShortcuts } from "../hooks/useGlobalShortcuts";
 import { useIsMobile } from "../hooks/useIsMobile";
+import { useVisualViewportHeight } from "../hooks/useVisualViewportHeight";
 import { ShareConversationDialog } from "../components/ksemo/ShareConversationDialog";
 import { ConfirmDeleteDialog } from "../components/ksemo/ConfirmDeleteDialog";
 import { useVoiceInput } from "../hooks/useVoiceInput";
@@ -221,6 +222,7 @@ function isSameTabReload(): boolean {
 
 export default function Home() {
   const isMobile = useIsMobile();
+  const visualViewportHeight = useVisualViewportHeight();
   const { user, loading, authUnavailable, refresh, logout } = useAuth();
   const { closePdf, isOpen: isDocumentOpen } = usePdfViewer();
   const [, setLocation] = useLocation();
@@ -2581,7 +2583,14 @@ export default function Home() {
   if (!user || isSignedOutPreview) return <AuthStage />;
 
   return (
-    <div className="flex h-dvh overflow-hidden bg-background">
+    <div
+      className="flex h-dvh overflow-hidden bg-background"
+      style={
+        isMobile && visualViewportHeight
+          ? { height: visualViewportHeight }
+          : undefined
+      }
+    >
       <ConversationSidebar
         conversations={conversationQuery.data ?? []}
         activeConversationId={activeConversationId}
