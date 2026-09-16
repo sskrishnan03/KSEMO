@@ -224,8 +224,8 @@ export const ConversationSidebar = memo(function ConversationSidebar({
           )}
         >
           {compact ? (
-            <div className="group/brand relative size-9">
-              <div className="size-9 overflow-hidden rounded-lg border border-border bg-card shadow-sm transition-all duration-150 group-hover/brand:scale-90 group-hover/brand:opacity-0 group-focus-within/brand:scale-90 group-focus-within/brand:opacity-0">
+            <div className="group/brand relative size-[2.125rem]">
+              <div className="size-[2.125rem] overflow-hidden rounded-lg border border-border bg-card shadow-sm transition-all duration-150 group-hover/brand:scale-90 group-hover/brand:opacity-0 group-focus-within/brand:scale-90 group-focus-within/brand:opacity-0">
                 <img
                   src="/KSEMOlogo.png"
                   alt="KSEMO logo"
@@ -238,10 +238,10 @@ export const ConversationSidebar = memo(function ConversationSidebar({
                     variant="ghost"
                     size="icon"
                     onClick={onToggleCollapsed}
-                    className="absolute inset-0 size-9 rounded-xl opacity-100 transition-all duration-150 group-hover/brand:scale-100 max-lg:opacity-100 lg:opacity-0 lg:group-hover/brand:opacity-100 lg:group-focus-within/brand:opacity-100 hover:bg-sidebar-accent active:scale-95"
+                    className="absolute inset-0 size-[2.125rem] rounded-xl opacity-100 transition-all duration-150 group-hover/brand:scale-100 max-lg:opacity-100 lg:opacity-0 lg:group-hover/brand:opacity-100 lg:group-focus-within/brand:opacity-100 hover:bg-sidebar-accent active:scale-95"
                     aria-label="Expand sidebar"
                   >
-                    <ChevronsRight className="size-5" />
+                    <ChevronsRight className="size-[1.125rem]" />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent
@@ -265,10 +265,10 @@ export const ConversationSidebar = memo(function ConversationSidebar({
                   variant="ghost"
                   size="icon"
                   onClick={onToggleCollapsed}
-                  className="hidden size-9 rounded-lg transition-transform duration-150 hover:bg-sidebar-accent active:scale-95 lg:inline-flex"
+                  className="hidden size-[2.125rem] rounded-lg transition-transform duration-150 hover:bg-sidebar-accent active:scale-95 lg:inline-flex"
                   aria-label="Collapse sidebar"
                 >
-                  <ChevronsLeft className="size-5" />
+                  <ChevronsLeft className="size-[1.125rem]" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom">Collapse sidebar</TooltipContent>
