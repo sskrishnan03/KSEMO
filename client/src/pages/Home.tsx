@@ -189,6 +189,28 @@ function rememberNewChatIntent(userId: number): void {
   } catch {}
 }
 
+// Distinguishes a refresh of the same tab (F5/reload, back/forward) from a
+// fresh open of the app (new tab / new session). A reload reuses the current
+// tab and its in-memory/storage session, so the last conversation can be
+// restored. A fresh open always starts on a blank new chat.
+function isSameTabReload(): boolean {
+  try {
+    const entries = performance.getEntriesByType("navigation");
+    if (entries.length) {
+      const type = (entries[0] as PerformanceNavigationTiming).type;
+      return type === "reload" || type === "back_forward";
+    }
+  } catch {}
+  try {
+    // Legacy fallback: 0 = navigate, 1 = reload, 2 = back/forward.
+    const type = (performance as unknown as {
+      navigation?: { type?: number };
+    }).navigation?.type;
+    return type === 1 || type === 2;
+  } catch {}
+  return false;
+}
+
 export default function Home() {
   const isMobile = useIsMobile();
   const { user, loading, authUnavailable, refresh, logout } = useAuth();
@@ -816,9 +838,16 @@ export default function Home() {
       return;
     }
     const stored = getStoredActiveConversationState(user.id);
-    // Restore where the user left off: if they were in a specific chat, reopen
-    // it (so a refresh doesn't lose their place). A new-chat marker or no saved
-    // session keeps them on a fresh new chat.
+    if (!isSameTabReload()) {
+      // Fresh open (new tab / new session): always start on a blank New Chat.
+      // Record the intent so a later reload of this tab stays fresh too.
+      if (activeConversationId === null) rememberNewChatIntent(user.id);
+      requestComposerFocus();
+      return;
+    }
+    // Same-tab reload: restore where the user left off so a refresh doesn't
+    // lose their place. A new-chat marker or no saved session keeps them on a
+    // fresh new chat.
     if (stored.newChatIntent) {
       requestComposerFocus();
       return;
