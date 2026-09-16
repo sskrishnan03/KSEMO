@@ -25,6 +25,11 @@ describe("TemporaryChatIcon", () => {
     expect(markup).toContain('604.5 556');
     expect(markup).toContain('628.5 580.2');
 
+    // Verify the bubble is clipped so it never draws inside the clock circle
+    expect(markup).toContain('<clipPath');
+    expect(markup).toContain('fill-rule="evenodd"');
+    expect(markup).toContain('clip-path="url(');
+
     // Verify the outer arcs and radiating marks were removed
     expect(markup).not.toContain('A 216 216 0 0 1');
     expect(markup).not.toContain('A 219 219 0 0 1');

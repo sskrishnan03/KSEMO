@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useId } from "react";
 import { cn } from "@/lib/utils";
 
 // Stroke-based share icon drawn on the same 24-unit grid as the lucide icons
@@ -34,13 +34,18 @@ export interface TemporaryChatIconProps extends React.SVGProps<SVGSVGElement> {
 // Temporary chat icon: bold monochrome recreation of the reference design.
 // Contains only the rounded chat bubble with three dots and the small timer
 // clock overlapping its lower-right corner; the decorative outer ring and
-// radiating marks were removed. Tightened viewBox makes the glyph read larger,
-// with heavier strokes for a bolder look at small sizes.
+// radiating marks were removed. The bubble outline is clipped exactly where it
+// would pass under the clock so the clock always reads as a clean, perfect
+// circle. Tightened viewBox and heavier strokes make the glyph read larger and
+// bolder at small sizes.
 export function TemporaryChatIcon({
   className,
   active = false,
   ...props
 }: TemporaryChatIconProps) {
+  const id = useId();
+  const clipId = `ksemo-tc-clip-${id}`;
+
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -50,32 +55,45 @@ export function TemporaryChatIcon({
       className={cn("size-4 shrink-0 select-none", className)}
       {...props}
     >
-      {/* Chat Bubble Outline */}
-      <path
-        d="M 645 537 
-           L 645 460 
-           C 645 405 600 375 540 375 
-           L 460 375 
-           C 400 375 363.5 405 363.5 460 
-           L 363.5 510 
-           C 363.5 535 380 555 388 568 
-           C 392 575 378 605 368 624 
-           L 438 591 
-           L 546.5 591"
-        stroke="currentColor"
-        strokeWidth="28"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        fill={active ? "currentColor" : "none"}
-        fillOpacity={active ? 0.16 : 0}
-      />
+      <defs>
+        {/* Carve the clock circle out of the bubble so nothing draws inside it */}
+        <clipPath id={clipId}>
+          <path
+            d="M 334 327.6 H 690 V 683.6 H 334 Z 
+               M 545.5 580.2 A 59 59 0 1 0 663.5 580.2 A 59 59 0 1 0 545.5 580.2 Z"
+            fillRule="evenodd"
+          />
+        </clipPath>
+      </defs>
 
-      {/* Three Horizontal Dots Inside Chat Bubble */}
-      <circle cx="445.4" cy="490.4" r="19" fill="currentColor" />
-      <circle cx="501.3" cy="490.4" r="19" fill="currentColor" />
-      <circle cx="558.2" cy="490.4" r="19" fill="currentColor" />
+      {/* Chat Bubble Outline (clipped where it passes under the clock) */}
+      <g clipPath={`url(#${clipId})`}>
+        <path
+          d="M 645 537 
+             L 645 460 
+             C 645 405 600 375 540 375 
+             L 460 375 
+             C 400 375 363.5 405 363.5 460 
+             L 363.5 510 
+             C 363.5 535 380 555 388 568 
+             C 392 575 378 605 368 624 
+             L 438 591 
+             L 546.5 591"
+          stroke="currentColor"
+          strokeWidth="28"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill={active ? "currentColor" : "none"}
+          fillOpacity={active ? 0.16 : 0}
+        />
 
-      {/* Clock Circle overlapping lower-right (clean transparent background) */}
+        {/* Three Horizontal Dots Inside Chat Bubble */}
+        <circle cx="445.4" cy="490.4" r="19" fill="currentColor" />
+        <circle cx="501.3" cy="490.4" r="19" fill="currentColor" />
+        <circle cx="558.2" cy="490.4" r="19" fill="currentColor" />
+      </g>
+
+      {/* Clock Circle overlapping lower-right, drawn on top (perfect circle) */}
       <circle
         cx="604.5"
         cy="580.2"
