@@ -27,7 +27,15 @@ import {
   Pin,
   Trash2,
 } from "lucide-react";
-import { ShareIcon } from "../components/ksemo/icons";
+import {
+  ShareIcon,
+  TemporaryChatIcon,
+} from "../components/ksemo/icons";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import React, {
   Fragment,
   useCallback,
@@ -264,6 +272,7 @@ export default function Home() {
   const [activeConversationId, setActiveConversationId] = useState<
     string | null
   >(null);
+  const [isTemporaryChat, setIsTemporaryChat] = useState(false);
   const [chatMessages, setChatMessages] = useState<KsemoMessage[]>([]);
   const [composerValue, setComposerValue] = useState("");
   const [composerFocusToken, setComposerFocusToken] = useState(0);
@@ -2581,6 +2590,41 @@ export default function Home() {
             >
               <ChevronsRight className="size-4" />
             </Button>
+
+            {!activeConversationId && visibleMessages.length === 0 && (
+              <div className="absolute right-2 top-2 z-10">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      data-testid="temporary-chat-toggle"
+                      aria-label={
+                        isTemporaryChat
+                          ? "Temporary chat (active)"
+                          : "Temporary chat"
+                      }
+                      aria-pressed={isTemporaryChat}
+                      onClick={() => setIsTemporaryChat(prev => !prev)}
+                      className={cn(
+                        "size-10 rounded-xl text-foreground transition-colors hover:bg-foreground/10",
+                        isTemporaryChat && "bg-foreground/15 text-foreground hover:bg-foreground/20"
+                      )}
+                    >
+                      <TemporaryChatIcon
+                        active={isTemporaryChat}
+                        className="size-[26px]"
+                      />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" sideOffset={6}>
+                    {isTemporaryChat
+                      ? "Temporary chat (active)"
+                      : "Temporary chat"}
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+            )}
 
             {visibleMessages.length > 0 && (
               <div className="absolute right-2 top-2 z-10">
