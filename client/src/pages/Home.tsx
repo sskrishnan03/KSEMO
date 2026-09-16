@@ -2759,11 +2759,11 @@ export default function Home() {
               variant="ghost"
               size="icon"
               onClick={() => setSidebarOpen(true)}
-              className="absolute left-3 top-3 z-10 size-9 rounded-lg bg-neutral-900 text-neutral-50 hover:bg-neutral-800 lg:hidden"
+              className="absolute left-2 top-2 z-10 size-10 rounded-lg bg-neutral-900 text-neutral-50 hover:bg-neutral-800 lg:hidden"
               aria-label="Open conversations"
               data-testid="mobile-sidebar-toggle"
             >
-              <ChevronsRight className="size-4" />
+              <ChevronsRight className="size-5" />
             </Button>
 
             {!activeConversationId && visibleMessages.length === 0 && (
@@ -2924,7 +2924,7 @@ export default function Home() {
               {visibleMessages.length ? (
                 <div
                   ref={messagesBodyRef}
-                  className="mx-auto max-w-3xl space-y-5 px-4 pb-3 pt-4 sm:px-6 sm:pb-4 sm:pt-5"
+                  className="mx-auto max-w-3xl space-y-5 px-4 pb-3 pt-16 sm:px-6 sm:pb-4 lg:pt-5"
                 >
                   {visibleMessages.map(message => {
                     const activeFileGen =
