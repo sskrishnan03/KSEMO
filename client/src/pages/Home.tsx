@@ -2644,8 +2644,8 @@ export default function Home() {
                       data-testid="temporary-chat-toggle"
                       aria-label={
                         isTemporaryChat
-                          ? "Close temporary chat"
-                          : "Open temporary chat"
+                          ? "Exit temporary chat"
+                          : "Temporary chat"
                       }
                       aria-pressed={isTemporaryChat}
                       onClick={() => {
@@ -2669,8 +2669,8 @@ export default function Home() {
                   </TooltipTrigger>
                   <TooltipContent side="bottom" sideOffset={6}>
                     {isTemporaryChat
-                      ? "End temporary chat"
-                      : "Start a temporary chat"}
+                      ? "Exit temporary chat"
+                      : "Temporary chat"}
                   </TooltipContent>
                 </Tooltip>
               </div>
