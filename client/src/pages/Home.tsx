@@ -2755,157 +2755,151 @@ export default function Home() {
           />
         ) : (
           <>
-            <nav
-              aria-label="Chat actions"
-              className="relative z-10 flex shrink-0 items-center justify-between pl-3 pr-2 pt-3 lg:absolute lg:right-2 lg:top-2 lg:z-10 lg:block lg:p-0"
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setSidebarOpen(true)}
+              className="absolute left-3 top-3 z-10 size-9 rounded-lg bg-neutral-900 text-neutral-50 hover:bg-neutral-800 lg:hidden"
+              aria-label="Open conversations"
+              data-testid="mobile-sidebar-toggle"
             >
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setSidebarOpen(true)}
-                className="size-9 rounded-lg bg-neutral-900 text-neutral-50 hover:bg-neutral-800 lg:hidden"
-                aria-label="Open conversations"
-                data-testid="mobile-sidebar-toggle"
-              >
-                <ChevronsRight className="size-4" />
-              </Button>
+              <ChevronsRight className="size-4" />
+            </Button>
 
-              <div className="flex items-center">
-                {!activeConversationId && visibleMessages.length === 0 ? (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        data-testid="temporary-chat-toggle"
-                        aria-label={
-                          isTemporaryChat
-                            ? "Exit temporary chat"
-                            : "Temporary chat"
+            {!activeConversationId && visibleMessages.length === 0 && (
+              <div className="absolute right-2 top-2 z-10">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      data-testid="temporary-chat-toggle"
+                      aria-label={
+                        isTemporaryChat
+                          ? "Exit temporary chat"
+                          : "Temporary chat"
+                      }
+                      aria-pressed={isTemporaryChat}
+                      onClick={() => {
+                        const next = !isTemporaryChatRef.current;
+                        isTemporaryChatRef.current = next;
+                        setIsTemporaryChat(next);
+                        if (next) {
+                          temporaryConversationIdsRef.current = new Set();
+                          writeStoredTemporaryChat(user?.id, {
+                            active: true,
+                            activeConversationId: null,
+                            ids: [],
+                          });
+                        } else {
+                          purgeTemporaryConversations();
+                          writeStoredTemporaryChat(user?.id, {
+                            active: false,
+                            activeConversationId: null,
+                            ids: [],
+                          });
                         }
-                        aria-pressed={isTemporaryChat}
-                        onClick={() => {
-                          const next = !isTemporaryChatRef.current;
-                          isTemporaryChatRef.current = next;
-                          setIsTemporaryChat(next);
-                          if (next) {
-                            temporaryConversationIdsRef.current = new Set();
-                            writeStoredTemporaryChat(user?.id, {
-                              active: true,
-                              activeConversationId: null,
-                              ids: [],
-                            });
-                          } else {
-                            purgeTemporaryConversations();
-                            writeStoredTemporaryChat(user?.id, {
-                              active: false,
-                              activeConversationId: null,
-                              ids: [],
-                            });
-                          }
-                        }}
-                        // Hover effect is always the same (ghost default);
-                        // active state adds a staying rounded-square highlight.
-                        className={cn(
-                          "size-10 rounded-xl text-foreground transition-colors",
-                          isTemporaryChat && "bg-foreground/10"
-                        )}
-                      >
-                        <TemporaryChatIcon
-                          active={false}
-                          className="size-[26px]"
-                        />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom" sideOffset={6}>
-                      {isTemporaryChat
-                        ? "Exit temporary chat"
-                        : "Temporary chat"}
-                    </TooltipContent>
-                  </Tooltip>
-                ) : visibleMessages.length > 0 && !isTemporaryChat ? (
-                  /* Chat action menu has no place in a temporary chat, so the
-                     three-dots button is hidden there entirely. */
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="size-9 rounded-lg bg-neutral-900 text-neutral-50 hover:bg-neutral-800"
-                        aria-label="Chat actions"
-                      >
-                        <MoreHorizontal className="size-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-44 rounded-xl">
-                      <DropdownMenuItem
-                        disabled={!activeConversationId}
-                        onSelect={() => {
-                          if (activeConversationId) {
-                            const pinned = activeConversation?.isPinned ?? false;
-                            stableOnPin({
-                              id: activeConversationId,
-                              isPinned: pinned,
-                            });
-                          }
-                        }}
-                      >
-                        <Pin className="mr-2 size-4" />
-                        {activeConversation?.isPinned ? "Unpin" : "Pin"}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        disabled={!activeConversationId}
-                        onSelect={() => {
-                          if (activeConversationId) {
-                            stableOnShareConversation(
-                              activeConversation
-                                ? {
-                                    id: activeConversationId,
-                                    title: activeConversation.title,
-                                    isPublic: activeConversation.isPublic,
-                                    shareToken: activeConversation.shareToken,
-                                  }
-                                : {
-                                    id: activeConversationId,
-                                    title: "this conversation",
-                                  }
-                            );
-                          }
-                        }}
-                      >
-                        <ShareIcon className="mr-2 size-4" />
-                        Share
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onSelect={() => setChatFilesOpen(true)}>
-                        <FolderOpen className="mr-2 size-4" />
-                        View files
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        disabled={!activeConversationId}
-                        variant="destructive"
-                        onSelect={() => {
-                          if (activeConversationId)
-                            stableOnDelete({
-                              id: activeConversationId,
-                              title:
-                                activeConversation?.title ?? "this conversation",
-                            });
-                        }}
-                      >
-                        <Trash2 className="mr-2 size-4" />
-                        Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                ) : null}
+                      }}
+                      // Hover effect is always the same (ghost default);
+                      // active state adds a staying rounded-square highlight.
+                      className={cn(
+                        "size-10 rounded-xl text-foreground transition-colors",
+                        isTemporaryChat && "bg-foreground/10"
+                      )}
+                    >
+                      <TemporaryChatIcon
+                        active={false}
+                        className="size-[26px]"
+                      />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" sideOffset={6}>
+                    {isTemporaryChat
+                      ? "Exit temporary chat"
+                      : "Temporary chat"}
+                  </TooltipContent>
+                </Tooltip>
               </div>
+            )}
 
-              <div
-                aria-hidden="true"
-                className="pointer-events-none absolute inset-x-0 top-full h-px bg-gradient-to-b from-background to-transparent lg:hidden"
-              />
-            </nav>
+            {/* Chat action menu has no place in a temporary chat, so the
+                three-dots button is hidden there entirely. */}
+            {visibleMessages.length > 0 && !isTemporaryChat && (
+              <div className="absolute right-2 top-2 z-10">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-10 rounded-lg bg-neutral-900 text-neutral-50 hover:bg-neutral-800"
+                      aria-label="Chat actions"
+                    >
+                      <MoreHorizontal className="size-5" strokeWidth={2.75} />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-44 rounded-xl">
+                    <DropdownMenuItem
+                      disabled={!activeConversationId}
+                      onSelect={() => {
+                        if (activeConversationId) {
+                          const pinned = activeConversation?.isPinned ?? false;
+                          stableOnPin({
+                            id: activeConversationId,
+                            isPinned: pinned,
+                          });
+                        }
+                      }}
+                    >
+                      <Pin className="mr-2 size-4" />
+                      {activeConversation?.isPinned ? "Unpin" : "Pin"}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      disabled={!activeConversationId}
+                      onSelect={() => {
+                        if (activeConversationId) {
+                          stableOnShareConversation(
+                            activeConversation
+                              ? {
+                                  id: activeConversationId,
+                                  title: activeConversation.title,
+                                  isPublic: activeConversation.isPublic,
+                                  shareToken: activeConversation.shareToken,
+                                }
+                              : {
+                                  id: activeConversationId,
+                                  title: "this conversation",
+                                }
+                          );
+                        }
+                      }}
+                    >
+                      <ShareIcon className="mr-2 size-4" />
+                      Share
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => setChatFilesOpen(true)}>
+                      <FolderOpen className="mr-2 size-4" />
+                      View files
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      disabled={!activeConversationId}
+                      variant="destructive"
+                      onSelect={() => {
+                        if (activeConversationId)
+                          stableOnDelete({
+                            id: activeConversationId,
+                            title:
+                              activeConversation?.title ?? "this conversation",
+                          });
+                      }}
+                    >
+                      <Trash2 className="mr-2 size-4" />
+                      Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            )}
             <ChatFilesDialog
               open={chatFilesOpen}
               onOpenChange={setChatFilesOpen}
