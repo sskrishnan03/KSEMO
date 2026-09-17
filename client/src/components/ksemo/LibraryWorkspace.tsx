@@ -22,7 +22,6 @@ import { format, isToday, isYesterday, isThisYear } from "date-fns";
 import { cn } from "@/lib/utils";
 import {
   Check,
-  CheckCheck,
   CheckCircle2,
   ChevronsRight,
   Download,
@@ -30,6 +29,8 @@ import {
   Grid2X2,
   Library,
   List,
+  ListChecks,
+  ListX,
   MessageCircle,
   MoreVertical,
   Pencil,
@@ -523,7 +524,7 @@ export function LibraryWorkspace({
                   onClick={() => setSelectedIds(new Set())}
                   className="flex h-8 items-center gap-1.5 rounded-full bg-muted/70 px-3 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground active:scale-95"
                 >
-                  <X className="size-3.5" />
+                  <ListX className="size-3.5" strokeWidth={2.5} />
                   <span>Clear</span>
                 </button>
               </div>
@@ -535,7 +536,7 @@ export function LibraryWorkspace({
                   disabled={allVisibleSelected}
                   className="flex h-8 items-center gap-1.5 rounded-full bg-muted/70 px-3 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground disabled:opacity-40 active:scale-95"
                 >
-                  <CheckCheck className="size-3.5" />
+                  <ListChecks className="size-3.5" strokeWidth={2.5} />
                   <span>All</span>
                 </button>
 
@@ -544,7 +545,7 @@ export function LibraryWorkspace({
                   onClick={chatWithSelected}
                   className="flex h-8 items-center gap-1.5 rounded-full bg-foreground px-4 text-xs font-semibold text-background shadow-sm transition-all hover:bg-foreground/90 active:scale-95"
                 >
-                  <MessageCircle className="size-3.5" />
+                  <MessageCircle className="size-3.5" strokeWidth={2.5} />
                   <span>Chat</span>
                 </button>
 
@@ -554,7 +555,7 @@ export function LibraryWorkspace({
                   className="flex size-8 items-center justify-center rounded-full bg-muted/70 text-muted-foreground transition-all hover:bg-destructive/10 hover:text-destructive active:scale-95"
                   aria-label="Remove selected"
                 >
-                  <Trash2 className="size-4" />
+                  <Trash2 className="size-4" strokeWidth={2.5} />
                 </button>
               </div>
             </div>
@@ -596,7 +597,7 @@ export function LibraryWorkspace({
                       className="flex h-11 w-11 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
                       aria-label="Select all visible files"
                     >
-                      <CheckCheck className="size-4.5" />
+                      <ListChecks className="size-4.5" strokeWidth={2.5} />
                     </button>
                   </TooltipTrigger>
                   <TooltipContent side="left">Select all</TooltipContent>
@@ -610,7 +611,7 @@ export function LibraryWorkspace({
                       className="flex h-11 w-11 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                       aria-label="Clear selection"
                     >
-                      <X className="size-4.5" />
+                      <ListX className="size-4.5" strokeWidth={2.5} />
                     </button>
                   </TooltipTrigger>
                   <TooltipContent side="left">Clear</TooltipContent>
@@ -624,7 +625,7 @@ export function LibraryWorkspace({
                       className="mt-0.5 flex h-11 w-11 items-center justify-center rounded-full bg-foreground text-background shadow-md transition-all hover:bg-foreground/90 active:scale-95"
                       aria-label="Chat with selected files"
                     >
-                      <MessageCircle className="size-5" />
+                      <MessageCircle className="size-5" strokeWidth={2.5} />
                     </button>
                   </TooltipTrigger>
                   <TooltipContent side="left">Chat</TooltipContent>
@@ -638,7 +639,7 @@ export function LibraryWorkspace({
                       className="flex h-11 w-11 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                       aria-label={removeActionLabel}
                     >
-                      <Trash2 className="size-4.5" />
+                      <Trash2 className="size-4.5" strokeWidth={2.5} />
                     </button>
                   </TooltipTrigger>
                   <TooltipContent side="left">
