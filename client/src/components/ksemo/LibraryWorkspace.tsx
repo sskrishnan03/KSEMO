@@ -506,56 +506,83 @@ export function LibraryWorkspace({
 
         {selectedFiles.length > 0 && (
           <>
-            {/* Mobile Selection Toolbar: Decent bottom-fixed action bar */}
+{/* Mobile Selection Toolbar: same dock design as desktop,
+                centered horizontally at the bottom */}
             <div
-              className="fixed bottom-0 inset-x-0 z-40 flex sm:hidden items-center justify-between gap-2 border-t border-border/80 bg-card/95 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-2xl backdrop-blur-xl animate-in slide-in-from-bottom-5 duration-200 select-none"
+              className="fixed bottom-0 inset-x-0 z-40 flex justify-center px-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:hidden select-none animate-in slide-in-from-bottom-5 duration-200"
               aria-label="Selected Library actions"
             >
-              <div className="flex items-center gap-2 min-w-0">
-                <div className="flex h-8 shrink-0 items-center gap-1.5 rounded-xl bg-foreground px-3 text-background shadow-xs">
-                  <CheckCircle2 className="size-3.5" />
-                  <span className="text-xs font-bold tabular-nums">
+              <div className="flex flex-row items-center gap-1.5 rounded-[1.25rem] border border-border/80 bg-card/95 p-2 shadow-2xl shadow-black/10 backdrop-blur-xl">
+                <div
+                  className="flex h-11 w-11 cursor-default flex-col items-center justify-center gap-0.5 rounded-xl bg-foreground text-background shadow-md"
+                  aria-label={`${selectedFiles.length} selected`}
+                >
+                  <CheckCircle2 className="size-4.5" />
+                  <span className="text-[11px] font-bold leading-none tabular-nums">
                     {selectedFiles.length}
                   </span>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setSelectedIds(new Set())}
-                  className="flex h-8 items-center gap-1.5 rounded-xl bg-neutral-900 px-3 text-xs font-medium text-neutral-50 transition-colors hover:bg-neutral-800 active:scale-95"
-                >
-                  <X className="size-4" strokeWidth={2.75} />
-                  <span>Clear</span>
-                </button>
-              </div>
 
-              <div className="flex items-center gap-1.5 shrink-0">
-                <button
-                  type="button"
-                  onClick={selectVisibleFiles}
-                  disabled={allVisibleSelected}
-                  className="flex h-8 items-center gap-1.5 rounded-xl bg-neutral-900 px-3 text-xs font-medium text-neutral-50 transition-colors hover:bg-neutral-800 disabled:opacity-40 active:scale-95"
-                >
-                  <ListChecks className="size-3.5" strokeWidth={2.5} />
-                  <span>All</span>
-                </button>
+                <div className="h-7 w-px bg-border" aria-hidden />
 
-                <button
-                  type="button"
-                  onClick={chatWithSelected}
-                  className="flex h-8 items-center gap-1.5 rounded-xl bg-foreground px-4 text-xs font-semibold text-background shadow-sm transition-all hover:bg-foreground/90 active:scale-95"
-                >
-                  <MessageCircle className="size-3.5" strokeWidth={2.5} />
-                  <span>Chat</span>
-                </button>
-
-                <button
-                  type="button"
-onClick={() => setDeleteTarget(selectedFiles)}
-                      className="flex size-8 items-center justify-center rounded-xl bg-neutral-900 text-destructive transition-all hover:bg-neutral-800 active:scale-95"
-                      aria-label="Remove selected"
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={selectVisibleFiles}
+                      disabled={allVisibleSelected}
+                      className="flex h-11 w-11 items-center justify-center rounded-xl bg-neutral-900 text-neutral-50 transition-colors hover:bg-neutral-800 disabled:pointer-events-none disabled:opacity-40"
+                      aria-label="Select all visible files"
                     >
-                      <Trash2 className="size-4" strokeWidth={2.5} />
+                      <ListChecks className="size-4.5" strokeWidth={2.5} />
                     </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">Select all</TooltipContent>
+                </Tooltip>
+
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedIds(new Set())}
+                      className="flex h-11 w-11 items-center justify-center rounded-xl bg-neutral-900 text-neutral-50 transition-colors hover:bg-neutral-800"
+                      aria-label="Clear selection"
+                    >
+                      <X className="size-4.5" strokeWidth={2.75} />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">Clear</TooltipContent>
+                </Tooltip>
+
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={chatWithSelected}
+                      className="flex h-11 w-11 items-center justify-center rounded-xl bg-foreground text-background shadow-md transition-all hover:bg-foreground/90 active:scale-95"
+                      aria-label="Chat with selected files"
+                    >
+                      <MessageCircle className="size-5" strokeWidth={2.5} />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">Chat</TooltipContent>
+                </Tooltip>
+
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={() => setDeleteTarget(selectedFiles)}
+                      className="flex h-11 w-11 items-center justify-center rounded-xl bg-neutral-900 text-destructive transition-colors hover:bg-neutral-800"
+                      aria-label={removeActionLabel}
+                    >
+                      <Trash2 className="size-4.5" strokeWidth={2.5} />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    {removeActionLabel}
+                  </TooltipContent>
+                </Tooltip>
               </div>
             </div>
 
