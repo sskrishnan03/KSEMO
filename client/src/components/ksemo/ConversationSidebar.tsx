@@ -779,7 +779,7 @@ export const ConversationActionsMenuItems = memo(
             <DropdownMenuSubContent
               sideOffset={6}
               collisionPadding={12}
-              className="w-40 rounded-xl"
+              className="w-auto min-w-[8rem] rounded-xl"
             >
               <DropdownMenuItem onClick={() => onExport(conversation, "pdf")}>
                 <PdfFileIcon className="mr-2 size-5" />
