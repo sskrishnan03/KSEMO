@@ -701,9 +701,9 @@ export const ConversationActionsMenu = memo(function ConversationActionsMenu({
         sideOffset={4}
         collisionPadding={isMobile ? 12 : 8}
         className={cn(
-          "w-40 rounded-xl",
+          "w-auto min-w-40 whitespace-nowrap rounded-xl",
           isMobile &&
-            "max-h-[calc(100dvh-2rem)] max-w-[calc(100vw-1.5rem)] overflow-y-auto shadow-xl"
+            "max-h-[calc(100dvh-2rem)] max-w-[calc(100vw-1.5rem)] overflow-y-auto overflow-x-visible shadow-xl"
         )}
       >
         <ConversationActionsMenuItems
