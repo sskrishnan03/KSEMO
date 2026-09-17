@@ -533,7 +533,7 @@ export function LibraryWorkspace({
                   type="button"
                   onClick={selectVisibleFiles}
                   disabled={allVisibleSelected}
-                  className="flex h-8 items-center gap-1.5 rounded-full bg-muted/70 px-3 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground disabled:opacity-40 active:scale-95"
+                  className="flex h-8 items-center gap-1.5 rounded-full bg-neutral-900 px-3 text-xs font-medium text-neutral-50 transition-colors hover:bg-neutral-800 disabled:opacity-40 active:scale-95"
                 >
                   <ListChecks className="size-3.5" strokeWidth={2.5} />
                   <span>All</span>
@@ -550,12 +550,12 @@ export function LibraryWorkspace({
 
                 <button
                   type="button"
-                  onClick={() => setDeleteTarget(selectedFiles)}
-                  className="flex size-8 items-center justify-center rounded-full bg-muted/70 text-muted-foreground transition-all hover:bg-destructive/10 hover:text-destructive active:scale-95"
-                  aria-label="Remove selected"
-                >
-                  <Trash2 className="size-4" strokeWidth={2.5} />
-                </button>
+onClick={() => setDeleteTarget(selectedFiles)}
+                      className="flex size-8 items-center justify-center rounded-full bg-neutral-900 text-destructive transition-all hover:bg-neutral-800 active:scale-95"
+                      aria-label="Remove selected"
+                    >
+                      <Trash2 className="size-4" strokeWidth={2.5} />
+                    </button>
               </div>
             </div>
 
@@ -593,7 +593,7 @@ export function LibraryWorkspace({
                       type="button"
                       onClick={selectVisibleFiles}
                       disabled={allVisibleSelected}
-                      className="flex h-11 w-11 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
+                      className="flex h-11 w-11 items-center justify-center rounded-full bg-neutral-900 text-neutral-50 transition-colors hover:bg-neutral-800 disabled:pointer-events-none disabled:opacity-40"
                       aria-label="Select all visible files"
                     >
                       <ListChecks className="size-4.5" strokeWidth={2.5} />
@@ -607,7 +607,7 @@ export function LibraryWorkspace({
                     <button
                       type="button"
                       onClick={() => setSelectedIds(new Set())}
-                      className="flex h-11 w-11 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                      className="flex h-11 w-11 items-center justify-center rounded-full bg-neutral-900 text-neutral-50 transition-colors hover:bg-neutral-800"
                       aria-label="Clear selection"
                     >
                       <X className="size-4.5" strokeWidth={2.75} />
@@ -635,7 +635,7 @@ export function LibraryWorkspace({
                     <button
                       type="button"
                       onClick={() => setDeleteTarget(selectedFiles)}
-                      className="flex h-11 w-11 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                      className="flex h-11 w-11 items-center justify-center rounded-full bg-neutral-900 text-destructive transition-colors hover:bg-neutral-800"
                       aria-label={removeActionLabel}
                     >
                       <Trash2 className="size-4.5" strokeWidth={2.5} />
