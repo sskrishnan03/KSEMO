@@ -701,7 +701,7 @@ export const ConversationActionsMenu = memo(function ConversationActionsMenu({
         sideOffset={4}
         collisionPadding={isMobile ? 12 : 8}
         className={cn(
-          "w-44 rounded-xl",
+          "w-40 rounded-xl",
           isMobile &&
             "max-h-[calc(100dvh-2rem)] max-w-[calc(100vw-1.5rem)] overflow-y-auto shadow-xl"
         )}
@@ -779,7 +779,7 @@ export const ConversationActionsMenuItems = memo(
             <DropdownMenuSubContent
               sideOffset={6}
               collisionPadding={12}
-              className="w-44 rounded-xl"
+              className="w-40 rounded-xl"
             >
               <DropdownMenuItem onClick={() => onExport(conversation, "pdf")}>
                 <PdfFileIcon className="mr-2 size-5" />

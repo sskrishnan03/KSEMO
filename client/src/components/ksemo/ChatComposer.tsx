@@ -630,9 +630,10 @@ export const ChatComposer = memo(function ChatComposer({
         className={cn(
           "relative rounded-[20px] border border-border bg-popover p-1.5 shadow-sm text-popover-foreground",
           // Temporary "incognito" mode: no hard border line at all; only a
-          // soft white glow hugs the edge of the box.
+          // soft glow hugs the edge of the box. The glow adapts to the theme —
+          // dark in light mode so it stays visible, white in dark mode.
           temporary &&
-            "border-transparent shadow-[0_0_12px_3px_rgba(255,255,255,0.14)]"
+            "border-transparent shadow-[0_0_12px_3px_rgba(0,0,0,0.16)] dark:shadow-[0_0_12px_3px_rgba(255,255,255,0.14)]"
         )}
       >
         {isDragActive && (
