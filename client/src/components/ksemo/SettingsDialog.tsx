@@ -34,6 +34,7 @@ import {
   ArchiveRestore,
   Brain,
   Bug,
+  CalendarDays,
   Check,
   Copy,
   ExternalLink,
@@ -42,6 +43,7 @@ import {
   Lightbulb,
   Link2,
   LogOut,
+  Mail,
   MessageSquare,
   Palette,
   Search,
@@ -633,6 +635,15 @@ function AccountSection({
       })
     : "—";
 
+  const signInMethod =
+    user.loginMethod === "google"
+      ? "Google"
+      : user.loginMethod === "password" || user.loginMethod === "email"
+        ? "Email and password"
+        : "Password";
+
+  const displayName = name.trim() || user.name || "KSEMO user";
+
   return (
     <div className="space-y-4">
       <div>
@@ -644,70 +655,109 @@ function AccountSection({
         </p>
       </div>
 
-      <div className="flex items-center gap-3.5 rounded-xl border border-border p-4">
-        <div className="flex size-11 items-center justify-center rounded-xl bg-muted text-sm font-bold">
-          {(name.trim() || user.name || "U").charAt(0).toUpperCase()}
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold">
-            {name.trim() || "KSEMO user"}
-          </p>
-          <p className="mt-0.5 truncate text-xs text-muted-foreground">
-            {user.email || "Signed in"}
-          </p>
-        </div>
-      </div>
-
-      <div className="space-y-4">
-        <div className="space-y-1.5">
-          <Label htmlFor="account-full-name" className="text-xs">
-            Full name
-          </Label>
+      <div className="space-y-2">
+        {/* Full name */}
+        <div className="rounded-xl border border-border p-4">
+          <div className="flex items-center gap-3">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-foreground text-sm font-bold text-background">
+              {displayName.charAt(0).toUpperCase()}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium">Full name</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Represents you across KSEMO
+              </p>
+            </div>
+          </div>
           <Input
             id="account-full-name"
             value={name}
             maxLength={120}
             onChange={e => setName(e.target.value)}
             placeholder="Your name"
-            className="h-9 rounded-lg text-sm"
+            className="mt-3 h-9 rounded-lg text-sm"
           />
-          <p className="text-[11px] text-muted-foreground">
-            {saveState === "saving"
-              ? "Saving…"
-              : saveState === "saved"
-                ? "Saved"
-                : "Represents you across KSEMO"}
+          <p className="mt-1.5 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+            {saveState === "saving" ? (
+              <>
+                <Zap className="size-3" />
+                Saving…
+              </>
+            ) : saveState === "saved" ? (
+              <>
+                <Check className="size-3 text-emerald-600 dark:text-emerald-400" />
+                Saved
+              </>
+            ) : (
+              "Enter your name to update it"
+            )}
           </p>
         </div>
 
-        <div className="space-y-1.5">
-          <Label className="text-xs">Email</Label>
-          <p className="truncate text-sm font-medium text-foreground">
-            {user.email || "—"}
-          </p>
+        {/* Email */}
+        <div className="rounded-xl border border-border p-4">
+          <div className="flex items-center gap-3">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted">
+              <Mail className="size-4 text-muted-foreground" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium">Email</p>
+              <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                {user.email || "—"}
+              </p>
+            </div>
+          </div>
         </div>
 
-        <div className="space-y-1.5">
-          <Label className="text-xs">Account created</Label>
-          <p className="text-sm font-medium text-foreground">{createdLabel}</p>
+        {/* Account created */}
+        <div className="rounded-xl border border-border p-4">
+          <div className="flex items-center gap-3">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted">
+              <CalendarDays className="size-4 text-muted-foreground" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium">Account created</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {createdLabel}
+              </p>
+            </div>
+          </div>
         </div>
-      </div>
 
-      <div className="flex w-full items-center justify-between gap-3 rounded-xl border border-destructive/30 bg-destructive/5 p-3.5">
-        <div className="min-w-0">
-          <p className="text-sm font-medium text-destructive">Delete account</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            Removes your account and all associated data
-          </p>
+        {/* Sign-in method */}
+        <div className="rounded-xl border border-border p-4">
+          <div className="flex items-center gap-3">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted">
+              <KeyRound className="size-4 text-muted-foreground" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium">Sign-in method</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {signInMethod}
+              </p>
+            </div>
+          </div>
         </div>
-        <button
-          type="button"
-          disabled={deleteBusy}
-          onClick={onDeleteAccount}
-          className="shrink-0 inline-flex items-center rounded-lg bg-destructive px-3 py-1.5 text-[11px] font-semibold text-destructive-foreground transition-opacity hover:opacity-90 disabled:pointer-events-none disabled:opacity-60"
-        >
-          {deleteBusy ? "Deleting…" : "Delete Account"}
-        </button>
+
+        {/* Delete account */}
+        <div className="flex w-full items-center justify-between gap-3 rounded-xl border border-destructive/30 bg-destructive/5 p-3.5">
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-destructive">
+              Delete account
+            </p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Removes your account and all associated data
+            </p>
+          </div>
+          <button
+            type="button"
+            disabled={deleteBusy}
+            onClick={onDeleteAccount}
+            className="shrink-0 inline-flex items-center rounded-lg bg-destructive px-3 py-1.5 text-[11px] font-semibold text-destructive-foreground transition-opacity hover:opacity-90 disabled:pointer-events-none disabled:opacity-60"
+          >
+            {deleteBusy ? "Deleting…" : "Delete Account"}
+          </button>
+        </div>
       </div>
     </div>
   );
