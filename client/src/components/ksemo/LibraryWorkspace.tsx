@@ -512,7 +512,7 @@ export function LibraryWorkspace({
               aria-label="Selected Library actions"
             >
               <div className="flex items-center gap-2 min-w-0">
-                <div className="flex h-8 shrink-0 items-center gap-1.5 rounded-full bg-foreground px-3 text-background shadow-xs">
+                <div className="flex h-8 shrink-0 items-center gap-1.5 rounded-xl bg-foreground px-3 text-background shadow-xs">
                   <CheckCircle2 className="size-3.5" />
                   <span className="text-xs font-bold tabular-nums">
                     {selectedFiles.length}
@@ -521,7 +521,7 @@ export function LibraryWorkspace({
                 <button
                   type="button"
                   onClick={() => setSelectedIds(new Set())}
-                  className="flex h-8 items-center gap-1.5 rounded-full bg-muted/70 px-3 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground active:scale-95"
+                  className="flex h-8 items-center gap-1.5 rounded-xl bg-neutral-900 px-3 text-xs font-medium text-neutral-50 transition-colors hover:bg-neutral-800 active:scale-95"
                 >
                   <X className="size-4" strokeWidth={2.75} />
                   <span>Clear</span>
@@ -533,7 +533,7 @@ export function LibraryWorkspace({
                   type="button"
                   onClick={selectVisibleFiles}
                   disabled={allVisibleSelected}
-                  className="flex h-8 items-center gap-1.5 rounded-full bg-neutral-900 px-3 text-xs font-medium text-neutral-50 transition-colors hover:bg-neutral-800 disabled:opacity-40 active:scale-95"
+                  className="flex h-8 items-center gap-1.5 rounded-xl bg-neutral-900 px-3 text-xs font-medium text-neutral-50 transition-colors hover:bg-neutral-800 disabled:opacity-40 active:scale-95"
                 >
                   <ListChecks className="size-3.5" strokeWidth={2.5} />
                   <span>All</span>
@@ -542,7 +542,7 @@ export function LibraryWorkspace({
                 <button
                   type="button"
                   onClick={chatWithSelected}
-                  className="flex h-8 items-center gap-1.5 rounded-full bg-foreground px-4 text-xs font-semibold text-background shadow-sm transition-all hover:bg-foreground/90 active:scale-95"
+                  className="flex h-8 items-center gap-1.5 rounded-xl bg-foreground px-4 text-xs font-semibold text-background shadow-sm transition-all hover:bg-foreground/90 active:scale-95"
                 >
                   <MessageCircle className="size-3.5" strokeWidth={2.5} />
                   <span>Chat</span>
@@ -551,7 +551,7 @@ export function LibraryWorkspace({
                 <button
                   type="button"
 onClick={() => setDeleteTarget(selectedFiles)}
-                      className="flex size-8 items-center justify-center rounded-full bg-neutral-900 text-destructive transition-all hover:bg-neutral-800 active:scale-95"
+                      className="flex size-8 items-center justify-center rounded-xl bg-neutral-900 text-destructive transition-all hover:bg-neutral-800 active:scale-95"
                       aria-label="Remove selected"
                     >
                       <Trash2 className="size-4" strokeWidth={2.5} />
@@ -566,11 +566,11 @@ onClick={() => setDeleteTarget(selectedFiles)}
               aria-label="Selected Library actions"
               className="fixed right-4 top-1/2 z-50 hidden -translate-y-1/2 select-none animate-in slide-in-from-right-8 fade-in-0 duration-300 ease-out sm:block"
             >
-              <div className="flex flex-col items-center gap-1.5 rounded-[1.875rem] border border-border/80 bg-card/95 p-2 shadow-2xl shadow-black/10 backdrop-blur-xl">
+              <div className="flex flex-col items-center gap-1.5 rounded-[1.25rem] border border-border/80 bg-card/95 p-2 shadow-2xl shadow-black/10 backdrop-blur-xl">
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <div
-                      className="flex h-11 w-11 cursor-default flex-col items-center justify-center gap-0.5 rounded-full bg-foreground text-background shadow-md"
+                      className="flex h-11 w-11 cursor-default flex-col items-center justify-center gap-0.5 rounded-xl bg-foreground text-background shadow-md"
                       aria-label={`${selectedFiles.length} selected`}
                     >
                       <CheckCircle2 className="size-4.5" />
@@ -593,7 +593,7 @@ onClick={() => setDeleteTarget(selectedFiles)}
                       type="button"
                       onClick={selectVisibleFiles}
                       disabled={allVisibleSelected}
-                      className="flex h-11 w-11 items-center justify-center rounded-full bg-neutral-900 text-neutral-50 transition-colors hover:bg-neutral-800 disabled:pointer-events-none disabled:opacity-40"
+                      className="flex h-11 w-11 items-center justify-center rounded-xl bg-neutral-900 text-neutral-50 transition-colors hover:bg-neutral-800 disabled:pointer-events-none disabled:opacity-40"
                       aria-label="Select all visible files"
                     >
                       <ListChecks className="size-4.5" strokeWidth={2.5} />
@@ -607,7 +607,7 @@ onClick={() => setDeleteTarget(selectedFiles)}
                     <button
                       type="button"
                       onClick={() => setSelectedIds(new Set())}
-                      className="flex h-11 w-11 items-center justify-center rounded-full bg-neutral-900 text-neutral-50 transition-colors hover:bg-neutral-800"
+                      className="flex h-11 w-11 items-center justify-center rounded-xl bg-neutral-900 text-neutral-50 transition-colors hover:bg-neutral-800"
                       aria-label="Clear selection"
                     >
                       <X className="size-4.5" strokeWidth={2.75} />
@@ -621,7 +621,7 @@ onClick={() => setDeleteTarget(selectedFiles)}
                     <button
                       type="button"
                       onClick={chatWithSelected}
-                      className="mt-0.5 flex h-11 w-11 items-center justify-center rounded-full bg-foreground text-background shadow-md transition-all hover:bg-foreground/90 active:scale-95"
+                      className="mt-0.5 flex h-11 w-11 items-center justify-center rounded-xl bg-foreground text-background shadow-md transition-all hover:bg-foreground/90 active:scale-95"
                       aria-label="Chat with selected files"
                     >
                       <MessageCircle className="size-5" strokeWidth={2.5} />
@@ -635,7 +635,7 @@ onClick={() => setDeleteTarget(selectedFiles)}
                     <button
                       type="button"
                       onClick={() => setDeleteTarget(selectedFiles)}
-                      className="flex h-11 w-11 items-center justify-center rounded-full bg-neutral-900 text-destructive transition-colors hover:bg-neutral-800"
+                      className="flex h-11 w-11 items-center justify-center rounded-xl bg-neutral-900 text-destructive transition-colors hover:bg-neutral-800"
                       aria-label={removeActionLabel}
                     >
                       <Trash2 className="size-4.5" strokeWidth={2.5} />
