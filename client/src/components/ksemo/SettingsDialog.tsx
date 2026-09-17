@@ -1459,7 +1459,9 @@ function FeedbackSection() {
                 return (
                   <button
                     key={cat.id}
-                    onClick={() => setCategory(cat.id)}
+                    onClick={() =>
+                      setCategory(prev => (prev === cat.id ? "" : cat.id))
+                    }
                     className={`flex items-center gap-2 rounded-xl border p-2.5 text-left text-sm transition-colors ${
                       active
                         ? "border-transparent bg-accent font-medium text-foreground"
