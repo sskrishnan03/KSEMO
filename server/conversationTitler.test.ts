@@ -128,6 +128,16 @@ describe("conversationTitler", () => {
       expect(title).toBe("How to Build a Flight Booking Ticket System");
     });
 
+    it("titles pure greetings and small talk meaningfully instead of repeating the text", () => {
+      expect(createInitialTitle("hi")).toBe("Greeting");
+      expect(createInitialTitle("hello there")).toBe("Greeting");
+      expect(createInitialTitle("thank you")).toBe("Thank You");
+      expect(createInitialTitle("goodbye")).toBe("Farewell");
+      expect(createInitialTitle("ok")).toBe("Acknowledgment");
+      expect(createInitialTitle("how are you")).toBe("Checking In");
+      expect(createFallbackTitle("hi", "Hello! How can I help?")).toBe("Greeting");
+    });
+
     it("falls back to heuristic topic extraction on long queries", () => {
       const fallback = createFallbackTitle(
         "I need help with how to partition a 22x12 retail store into fitting rooms and cash wrap",

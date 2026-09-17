@@ -211,11 +211,60 @@ export async function generateAiConversationTitle(options: {
 }
 
 /**
+ * Detects pure small-talk messages (greetings, thanks, goodbyes, etc.) and
+ * returns a short meaningful title instead of repeating the raw text (e.g.
+ * "hi" should title a conversation as "Greeting", not "Hi").
+ */
+const SMALL_TALK_TITLES: Array<{ pattern: RegExp; title: string }> = [
+  {
+    pattern:
+      /^(hi+|hello|hey+|yo+|hiya|howdy|wassup|what'?s\s+up|sup|good\s+(morning|afternoon|evening|day)|greetings|namaste|hey\s+there|hello\s+there)\b/,
+    title: "Greeting",
+  },
+  {
+    pattern: /^(thank\s*(you|u)?\s*(so\s+much)?|thanks|thx|ty|tysm)\b/,
+    title: "Thank You",
+  },
+  {
+    pattern:
+      /^(bye+|goodbye|good\s+night|see\s+you|see\s+ya|cya|later|farewell|take\s+care)\b/,
+    title: "Farewell",
+  },
+  {
+    pattern:
+      /^(ok+|okay|alright|all\s+right|sure|fine|cool|got\s+it|roger(?!\s+that$)|no\s+problem|nps)\b/,
+    title: "Acknowledgment",
+  },
+  {
+    pattern:
+      /^(who\s+are\s+you|what\s+are\s+you|what'?s\s+your\s+name|tell\s+me\s+about\s+yourself|introduce\s+yourself)\b/,
+    title: "About KSEMO",
+  },
+  {
+    pattern:
+      /^(how\s+are\s+you|how'?s\s+it\s+going|how\s+are\s+things|how\s+are\s+you\s+doing|you\s+good|how\s+is\s+everything)\b/,
+    title: "Checking In",
+  },
+];
+
+export function detectSmallTalkTitle(content: string): string | null {
+  const text = (content ?? "").replace(/\s+/g, " ").trim().toLowerCase();
+  if (!text) return null;
+  for (const { pattern, title } of SMALL_TALK_TITLES) {
+    if (pattern.test(text)) return title;
+  }
+  return null;
+}
+
+/**
  * Quick title generation for initial conversation creation (before assistant responds).
  */
 export function createInitialTitle(content: string): string {
   const cleaned = content.replace(/\s+/g, " ").trim();
   if (!cleaned) return "New conversation";
+
+  const smallTalk = detectSmallTalkTitle(cleaned);
+  if (smallTalk) return smallTalk;
 
   if (cleaned.length <= 60) {
     return toTitleCase(cleaned.slice(0, 120));
@@ -238,6 +287,9 @@ export function createInitialTitle(content: string): string {
 export function createFallbackTitle(userContent: string, assistantContent?: string): string {
   const cleanedUser = userContent.replace(/\s+/g, " ").trim();
   if (!cleanedUser) return "New conversation";
+
+  const smallTalk = detectSmallTalkTitle(cleanedUser);
+  if (smallTalk) return smallTalk;
 
   if (cleanedUser.length <= 50) {
     return toTitleCase(cleanedUser.slice(0, 120));
