@@ -2834,11 +2834,11 @@ export default function Home() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="size-8 rounded-md text-muted-foreground hover:bg-accent hover:text-foreground data-[state=open]:bg-accent data-[state=open]:opacity-100"
+                      className="size-9 rounded-lg bg-neutral-900 text-neutral-50 hover:bg-neutral-800"
                       aria-label="Chat actions"
                     >
                       <MoreHorizontal
-                        className="size-4"
+                        className="size-4.5"
                         strokeWidth={2.75}
                         fill="currentColor"
                       />
