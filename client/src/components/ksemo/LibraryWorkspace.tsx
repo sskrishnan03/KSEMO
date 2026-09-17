@@ -30,7 +30,6 @@ import {
   Library,
   List,
   ListChecks,
-  ListX,
   MessageCircle,
   MoreVertical,
   Pencil,
@@ -524,7 +523,7 @@ export function LibraryWorkspace({
                   onClick={() => setSelectedIds(new Set())}
                   className="flex h-8 items-center gap-1.5 rounded-full bg-muted/70 px-3 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground active:scale-95"
                 >
-                  <ListX className="size-3.5" strokeWidth={2.5} />
+                  <X className="size-4" strokeWidth={2.75} />
                   <span>Clear</span>
                 </button>
               </div>
@@ -611,7 +610,7 @@ export function LibraryWorkspace({
                       className="flex h-11 w-11 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                       aria-label="Clear selection"
                     >
-                      <ListX className="size-4.5" strokeWidth={2.5} />
+                      <X className="size-4.5" strokeWidth={2.75} />
                     </button>
                   </TooltipTrigger>
                   <TooltipContent side="left">Clear</TooltipContent>
