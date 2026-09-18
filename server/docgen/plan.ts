@@ -415,13 +415,35 @@ export async function planDocument(
       if (opts?.visualStyle) {
         const styleName = opts.visualStyle.toUpperCase();
         systemContent += `\n\nAUTHORITATIVE PRESENTATION STYLE: ${styleName}.
+
+NARRATIVE STRUCTURE (apply to every deck regardless of style):
+Walk the audience through a coherent story — never a random list of slides. Follow this arc:
+1. TITLE — a strong, specific title and subtitle that frame the topic.
+2. CONTEXT — why this topic matters now (background, market, problem statement).
+3. CONTENT — the substance: key concepts, mechanisms, evidence, cases. Use focused detail.
+4. ANALYSIS / INSIGHTS — comparisons, metrics, implications. Let the numbers tell the story.
+5. CONCLUSION — key takeaways, next steps, or a call to action.
+Choose slide layouts that match this arc (title -> agenda -> content -> data/comparison -> closing). Never include page numbers, slide counters, "Slide N", "Page N", or the file name in any slide text.
+
 You MUST tailor slide content, tone, layouts, and data storytelling directly to this visual style:
-- Minimal: Crisp, punchy statements, high signal-to-noise ratio, focused single ideas per slide, avoid clutter.
-- Tech / Futuristic: Precise technical terminology, system architecture blocks, telemetry/metrics, quantitative benchmarks.
-- Consultant: Clear executive takeaways, problem-solution-impact structure, scorecard metrics, strategic frameworks.
-- Editorial / Academic: Thoughtful narrative flow, deep context, clear citations, analytical depth.
-- Bold / Cinematic: Punchy dramatic headlines, high-impact numbers, decisive calls-to-action.
-Produce substantive, authentic slides reflecting this design archetype.`;
+- Minimal: Crisp, punchy statements; one focused idea per slide; generous whitespace; high signal-to-noise ratio; avoid clutter; short bullets (under 8 words each).
+- Modern: Clean, forward-looking tone; distinct sections with a rhythm of statements, compact bullet groups, and metric highlights; optimistic and conversational but professional.
+- Corporate: Executive-grade tone; clear problem-solution-impact; scorecards, benchmarks, responsibility framing, ROI and readiness metrics; serious, measured language.
+- Editorial: Thoughtful narrative flow; long-form analysis with rich sub-points, context, and nuance; magazine-style storytelling; detailed but structured bullets.
+- Bold: Punchy, dramatic headlines; high-impact numbers; decisive statements and calls-to-action; fewer but stronger points; imperative tone.
+- Elegant: Sophisticated, refined language; polished framing with considered wording; restrained bullet count; graceful headings; premium tone.
+- Creative: Playful, energetic prose; vivid metaphors; memorable framing; slightly unconventional structure; expressive labels and punchy copy.
+- Dark: Dramatic, high-contrast storytelling; emphasis on deep context, striking statistics, and confident declarations; sleek and modern tone.
+- Light: Airy, optimistic, accessible tone; clear simple structure; friendly explanations; approachable framing for general audiences.
+- Glass: Contemporary, translucent feel; layered concepts (foreground/background); clear tiers of information; modern tech-leaning tone.
+- Academic: Rigorous, citation-ready; formal definitions, methodology, evidence, and references; analytical depth; precise terminology.
+- Technical: Precise technical terminology; system architecture blocks; telemetry/metrics; quantitative benchmarks; implementation details.
+- Luxury: Prestigious, understated tone; exclusive high-value framing; refined statistics; premium brand messaging with restraint.
+- Startup: Energetic, product-led; problem-solution-validation framing; traction metrics, growth numbers, and crisp value propositions.
+- Magazine: Feature-article tone; bold pull-quotes; human-interest framing; vivid details; structured feature sections with striking copy.
+- Data: Data-first storytelling; every claim backed by metrics; comparisons, distributions, and quantified insights; analytical and evidence-led.
+- Presentation: Balanced, all-purpose professional; clear structure; confident summaries; adaptable tone that makes complex topics easy to grasp.
+Produce substantive, authentic slides reflecting this design archetype. If "AUTO", pick the archetype that best matches the topic and state it implicitly in your content choices.`;
       }
     }
     const researchHint = research?.needed

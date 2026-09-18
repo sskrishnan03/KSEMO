@@ -31,63 +31,63 @@ export type PptSlidesConfig =
 
 export type PptConcreteStyle =
   | "minimal"
-  | "visual"
-  | "classic"
-  | "consultant"
-  | "editorial"
   | "modern"
+  | "corporate"
+  | "editorial"
   | "bold"
   | "elegant"
-  | "professional"
   | "creative"
-  | "tech"
-  | "cinematic"
-  | "playful"
-  | "luxury"
+  | "dark"
+  | "light"
+  | "glass"
   | "academic"
-  | "futuristic"
-  | "storytelling";
+  | "technical"
+  | "luxury"
+  | "startup"
+  | "magazine"
+  | "data"
+  | "presentation";
 
 export type PptVisualStyle =
   | "auto"
   | PptConcreteStyle
   // Backward compatibility with capitalized input
   | "Minimal"
-  | "Visual"
-  | "Classic"
-  | "Consultant"
-  | "Editorial"
   | "Modern"
+  | "Corporate"
+  | "Editorial"
   | "Bold"
   | "Elegant"
-  | "Professional"
   | "Creative"
-  | "Tech"
-  | "Cinematic"
-  | "Playful"
-  | "Luxury"
+  | "Dark"
+  | "Light"
+  | "Glass"
   | "Academic"
-  | "Futuristic"
-  | "Storytelling";
+  | "Technical"
+  | "Luxury"
+  | "Startup"
+  | "Magazine"
+  | "Data"
+  | "Presentation";
 
 export const PPT_CONCRETE_STYLES: readonly PptConcreteStyle[] = [
   "minimal",
-  "visual",
-  "classic",
-  "consultant",
-  "editorial",
   "modern",
+  "corporate",
+  "editorial",
   "bold",
   "elegant",
-  "professional",
   "creative",
-  "tech",
-  "cinematic",
-  "playful",
-  "luxury",
+  "dark",
+  "light",
+  "glass",
   "academic",
-  "futuristic",
-  "storytelling",
+  "technical",
+  "luxury",
+  "startup",
+  "magazine",
+  "data",
+  "presentation",
 ] as const;
 
 export const PPT_STYLE_OPTIONS: PptVisualStyle[] = [
@@ -245,6 +245,9 @@ export type PptElement =
       bullet?: boolean;
       letterSpacing?: number;
       opacity?: number;
+      /** Hard floor for overflow repair — the repairer must never shrink
+       *  below this size, keeping generated decks readable. */
+      minFontSize?: number;
     }
   | {
       kind: "shape";

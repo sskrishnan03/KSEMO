@@ -113,11 +113,22 @@ export function truncateTo(text: string, maxChars: number): string {
 }
 
 export const PROFESSIONAL_MIN_FONT = {
-  title: 20,
+  /** Hero / title slide display type. */
+  display: 24,
+  /** Content slide main heading. */
+  title: 22,
+  /** In-slide section heading (column titles, block headers). */
   subtitle: 13,
-  body: 11,
-  caption: 9,
-  stat: 20,
+  /** Body text. */
+  body: 12,
+  /** Big statistic / number. */
+  stat: 24,
+  /** Supporting / secondary text. */
+  small: 11,
+  /** Kicker / eyebrow labels. */
+  caption: 10,
+  /** Captions, references and footnotes. */
+  label: 10,
+  /** Table cell text. */
   table: 9,
-  label: 9,
 } as const;

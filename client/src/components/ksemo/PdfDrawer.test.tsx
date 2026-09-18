@@ -251,8 +251,8 @@ describe("PdfDrawer", () => {
       widthIn: 13.333,
       heightIn: 7.5,
       title: "Growth Report",
-      themeKey: "Classic",
-      style: "Classic",
+      themeKey: "corporate",
+      style: "Corporate",
       config: {
         slides: "auto",
         visualStyle: "auto",

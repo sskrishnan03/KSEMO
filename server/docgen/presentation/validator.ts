@@ -18,6 +18,7 @@ import {
   type PptPresentationSpec,
   type PptSlideSpec,
 } from "@shared/presentation";
+import { PROFESSIONAL_MIN_FONT } from "./textFit";
 
 export type Violation = {
   slideIndex: number;
@@ -153,8 +154,19 @@ export function repairSpec(
             return;
           }
           if (v.kind === "overflow" && el.kind === "text") {
-            const fixed = shrinkToFit(el.box, el.text, el.fontSize, el.lineSpacing ?? 1.15);
-            elements[v.elementIndex] = { ...el, fontSize: fixed, text: el.text };
+            const floor = el.minFontSize ?? PROFESSIONAL_MIN_FONT.body;
+            const fixed = shrinkToFit(
+              el.box,
+              el.text,
+              el.fontSize,
+              el.lineSpacing ?? 1.15,
+              floor
+            );
+            elements[v.elementIndex] = {
+              ...el,
+              fontSize: Math.max(fixed, floor),
+              text: el.text,
+            };
             repairs += 1;
             return;
           }
@@ -180,10 +192,12 @@ function shrinkToFit(
   box: { w: number; h: number },
   text: string,
   start: number,
-  lineSpacing: number
+  lineSpacing: number,
+  floor = 9
 ): number {
-  let size = Math.max(start, 20);
-  for (let f = Math.min(start, 20); f >= 6; f -= 0.5) {
+  let size = Math.max(start, floor);
+  if (floor > start) start = floor;
+  for (let f = start; f >= floor; f -= 0.5) {
     const est = estimateTextHeight({ text, fontSize: f, widthIn: box.w, lineSpacing });
     if (est <= box.h + HEIGHT_TOL) {
       size = f;
@@ -191,7 +205,7 @@ function shrinkToFit(
     }
     size = f;
   }
-  return Math.round(Math.max(size, 6) * 100) / 100;
+  return Math.round(Math.max(size, floor) * 100) / 100;
 }
 
 function clampBox(box: { x: number; y: number; w: number; h: number }) {

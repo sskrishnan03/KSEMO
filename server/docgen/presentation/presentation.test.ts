@@ -129,11 +129,11 @@ describe("presentation engine", () => {
       title: "Statement of Work",
       slides: sampleSlides(),
       config: DEFAULT_PRESENTATION_CONFIG,
-      styleName: "Cinematic",
+      styleName: "Dark",
       footerLabel: "KSEMO",
     });
-    expect(spec.style).toBe(VISUAL_THEMES["Cinematic"].name);
-    expect(spec.themeKey).toBe(VISUAL_THEMES["Cinematic"].key);
+    expect(spec.style).toBe(VISUAL_THEMES["Dark"].name);
+    expect(spec.themeKey).toBe(VISUAL_THEMES["Dark"].key);
     const colors = new Set(
       spec.slides.flatMap(s =>
         s.elements
@@ -142,13 +142,13 @@ describe("presentation engine", () => {
       )
     );
     const styleColors = [
-      VISUAL_THEMES["Cinematic"].primary,
-      VISUAL_THEMES["Cinematic"].secondary,
-      VISUAL_THEMES["Cinematic"].accent,
-      VISUAL_THEMES["Cinematic"].accent2,
-      VISUAL_THEMES["Cinematic"].text,
-      VISUAL_THEMES["Cinematic"].muted,
-      VISUAL_THEMES["Cinematic"].invertedText,
+      VISUAL_THEMES["Dark"].primary,
+      VISUAL_THEMES["Dark"].secondary,
+      VISUAL_THEMES["Dark"].accent,
+      VISUAL_THEMES["Dark"].accent2,
+      VISUAL_THEMES["Dark"].text,
+      VISUAL_THEMES["Dark"].muted,
+      VISUAL_THEMES["Dark"].invertedText,
     ];
     expect([...colors].some(c => styleColors.includes(c.toUpperCase()))).toBe(
       true
@@ -328,11 +328,11 @@ describe("presentation engine", () => {
       title: "Upper test",
       slides: sampleSlides(),
       config: DEFAULT_PRESENTATION_CONFIG,
-      styleName: "TECH" as any,
+      styleName: "TECHNICAL" as any,
       footerLabel: "KSEMO",
     });
-    expect(upper.spec.style).toBe("Tech");
-    expect(upper.spec.resolvedStyle).toBe("tech");
+    expect(upper.spec.style).toBe("Technical");
+    expect(upper.spec.resolvedStyle).toBe("technical");
   });
 
   it("generates distinct layouts and backgrounds across styles", () => {
@@ -342,26 +342,26 @@ describe("presentation engine", () => {
       config: DEFAULT_PRESENTATION_CONFIG,
       styleName: "minimal",
     });
-    const tech = buildDeckSpec({
-      title: "Tech Deck",
+    const technical = buildDeckSpec({
+      title: "Technical Deck",
       slides: sampleSlides(),
       config: DEFAULT_PRESENTATION_CONFIG,
-      styleName: "tech",
+      styleName: "technical",
     });
-    const cinematic = buildDeckSpec({
-      title: "Cinematic Deck",
+    const dark = buildDeckSpec({
+      title: "Dark Deck",
       slides: sampleSlides(),
       config: DEFAULT_PRESENTATION_CONFIG,
-      styleName: "cinematic",
+      styleName: "dark",
     });
 
-    // Minimal is light background, Cinematic is dark background
-    expect(minimal.spec.slides[0].background).not.toBe(cinematic.spec.slides[0].background);
-    expect(tech.spec.slides[0].background).toBe(VISUAL_THEMES["tech"].titleBackground);
+    // Minimal is light background, Dark is dark background
+    expect(minimal.spec.slides[0].background).not.toBe(dark.spec.slides[0].background);
+    expect(technical.spec.slides[0].background).toBe(VISUAL_THEMES["technical"].titleBackground);
     expect(minimal.spec.slides[0].background).toBe(VISUAL_THEMES["minimal"].titleBackground);
 
-    // Tech contains telemetry elements
-    const techTexts = tech.spec.slides.flatMap(s => s.elements.filter(e => e.kind === "text").map(e => (e as any).text));
-    expect(techTexts.some(t => t.includes("TELEMETRY") || t.includes("METRIC"))).toBe(true);
+    // Technical contains telemetry elements
+    const technicalTexts = technical.spec.slides.flatMap(s => s.elements.filter(e => e.kind === "text").map(e => (e as any).text));
+    expect(technicalTexts.some(t => t.includes("TELEMETRY") || t.includes("METRIC") || t.includes("SYSTEM"))).toBe(true);
   });
 });
