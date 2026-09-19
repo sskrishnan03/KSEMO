@@ -119,6 +119,19 @@ export type InsertConversation = Partial<
   userId: number;
 };
 
+export type MessageMetadata = {
+  // Optional presentation outline state persisted on assistant messages
+  // during the outline-before-PPT flow. See shared/presentationOutline.ts.
+  [key: string]: unknown;
+  pptOutline?: {
+    kind: string;
+    outline: unknown;
+    prompt: string;
+    updatedAt: string;
+    headerText: string;
+  };
+};
+
 export type Message = {
   id: string;
   conversationId: string;
@@ -126,6 +139,7 @@ export type Message = {
   content: string;
   model: string | null;
   status: "sending" | "streaming" | "completed" | "failed" | "cancelled";
+  metadata?: MessageMetadata | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -304,6 +318,7 @@ export type DbMessage = {
   content: string;
   model: string | null;
   status: "sending" | "streaming" | "completed" | "failed" | "cancelled";
+  metadata: unknown | null;
   created_at: string;
   updated_at: string;
 };
@@ -389,6 +404,10 @@ export function dbToMessage(db: DbMessage): Message {
     content: db.content,
     model: db.model,
     status: db.status,
+    metadata:
+      db.metadata && typeof db.metadata === "object"
+        ? (db.metadata as MessageMetadata)
+        : null,
     createdAt: new Date(db.created_at),
     updatedAt: new Date(db.updated_at),
   };
@@ -486,6 +505,7 @@ export function messageToDb(msg: Partial<Message>): Partial<DbMessage> {
   if (msg.content !== undefined) db.content = msg.content;
   if (msg.model !== undefined) db.model = msg.model;
   if (msg.status !== undefined) db.status = msg.status;
+  if (msg.metadata !== undefined) db.metadata = msg.metadata ?? null;
   if (msg.createdAt !== undefined) db.created_at = msg.createdAt.toISOString();
   if (msg.updatedAt !== undefined) db.updated_at = msg.updatedAt.toISOString();
   return db;

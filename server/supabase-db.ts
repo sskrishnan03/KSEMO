@@ -151,6 +151,29 @@ function isNotFound(error: unknown): boolean {
   return code === "PGRST116";
 }
 
+// Deployments created before the `metadata` column existed must keep working.
+// When Supabase reports that the column is missing from its schema cache we
+// stop sending it and warn once instead of failing every message write.
+let metadataColumnSupported = true;
+
+function isMissingMetadataColumn(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const code = (error as any).code;
+  const message = String((error as any).message ?? "").toLowerCase();
+  return code === "PGRST204" && message.includes("metadata");
+}
+
+function warnMetadataColumnMissing(): void {
+  if (!metadataColumnSupported) return;
+  metadataColumnSupported = false;
+  console.warn(
+    "[supabase-db] The `messages.metadata` column is missing from the database " +
+      "schema cache. Presentation outlines will not persist across refreshes " +
+      "until you run this migration in the Supabase SQL editor:\n" +
+      "  alter table public.messages add column if not exists metadata jsonb;"
+  );
+}
+
 function nowIso(): string {
   return new Date().toISOString();
 }
@@ -501,27 +524,41 @@ export async function createMessage(input: Message): Promise<Message> {
   if (useMemoryFallback()) {
     return inMemoryStore.createMessage(input);
   }
-  const { data, error } = await supabase
+  const payload: Record<string, any> = {
+    id: input.id,
+    conversation_id: input.conversationId,
+    role: input.role,
+    content: input.content,
+    model: input.model ?? null,
+    status: input.status,
+    created_at: input.createdAt.toISOString(),
+    updated_at: input.updatedAt.toISOString(),
+  };
+  const wantsMetadata = input.metadata !== undefined;
+  if (wantsMetadata && metadataColumnSupported) {
+    payload.metadata = input.metadata ?? null;
+  }
+  let { data, error } = await supabase
     .from("messages")
-    .insert({
-      id: input.id,
-      conversation_id: input.conversationId,
-      role: input.role,
-      content: input.content,
-      model: input.model ?? null,
-      status: input.status,
-      created_at: input.createdAt.toISOString(),
-      updated_at: input.updatedAt.toISOString(),
-    })
+    .insert(payload)
     .select("*")
     .single();
+  if (error && wantsMetadata && isMissingMetadataColumn(error)) {
+    warnMetadataColumnMissing();
+    delete payload.metadata;
+    ({ data, error } = await supabase
+      .from("messages")
+      .insert(payload)
+      .select("*")
+      .single());
+  }
   if (error) throwDb("createMessage", error);
   return dbToMessage(data);
 }
 
 export async function updateMessage(
   id: string,
-  values: Partial<Pick<Message, "content" | "model" | "status">>
+  values: Partial<Pick<Message, "content" | "model" | "status" | "metadata">>
 ): Promise<void> {
   if (useMemoryFallback()) {
     return inMemoryStore.updateMessage(id, values);
@@ -530,10 +567,16 @@ export async function updateMessage(
   if (values.content !== undefined) update.content = values.content;
   if (values.model !== undefined) update.model = values.model;
   if (values.status !== undefined) update.status = values.status;
-  const { error } = await supabase
-    .from("messages")
-    .update(update)
-    .eq("id", id);
+  const wantsMetadata = values.metadata !== undefined;
+  if (wantsMetadata && metadataColumnSupported) {
+    update.metadata = values.metadata ?? null;
+  }
+  let { error } = await supabase.from("messages").update(update).eq("id", id);
+  if (error && wantsMetadata && isMissingMetadataColumn(error)) {
+    warnMetadataColumnMissing();
+    delete update.metadata;
+    ({ error } = await supabase.from("messages").update(update).eq("id", id));
+  }
   if (error) throwDb("updateMessage", error);
 }
 

@@ -12,6 +12,7 @@ export type PdfViewerFile = {
   sizeBytes?: number;
   mimeType?: string;
   id?: string;
+  isCode?: boolean;
 };
 
 export type DocumentViewerFile = PdfViewerFile;

@@ -85,56 +85,38 @@ describe("FileCreationCard", () => {
       expect(validatingMarkup).toContain("Validating document integrity");
     });
 
-    it("renders stage-specific icons before each step label inside the expanded process dropdown", () => {
+    it("renders Python code block directly inside the expanded process dropdown without artificial checklist steps", () => {
       const docxMarkup = renderCard({
         stage: "generating",
         format: "docx",
         defaultExpanded: true,
-        researchSourceCount: 3,
       });
 
       // Must render process list
       expect(docxMarkup).toContain('data-testid="file-creation-process-list"');
 
-      // Check each step's icon (lucide icons generate class names like lucide-sparkles, etc.)
-      expect(docxMarkup).toContain("lucide-sparkles");
-      expect(docxMarkup).toContain("Analyzing the request");
+      // Replaces artificial checklist steps with Python code block
+      expect(docxMarkup).not.toContain("Analyzing the request");
+      expect(docxMarkup).not.toContain("Structuring the content");
+      expect(docxMarkup).not.toContain("Validating document integrity");
 
-      expect(docxMarkup).toContain("lucide-globe");
-      expect(docxMarkup).toContain("Gathering verified research (3 sources)");
-
-      expect(docxMarkup).toContain("lucide-layout-list");
-      expect(docxMarkup).toContain("Structuring the content");
-
-      expect(docxMarkup).toContain("lucide-pen-line");
-      expect(docxMarkup).toContain("Writing the document");
-
-      expect(docxMarkup).toContain("lucide-palette");
-      expect(docxMarkup).toContain("Formatting the layout");
-
-      expect(docxMarkup).toContain("lucide-cpu");
-      expect(docxMarkup).toContain("Compiling the file");
-
-      expect(docxMarkup).toContain("lucide-shield-check");
-      expect(docxMarkup).toContain("Validating document integrity");
+      // Displays Python code block
+      expect(docxMarkup).toContain("Python");
+      expect(docxMarkup).toContain("Generating document.docx via Python");
     });
 
-    it("renders format-tailored icons for spreadsheet and presentation steps", () => {
-      const xlsxMarkup = renderCard({
-        stage: "content_generated",
-        format: "xlsx",
+    it("renders custom streamed Python code inside the expanded dropdown when provided", () => {
+      const customCode = "from docx import Document\ndoc = Document()\ndoc.add_heading('Hello', 0)\ndoc.save('out.docx')";
+      const markup = renderCard({
+        stage: "generating",
+        format: "docx",
         defaultExpanded: true,
+        code: customCode,
       });
-      expect(xlsxMarkup).toContain("lucide-table");
-      expect(xlsxMarkup).toContain("Writing the spreadsheet");
 
-      const pptxMarkup = renderCard({
-        stage: "content_generated",
-        format: "pptx",
-        defaultExpanded: true,
-      });
-      expect(pptxMarkup).toContain("lucide-presentation");
-      expect(pptxMarkup).toContain("Writing the presentation");
+      expect(markup).toContain('data-testid="file-creation-process-list"');
+      expect(markup).toContain("from docx import Document");
+      expect(markup).toContain("doc.save");
     });
   });
 
@@ -157,14 +139,17 @@ describe("FileCreationCard", () => {
       // File type is surfaced as plain metadata in the footer row
       expect(markup).toContain("PDF");
 
-      // Single action: Open sits next to the filename in a footer BELOW the
-      // preview (preview content on top), blended in by a fade (no hard line),
-      // and there is no Download action at all
+      // Preview action: hover reveals "Preview" with glassmorphic blur overlay,
+      // clicking the preview area triggers open, while filename bar is static without Open button
       expect(markup).toContain("flex items-center justify-between gap-3");
       expect(markup).toContain("bg-gradient-to-t from-card");
       expect(markup).not.toContain("border-t");
-      expect(markup).toContain('aria-label="Open Quarterly_Report.pdf"');
-      expect(markup).toContain("Open");
+      expect(markup).toContain('aria-label="Preview Quarterly_Report.pdf"');
+      expect(markup).toContain('data-testid="file-preview-overlay"');
+      expect(markup).toContain("Preview");
+      expect(markup).toContain("lucide-eye");
+      expect(markup).not.toContain("lucide-external-link");
+      expect(markup).not.toContain("Open");
       expect(markup).not.toContain("Download");
 
       // Ready status indicator when freshly created
@@ -180,7 +165,7 @@ describe("FileCreationCard", () => {
 
       // No legacy attachment-bubble styling (hover-only icon, tiny bubble)
       expect(markup).not.toContain("group-hover/file");
-      expect(markup).not.toContain("opacity-0 transition-opacity");
+      expect(markup).not.toContain("group-hover/file:opacity-100");
       expect(markup).not.toContain("min-h-[58px]");
 
       // No size or page-count clutter on the card
@@ -282,6 +267,81 @@ describe("FileCreationCard", () => {
       expect(markup).toContain("Try again");
       expect(markup).not.toContain('data-testid="file-creation-drafting"');
       expect(markup).not.toContain('data-testid="file-creation-completed"');
+    });
+  });
+
+  describe("Python Code Inspection", () => {
+    it("renders file container and code container with identical h-[302px] height, matching subtle blur, and Show Code", () => {
+      const markup = renderCard({
+        stage: "completed",
+        format: "pdf",
+        filename: "report.pdf",
+        fileUrl: "https://example.com/report.pdf",
+        code: "#!/usr/bin/env python3\nimport reportlab\nprint('Generated PDF')",
+      });
+
+      // Layout: file card original width + code container with small two-lines gap
+      expect(markup).toContain("flex flex-col md:flex-row items-stretch gap-1 sm:gap-1.5");
+      expect(markup).toContain('data-testid="file-creation-completed"');
+      expect(markup).toContain("md:w-[460px]");
+      expect(markup).toContain("h-[302px]");
+      expect(markup).toContain('data-testid="file-code-container"');
+
+      // Both file card and code container have identical height (h-[302px])
+      const matchHeights = markup.match(/h-\[302px\]/g);
+      expect(matchHeights?.length).toBeGreaterThanOrEqual(2);
+
+      // Left container: document preview with hover Preview overlay, title, NO Open button
+      expect(markup).toContain("report.pdf");
+      expect(markup).toContain("PDF");
+      expect(markup).toContain('data-testid="file-preview-overlay"');
+      expect(markup).toContain("Preview");
+      expect(markup).toContain("lucide-eye");
+      expect(markup).not.toContain("lucide-external-link");
+      expect(markup).not.toContain("Open");
+
+      // Right container: sidebar theme color, CodeSurface code preview, Show Code on hover, no outside Python tag, no green colors, NO tooltip title
+      expect(markup).toContain("bg-sidebar");
+      expect(markup).toContain("import reportlab");
+      expect(markup).toContain("ksemo-code-body");
+      expect(markup).toContain("Show Code");
+      expect(markup).not.toContain('title="Click to view code"');
+      expect(markup).not.toContain("text-emerald-400");
+      expect(markup).not.toContain("text-emerald-500");
+
+      // Strips shebang from code block
+      expect(markup).not.toContain("#!/usr/bin/env");
+
+      // Matching subtle blur effect on both containers
+      expect(markup).toContain("backdrop-blur-[1px]");
+    });
+
+    it("unifies code opening with the document viewer (exact same opening mechanism as file)", () => {
+      const markup = renderCard({
+        stage: "completed",
+        format: "pdf",
+        filename: "report.pdf",
+        fileUrl: "https://example.com/report.pdf",
+        code: "#!/usr/bin/env python3\nimport reportlab\nprint('Generated PDF')",
+        initialShowCodeDrawer: true,
+      });
+
+      // Unified experience: no separate standalone modal or inline clutter
+      expect(markup).not.toContain('data-testid="file-code-studio"');
+      expect(markup).not.toContain('data-testid="file-code-modal"');
+      expect(markup).not.toContain('data-testid="file-code-expanded"');
+
+      // Both containers present side-by-side with exact same height
+      expect(markup).toContain('data-testid="file-preview-stage"');
+      expect(markup).toContain('data-testid="file-code-container"');
+      expect(markup).toContain("Show Code");
+
+      // Verify preview icon is distinct from external-link
+      expect(markup).toContain("lucide-eye");
+      expect(markup).not.toContain("lucide-external-link");
+
+      // Strips shebang
+      expect(markup).not.toContain("#!/usr/bin/env");
     });
   });
 });

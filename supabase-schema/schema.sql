@@ -180,6 +180,7 @@ CREATE TABLE messages (
     content TEXT NOT NULL,
     model VARCHAR(160),
     status VARCHAR(20) DEFAULT 'sending' CHECK (status IN ('sending', 'streaming', 'completed', 'failed', 'cancelled')),
+    metadata JSONB,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -188,6 +189,19 @@ CREATE INDEX idx_messages_conversation_id ON messages(conversation_id);
 CREATE INDEX idx_messages_role ON messages(role);
 CREATE INDEX idx_messages_status ON messages(status);
 CREATE INDEX idx_messages_created_at ON messages(created_at);
+
+-- Migration (idempotent) for deployments that created messages before the
+-- metadata column existed. Used to persist presentation outlines and other
+-- structured message state.
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'messages' AND column_name = 'metadata'
+    ) THEN
+        ALTER TABLE messages ADD COLUMN metadata JSONB;
+    END IF;
+END $$;
 
 -- ============================================
 -- MESSAGE VERSIONS TABLE

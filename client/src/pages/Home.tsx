@@ -56,6 +56,7 @@ import {
   type FileMetrics,
   type FileSource,
 } from "../components/ksemo/FileCreationCard";
+import { PresentationOutlineCard } from "../components/ksemo/PresentationOutlineCard";
 import { PdfDrawer } from "../components/ksemo/PdfDrawer";
 import type { DocFormat } from "@/lib/docFormats";
 import { usePdfViewer } from "@/contexts/PdfViewerContext";
@@ -93,6 +94,10 @@ import {
   DEFAULT_PRESENTATION_CONFIG,
   type PresentationConfig,
 } from "@shared/presentation";
+import {
+  isPptOutlinePlan,
+  type PptOutlinePlan,
+} from "@shared/presentationOutline";
 type StreamConversation = {
   conversationId: string;
   title: string;
@@ -349,7 +354,14 @@ export default function Home() {
     metrics?: FileMetrics;
     summary?: string;
     fileId?: string;
+    outline?: PptOutlinePlan;
+    code?: string;
   } | null>(null);
+  const [outlineGenerating, setOutlineGenerating] = useState(false);
+  const [outlineRegenError, setOutlineRegenError] = useState<string | null>(
+    null
+  );
+  const outlineGeneratingRef = useRef(false);
   const [activeMode, setActiveMode] = useState<CapabilityMode>("chat");
   const [pptConfig, setPptConfig] = useState<PresentationConfig>({
     ...DEFAULT_PRESENTATION_CONFIG,
@@ -656,6 +668,10 @@ export default function Home() {
   const composerFileUpload = trpc.workspace.files.upload.useMutation();
   const composerFileAttach =
     trpc.workspace.files.attachToConversation.useMutation();
+  const regenerateOutlineMutation =
+    trpc.fileGeneration.regenerateOutline.useMutation();
+  const regenerateSlideMutation =
+    trpc.fileGeneration.regenerateSlide.useMutation();
   const voice = useVoiceInput({
     onTranscript: text =>
       setComposerValue(current => (current ? `${current} ${text}` : text)),
@@ -699,12 +715,21 @@ export default function Home() {
             researchSourceCount?: number;
             sources?: FileSource[];
             metrics?: FileMetrics;
+            code?: string;
           }
         | undefined;
+
+      const metadata = (message as Record<string, unknown>).metadata as
+        | { pptOutline?: { outline?: unknown } }
+        | undefined;
+      const restoredOutline = isPptOutlinePlan(metadata?.pptOutline?.outline)
+        ? (metadata!.pptOutline!.outline as PptOutlinePlan)
+        : undefined;
 
       let persistedSources: FileSource[] | undefined = fileGeneration?.sources;
       let persistedMetrics: FileMetrics | undefined = fileGeneration?.metrics;
       let persistedFormat: string | undefined = fileGeneration?.format;
+      let persistedCode: string | undefined = fileGeneration?.code;
 
       if (
         firstAttachment?.metadata &&
@@ -722,6 +747,9 @@ export default function Home() {
         if (firstAttachment.metadata.format) {
           persistedFormat = firstAttachment.metadata.format;
         }
+        if (typeof (firstAttachment.metadata as any).code === "string") {
+          persistedCode = (firstAttachment.metadata as any).code;
+        }
       } else if (
         firstAttachment?.contentText &&
         typeof firstAttachment.contentText === "string"
@@ -737,6 +765,9 @@ export default function Home() {
             }
             if (parsed.format) {
               persistedFormat = parsed.format;
+            }
+            if (typeof parsed.code === "string") {
+              persistedCode = parsed.code;
             }
           }
         } catch {}
@@ -767,8 +798,17 @@ export default function Home() {
                 status: "created" as const,
                 sources: persistedSources,
                 metrics: persistedMetrics,
+                code: persistedCode,
               }
-            : undefined),
+            : restoredOutline
+              ? {
+                  stage: "outline",
+                  format: "pptx",
+                  status: "processing" as const,
+                  message: "Outline ready — review & approve",
+                  outline: restoredOutline,
+                }
+              : undefined),
       };
     });
     setChatMessages(current => {
@@ -1379,6 +1419,8 @@ export default function Home() {
               typeof data.researchSourceCount === "number"
                 ? data.researchSourceCount
                 : undefined;
+            const progressCode =
+              typeof data.code === "string" ? data.code : undefined;
             setFileGeneration(current => {
               const progressFormat =
                 str(data.format ?? "") || current?.format || "";
@@ -1391,6 +1433,8 @@ export default function Home() {
                 message: progressMessage,
                 researchSourceCount:
                   researchSourceCount ?? current?.researchSourceCount,
+                outline: current?.outline,
+                code: progressCode ?? current?.code,
               };
             });
             if (isViewingThisStream()) {
@@ -1407,11 +1451,49 @@ export default function Home() {
                           status: "processing" as const,
                           message: progressMessage,
                           researchSourceCount: researchSourceCount,
+                          outline: message.fileGeneration?.outline,
+                          code: progressCode ?? message.fileGeneration?.code,
                         },
                       }
                     : message
                 )
               );
+            }
+          } else if (eventName === "file.outline") {
+            lastProgressAt = Date.now();
+            const outlineMessageId = str(data.messageId);
+            const rawOutline = data.outline;
+            if (outlineMessageId && isPptOutlinePlan(rawOutline)) {
+              const outline = rawOutline;
+              setFileGeneration(current => ({
+                messageId: outlineMessageId,
+                stage: "outline",
+                format: "pptx",
+                status: "processing",
+                createdAt: current?.createdAt ?? Date.now(),
+                message: "Outline ready — review & approve",
+                researchSourceCount: current?.researchSourceCount,
+                outline,
+              }));
+              if (isViewingThisStream()) {
+                setChatMessages(current =>
+                  current.map(message =>
+                    message.id === outlineMessageId
+                      ? {
+                          ...message,
+                          content: outline.summary || message.content,
+                          fileGeneration: {
+                            stage: "outline",
+                            format: "pptx",
+                            status: "processing" as const,
+                            message: "Outline ready — review & approve",
+                            outline,
+                          },
+                        }
+                      : message
+                  )
+                );
+              }
             }
           } else if (eventName === "file.error") {
             lastProgressAt = Date.now();
@@ -1451,6 +1533,7 @@ export default function Home() {
                   sources?: FileSource[];
                   metrics?: FileMetrics;
                   summary?: string;
+                  code?: string;
                 }
               | undefined;
             const fileSources = fileData?.sources?.length
@@ -1458,6 +1541,7 @@ export default function Home() {
               : undefined;
             const fileMetrics = fileData?.metrics;
             const fileSummary = fileData?.summary;
+            const fileCode = fileData?.code;
             setFileGeneration(current => ({
               messageId: str(data.messageId),
               stage: "completed",
@@ -1469,6 +1553,7 @@ export default function Home() {
               metrics: fileMetrics ?? current?.metrics,
               summary: fileSummary ?? current?.summary,
               fileId: fileData?.fileId ?? current?.fileId,
+              code: fileCode ?? current?.code,
             }));
             if (isViewingThisStream()) {
               const createdMsgId = str(data.messageId);
@@ -1486,6 +1571,7 @@ export default function Home() {
                           sources: fileSources ?? fileGeneration?.sources,
                           metrics: fileMetrics ?? fileGeneration?.metrics,
                           summary: fileSummary ?? fileGeneration?.summary,
+                          code: fileCode ?? fileGeneration?.code,
                         },
                       }
                     : message
@@ -1677,6 +1763,359 @@ export default function Home() {
         !userStopped
       )
         speak(responseText, completedConversation.assistantMessageId);
+    }
+  }
+
+  // ── Presentation outline (two-phase pptx flow) ─────────────────────────
+  // Phase 1 streams an editable outline into the chat. The user edits and
+  // approves it here; approval POSTs to /api/chat/presentation/stream which
+  // runs phase 2 (the actual .pptx render) and emits progress/file events.
+  function findOutlinePrompt(messageId: string): string {
+    const index = chatMessages.findIndex(message => message.id === messageId);
+    for (let i = index - 1; i >= 0; i -= 1) {
+      if (chatMessages[i].role === "user") {
+        const text = chatMessages[i].content.trim();
+        if (text) return text;
+      }
+    }
+    return "";
+  }
+
+  function setMessageFileGeneration(
+    messageId: string,
+    updater: (
+      previous: KsemoMessage["fileGeneration"]
+    ) => KsemoMessage["fileGeneration"]
+  ) {
+    setChatMessages(current =>
+      current.map(message =>
+        message.id === messageId
+          ? { ...message, fileGeneration: updater(message.fileGeneration) }
+          : message
+      )
+    );
+  }
+
+  function applyOutlineToActive(messageId: string, outline: PptOutlinePlan) {
+    setFileGeneration(current => ({
+      messageId,
+      stage: "outline",
+      format: "pptx",
+      status: "processing",
+      createdAt:
+        current && current.messageId === messageId
+          ? current.createdAt
+          : Date.now(),
+      message: "Outline ready — review & approve",
+      researchSourceCount:
+        current && current.messageId === messageId
+          ? current.researchSourceCount
+          : undefined,
+      outline,
+    }));
+    setMessageFileGeneration(messageId, () => ({
+      stage: "outline",
+      format: "pptx",
+      status: "processing" as const,
+      message: "Outline ready — review & approve",
+      outline,
+    }));
+  }
+
+  function handleOutlineChange(messageId: string, outline: PptOutlinePlan) {
+    setFileGeneration(current =>
+      current && current.messageId === messageId
+        ? { ...current, outline }
+        : current
+    );
+    setMessageFileGeneration(messageId, previous => ({
+      stage: previous?.stage ?? "outline",
+      format: previous?.format ?? "pptx",
+      status: previous?.status ?? ("processing" as const),
+      message: previous?.message,
+      researchSourceCount: previous?.researchSourceCount,
+      sources: previous?.sources,
+      metrics: previous?.metrics,
+      summary: previous?.summary,
+      outline,
+    }));
+  }
+
+  async function handleRegenerateOutline(
+    messageId: string,
+    currentOutline: PptOutlinePlan
+  ): Promise<PptOutlinePlan | null> {
+    setOutlineRegenError(null);
+    try {
+      const outline = await regenerateOutlineMutation.mutateAsync({
+        assistantMessageId: messageId,
+        prompt:
+          findOutlinePrompt(messageId) ||
+          currentOutline.title ||
+          "Presentation",
+        pptConfig: currentOutline.config as unknown as Record<string, unknown>,
+        pptStyle: currentOutline.styleName,
+      });
+      if (!isPptOutlinePlan(outline)) return null;
+      applyOutlineToActive(messageId, outline);
+      return outline;
+    } catch (error) {
+      setOutlineRegenError(
+        error instanceof Error
+          ? error.message
+          : "Could not regenerate the outline. Please try again."
+      );
+      return null;
+    }
+  }
+
+  async function handleRegenerateSlide(
+    messageId: string,
+    slideId: string,
+    currentOutline: PptOutlinePlan,
+    instruction?: string
+  ): Promise<PptOutlinePlan | null> {
+    setOutlineRegenError(null);
+    try {
+      const updated = await regenerateSlideMutation.mutateAsync({
+        assistantMessageId: messageId,
+        slideId,
+        outline: currentOutline as unknown,
+        instruction: instruction?.trim() ? instruction.trim() : undefined,
+      });
+      if (!isPptOutlinePlan(updated)) return null;
+      applyOutlineToActive(messageId, updated);
+      return updated;
+    } catch (error) {
+      setOutlineRegenError(
+        error instanceof Error
+          ? error.message
+          : "Could not regenerate that slide. Please try again."
+      );
+      return null;
+    }
+  }
+
+  async function approvePresentationOutline(
+    messageId: string,
+    outline: PptOutlinePlan
+  ) {
+    const conversationId = activeConversationIdRef.current;
+    if (!conversationId) {
+      toast.error("This presentation needs a saved conversation.");
+      return;
+    }
+    if (outlineGeneratingRef.current) return;
+    outlineGeneratingRef.current = true;
+    setOutlineGenerating(true);
+    setOutlineRegenError(null);
+    setFileGeneration(current => ({
+      messageId,
+      stage: "content_generated",
+      format: "pptx",
+      status: "processing",
+      createdAt:
+        current && current.messageId === messageId
+          ? current.createdAt
+          : Date.now(),
+      message: "Writing the presentation",
+      outline,
+    }));
+    setMessageFileGeneration(messageId, () => ({
+      stage: "content_generated",
+      format: "pptx",
+      status: "processing" as const,
+      message: "Writing the presentation",
+      outline,
+    }));
+
+    try {
+      const response = await fetch("/api/chat/presentation/stream", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "content-type": "application/json",
+          accept: "text/event-stream",
+          ...getAuthHeaders(),
+        },
+        body: JSON.stringify({
+          assistantMessageId: messageId,
+          conversationId,
+          outline,
+        }),
+      });
+      if (!response.ok || !response.body) {
+        let serverError = "";
+        try {
+          const errData = await response.json();
+          serverError = errData?.error || "";
+        } catch {}
+        throw new Error(
+          serverError || "Presentation generation could not be started."
+        );
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let streamError: string | null = null;
+      const str = (value: unknown): string =>
+        typeof value === "string" ? value : "";
+
+      const processEvents = (rawEvents: string[]) => {
+        for (const rawEvent of rawEvents) {
+          const lines = rawEvent.split("\n");
+          const eventName = lines
+            .find(line => line.startsWith("event:"))
+            ?.slice(6)
+            .trim();
+          const rawData = lines
+            .find(line => line.startsWith("data:"))
+            ?.slice(5)
+            .trim();
+          if (!eventName || !rawData) continue;
+          let data: Record<string, unknown>;
+          try {
+            data = JSON.parse(rawData) as Record<string, unknown>;
+          } catch {
+            continue;
+          }
+
+          if (eventName === "file.progress") {
+            const stage = str(data.stage) || "generating";
+            const label = str(data.message ?? "") || undefined;
+            setFileGeneration(current =>
+              current && current.messageId === messageId
+                ? { ...current, stage, status: "processing", message: label }
+                : current
+            );
+            setMessageFileGeneration(messageId, previous => ({
+              stage,
+              format: "pptx",
+              status: "processing" as const,
+              message: label,
+              outline: previous?.outline ?? outline,
+            }));
+          } else if (eventName === "file.created") {
+            const fileData = data.file as
+              | {
+                  fileId?: string;
+                  filename?: string;
+                  mimeType?: string;
+                  url?: string;
+                  sizeBytes?: number;
+                  sources?: FileSource[];
+                  metrics?: FileMetrics;
+                  summary?: string;
+                  code?: string;
+                }
+              | undefined;
+            if (!fileData?.fileId || !fileData.url) {
+              streamError = "Presentation file could not be created.";
+              continue;
+            }
+            const sources = fileData.sources?.length
+              ? fileData.sources
+              : undefined;
+            const resolvedFileId = fileData.fileId;
+            const resolvedUrl = fileData.url;
+            const resolvedCode = fileData.code;
+            setFileGeneration(current => ({
+              messageId,
+              stage: "completed",
+              format: "pptx",
+              status: "created",
+              createdAt: current?.createdAt ?? Date.now(),
+              researchSourceCount: current?.researchSourceCount,
+              sources,
+              metrics: fileData.metrics,
+              summary: fileData.summary,
+              fileId: resolvedFileId,
+              outline,
+              code: resolvedCode ?? current?.code,
+            }));
+            setMessageFileGeneration(messageId, () => ({
+              stage: "completed",
+              format: "pptx",
+              status: "created" as const,
+              sources,
+              metrics: fileData.metrics,
+              summary: fileData.summary,
+              code: resolvedCode,
+            }));
+            setChatMessages(current =>
+              current.map(message =>
+                message.id === messageId
+                  ? {
+                      ...message,
+                      attachments: [
+                        ...(message.attachments ?? []).filter(
+                          attachment => attachment.id !== resolvedFileId
+                        ),
+                        {
+                          id: resolvedFileId,
+                          filename: fileData.filename ?? outline.filename,
+                          mimeType: fileData.mimeType,
+                          url: resolvedUrl,
+                          sizeBytes: fileData.sizeBytes,
+                        },
+                      ],
+                    }
+                  : message
+              )
+            );
+            utils.workspace.files.list.invalidate();
+          } else if (eventName === "file.error") {
+            streamError =
+              str(data.message) || "Presentation generation failed.";
+          } else if (eventName === "assistant.error") {
+            streamError = str(data.message) || streamError;
+          }
+        }
+      };
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) {
+          buffer += decoder.decode();
+          if (buffer.trim()) processEvents([buffer.replace(/\r\n/g, "\n")]);
+          break;
+        }
+        buffer += decoder
+          .decode(value, { stream: true })
+          .replace(/\r\n/g, "\n");
+        const events = buffer.split("\n\n");
+        buffer = events.pop() ?? "";
+        processEvents(events);
+      }
+
+      if (streamError) {
+        setOutlineRegenError(streamError);
+        toast.error(streamError);
+        applyOutlineToActive(messageId, outline);
+        setFileGeneration(current =>
+          current && current.messageId === messageId
+            ? { ...current, message: streamError ?? undefined }
+            : current
+        );
+      }
+    } catch (error) {
+      const errorText =
+        error instanceof Error
+          ? error.message
+          : "Presentation generation failed. Please try again.";
+      setOutlineRegenError(errorText);
+      toast.error(errorText);
+      applyOutlineToActive(messageId, outline);
+      setFileGeneration(current =>
+        current && current.messageId === messageId
+          ? { ...current, message: errorText }
+          : current
+      );
+    } finally {
+      outlineGeneratingRef.current = false;
+      setOutlineGenerating(false);
+      void syncConversationFromServer(conversationId);
     }
   }
 
@@ -2943,33 +3382,74 @@ export default function Home() {
                               message: message.fileGeneration.message,
                               researchSourceCount:
                                 message.fileGeneration.researchSourceCount,
+                              outline: message.fileGeneration.outline,
+                              code: message.fileGeneration.code,
                             }
                           : null;
 
+                    const outlinePlan = activeFileGen?.outline;
+                    const showOutlineEditor = Boolean(
+                      outlinePlan && activeFileGen?.status !== "created"
+                    );
+
                     const fileCreationNode = activeFileGen ? (
                       <div className="animate-in fade-in-0 duration-150">
-                        <FileCreationCard
-                          stage={
-                            activeFileGen.status === "created"
-                              ? "completed"
-                              : activeFileGen.stage === "interrupted"
-                                ? "interrupted"
-                                : activeFileGen.status === "error"
-                                  ? "error"
-                                  : (activeFileGen.stage as FileCreationStage)
-                          }
-                          format={
-                            (activeFileGen.format as DocFormat) || undefined
-                          }
-                          filename={message.attachments?.[0]?.filename}
-                          fileUrl={message.attachments?.[0]?.url}
-                          fileSizeBytes={message.attachments?.[0]?.sizeBytes}
-                          fileId={message.attachments?.[0]?.id}
-                          researchSourceCount={
-                            activeFileGen.researchSourceCount
-                          }
-                          onRetry={() => regenerateMessage(message)}
-                        />
+                        {showOutlineEditor && outlinePlan ? (
+                          <PresentationOutlineCard
+                            outline={outlinePlan}
+                            generating={
+                              outlineGenerating &&
+                              fileGeneration?.messageId === message.id
+                            }
+                            progressLabel={activeFileGen.message}
+                            regenerationError={outlineRegenError}
+                            onChange={next =>
+                              handleOutlineChange(message.id, next)
+                            }
+                            onApprove={next =>
+                              void approvePresentationOutline(message.id, next)
+                            }
+                            onRegenerateOutline={next =>
+                              handleRegenerateOutline(message.id, next)
+                            }
+                            onRegenerateSlide={(
+                              slideId,
+                              currentOutline,
+                              instruction
+                            ) =>
+                              handleRegenerateSlide(
+                                message.id,
+                                slideId,
+                                currentOutline,
+                                instruction
+                              )
+                            }
+                          />
+                        ) : (
+                          <FileCreationCard
+                            stage={
+                              activeFileGen.status === "created"
+                                ? "completed"
+                                : activeFileGen.stage === "interrupted"
+                                  ? "interrupted"
+                                  : activeFileGen.status === "error"
+                                    ? "error"
+                                    : (activeFileGen.stage as FileCreationStage)
+                            }
+                            format={
+                              (activeFileGen.format as DocFormat) || undefined
+                            }
+                            filename={message.attachments?.[0]?.filename}
+                            fileUrl={message.attachments?.[0]?.url}
+                            fileSizeBytes={message.attachments?.[0]?.sizeBytes}
+                            fileId={message.attachments?.[0]?.id}
+                            researchSourceCount={
+                              activeFileGen.researchSourceCount
+                            }
+                            onRetry={() => regenerateMessage(message)}
+                            code={activeFileGen.code}
+                          />
+                        )}
                       </div>
                     ) : null;
 

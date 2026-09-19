@@ -20,17 +20,20 @@ import {
   restoreConversationForUser,
   searchConversationMessages,
   searchConversationTitles,
-  setMessageFeedbackForUser,
+setMessageFeedbackForUser,
   updateConversationForUser,
+  updateMessage,
   updateVoiceSessionForUser,
   upsertUserPreferences,
   createFileForUser,
 } from "../supabase-db";
 import { storagePut } from "../storage";
 import { listLLMModels } from "../_core/llm";
+import type { Message } from "../_core/llm";
 import { transcribeAudio } from "../_core/voiceTranscription";
 import { isMailerConfigured, sendFeedbackEmail } from "../_core/mailer";
 import { generateFile, type FileFormat } from "../fileGeneration";
+import { planPresentationOutline, regenerateSingleSlide, buildOutlineMetadata } from "../docgen/presentation/outline";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { typeAfterVoiceSession } from "../conversationTypes";
 import type { KsemoFile } from "../../supabase-schema/04-types";
@@ -505,7 +508,7 @@ export const fileGenerationRouter = router({
           mimeType: result.mimeType,
           sizeBytes: result.size,
           status: "ready",
-          contentText: null,
+          contentText: result.code ? JSON.stringify({ code: result.code, format: input.format }) : null,
           createdAt: new Date(),
           updatedAt: new Date(),
         };
@@ -521,6 +524,7 @@ export const fileGenerationRouter = router({
             storageKey: saved.key,
             mimeType: result.mimeType,
             sizeBytes: result.size,
+            code: result.code,
           },
         };
       } catch (error) {
@@ -530,6 +534,94 @@ export const fileGenerationRouter = router({
           message: "Failed to generate file",
         });
       }
+    }),
+
+  // ── Presentation outline mutations (two-phase PPT flow) ─────────────────
+
+  /**
+   * Regenerate the entire presentation outline for an assistant message. The
+   * updated outline is persisted to the message's metadata and returned so the
+   * client editor re-renders with the fresh plan.
+   */
+  regenerateOutline: protectedProcedure
+    .input(
+      z.object({
+        assistantMessageId: z.string().min(8).max(36),
+        prompt: z.string().min(1).max(4000),
+        pptConfig: z.record(z.string(), z.unknown()).optional(),
+        pptStyle: z.string().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const message = await getMessageForUser(input.assistantMessageId, ctx.user.id);
+      if (!message)
+        throw new TRPCError({ code: "NOT_FOUND", message: "Message not found" });
+
+      let history: Message[] = [];
+      try {
+        const conversationMessages = await listMessagesForConversation(message.conversationId);
+        history = conversationMessages
+          .filter(m => m.role === "user" || m.role === "assistant")
+          .filter(m => m.content.trim().length > 0)
+          .slice(-8)
+          .map(m => ({
+            role: m.role === "assistant" ? "assistant" as const : "user" as const,
+            content: m.content,
+          }));
+      } catch {}
+
+      const outline = await planPresentationOutline({
+        userMessage: input.prompt,
+        history,
+        presentationConfig: input.pptConfig,
+        presentationStyle: input.pptStyle,
+      });
+
+      await updateMessage(input.assistantMessageId, {
+        metadata: {
+          pptOutline: buildOutlineMetadata(outline, input.prompt),
+        },
+      });
+
+      return outline;
+    }),
+
+  /**
+   * Regenerate a single slide within an existing outline. Accepts the current
+   * (possibly user-edited) outline, replaces the target slide via the LLM, then
+   * persists and returns the updated outline.
+   */
+  regenerateSlide: protectedProcedure
+    .input(
+      z.object({
+        assistantMessageId: z.string().min(8).max(36),
+        slideId: z.string().min(1),
+        outline: z.unknown(),
+        instruction: z.string().max(800).optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (!input.outline || typeof input.outline !== "object")
+        throw new TRPCError({ code: "BAD_REQUEST", message: "An outline is required" });
+
+      const message = await getMessageForUser(input.assistantMessageId, ctx.user.id);
+      if (!message)
+        throw new TRPCError({ code: "NOT_FOUND", message: "Message not found" });
+
+      const baseOutline = input.outline as Parameters<typeof regenerateSingleSlide>[0]["outline"];
+      const updated = await regenerateSingleSlide({
+        outline: baseOutline,
+        slideId: input.slideId,
+        instruction: input.instruction,
+      });
+
+      await updateMessage(input.assistantMessageId, {
+        metadata: {
+          pptOutline: buildOutlineMetadata(updated, "Slide regeneration"),
+        },
+      });
+
+      return updated;
     }),
 });
 

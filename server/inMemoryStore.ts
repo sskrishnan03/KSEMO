@@ -582,7 +582,7 @@ class InMemoryStore {
 
   async updateMessage(
     id: string,
-    values: Partial<Pick<Message, "content" | "model" | "status">>
+    values: Partial<Pick<Message, "content" | "model" | "status" | "metadata">>
   ): Promise<void> {
     const msg = this.messages.get(id);
     if (!msg) return;

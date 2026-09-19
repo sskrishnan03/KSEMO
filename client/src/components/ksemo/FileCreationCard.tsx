@@ -1,26 +1,18 @@
 import type { DocFormat } from "@/lib/docFormats";
 import {
-  ArrowUpRight,
   Check,
   ChevronDown,
-  Cpu,
-  Globe,
-  LayoutList,
-  Palette,
-  PenLine,
-  Presentation,
+  Code2,
+  Eye,
   RotateCw,
-  ShieldCheck,
-  Sparkles,
-  Table,
 } from "lucide-react";
-import React, { memo, useEffect, useRef, useState } from "react";
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   FileBrandMark,
   type FileBrandVariant,
 } from "@/components/ksemo/FileBrandIcons";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
+import { KsemoCodeBlock, CodeSurface, stripShebang } from "@/components/ksemo/code-block";
 import {
   loadFilePreview,
   type FilePreviewData,
@@ -44,6 +36,7 @@ export type FileCreationStage =
   | "fetching"
   | "analyzing_sources"
   | "content_generated"
+  | "outline"
   | "designing"
   | "generating"
   | "validating"
@@ -177,6 +170,8 @@ export function getLiveStatusPhrase(
       if (format === "pptx") return "Writing the presentation";
       return "Writing the document";
     }
+    case "outline":
+      return "Preparing the presentation outline";
     case "designing":
       return "Formatting the layout";
     case "generating":
@@ -202,6 +197,7 @@ export const STAGE_NUMBERS: Record<FileCreationStage, number> = {
   analyzing_sources: 2,
   planning: 3,
   content_generated: 4,
+  outline: 4,
   designing: 5,
   generating: 6,
   validating: 7,
@@ -224,6 +220,11 @@ export type FileCreationCardProps = {
   summary?: string;
   defaultExpanded?: boolean;
   initialShowReady?: boolean;
+  code?: string;
+  initialShowCodeExpanded?: boolean;
+  initialShowCodeModal?: boolean;
+  initialShowCodeDrawer?: boolean;
+  onOpenCode?: (code: string) => void;
 };
 
 // ── Main card ──────────────────────────────────────────────────────────────
@@ -238,6 +239,11 @@ export const FileCreationCard = memo(function FileCreationCard({
   researchSourceCount,
   defaultExpanded = false,
   initialShowReady = false,
+  code,
+  initialShowCodeExpanded = false,
+  initialShowCodeModal = false,
+  initialShowCodeDrawer = false,
+  onOpenCode,
 }: FileCreationCardProps) {
   const { openPdf } = usePdfViewer();
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
@@ -245,6 +251,23 @@ export const FileCreationCard = memo(function FileCreationCard({
   const prevStageRef = useRef<FileCreationStage | null>(stage);
   const stageRef = useRef<HTMLDivElement>(null);
   const [stageWidth, setStageWidth] = useState(0);
+
+  const cleanCode = useMemo(() => {
+    return stripShebang(code || "");
+  }, [code]);
+
+  const codePreviewLines = useMemo(() => {
+    if (!cleanCode) return "";
+    return cleanCode
+      .split("\n")
+      .slice(0, 16)
+      .join("\n");
+  }, [cleanCode]);
+
+  const codeLineCount = useMemo(() => {
+    if (!cleanCode) return 0;
+    return cleanCode.split("\n").length;
+  }, [cleanCode]);
 
   useEffect(() => {
     // Measure the preview stage so the document preview can scale up to fill
@@ -367,81 +390,13 @@ export const FileCreationCard = memo(function FileCreationCard({
     );
   }
 
-  // ── In-Progress / Creating state (CONTAINER-FREE, TEXT-ONLY PROCESS DROPDOWN) ──
+  // ── In-Progress / Creating state (CONTAINER-FREE, PYTHON CODE DROPDOWN) ───────
   if (stage !== "completed") {
     const statusPhrase = getLiveStatusPhrase(
       stage as FileCreationStage,
       format
     );
-    const currentOrder = STAGE_NUMBERS[stage as FileCreationStage] ?? 1;
-
-    const hasResearch =
-      (researchSourceCount && researchSourceCount > 0) ||
-      ["researching", "searching", "fetching", "analyzing_sources"].includes(
-        stage
-      );
-
-    const steps = [
-      {
-        id: "analyzing",
-        order: 1,
-        label: "Analyzing the request",
-        icon: Sparkles,
-      },
-      ...(hasResearch
-        ? [
-            {
-              id: "researching",
-              order: 2,
-              label:
-                researchSourceCount && researchSourceCount > 0
-                  ? `Gathering verified research (${researchSourceCount} sources)`
-                  : "Gathering verified research",
-              icon: Globe,
-            },
-          ]
-        : []),
-      {
-        id: "planning",
-        order: 3,
-        label: "Structuring the content",
-        icon: LayoutList,
-      },
-      {
-        id: "content",
-        order: 4,
-        label:
-          format === "xlsx" || format === "csv"
-            ? "Writing the spreadsheet"
-            : format === "pptx"
-              ? "Writing the presentation"
-              : "Writing the document",
-        icon:
-          format === "xlsx" || format === "csv"
-            ? Table
-            : format === "pptx"
-              ? Presentation
-              : PenLine,
-      },
-      {
-        id: "designing",
-        order: 5,
-        label: "Formatting the layout",
-        icon: Palette,
-      },
-      {
-        id: "generating",
-        order: 6,
-        label: "Compiling the file",
-        icon: Cpu,
-      },
-      {
-        id: "validating",
-        order: 7,
-        label: "Validating document integrity",
-        icon: ShieldCheck,
-      },
-    ];
+    const defaultDraftCode = `# Generating ${displayName} via Python...\nimport os\nimport sys\n\n# Preparing document structure and content...\n`;
 
     return (
       <div
@@ -475,47 +430,16 @@ export const FileCreationCard = memo(function FileCreationCard({
           />
         </button>
 
-        {/* Process dropdown with step icons before each word */}
+        {/* Process dropdown: Python code block directly instead of artificial checklist */}
         {isExpanded && (
           <div
             data-testid="file-creation-process-list"
-            className="mt-2 space-y-2 pl-8 animate-in fade-in slide-in-from-top-1 duration-150"
+            className="mt-2 w-full max-w-[560px] animate-in fade-in slide-in-from-top-1 duration-150"
           >
-            {steps.map(step => {
-              const StepIcon = step.icon;
-              const isCompleted = currentOrder > step.order;
-              const isActive = currentOrder === step.order;
-
-              return (
-                <div
-                  key={step.id}
-                  className="flex items-center gap-2 text-[13.5px] leading-snug"
-                >
-                  <StepIcon
-                    className={cn(
-                      "size-3.5 shrink-0 transition-colors duration-200",
-                      isActive
-                        ? "text-foreground"
-                        : isCompleted
-                          ? "text-muted-foreground"
-                          : "text-muted-foreground/40"
-                    )}
-                  />
-                  <span
-                    className={cn(
-                      "transition-colors duration-200 select-none",
-                      isActive
-                        ? "font-medium text-foreground"
-                        : isCompleted
-                          ? "text-muted-foreground"
-                          : "text-muted-foreground/40"
-                    )}
-                  >
-                    {step.label}
-                  </span>
-                </div>
-              );
-            })}
+            <KsemoCodeBlock
+              code={code || defaultDraftCode}
+              rawLanguage="python"
+            />
           </div>
         )}
       </div>
@@ -543,65 +467,151 @@ export const FileCreationCard = memo(function FileCreationCard({
     }
   };
 
-  // ── Completed state (PREMIUM FULL-ZOOM DOCUMENT CARD, OPEN ONLY) ────────────
+  const cleanBaseName = useMemo(() => {
+    return displayName.replace(/\.\w+$/, "");
+  }, [displayName]);
+
+  const handleOpenCode = useCallback(() => {
+    if (!cleanCode) return;
+    const codeDataUrl = `data:text/x-python;charset=utf-8,${encodeURIComponent(cleanCode)}`;
+    openPdf({
+      url: codeDataUrl,
+      filename: `${cleanBaseName}.py`,
+      sizeBytes: new Blob([cleanCode]).size,
+      mimeType: "text/x-python",
+      isCode: true,
+    });
+    onOpenCode?.(cleanCode);
+  }, [cleanCode, cleanBaseName, openPdf, onOpenCode]);
+
+  useEffect(() => {
+    if (
+      (initialShowCodeDrawer || initialShowCodeModal || initialShowCodeExpanded) &&
+      cleanCode
+    ) {
+      handleOpenCode();
+    }
+  }, [
+    initialShowCodeDrawer,
+    initialShowCodeModal,
+    initialShowCodeExpanded,
+    cleanCode,
+    handleOpenCode,
+  ]);
+
   return (
     <div
-      data-testid="file-creation-completed"
-      className="my-2 w-full max-w-[440px] sm:max-w-[480px] select-none animate-in fade-in-0 slide-in-from-bottom-2 zoom-in-95 duration-300 ease-out"
+      className={cn(
+        "my-2 w-full max-w-full",
+        code
+          ? "flex flex-col md:flex-row items-stretch gap-1 sm:gap-1.5"
+          : "max-w-[440px] sm:max-w-[480px]"
+      )}
     >
-      <div className="overflow-hidden rounded-2xl border border-border/70 bg-card/70 shadow-sm backdrop-blur-sm dark:bg-card/60">
-        {/* Dark preview frame — the document is offset inside it (asymmetric, layered) */}
-        <div
-          ref={stageRef}
-          data-testid="file-preview-stage"
-          className="relative grid h-[240px] place-items-center overflow-hidden bg-neutral-900 bg-gradient-to-br from-white/[0.06] via-transparent to-transparent shadow-inner ring-1 ring-inset ring-white/5"
-        >
-          <FileDocumentPreview
-            format={format}
-            url={fileUrl}
-            displayName={displayName}
-            variant={variant}
-            availWidth={stageWidth}
-          />
-
-          {showReady && (
-            <span className="absolute top-2 right-2 flex items-center gap-1 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2 py-0.5 text-[10.5px] font-semibold text-emerald-600 dark:text-emerald-400 animate-in fade-in duration-200 backdrop-blur-xs">
-              <Check className="size-3 stroke-[2.5]" />
-              Ready
-            </span>
-          )}
-
-          {/* Short, strong fade at the bottom — between the document and the file bar only */}
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-card via-card/60 to-transparent" />
-        </div>
-
-        {/* File name (left) + Open (right) — solid card bg matching the fade base */}
-        <div className="relative z-10 flex items-center justify-between gap-3 bg-card px-4 py-3">
-          <div className="min-w-0">
-            <p className="truncate text-[15px] font-semibold leading-snug text-foreground">
-              {displayName}
-            </p>
-            <p
-              className="mt-0.5 text-[11.5px] font-bold tracking-wide uppercase"
-              style={{
-                color: FORMAT_TEXT_COLOR[format] ?? "#9AA4B2",
-              }}
-            >
-              {config.ext}
-            </p>
-          </div>
-          <Button
-            size="sm"
+      {/* ── Left Container: File Card (Original Size, 302px height) ── */}
+      <div
+        data-testid="file-creation-completed"
+        className="w-full md:w-[460px] h-[302px] max-h-[302px] shrink-0 select-none animate-in fade-in-0 slide-in-from-bottom-2 zoom-in-95 duration-300 ease-out"
+      >
+        <div className="h-full flex flex-col overflow-hidden rounded-2xl border border-border/70 bg-card/70 shadow-sm backdrop-blur-sm dark:bg-card/60">
+          {/* Dark preview frame: hover reveals "Preview" with identical subtle blur overlay */}
+          <div
+            ref={stageRef}
+            data-testid="file-preview-stage"
+            role="button"
+            tabIndex={0}
             onClick={handleOpen}
-            disabled={!fileUrl}
-            aria-label={`Open ${displayName}`}
-            className="shrink-0 rounded-lg bg-neutral-900 text-neutral-50 hover:bg-neutral-800"
+            onKeyDown={e => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                handleOpen();
+              }
+            }}
+            aria-label={`Preview ${displayName}`}
+            className="group/preview relative flex-1 min-h-0 grid place-items-center overflow-hidden bg-neutral-900 bg-gradient-to-br from-white/[0.06] via-transparent to-transparent shadow-inner ring-1 ring-inset ring-white/5 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
           >
-            Open
-            <ArrowUpRight className="size-3.5" />
-          </Button>
+            <FileDocumentPreview
+              format={format}
+              url={fileUrl}
+              displayName={displayName}
+              variant={variant}
+              availWidth={stageWidth}
+            />
+
+            {showReady && (
+              <span className="absolute top-2 right-2 flex items-center gap-1 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2 py-0.5 text-[10.5px] font-semibold text-emerald-600 dark:text-emerald-400 animate-in fade-in duration-200 backdrop-blur-xs">
+                <Check className="size-3 stroke-[2.5]" />
+                Ready
+              </span>
+            )}
+
+            {/* Hover overlay with matching subtle blur effect & classic Preview Eye icon */}
+            <div
+              data-testid="file-preview-overlay"
+              className="absolute inset-0 z-20 flex items-center justify-center bg-black/20 dark:bg-black/35 backdrop-blur-[1px] opacity-0 transition-opacity duration-150 group-hover/preview:opacity-100"
+            >
+              <span className="inline-flex items-center gap-1.5 rounded-xl border border-border/80 bg-card/95 px-3.5 py-1.5 text-xs font-semibold text-foreground shadow-sm transition-transform duration-150 group-hover/preview:scale-105 select-none">
+                <Eye className="size-3.5 text-foreground" />
+                Preview
+              </span>
+            </div>
+
+            {/* Short, strong fade at the bottom */}
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-card via-card/60 to-transparent" />
+          </div>
+
+          {/* File name (left) + Extension tag — static, separated from preview click */}
+          <div className="relative z-10 flex items-center justify-between gap-3 h-[62px] shrink-0 bg-card px-4 py-3 select-none">
+            <div className="min-w-0">
+              <p className="truncate text-[15px] font-semibold leading-snug text-foreground">
+                {displayName}
+              </p>
+              <p
+                className="mt-0.5 text-[11.5px] font-bold tracking-wide uppercase"
+                style={{
+                  color: FORMAT_TEXT_COLOR[format] ?? "#9AA4B2",
+                }}
+              >
+                {config.ext}
+              </p>
+            </div>
+          </div>
         </div>
       </div>
+
+      {/* ── Right Container: Code container in sidebar color, exact same height as file container ── */}
+      {code && (
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={handleOpenCode}
+          onKeyDown={e => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              handleOpenCode();
+            }
+          }}
+          data-testid="file-code-container"
+          aria-label="Show code"
+          className="group/code relative flex flex-1 min-w-[140px] h-[302px] max-h-[302px] flex-col overflow-hidden rounded-2xl border border-sidebar-border bg-sidebar p-3 shadow-sm cursor-pointer select-none transition-all duration-200 hover:border-border hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 animate-in fade-in-0 slide-in-from-bottom-2 zoom-in-95"
+        >
+          {/* Colorful code snippet: starts from line 1, filling exact height with zero dead space */}
+          <div className="relative z-0 flex-1 overflow-hidden pointer-events-none select-none [&_.ksemo-code-body_pre]:p-0! [&_.ksemo-code-body_pre]:bg-transparent!">
+            <CodeSurface code={codePreviewLines} rawLanguage="python" />
+          </div>
+
+          {/* Hover overlay with exact same subtle blur effect & matching button pill */}
+          <div
+            data-testid="show-code-container-btn"
+            className="absolute inset-0 z-20 flex items-center justify-center bg-black/20 dark:bg-black/35 backdrop-blur-[1px] opacity-0 transition-opacity duration-150 group-hover/code:opacity-100"
+          >
+            <span className="inline-flex items-center gap-1.5 rounded-xl border border-border/80 bg-card/95 px-3.5 py-1.5 text-xs font-semibold text-foreground shadow-sm transition-transform duration-150 group-hover/code:scale-105 select-none">
+              <Code2 className="size-3.5 text-foreground" />
+              Show Code
+            </span>
+          </div>
+        </div>
+      )}
     </div>
   );
 });

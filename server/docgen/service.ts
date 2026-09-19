@@ -21,6 +21,9 @@ import { planDocument } from "./plan";
 import { performResearch, type ResearchResult } from "./research";
 import { validateDocument, type QualityReport } from "./quality";
 import type { Message } from "../_core/llm";
+import { planPresentationOutline, outlineToSlideDefinitions, type OutlineProgressStage } from "./presentation/outline";
+import type { PptOutlinePlan } from "../../shared/presentationOutline";
+import { generatePythonScript } from "./pythonGenerator";
 
 export type GeneratedFileResult = {
   fileId: string;
@@ -39,6 +42,7 @@ export type GeneratedFileResult = {
     words?: number;
   };
   qualityReport?: QualityReport;
+  code?: string;
 };
 
 export type PipelineProgressStage =
@@ -63,6 +67,7 @@ export type PipelineProgressEvent = {
   researchFindingCount?: number;
   qualityPassed?: boolean;
   qualityIssueCount?: number;
+  code?: string;
 };
 
 export type PipelineProgressCallback = (event: PipelineProgressEvent) => void;
@@ -231,11 +236,18 @@ export async function runDocumentPipeline(input: {
   }
   await paceStage(450, signal);
 
+  // Pre-generate Python script so the client can show code immediately
+  let earlyPythonCode: string | undefined;
+  try {
+    earlyPythonCode = generatePythonScript(spec);
+  } catch {}
+
   // ── Stage 5: File Generation ─────────────────────────────────────────
   onProgress({
     stage: "generating",
     format: spec.format,
-    message: "Compiling document",
+    message: "Writing & executing Python generation code",
+    code: earlyPythonCode,
   });
 
   const generated = await generateDocument(spec);
@@ -280,6 +292,7 @@ export async function runDocumentPipeline(input: {
     sources: spec.sources && spec.sources.length > 0 ? spec.sources : undefined,
     metrics,
     qualityReport,
+    code: generated.code,
   };
 }
 
@@ -358,10 +371,20 @@ async function computeFileMetrics(
  * deterministic generators can safely consume.
  */
 export function buildDocumentSpec(plan: Extract<DocumentPlan, { kind: "file" }>): DocumentSpec {
+  const filename = sanitizeFilename(plan.format, plan.filename || plan.title);
+  const cleanTitleFromFilename = filename
+    .replace(/\.\w+$/, "")
+    .replace(/[_-]+/g, " ")
+    .trim();
+  const title =
+    plan.title && !/^(document|untitled|file)$/i.test(plan.title.trim())
+      ? plan.title.trim()
+      : cleanTitleFromFilename || "Document";
+
   const spec: DocumentSpec = {
     format: plan.format,
-    filename: plan.filename,
-    title: plan.title || "Document",
+    filename,
+    title,
     summary: plan.summary,
     theme: plan.theme ?? "modern",
   };
@@ -433,7 +456,8 @@ export async function generateAndDeliverFile(input: {
   metrics?: { pages?: number; sheets?: number; slides?: number; words?: number };
 }): Promise<GeneratedFileResult> {
   const { userId, assistantMessageId, conversationId, spec, generated } = input;
-  const { buffer, filename, mimeType } = generated ?? (await generateDocument(spec));
+  const artifact = generated ?? (await generateDocument(spec));
+  const { buffer, filename, mimeType, code } = artifact;
   const sources =
     input.sources ??
     (spec.sources && spec.sources.length > 0 ? spec.sources : undefined);
@@ -442,6 +466,7 @@ export async function generateAndDeliverFile(input: {
     sources: sources && sources.length > 0 ? sources : undefined,
     metrics: metrics ?? undefined,
     format: spec.format,
+    code: code ?? undefined,
   });
 
   const fileId = crypto.randomUUID();
@@ -498,6 +523,205 @@ export async function generateAndDeliverFile(input: {
     format: spec.format,
     summary,
     sourceCount: spec.sources?.length ?? 0,
+    code,
+  };
+}
+
+// ─── Presentation Outline Pipeline (two-phase PPT flow) ────────────────────
+
+/**
+ * Phase 1 of the two-phase PowerPoint flow: analyze the request, run research
+ * when useful, then produce the user-editable presentation OUTLINE. No .pptx
+ * bytes are generated here — the user reviews + edits the outline, approves it,
+ * then `runPresentationFromOutline` renders the deck.
+ */
+export async function runPresentationOutline(input: {
+  userId: number;
+  assistantMessageId: string;
+  conversationId: string;
+  userMessage: string;
+  history: Message[];
+  onProgress: PipelineProgressCallback;
+  signal?: AbortSignal;
+  presentationConfig?: unknown;
+  presentationStyle?: unknown;
+}): Promise<PptOutlinePlan> {
+  const {
+    userMessage,
+    history,
+    onProgress,
+    signal,
+    presentationConfig,
+    presentationStyle,
+  } = input;
+
+  onProgress({ stage: "analyzing", format: "pptx", message: "Analyzing prompt & scope" });
+  await paceStage(450, signal);
+
+  onProgress({ stage: "planning", format: "pptx", message: "Planning presentation structure" });
+  await paceStage(300, signal);
+
+  // Ground the outline in fresh research when useful (same research stage as the
+  // one-shot pipeline, surfaced through identical progress events).
+  let research: ResearchResult | undefined;
+  try {
+    research = await performResearch(
+      userMessage,
+      history,
+      "pptx",
+      researchStage => {
+        switch (researchStage) {
+          case "searching":
+            onProgress({ stage: "researching", format: "pptx", message: "Searching verified sources" });
+            break;
+          case "fetching":
+            onProgress({ stage: "searching", format: "pptx", message: "Gathering authoritative content" });
+            break;
+          case "analyzing_sources":
+            onProgress({ stage: "analyzing_sources", format: "pptx", message: "Synthesizing research insights" });
+            break;
+          default:
+            onProgress({ stage: "researching", format: "pptx", message: "Researching topic" });
+        }
+      },
+      signal
+    );
+  } catch (error) {
+    console.warn("[DocGen] Research failed; continuing without web research:", error);
+    research = undefined;
+  }
+
+  if (research?.needed && (research.sourceCount ?? 0) > 0) {
+    console.log(`[DocGen] Outline research complete: ${research.sourceCount} sources`);
+  }
+  await paceStage(300, signal);
+
+  onProgress({
+    stage: "content_generated",
+    format: "pptx",
+    message: "Drafting outline & structure",
+    researchSourceCount: research?.sourceCount,
+    researchFindingCount: research?.findings.length,
+  });
+
+  const researchContext = research?.needed
+    ? buildResearchContextText(research)
+    : undefined;
+
+  const outline = await planPresentationOutline({
+    userMessage,
+    history,
+    presentationConfig,
+    presentationStyle,
+    researchContext,
+    signal,
+    onProgress: (stage: OutlineProgressStage) => {
+      if (stage === "content_generated") {
+        onProgress({
+          stage: "content_generated",
+          format: "pptx",
+          message: "Outline ready for review",
+          researchSourceCount: research?.sourceCount,
+          researchFindingCount: research?.findings.length,
+        });
+      }
+    },
+  });
+
+  return outline;
+}
+
+function buildResearchContextText(research: ResearchResult): string {
+  const findingsText = research.findings
+    .map(
+      (f, i) =>
+        `${i + 1}. ${f.topic} (confidence: ${f.confidence})\n   ${f.content}\n   Sources: ${f.sources.join(", ")}`
+    )
+    .join("\n\n");
+
+  const sourcesText = research.sources
+    .map(s => `${s.title} — ${s.url}${s.publisher ? ` (${s.publisher})` : ""}`)
+    .join("\n");
+
+  return `
+RESEARCH FINDINGS (gathered from web sources — USE these facts in the presentation):
+${findingsText}
+
+AVAILABLE SOURCES (cite these where appropriate):
+${sourcesText}
+
+IMPORTANT: Ground the deck content in these findings. Use specific facts, numbers, dates, and names from the findings.
+`;
+}
+
+/**
+ * Phase 2 of the two-phase PowerPoint flow: render the finalized (user-edited)
+ * outline into a real .pptx via the canonical layout engine, store it, record
+ * it in the library, and attach it to the assistant message.
+ */
+export async function runPresentationFromOutline(input: {
+  userId: number;
+  assistantMessageId: string;
+  conversationId: string;
+  outline: PptOutlinePlan;
+  onProgress: PipelineProgressCallback;
+  signal?: AbortSignal;
+}): Promise<GeneratedFileResult> {
+  const { userId, assistantMessageId, conversationId, outline, onProgress, signal } = input;
+
+  onProgress({ stage: "designing", format: "pptx", message: "Formatting layout & typography" });
+  await paceStage(450, signal);
+
+  const slideDefinitions = outlineToSlideDefinitions(outline.slides, outline.title);
+  const spec: DocumentSpec = {
+    format: "pptx",
+    filename: outline.filename,
+    title: outline.title,
+    summary: outline.summary,
+    theme: "modern",
+    slides: slideDefinitions,
+    pptx: { config: outline.config, styleName: outline.styleName },
+  };
+
+  await paceStage(350, signal);
+
+  let earlyPptPythonCode: string | undefined;
+  try {
+    earlyPptPythonCode = generatePythonScript(spec);
+  } catch {}
+
+  onProgress({
+    stage: "generating",
+    format: "pptx",
+    message: "Writing & executing Python presentation generator",
+    code: earlyPptPythonCode,
+  });
+  const generated = await generateDocument(spec);
+  await paceStage(400, signal);
+
+  const metrics = { slides: slideDefinitions.length };
+
+  onProgress({ stage: "validating", format: "pptx", message: "Validating deck integrity" });
+  const qualityReport = validateDocument(spec, generated.buffer);
+  await paceStage(350, signal);
+
+  if (!qualityReport.passed) {
+    console.warn("[DocGen] Presentation quality check found issues:", qualityReport.issues);
+  }
+
+  const result = await generateAndDeliverFile({
+    userId,
+    assistantMessageId,
+    conversationId,
+    spec,
+    summary: outline.summary,
+    generated,
+    metrics,
+  });
+
+  return {
+    ...result,
+    code: generated.code,
   };
 }
 

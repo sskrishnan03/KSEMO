@@ -9,11 +9,8 @@
  * - TXT: Plain text files
  */
 
-import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, Table, TableRow, TableCell, WidthType, BorderStyle } from "docx";
-import PptxGenJS from "pptxgenjs";
-import * as XLSX from "xlsx";
-import { generatePdf as generatePdfDoc } from "./docgen/generate";
-import type { DocBlock } from "./docgen/spec";
+import { generateDocument } from "./docgen/generate";
+import type { DocBlock, DocumentSpec } from "./docgen/spec";
 
 export type FileFormat = "pdf" | "docx" | "xlsx" | "pptx" | "txt";
 
@@ -29,6 +26,7 @@ export interface GeneratedFile {
   mimeType: string;
   data: Buffer;
   size: number;
+  code?: string;
 }
 
 /**
@@ -102,8 +100,7 @@ async function generatePdf(content: string, title?: string, description?: string
   }
 
   const filename = title ? `${sanitizeFilename(title)}.pdf` : "generated_document.pdf";
-
-  const buffer = await generatePdfDoc({
+  const artifact = await generateDocument({
     format: "pdf",
     filename,
     title: title || "Generated Document",
@@ -112,10 +109,11 @@ async function generatePdf(content: string, title?: string, description?: string
   });
 
   return {
-    filename,
-    mimeType: "application/pdf",
-    data: buffer,
-    size: buffer.length,
+    filename: artifact.filename,
+    mimeType: artifact.mimeType,
+    data: artifact.buffer,
+    size: artifact.buffer.length,
+    code: artifact.code,
   };
 }
 
@@ -123,95 +121,69 @@ async function generatePdf(content: string, title?: string, description?: string
  * Generate a DOCX (Word) file with professional formatting.
  */
 async function generateDocx(content: string, title?: string, description?: string): Promise<GeneratedFile> {
-  const paragraphs: Paragraph[] = [];
-  
-  // Add title if provided
+  const blocks: DocBlock[] = [];
   if (title) {
-    paragraphs.push(
-      new Paragraph({
-        text: title,
-        heading: HeadingLevel.HEADING_1,
-        alignment: AlignmentType.CENTER,
-        spacing: { after: 400 },
-      })
-    );
+    blocks.push({ type: "heading", level: 1, text: title });
   }
-  
-  // Add description if provided
   if (description) {
-    paragraphs.push(
-      new Paragraph({
-        text: description,
-        spacing: { after: 400 },
-      })
-    );
+    blocks.push({ type: "paragraph", text: description });
   }
-  
-  // Parse content and convert to paragraphs
   const lines = content.split('\n');
+  let currentParagraph = "";
   for (const line of lines) {
-    if (line.trim() === '') {
-      paragraphs.push(new Paragraph({ text: '' }));
-    } else if (line.startsWith('# ')) {
-      paragraphs.push(
-        new Paragraph({
-          text: line.substring(2),
-          heading: HeadingLevel.HEADING_1,
-          spacing: { before: 400, after: 200 },
-        })
-      );
-    } else if (line.startsWith('## ')) {
-      paragraphs.push(
-        new Paragraph({
-          text: line.substring(3),
-          heading: HeadingLevel.HEADING_2,
-          spacing: { before: 300, after: 200 },
-        })
-      );
-    } else if (line.startsWith('### ')) {
-      paragraphs.push(
-        new Paragraph({
-          text: line.substring(4),
-          heading: HeadingLevel.HEADING_3,
-          spacing: { before: 200, after: 200 },
-        })
-      );
-    } else if (line.startsWith('- ') || line.startsWith('* ')) {
-      paragraphs.push(
-        new Paragraph({
-          children: [
-            new TextRun({
-              text: "• ",
-              bold: true,
-            }),
-            new TextRun(line.substring(2)),
-          ],
-          indent: { left: 720 },
-          spacing: { after: 100 },
-        })
-      );
+    const trimmed = line.trim();
+    if (trimmed.startsWith('# ')) {
+      if (currentParagraph) {
+        blocks.push({ type: "paragraph", text: currentParagraph });
+        currentParagraph = "";
+      }
+      blocks.push({ type: "heading", level: 1, text: trimmed.slice(2).trim() });
+    } else if (trimmed.startsWith('## ')) {
+      if (currentParagraph) {
+        blocks.push({ type: "paragraph", text: currentParagraph });
+        currentParagraph = "";
+      }
+      blocks.push({ type: "heading", level: 2, text: trimmed.slice(3).trim() });
+    } else if (trimmed.startsWith('### ')) {
+      if (currentParagraph) {
+        blocks.push({ type: "paragraph", text: currentParagraph });
+        currentParagraph = "";
+      }
+      blocks.push({ type: "heading", level: 3, text: trimmed.slice(4).trim() });
+    } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+      if (currentParagraph) {
+        blocks.push({ type: "paragraph", text: currentParagraph });
+        currentParagraph = "";
+      }
+      blocks.push({ type: "bulletList", items: [trimmed.slice(2).trim()] });
+    } else if (!trimmed) {
+      if (currentParagraph) {
+        blocks.push({ type: "paragraph", text: currentParagraph });
+        currentParagraph = "";
+      }
     } else {
-      paragraphs.push(
-        new Paragraph({
-          text: line,
-          spacing: { after: 120 },
-        })
-      );
+      currentParagraph = currentParagraph ? `${currentParagraph} ${trimmed}` : trimmed;
     }
   }
-  
-  const doc = new Document({
-    sections: [{ children: paragraphs }],
-  });
-  
-  const buffer = await Packer.toBuffer(doc);
+  if (currentParagraph) {
+    blocks.push({ type: "paragraph", text: currentParagraph });
+  }
+
   const filename = title ? `${sanitizeFilename(title)}.docx` : "generated_document.docx";
-  
-  return {
+  const artifact = await generateDocument({
+    format: "docx",
     filename,
-    mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    data: buffer,
-    size: buffer.length,
+    title: title || "Generated Document",
+    summary: description,
+    blocks: blocks.length ? blocks : [{ type: "paragraph", text: content }],
+  });
+
+  return {
+    filename: artifact.filename,
+    mimeType: artifact.mimeType,
+    data: artifact.buffer,
+    size: artifact.buffer.length,
+    code: artifact.code,
   };
 }
 
@@ -219,45 +191,40 @@ async function generateDocx(content: string, title?: string, description?: strin
  * Generate an XLSX (Excel) file with structured data.
  */
 async function generateXlsx(content: string, title?: string, description?: string): Promise<GeneratedFile> {
-  const workbook = XLSX.utils.book_new();
-  
-  // Parse content to extract structured data
   const lines = content.split('\n');
-  const data: string[][] = [];
+  const data: (string | number)[][] = [];
   
   for (const line of lines) {
     if (line.includes('|')) {
-      // Treat as table row (Markdown table format)
       const cells = line.split('|').map(cell => cell.trim()).filter(cell => cell !== '');
-      if (!cells.some(cell => cell.startsWith('---'))) { // Skip separator lines
+      if (!cells.some(cell => cell.startsWith('---'))) {
         data.push(cells);
       }
     } else if (line.includes(',')) {
-      // Treat as CSV row
       const cells = line.split(',').map(cell => cell.trim());
       data.push(cells);
     } else if (line.trim()) {
-      // Treat as single-column data
       data.push([line.trim()]);
     }
   }
   
-  // Create worksheet
-  const worksheet = XLSX.utils.aoa_to_sheet(data);
-  
-  // Add worksheet to workbook
   const sheetName = title ? sanitizeFilename(title).substring(0, 31) : "Sheet1";
-  XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
-  
-  // Generate buffer
-  const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
   const filename = title ? `${sanitizeFilename(title)}.xlsx` : "generated_spreadsheet.xlsx";
-  
-  return {
+
+  const artifact = await generateDocument({
+    format: "xlsx",
     filename,
-    mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    data: buffer,
-    size: buffer.length,
+    title: title || "Spreadsheet",
+    summary: description,
+    sheets: [{ name: sheetName, rows: data }],
+  });
+
+  return {
+    filename: artifact.filename,
+    mimeType: artifact.mimeType,
+    data: artifact.buffer,
+    size: artifact.buffer.length,
+    code: artifact.code,
   };
 }
 
@@ -265,119 +232,57 @@ async function generateXlsx(content: string, title?: string, description?: strin
  * Generate a PPTX (PowerPoint) presentation.
  */
 async function generatePptx(content: string, title?: string, description?: string): Promise<GeneratedFile> {
-  const pptx = new PptxGenJS();
-  
-  // Set presentation title
-  if (title) {
-    pptx.title = title;
-  }
-  
-  // Parse content into slides
   const lines = content.split('\n');
-  let currentSlide = pptx.addSlide();
-  let bulletLevel = 0;
-  
+  const slides: any[] = [];
+  let currentSlide: { title: string; bullets: string[] } | null = null;
+
   for (const line of lines) {
     const trimmed = line.trim();
-    
-    if (trimmed.startsWith('# ')) {
-      // Main heading - new slide
-      currentSlide = pptx.addSlide();
-      currentSlide.addText(trimmed.substring(2), {
-        x: 0.5,
-        y: 1,
-        w: 9,
-        h: 1,
-        fontSize: 36,
-        bold: true,
-        color: '363636',
-      });
-      bulletLevel = 0;
-    } else if (trimmed.startsWith('## ')) {
-      // Subheading - new slide
-      currentSlide = pptx.addSlide();
-      currentSlide.addText(trimmed.substring(3), {
-        x: 0.5,
-        y: 1,
-        w: 9,
-        h: 1,
-        fontSize: 32,
-        bold: true,
-        color: '363636',
-      });
-      bulletLevel = 0;
-    } else if (trimmed.startsWith('### ')) {
-      // Sub-subheading - same slide, reset bullets
-      currentSlide.addText(trimmed.substring(4), {
-        x: 0.5,
-        y: 2,
-        w: 9,
-        h: 0.8,
-        fontSize: 28,
-        bold: true,
-        color: '525252',
-      });
-      bulletLevel = 0;
+    if (trimmed.startsWith('# ') || trimmed.startsWith('## ')) {
+      if (currentSlide) {
+        slides.push(currentSlide);
+      }
+      currentSlide = {
+        title: trimmed.replace(/^#+\s*/, ''),
+        bullets: [],
+      };
     } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
-      // Bullet point
-      currentSlide.addText(trimmed.substring(2), {
-        x: 0.5 + (bulletLevel * 0.5),
-        y: 2.5 + (bulletLevel * 0.3),
-        w: 9 - (bulletLevel * 0.5),
-        h: 0.5,
-        fontSize: 18,
-        color: '525252',
-        bullet: true,
-      });
-      bulletLevel = Math.min(bulletLevel + 1, 2);
+      if (!currentSlide) {
+        currentSlide = { title: title || "Overview", bullets: [] };
+      }
+      currentSlide.bullets.push(trimmed.substring(2));
     } else if (trimmed) {
-      // Regular text
-      currentSlide.addText(trimmed, {
-        x: 0.5,
-        y: 2.5,
-        w: 9,
-        h: 0.5,
-        fontSize: 18,
-        color: '525252',
-      });
+      if (!currentSlide) {
+        currentSlide = { title: title || "Overview", bullets: [] };
+      }
+      currentSlide.bullets.push(trimmed);
     }
   }
-  
-  // If no slides were created, add a title slide
-  if ((pptx as any).slides?.length === 0) {
-    const titleSlide = pptx.addSlide();
-    titleSlide.addText(title || "Presentation", {
-      x: 0.5,
-      y: 2,
-      w: 9,
-      h: 1.5,
-      fontSize: 44,
-      bold: true,
-      color: '363636',
-      align: 'center',
+  if (currentSlide) {
+    slides.push(currentSlide);
+  }
+  if (slides.length === 0) {
+    slides.push({
+      title: title || "Presentation",
+      bullets: [description || "Generated presentation"],
     });
-    
-    if (description) {
-      titleSlide.addText(description, {
-        x: 0.5,
-        y: 3.5,
-        w: 9,
-        h: 1,
-        fontSize: 20,
-        color: '737373',
-        align: 'center',
-      });
-    }
   }
-  
-  const buffer = (await pptx.write({ outputType: 'nodebuffer' })) as Buffer;
+
   const filename = title ? `${sanitizeFilename(title)}.pptx` : "generated_presentation.pptx";
-  
-  return {
+  const artifact = await generateDocument({
+    format: "pptx",
     filename,
-    mimeType: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-    data: buffer,
-    size: buffer.length,
+    title: title || "Presentation",
+    summary: description,
+    slides,
+  });
+
+  return {
+    filename: artifact.filename,
+    mimeType: artifact.mimeType,
+    data: artifact.buffer,
+    size: artifact.buffer.length,
+    code: artifact.code,
   };
 }
 
@@ -385,22 +290,20 @@ async function generatePptx(content: string, title?: string, description?: strin
  * Generate a plain text file.
  */
 async function generateTxt(content: string, title?: string): Promise<GeneratedFile> {
-  let text = "";
-  
-  if (title) {
-    text += `${title}\n${'='.repeat(title.length)}\n\n`;
-  }
-  
-  text += content;
-  
-  const buffer = Buffer.from(text, 'utf-8');
   const filename = title ? `${sanitizeFilename(title)}.txt` : "generated_document.txt";
-  
-  return {
+  const artifact = await generateDocument({
+    format: "txt",
     filename,
-    mimeType: "text/plain",
-    data: buffer,
-    size: buffer.length,
+    title: title || "Document",
+    blocks: [{ type: "paragraph", text: content }],
+  });
+
+  return {
+    filename: artifact.filename,
+    mimeType: artifact.mimeType,
+    data: artifact.buffer,
+    size: artifact.buffer.length,
+    code: artifact.code,
   };
 }
 

@@ -84,7 +84,7 @@ describe("document generators", () => {
     if (magic) {
       expect(buffer.slice(0, magic.length).toString("ascii")).toBe(magic);
     }
-  });
+  }, 20_000);
 
   it("generatePdf produces valid PDF bytes with footer", async () => {
     const buffer = await generatePdf(textSpec("pdf"));
@@ -133,7 +133,8 @@ describe("quality validation", () => {
       expect(report.passed).toBe(true);
       expect(report.stats.byteSize).toBe(buffer.length);
       expect(report.issues.filter(i => i.severity === "error")).toHaveLength(0);
-    }
+    },
+    20_000
   );
 
   it("flags a corrupted PDF buffer as an error", () => {

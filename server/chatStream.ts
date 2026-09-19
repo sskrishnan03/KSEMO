@@ -4,6 +4,7 @@ import {
   createConversationForUser,
   createMessage,
   getConversationForUser,
+  getMessageForUser,
   getUserPreferences,
   listMessageFilesForUser,
   listMessagesForConversation,
@@ -26,9 +27,13 @@ import {
 } from "./docgen/detect";
 import {
   runDocumentPipeline,
+  runPresentationOutline,
+  runPresentationFromOutline,
   type GeneratedFileResult,
   type PipelineProgressEvent,
 } from "./docgen/service";
+import { buildOutlineMetadata } from "./docgen/presentation/outline";
+import { isPptOutlinePlan, type PptOutlinePlan } from "@shared/presentationOutline";
 import type { CapabilityMode } from "@shared/capabilities";
 import { ensureExtractedContent } from "./fileExtract";
 import {
@@ -565,6 +570,7 @@ export function registerChatStream(app: Express) {
         // 2. Natural language detection from user message ("I want this in PDF",
         //    "give me this in Word", "create an excel sheet...", etc.)
         let deliveredFile: GeneratedFileResult | null = null;
+        let outlineDelivered = false;
         let fileModeFailed = false;
         // Resolve the active capability mode (moves Normal Chat -> a specific
         // file format). `mode` is the source of truth; `documentFormat` is kept
@@ -591,61 +597,131 @@ export function registerChatStream(app: Express) {
           forcedFormat ?? (detected?.isFileRequest && detected.format && FILE_FORMATS.has(detected.format) ? (detected.format as GeneratedFileResult["format"]) : null);
 
         if (targetFormat) {
-          try {
-            // Clean command prefixes if present while preserving core prompt
-            const cleanUserMessage = detected?.cleanedPrompt || cleanPromptText(content ?? "", targetFormat);
+          const cleanUserMessage = detected?.cleanedPrompt || cleanPromptText(content ?? "", targetFormat);
 
-            // Run the full intelligent document generation pipeline.
-            // Each pipeline stage emits real progress events that the
-            // client renders as meaningful live stages.
-            deliveredFile = await runDocumentPipeline({
-              userId: user.id,
-              assistantMessageId,
-              conversationId: conversation.id,
-              userMessage: cleanUserMessage || content || "",
-              format: targetFormat,
-              history: filteredAssistantContext,
-              presentationConfig: targetFormat === "pptx" ? body.pptConfig : undefined,
-              presentationStyle: targetFormat === "pptx" ? body.pptStyle : undefined,
-              onProgress: (event: PipelineProgressEvent) => {
-                writeEvent(res, "file.progress", {
-                  messageId: assistantMessageId,
-                  stage: event.stage,
-                  format: event.format,
-                  message: event.message,
-                  researchSourceCount: event.researchSourceCount,
-                  researchFindingCount: event.researchFindingCount,
-                  qualityPassed: event.qualityPassed,
-                  qualityIssueCount: event.qualityIssueCount,
-                });
-              },
-              signal: generationSignal,
-            });
+          if (targetFormat === "pptx") {
+            // ── Phase 1 (pptx): OUTLINE ONLY ─────────────────────────────
+            // Produce the user-editable presentation outline (analysis +
+            // structured slides), persist it to message metadata, and stream a
+            // `file.outline` event. The .pptx is NOT generated yet — the user
+            // reviews/edits the outline and approves it, which runs the second
+            // phase via POST /api/chat/presentation/stream.
+            try {
+              const outline = await runPresentationOutline({
+                userId: user.id,
+                assistantMessageId,
+                conversationId: conversation.id,
+                userMessage: cleanUserMessage || content || "",
+                history: filteredAssistantContext,
+                presentationConfig: body.pptConfig,
+                presentationStyle: body.pptStyle,
+                onProgress: (event: PipelineProgressEvent) => {
+                  writeEvent(res, "file.progress", {
+                    messageId: assistantMessageId,
+                    stage: event.stage,
+                    format: event.format,
+                    message: event.message,
+                    researchSourceCount: event.researchSourceCount,
+                    researchFindingCount: event.researchFindingCount,
+                  });
+                },
+                signal: generationSignal,
+              });
 
-            writeEvent(res, "file.created", {
-              messageId: assistantMessageId,
-              file: deliveredFile,
-            });
+              await updateMessage(assistantMessageId, {
+                metadata: {
+                  pptOutline: buildOutlineMetadata(
+                    outline,
+                    cleanUserMessage || content || ""
+                  ),
+                },
+              });
 
-            responseText = deliveredFile.summary;
-            for (let i = 0; i < responseText.length; i += 64) {
-              writeEvent(res, "assistant.delta", {
+              writeEvent(res, "file.progress", {
                 messageId: assistantMessageId,
-                delta: responseText.slice(i, i + 64),
+                stage: "outline",
+                format: "pptx",
+                message: "Outline ready — review & approve",
+              });
+
+              writeEvent(res, "file.outline", {
+                messageId: assistantMessageId,
+                outline,
+              });
+
+              // Settle the assistant message with the outline summary so the
+              // turn completes; the client renders the outline editor instead
+              // of a plain text answer, and no file exists yet.
+              responseText = outline.summary;
+              outlineDelivered = true;
+            } catch (error) {
+              console.warn("[ChatStream] presentation outline failed", error);
+              fileModeFailed = true;
+              writeEvent(res, "file.error", {
+                messageId: assistantMessageId,
+                message:
+                  error instanceof Error
+                    ? `Could not plan your presentation: ${error.message}`
+                    : "Could not plan your presentation. Please try again.",
               });
             }
-          } catch (error) {
-            console.warn(
-              "[ChatStream] file generation failed",
-              error
-            );
-            fileModeFailed = true;
-            writeEvent(res, "file.error", {
-              messageId: assistantMessageId,
-              message: error instanceof Error
-                ? `File generation failed: ${error.message}`
-                : "File generation could not be completed. Please try again.",
-            });
+          } else {
+            try {
+              // Clean command prefixes if present while preserving core prompt
+              // Run the full intelligent document generation pipeline.
+              // Each pipeline stage emits real progress events that the
+              // client renders as meaningful live stages.
+              deliveredFile = await runDocumentPipeline({
+                userId: user.id,
+                assistantMessageId,
+                conversationId: conversation.id,
+                userMessage: cleanUserMessage || content || "",
+                format: targetFormat,
+                history: filteredAssistantContext,
+                // pptx never reaches this branch — it uses the outline flow.
+                presentationConfig: undefined,
+                presentationStyle: undefined,
+                onProgress: (event: PipelineProgressEvent) => {
+                  writeEvent(res, "file.progress", {
+                    messageId: assistantMessageId,
+                    stage: event.stage,
+                    format: event.format,
+                    message: event.message,
+                    researchSourceCount: event.researchSourceCount,
+                    researchFindingCount: event.researchFindingCount,
+                    qualityPassed: event.qualityPassed,
+                    qualityIssueCount: event.qualityIssueCount,
+                    code: event.code,
+                  });
+                },
+                signal: generationSignal,
+              });
+
+              writeEvent(res, "file.created", {
+                messageId: assistantMessageId,
+                file: deliveredFile,
+              });
+
+              responseText = deliveredFile.summary;
+              for (let i = 0; i < responseText.length; i += 64) {
+                writeEvent(res, "assistant.delta", {
+                  messageId: assistantMessageId,
+                  delta: responseText.slice(i, i + 64),
+                });
+              }
+            } catch (error) {
+              console.warn(
+                "[ChatStream] file generation failed",
+                error
+              );
+              fileModeFailed = true;
+              writeEvent(res, "file.error", {
+                messageId: assistantMessageId,
+                message: error instanceof Error
+                  ? `File generation failed: ${error.message}`
+                  : "File generation could not be completed. Please try again.",
+              });
+            }
           }
         }
 
@@ -657,6 +733,7 @@ export function registerChatStream(app: Express) {
         if (
           !deliveredFile &&
           !fileModeFailed &&
+          !outlineDelivered &&
           !targetFormat
         ) {
           try {
@@ -852,6 +929,216 @@ export function registerChatStream(app: Express) {
       if (!res.headersSent)
         res.status(500).json({ error: "Unable to start the response stream." });
       else if (!res.writableEnded) res.end();
+    }
+  });
+
+  // -----------------------------------------------------------------------
+  // Presentation approve & generate endpoint (Phase 2 of two-phase PPT flow)
+  //
+  // Called when the user edits the outline in the chat and clicks "Generate
+  // presentation". Runs the layout engine, export, and storage; emits
+  // file.progress / file.created events; then settles the assistant message.
+  // Reuses the same SSE machinery so the client's existing file-progress UI
+  // and FileCreationCard work without changes.
+  // -----------------------------------------------------------------------
+  app.post("/api/chat/presentation/stream", async (req: Request, res: Response) => {
+    let user;
+    try {
+      user = await sdk.authenticateRequest(req);
+    } catch (error) {
+      if (error instanceof DatabaseUnavailableError || error instanceof SessionLookupError) {
+        res.status(503).json({
+          error: "KSEMO's data store is temporarily unavailable. Please try again.",
+        });
+        return;
+      }
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
+    if (!user) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
+
+    const body = req.body as {
+      assistantMessageId?: string;
+      conversationId?: string;
+      outline?: unknown;
+      pptConfig?: Record<string, unknown>;
+      pptStyle?: string;
+    };
+
+    if (!body.assistantMessageId || !body.conversationId || !body.outline) {
+      res.status(400).json({ error: "assistantMessageId, conversationId, and outline are required." });
+      return;
+    }
+
+    // Validate outline structure before doing any work
+    if (!isPptOutlinePlan(body.outline)) {
+      res.status(400).json({ error: "Invalid presentation outline. Please regenerate the outline and try again." });
+      return;
+    }
+
+    // Validate the assistant message exists, is in this conversation, and
+    // belongs to the authenticated user.
+    const message = await getMessageForUser(body.assistantMessageId, user.id);
+    if (!message) {
+      res.status(404).json({ error: "Message not found" });
+      return;
+    }
+    if (message.conversationId !== body.conversationId) {
+      res.status(400).json({ error: "Message does not belong to this conversation" });
+      return;
+    }
+
+    const conversation = await getConversationForUser(body.conversationId, user.id);
+    if (!conversation) {
+      res.status(404).json({ error: "Conversation not found" });
+      return;
+    }
+
+    // The prompt recorded in metadata is the user message that preceded this
+    // assistant message (the assistant placeholder content is always empty
+    // during the outline phase).
+    let outlinePrompt = "";
+    try {
+      const conversationMessages = await listMessagesForConversation(body.conversationId);
+      const assistantIndex = conversationMessages.findIndex(m => m.id === body.assistantMessageId);
+      const sourceUser = assistantIndex >= 0
+        ? [...conversationMessages.slice(0, assistantIndex)].reverse().find(m => m.role === "user")
+        : undefined;
+      outlinePrompt = sourceUser?.content ?? "";
+    } catch {}
+
+    // Persist the (potentially user-edited) outline so it survives a refresh
+    await updateMessage(body.assistantMessageId, {
+      metadata: {
+        pptOutline: {
+          kind: "pptOutline",
+          outline: body.outline,
+          prompt: outlinePrompt,
+          updatedAt: new Date().toISOString(),
+          headerText: (body.outline as PptOutlinePlan).summary || "",
+        },
+      },
+    });
+
+    res.status(200);
+    res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+    res.setHeader("Cache-Control", "no-cache, no-transform");
+    res.setHeader("Connection", "keep-alive");
+    res.flushHeaders();
+
+    let finished = false;
+    const controller = new AbortController();
+    res.on("close", () => { if (!finished) controller.abort(); });
+
+    const heartbeat = setInterval(() => {
+      if (!finished && !res.writableEnded && !res.destroyed) {
+        try { res.write(": ping\n\n"); } catch {}
+      }
+    }, HEARTBEAT_INTERVAL_MS);
+    const deadline = createDeadlineTimer(GENERATION_DEADLINE_MS);
+    const generationSignal = composeAbortSignals(controller.signal, deadline.signal);
+
+    let settled = false;
+    try {
+      const outlinePlan = body.outline as PptOutlinePlan;
+
+      writeEvent(res, "conversation", {
+        conversationId: body.conversationId,
+        title: conversation.title,
+        userMessageId: message.conversationId,
+        assistantMessageId: body.assistantMessageId,
+      });
+
+      const result = await runPresentationFromOutline({
+        userId: user.id,
+        assistantMessageId: body.assistantMessageId,
+        conversationId: body.conversationId,
+        outline: outlinePlan,
+        onProgress: (event: PipelineProgressEvent) => {
+          writeEvent(res, "file.progress", {
+            messageId: body.assistantMessageId,
+            stage: event.stage,
+            format: event.format,
+            message: event.message,
+            researchSourceCount: event.researchSourceCount,
+            researchFindingCount: event.researchFindingCount,
+            qualityPassed: event.qualityPassed,
+            qualityIssueCount: event.qualityIssueCount,
+            code: event.code,
+          });
+        },
+        signal: generationSignal,
+      });
+
+      // Persist the outline once more with an updated timestamp so the client
+      // knows the version that produced this specific .pptx
+      await updateMessage(body.assistantMessageId, {
+        metadata: {
+          pptOutline: {
+            kind: "pptOutline",
+            outline: outlinePlan,
+            prompt: outlinePrompt,
+            updatedAt: new Date().toISOString(),
+            headerText: outlinePlan.summary,
+          },
+        },
+      });
+
+      writeEvent(res, "file.created", {
+        messageId: body.assistantMessageId,
+        file: result,
+      });
+
+      const summary = outlinePlan.summary || result.summary;
+      for (let i = 0; i < summary.length; i += 64) {
+        writeEvent(res, "assistant.delta", {
+          messageId: body.assistantMessageId,
+          delta: summary.slice(i, i + 64),
+        });
+      }
+
+      await updateMessage(body.assistantMessageId, {
+        content: summary,
+        status: "completed",
+        metadata: {
+          pptOutline: {
+            kind: "pptOutline",
+            outline: outlinePlan,
+            prompt: outlinePrompt,
+            updatedAt: new Date().toISOString(),
+            headerText: outlinePlan.summary,
+          },
+        },
+      });
+      settled = true;
+
+      writeEvent(res, "assistant.completed", {
+        messageId: body.assistantMessageId,
+      });
+    } catch (error) {
+      console.warn("[ChatStream] presentation generation failed", error);
+      if (!controller.signal.aborted) {
+        writeEvent(res, "file.error", {
+          messageId: body.assistantMessageId,
+          message:
+            error instanceof Error
+              ? `Presentation generation failed: ${error.message}`
+              : "Presentation generation could not be completed. Please try again.",
+        });
+        try {
+          await updateMessage(body.assistantMessageId, {
+            status: "failed",
+          });
+        } catch {}
+      }
+    } finally {
+      finished = true;
+      clearInterval(heartbeat);
+      deadline.clear();
+      if (!res.writableEnded) res.end();
     }
   });
 }

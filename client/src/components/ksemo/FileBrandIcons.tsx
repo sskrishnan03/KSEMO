@@ -1,5 +1,6 @@
 import React, { memo, useId } from "react";
 import type { ComponentType } from "react";
+import { Code2 } from "lucide-react";
 import {
   ExcelLogo,
   ImageLogo,
@@ -8,6 +9,10 @@ import {
   TextLogo,
   WordLogo,
 } from "./FileBrandLogos";
+
+function CodeLogo({ className }: { className?: string }) {
+  return <Code2 className={className} />;
+}
 
 // File format icons: PDF / Word / Excel / PowerPoint / Text render KSEMO's
 // custom format icon set, while the remaining variants use a colored document
@@ -33,6 +38,7 @@ const BRAND_LOGOS: Partial<Record<FileBrandVariant, ComponentType<{ className?: 
   powerpoint: PowerPointLogo,
   text: TextLogo,
   image: ImageLogo,
+  code: CodeLogo,
 };
 
 type BrandStyle = {
@@ -169,7 +175,20 @@ export function brandVariantForExt(ext: string): FileBrandVariant {
   if (e === "xls" || e === "xlsx" || e === "csv" || e === "tsv") return "excel";
   if (e === "ppt" || e === "pptx") return "powerpoint";
   if (e === "txt" || e === "log" || e === "md" || e === "markdown") return "text";
-  if (e === "json" || e === "xml" || e === "yml" || e === "yaml")
+  if (
+    e === "json" ||
+    e === "xml" ||
+    e === "yml" ||
+    e === "yaml" ||
+    e === "py" ||
+    e === "python" ||
+    e === "js" ||
+    e === "ts" ||
+    e === "jsx" ||
+    e === "tsx" ||
+    e === "sql" ||
+    e === "sh"
+  )
     return "code";
   if (
     /^(png|jpe?g|webp|gif|bmp|svg|avif)$/.test(e) ||

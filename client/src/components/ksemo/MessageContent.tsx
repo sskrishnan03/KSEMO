@@ -36,6 +36,7 @@ import { Streamdown } from "streamdown";
 import { KsemoMarkdownCode } from "./code-block";
 import { sanitizeAssistantText } from "@/lib/sanitizeAssistant";
 import { usePdfViewer, isViewableDocument } from "@/contexts/PdfViewerContext";
+import type { PptOutlinePlan } from "@shared/presentationOutline";
 
 type KsemoMessage = {
   id: string;
@@ -64,6 +65,8 @@ type KsemoMessage = {
       words?: number;
     };
     summary?: string;
+    outline?: PptOutlinePlan;
+    code?: string;
   };
 };
 

@@ -38,6 +38,8 @@ import type {
 import { sanitizeFilename, THEME_PALETTES } from "./spec";
 import { DEFAULT_PRESENTATION_CONFIG } from "@shared/presentation";
 import { generateDeck } from "./presentation/engine";
+import { generatePythonScript } from "./pythonGenerator";
+import { executePythonCode } from "../services/pythonExecutor";
 
 // ---------------------------------------------------------------------------
 // Shared helpers
@@ -1638,6 +1640,7 @@ export type GeneratedArtifact = {
   buffer: Buffer;
   filename: string;
   mimeType: string;
+  code?: string;
 };
 
 export async function generateDocument(spec: DocumentSpec): Promise<GeneratedArtifact> {
@@ -1649,31 +1652,64 @@ export async function generateDocument(spec: DocumentSpec): Promise<GeneratedArt
     pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
     txt: "text/plain",
   };
-  let buffer: Buffer;
+
+  // Step 1: Generate clean, production Python code for this document
+  let pythonCode: string | undefined;
   try {
-    switch (spec.format) {
-      case "docx":
-        buffer = await generateDocx(spec);
-        break;
-      case "xlsx":
-        buffer = generateXlsx(spec);
-        break;
-      case "pptx":
-        buffer = await generatePptx(spec);
-        break;
-      case "pdf":
-        buffer = await generatePdf(spec);
-        break;
-      case "txt":
-        buffer = generateTxt(spec);
-        break;
-      default:
-        buffer = generateTxt(spec);
-        break;
-    }
-  } catch (genError) {
-    console.warn(`[DocGen] Specific generator for ${spec.format} encountered an issue; falling back to clean text compilation.`, genError);
-    buffer = generateTxt(spec);
+    pythonCode = generatePythonScript(spec);
+  } catch (err) {
+    console.warn(`[DocGen] Failed to generate Python script for ${spec.format}:`, err);
   }
-  return { buffer, filename, mimeType: mimeTypes[spec.format] || "application/octet-stream" };
+
+  // Step 2: Execute the Python code in our sandbox to create the file
+  let buffer: Buffer | null = null;
+  if (pythonCode) {
+    try {
+      const execResult = await executePythonCode(pythonCode, filename);
+      if (execResult.success && execResult.fileBuffer && execResult.fileBuffer.length > 0) {
+        buffer = execResult.fileBuffer;
+        console.log(`[DocGen] Successfully generated ${spec.format} (${filename}) via Python (${buffer.length} bytes)`);
+      } else {
+        console.warn(`[DocGen] Python execution completed with issue: ${execResult.error || execResult.stderr}`);
+      }
+    } catch (pyErr) {
+      console.warn(`[DocGen] Python execution error for ${spec.format}; will fall back to JS generator:`, pyErr);
+    }
+  }
+
+  // Step 3: Fallback to JS generator if Python execution was unavailable or failed
+  if (!buffer) {
+    try {
+      switch (spec.format) {
+        case "docx":
+          buffer = await generateDocx(spec);
+          break;
+        case "xlsx":
+          buffer = generateXlsx(spec);
+          break;
+        case "pptx":
+          buffer = await generatePptx(spec);
+          break;
+        case "pdf":
+          buffer = await generatePdf(spec);
+          break;
+        case "txt":
+          buffer = generateTxt(spec);
+          break;
+        default:
+          buffer = generateTxt(spec);
+          break;
+      }
+    } catch (genError) {
+      console.warn(`[DocGen] Specific generator for ${spec.format} encountered an issue; falling back to clean text compilation.`, genError);
+      buffer = generateTxt(spec);
+    }
+  }
+
+  return {
+    buffer,
+    filename,
+    mimeType: mimeTypes[spec.format] || "application/octet-stream",
+    code: pythonCode,
+  };
 }

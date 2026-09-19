@@ -5,7 +5,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { Check, Copy, Download } from "lucide-react";
+import { Check, Code2, Copy, Download } from "lucide-react";
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { codeToHtml } from "shiki";
 
@@ -109,12 +109,7 @@ export function codeBlockDownloadName(rawLanguage?: string) {
 
 function LanguageIcon() {
   return (
-    <span
-      className="grid size-6 shrink-0 place-items-center font-mono text-[11px] font-semibold text-muted-foreground"
-      aria-hidden
-    >
-      &lt;/&gt;
-    </span>
+    <Code2 className="size-4.5 shrink-0 text-muted-foreground" aria-hidden />
   );
 }
 
@@ -163,9 +158,9 @@ function CopyCodeButton({ code }: { code: string }) {
           variant="ghost"
           size="icon"
           className={cn(
-            "size-7 rounded-md transition-colors",
+            "size-8 sm:size-8.5 rounded-lg transition-colors",
             copied
-              ? "text-foreground"
+              ? "text-foreground bg-accent/60"
               : "text-muted-foreground hover:bg-accent hover:text-foreground"
           )}
           onClick={copy}
@@ -173,9 +168,9 @@ function CopyCodeButton({ code }: { code: string }) {
           aria-label={label}
         >
           {copied ? (
-            <Check className="size-3.5" aria-hidden />
+            <Check className="size-4.5 stroke-[2.2]" aria-hidden />
           ) : (
-            <Copy className="size-3.5" aria-hidden />
+            <Copy className="size-4.5" aria-hidden />
           )}
         </Button>
       </TooltipTrigger>
@@ -215,12 +210,12 @@ function DownloadCodeButton({
           type="button"
           variant="ghost"
           size="icon"
-          className="size-7 rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
+          className="size-8 sm:size-8.5 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
           onClick={download}
           disabled={!code}
           aria-label="Download code"
         >
-          <Download className="size-3.5" aria-hidden />
+          <Download className="size-4.5" aria-hidden />
         </Button>
       </TooltipTrigger>
       <TooltipContent side="bottom">
@@ -238,14 +233,14 @@ function KsemoCodeBlockHeader({
   rawLanguage?: string;
 }) {
   return (
-    <div className="flex items-center justify-between gap-3 border-b border-border/60 px-3 py-2">
-      <span className="flex min-w-0 items-center gap-2">
+    <div className="flex items-center justify-between gap-3 border-b border-border/60 px-3.5 py-2.5 sm:px-4 sm:py-3">
+      <span className="flex min-w-0 items-center gap-2 sm:gap-2.5">
         <LanguageIcon />
-        <span className="truncate font-mono text-xs font-medium lowercase tracking-wide text-muted-foreground">
+        <span className="truncate font-mono text-sm sm:text-[14.5px] font-semibold lowercase tracking-wide text-muted-foreground/90">
           {codeBlockLanguageLabel(rawLanguage)}
         </span>
       </span>
-      <div className="flex shrink-0 items-center gap-1.5">
+      <div className="flex shrink-0 items-center gap-2">
         <DownloadCodeButton code={code} rawLanguage={rawLanguage} />
         <CopyCodeButton code={code} />
       </div>
@@ -253,13 +248,21 @@ function KsemoCodeBlockHeader({
   );
 }
 
-function CodeSurface({
+export function stripShebang(code: string): string {
+  if (!code) return "";
+  return code.replace(/^#!.*(\r?\n)+/, "");
+}
+
+export function CodeSurface({
   code,
   rawLanguage,
+  className,
 }: {
   code: string;
   rawLanguage?: string;
+  className?: string;
 }) {
+  const sanitizedCode = useMemo(() => stripShebang(code), [code]);
   const [html, setHtml] = useState<string>("");
   const debounceRef = useRef<number | null>(null);
 
@@ -269,7 +272,7 @@ function CodeSurface({
     const validLang = lang && lang in LANGUAGE_META ? lang : "text";
 
     const run = () => {
-      highlightCode(code, validLang)
+      highlightCode(sanitizedCode, validLang)
         .then(result => {
           if (!cancelled) setHtml(result);
         })
@@ -289,13 +292,13 @@ function CodeSurface({
       if (debounceRef.current !== null) window.clearTimeout(debounceRef.current);
       debounceRef.current = null;
     };
-  }, [code, rawLanguage]);
+  }, [sanitizedCode, rawLanguage]);
 
   return (
     // Deliberately NOT a vertical scroll container. Horizontal overflow is
     // handled by the <pre> itself so vertical wheel/trackpad movement always
     // chains up to the main conversation scroller.
-    <div className="ksemo-code-body">
+    <div className={cn("ksemo-code-body", className)}>
       {html ? (
         <div
           className="[&>pre]:m-0 [&>pre]:bg-transparent"
@@ -303,7 +306,7 @@ function CodeSurface({
         />
       ) : (
         <pre data-code-pre="plain">
-          <code>{code}</code>
+          <code>{sanitizedCode}</code>
         </pre>
       )}
     </div>
@@ -313,10 +316,13 @@ function CodeSurface({
 export function KsemoCodeBlock({
   code,
   rawLanguage,
+  className,
 }: {
   code: string;
   rawLanguage?: string;
+  className?: string;
 }) {
+  const sanitizedCode = useMemo(() => stripShebang(code), [code]);
   const { id } = normalizeLanguage(rawLanguage);
   const blockStyle = useMemo(
     () => ({ contentVisibility: "auto" as const, containIntrinsicSize: "auto 200px" as const }),
@@ -324,13 +330,16 @@ export function KsemoCodeBlock({
   );
   return (
     <div
-      className="my-4 w-full overflow-hidden rounded-xl border border-border/70 bg-muted"
+      className={cn(
+        "my-4 w-full overflow-hidden rounded-xl border border-border/70 bg-muted",
+        className
+      )}
       data-language={id || "text"}
       style={blockStyle}
       aria-label={`${codeBlockLanguageLabel(rawLanguage)} code block`}
     >
-      <KsemoCodeBlockHeader code={code} rawLanguage={rawLanguage} />
-      <CodeSurface code={code} rawLanguage={rawLanguage} />
+      <KsemoCodeBlockHeader code={sanitizedCode} rawLanguage={rawLanguage} />
+      <CodeSurface code={sanitizedCode} rawLanguage={rawLanguage} />
     </div>
   );
 }

@@ -23,6 +23,7 @@ import {
 import { downloadFile } from "@/lib/downloadFile";
 import { trpc } from "@/lib/trpc";
 import { FileBrandMark, brandVariantForExt } from "./FileBrandIcons";
+import { KsemoCodeBlock } from "./code-block";
 import {
   ChevronLeft,
   ChevronRight,
@@ -30,6 +31,7 @@ import {
   ChevronsLeft,
   ChevronsRight,
   ChevronsUp,
+  Code2,
   Download,
   Minus,
   Pencil,
@@ -2945,6 +2947,12 @@ export const PdfDrawer = memo(function PdfDrawer() {
     ? isText(currentPdf.filename, currentPdf.mimeType)
     : false;
   const ext = currentPdf?.filename.split(".").pop() || "";
+  const isCodeDoc = Boolean(
+    currentPdf?.isCode ||
+    currentPdf?.mimeType === "text/x-python" ||
+    ext.toLowerCase() === "py" ||
+    ext.toLowerCase() === "python"
+  );
   const brandVariant = brandVariantForExt(ext);
   const pptxCount = canonicalSpec
     ? canonicalSpec.slides.length
@@ -2952,6 +2960,7 @@ export const PdfDrawer = memo(function PdfDrawer() {
 
   // Measure container width to dynamically calculate "Fit" scale
   const updateWidth = useCallback(() => {
+    if (isCodeDoc) return;
     if (scrollContainerRef.current) {
       const width = scrollContainerRef.current.clientWidth;
       setContainerWidth(width);
@@ -2960,7 +2969,7 @@ export const PdfDrawer = memo(function PdfDrawer() {
         setScale(Math.min(available / basePageWidthRef.current, 2.5));
       }
     }
-  }, [isFit]);
+  }, [isFit, isCodeDoc]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -3182,10 +3191,15 @@ export const PdfDrawer = memo(function PdfDrawer() {
           }
 
           setTextContent(formattedText);
-          basePageWidthRef.current = 800;
-          const available = Math.max(containerWidth - 64, 280);
-          setScale(Math.min(available / 800, 1.25));
-          setIsFit(true);
+          if (!isCodeDoc) {
+            basePageWidthRef.current = 800;
+            const available = Math.max(containerWidth - 64, 280);
+            setScale(Math.min(available / 800, 1.25));
+            setIsFit(true);
+          } else {
+            setScale(1.0);
+            setIsFit(false);
+          }
           setIsLoading(false);
         } else {
           // Unsupported direct preview
@@ -3355,11 +3369,12 @@ export const PdfDrawer = memo(function PdfDrawer() {
 
   // Touchpad pinch-to-zoom / Ctrl+Wheel zoom handler
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || isCodeDoc) return;
     const container = scrollContainerRef.current;
     if (!container) return;
 
     const handleWheel = (e: WheelEvent) => {
+      if (isCodeDoc) return;
       if (e.ctrlKey) {
         e.preventDefault();
         if (isPowerPointDoc) {
@@ -3382,7 +3397,7 @@ export const PdfDrawer = memo(function PdfDrawer() {
     return () => {
       container.removeEventListener("wheel", handleWheel);
     };
-  }, [isOpen, isPowerPointDoc, handlePptZoomIn, handlePptZoomOut]);
+  }, [isOpen, isCodeDoc, isPowerPointDoc, handlePptZoomIn, handlePptZoomOut]);
 
   // Scroll to a specific PowerPoint slide
   const scrollToSlide = useCallback((slideNum: number) => {
@@ -3425,6 +3440,10 @@ export const PdfDrawer = memo(function PdfDrawer() {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         closePdf();
+        return;
+      }
+
+      if (isCodeDoc) {
         return;
       }
 
@@ -3631,14 +3650,18 @@ export const PdfDrawer = memo(function PdfDrawer() {
       <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-border bg-card/90 px-3 sm:px-4 backdrop-blur-md">
         {/* Left Side: Only the File Name, Brand mark, and mobile Slides toggle */}
         <div className="flex min-w-0 items-center gap-2 sm:gap-2.5">
-          <FileBrandMark variant={brandVariant} className="size-6 shrink-0" />
-          <p
-            className="truncate text-sm font-semibold text-foreground leading-normal"
-            title={currentPdf.filename}
-            data-testid="pdf-drawer-filename"
-          >
-            {currentPdf.filename}
-          </p>
+          {!isCodeDoc && (
+            <>
+              <FileBrandMark variant={brandVariant} className="size-6 shrink-0" />
+              <p
+                className="truncate text-sm font-semibold text-foreground leading-normal"
+                title={currentPdf.filename}
+                data-testid="pdf-drawer-filename"
+              >
+                {currentPdf.filename}
+              </p>
+            </>
+          )}
           {isPowerPointDoc && pptxCount > 0 && (
             <Button
               variant="outline"
@@ -3659,8 +3682,9 @@ export const PdfDrawer = memo(function PdfDrawer() {
 
         {/* Right Side: Edit (text only), Download, then Cancel (only icons, with hover) */}
         <div className="flex shrink-0 items-center gap-1.5">
-          {/* Edit Text Button (Text Documents Only) */}
-          {isTextDoc &&
+          {/* Edit Text Button (Text Documents Only, NOT code) */}
+          {!isCodeDoc &&
+            isTextDoc &&
             currentPdf?.id &&
             !isLoading &&
             !loadError &&
@@ -3693,24 +3717,26 @@ export const PdfDrawer = memo(function PdfDrawer() {
               </Tooltip>
             )}
 
-          {/* Download Button (Icon Only) */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => void handleDownloadFile()}
-                data-testid="pdf-drawer-download-btn"
-                aria-label="Download"
-                className="size-9 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
-              >
-                <Download className="size-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom" sideOffset={6}>
-              Download
-            </TooltipContent>
-          </Tooltip>
+          {/* Download Button (Icon Only, NOT code — code has download inside codeblock) */}
+          {!isCodeDoc && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => void handleDownloadFile()}
+                  data-testid="pdf-drawer-download-btn"
+                  aria-label="Download"
+                  className="size-9 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+                >
+                  <Download className="size-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" sideOffset={6}>
+                Download
+              </TooltipContent>
+            </Tooltip>
+          )}
 
           {/* Cancel Option (Icon Only, slightly larger, on the right side) */}
           <Tooltip>
@@ -3741,7 +3767,9 @@ export const PdfDrawer = memo(function PdfDrawer() {
             ? "flex flex-row bg-neutral-900/10 dark:bg-neutral-950/40"
             : isExcelDoc
               ? "bg-background flex flex-col"
-              : "bg-neutral-900/10 dark:bg-neutral-950/40"
+              : isCodeDoc
+                ? "bg-background flex flex-col"
+                : "bg-neutral-900/10 dark:bg-neutral-950/40"
         )}
       >
         {/* PowerPoint Left Thumbnail Sidebar:
@@ -3805,9 +3833,11 @@ export const PdfDrawer = memo(function PdfDrawer() {
             "h-full w-full",
             isExcelDoc
               ? "p-0 overflow-hidden flex flex-col"
-              : isPowerPointDoc
-                ? "flex-1 overflow-y-auto p-2 sm:p-6 md:p-8"
-                : "overflow-y-auto p-4 sm:p-6"
+              : isCodeDoc
+                ? "overflow-y-auto p-2 sm:p-3"
+                : isPowerPointDoc
+                  ? "flex-1 overflow-y-auto p-2 sm:p-6 md:p-8"
+                  : "overflow-y-auto p-4 sm:p-6"
           )}
         >
           {isLoading && (
@@ -3898,9 +3928,24 @@ export const PdfDrawer = memo(function PdfDrawer() {
               />
             ))}
 
+          {/* Code Document (Codeblock with copy & download directly in drawer, zero nested container cards, tight padding, no zoom) */}
+          {!isLoading && !loadError && isCodeDoc && textContent !== null && (
+            <div
+              data-testid="text-document-viewer"
+              className="w-full select-text"
+            >
+              <KsemoCodeBlock
+                code={textContent}
+                rawLanguage="python"
+                className="my-0 w-full rounded-xl border border-border/70"
+              />
+            </div>
+          )}
+
           {/* Text Document (.txt, .md, .json, etc.) Rendering */}
           {!isLoading &&
             !loadError &&
+            !isCodeDoc &&
             isTextDoc &&
             textContent !== null &&
             (isEditingText ? (
@@ -3926,10 +3971,8 @@ export const PdfDrawer = memo(function PdfDrawer() {
             ) : (
               <div
                 data-testid="text-document-viewer"
-                className="mx-auto my-4 bg-white text-neutral-900 dark:bg-card dark:text-foreground shadow-xl border border-border/80 rounded-sm p-6 sm:p-10 min-h-[600px] select-text selection:bg-blue-500/30 transition-transform origin-top"
+                className="mx-auto my-4 shadow-lg border border-border/80 min-h-[600px] select-text selection:bg-blue-500/30 transition-transform origin-top max-w-[860px] w-full rounded-sm p-6 sm:p-10 bg-white text-neutral-900 dark:bg-card dark:text-foreground"
                 style={{
-                  maxWidth: "860px",
-                  width: "100%",
                   zoom: scale !== 1.0 ? scale : undefined,
                 }}
               >
@@ -4013,7 +4056,7 @@ export const PdfDrawer = memo(function PdfDrawer() {
         )}
 
         {/* Bottom-Right Zoom Pill */}
-        {!isLoading && !loadError && (
+        {!isLoading && !loadError && !isCodeDoc && (
           <div
             data-testid="pdf-drawer-control-bar"
             className="absolute bottom-4 sm:bottom-5 right-4 z-30 flex items-center gap-0.5 rounded-full border border-border/70 bg-card px-2 py-1 shadow-lg [&_svg]:stroke-[2.5] animate-in fade-in-0 duration-200 select-none"

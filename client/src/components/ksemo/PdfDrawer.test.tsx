@@ -189,6 +189,29 @@ describe("PdfDrawer", () => {
     expect(markup).not.toContain("<iframe");
   });
 
+  it("renders drawer with clean navbar (only cancel button, no filename, no top download) and no zoom controls for Python (.py) code document", () => {
+    const markup = renderToStaticMarkup(
+      createElement(TestDrawerWithFile, {
+        file: {
+          url: "data:text/x-python;charset=utf-8,print('hello world')",
+          filename: "report.py",
+          mimeType: "text/x-python",
+        },
+        openImmediately: true,
+      })
+    );
+
+    expect(markup).toContain('data-testid="pdf-drawer"');
+    // Top navbar: per user request, only cancel button, no filename and no duplicate top download
+    expect(markup).toContain('data-testid="pdf-drawer-close-btn"');
+    expect(markup).not.toContain('data-testid="pdf-drawer-filename"');
+    expect(markup).not.toContain('data-testid="pdf-drawer-download-btn"');
+
+    // Bottom controls: per user request, no zoom in / zoom out controls
+    expect(markup).not.toContain('data-testid="pdf-drawer-control-bar"');
+    expect(markup).not.toContain("<iframe");
+  });
+
   it("renders ExcelViewer edge-to-edge with formula bar, add row/col, undo/redo, minimum 50x50 grid, drag-to-copy handle, and renamable sheet tabs", () => {
     const sheets = [
       {
