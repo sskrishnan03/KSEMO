@@ -26,9 +26,10 @@ import {
   Ellipsis,
   ExternalLink,
   FileText,
+  Headset,
   HelpCircle,
   Library,
-  Headset,
+  LogIn,
   LogOut,
   MessageCircle,
   Pencil,
@@ -42,6 +43,7 @@ import {
 import { ShareIcon } from "./icons";
 import { PdfFileIcon, WordFileIcon } from "./FileBrandIcons";
 import { useIsMobile } from "@/hooks/useIsMobile";
+import { startLogin } from "@/const";
 import React, { memo, useMemo, useRef, useState } from "react";
 
 type Conversation = {
@@ -76,6 +78,8 @@ export const ConversationSidebar = memo(function ConversationSidebar({
   onLogout,
   user,
   previewSupportOpen = false,
+  locked = false,
+  onLoginPrompt,
 }: {
   conversations: Conversation[];
   activeConversationId: string | null;
@@ -99,6 +103,9 @@ export const ConversationSidebar = memo(function ConversationSidebar({
   onLogout: () => void;
   user: { id?: string | number; name?: string | null; email?: string | null };
   previewSupportOpen?: boolean;
+  /** Signed-out guest mode: nothing in the sidebar is usable until sign-in. */
+  locked?: boolean;
+  onLoginPrompt?: () => void;
 }) {
   const pinned = useMemo(
     () => conversations.filter(item => item.isPinned),
@@ -292,18 +299,55 @@ export const ConversationSidebar = memo(function ConversationSidebar({
           )}
         </div>
         <div className="space-y-1">
-          {utility("New chat", <SquarePen className="size-4" />, onNew)}
-          {utility("Search", <Search className="size-4" />, onSearch)}
-          {utility("Library", <Library className="size-4" />, () =>
-            onWorkspace("files")
-          )}
+          {utility("New chat", <SquarePen className="size-4" />, () => {
+            if (locked) {
+              onLoginPrompt?.();
+              return;
+            }
+            onNew();
+          })}
+          {utility("Search", <Search className="size-4" />, () => {
+            if (locked) {
+              onLoginPrompt?.();
+              return;
+            }
+            onSearch();
+          })}
+          {utility("Library", <Library className="size-4" />, () => {
+            if (locked) {
+              onLoginPrompt?.();
+              return;
+            }
+            onWorkspace("files");
+          })}
         </div>
         <nav
           ref={navRef}
           className="mt-4 min-h-0 flex-1 overflow-y-auto"
           aria-label="Conversations"
         >
-          {!compact && (
+          {locked ? (
+            compact ? (
+              <div className="mt-1 px-1">
+                <Tooltip>
+                  <TooltipContent side="right" sideOffset={8} collisionPadding={12}>
+                    Sign in
+                  </TooltipContent>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => startLogin()}
+                      className="size-9 rounded-lg text-foreground/90 transition-colors hover:bg-sidebar-accent hover:text-foreground"
+                      aria-label="Sign in"
+                    >
+                      <LogIn className="size-4" />
+                    </Button>
+                  </TooltipTrigger>
+                </Tooltip>
+              </div>
+            ) : null
+          ) : !compact ? (
             <>
               {pinned.length > 0 && (
                 <ConversationGroup
@@ -351,10 +395,38 @@ export const ConversationSidebar = memo(function ConversationSidebar({
                 isMobile={isMobile}
               />
             </>
-          )}
+          ) : null
+          }
         </nav>
-        <div className="mt-3 border-t border-border pt-3">
-          <DropdownMenu open={previewSupportOpen || undefined}>
+        {locked && !compact && (
+          <div className="mt-3 rounded-xl bg-gradient-to-b from-sidebar-accent/40 to-transparent p-4 text-center">
+            <div className="mx-auto size-10 overflow-hidden rounded-xl transition-transform duration-150 hover:scale-105">
+              <img
+                src="/KSEMOlogo.png"
+                alt="KSEMO logo"
+                className="size-full object-cover"
+              />
+            </div>
+            <p className="mt-2.5 text-sm font-semibold tracking-[-0.01em]">
+              Sign in to KSEMO
+            </p>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">
+              Your conversations, files, and creations — all in one place.
+            </p>
+            <Button
+              onClick={() => startLogin()}
+              className="mt-3 h-9 w-full rounded-lg bg-[oklch(0.95_0.003_80)] text-[oklch(0.21_0.008_80)] shadow-sm transition-[background-color,transform] duration-150 hover:bg-[oklch(0.93_0.003_80)] active:scale-[0.98]"
+            >
+              <span className="inline-flex items-center gap-2 text-sm font-medium">
+                <LogIn className="size-4" />
+                Sign in
+              </span>
+            </Button>
+          </div>
+        )}
+        {!locked && (
+          <div className="mt-3 border-t border-border pt-3">
+            <DropdownMenu open={previewSupportOpen || undefined}>
             {compact ? (
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -472,7 +544,8 @@ export const ConversationSidebar = memo(function ConversationSidebar({
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-        </div>
+          </div>
+        )}
       </aside>
     </>
   );

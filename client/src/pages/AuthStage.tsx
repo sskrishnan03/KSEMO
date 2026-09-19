@@ -26,6 +26,19 @@ type Panel = "idle" | "signin" | "signup" | "forgot";
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const FADE = { duration: 0.22, ease: [0.32, 0.72, 0, 1] } as const;
 
+function BackButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="mb-4 flex size-10 items-center justify-center rounded-xl border border-border text-muted-foreground transition-all duration-150 hover:rounded-full hover:border-accent hover:bg-accent hover:text-foreground active:scale-90 focus-visible:ring-0 focus-visible:outline-none"
+      aria-label="Go back"
+    >
+      <ArrowLeft className="size-4" />
+    </button>
+  );
+}
+
 function AuthDivider() {
   return (
     <div className="flex items-center gap-3" aria-hidden="true">
@@ -41,23 +54,20 @@ function AuthDivider() {
 function FooterLinks() {
   return (
     <div className="flex items-center justify-center gap-2 text-[11px] leading-5 text-muted-foreground">
-      <Link
-        href="/support/faq"
-        className="underline-offset-4 hover:text-foreground hover:underline"
-      >
+      <Link href="/support/faq" className="transition-colors hover:text-foreground">
         Help
       </Link>
       <span aria-hidden="true">·</span>
       <Link
         href="/support/privacy"
-        className="underline-offset-4 hover:text-foreground hover:underline"
+        className="transition-colors hover:text-foreground"
       >
         Privacy
       </Link>
       <span aria-hidden="true">·</span>
       <Link
         href="/support/terms"
-        className="underline-offset-4 hover:text-foreground hover:underline"
+        className="transition-colors hover:text-foreground"
       >
         Terms
       </Link>
@@ -125,13 +135,6 @@ function SignInForm({
     signIn.mutate({ email: email.trim(), password });
   }
 
-  function handleDemoSignIn() {
-    setEmail("demo@ksemo.ai");
-    setPassword("password123");
-    setFormError(null);
-    signIn.mutate({ email: "demo@ksemo.ai", password: "password123" });
-  }
-
   return (
     <form onSubmit={submit} noValidate className="space-y-3 max-w-xs mx-auto">
       <AuthTextField
@@ -166,27 +169,18 @@ function SignInForm({
           {signIn.isPending ? "Signing in…" : "Sign in"}
         </span>
       </Button>
-      <Button
-        type="button"
-        variant="ghost"
-        onClick={handleDemoSignIn}
-        disabled={signIn.isPending}
-        className="h-9 w-full rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-accent/60"
-      >
-        Quick Sign-in as Demo User
-      </Button>
       <div className="flex items-center justify-between gap-2">
         <button
           type="button"
           onClick={onForgot}
-          className="text-xs font-medium text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+          className="text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
         >
           Forgot password?
         </button>
         <button
           type="button"
           onClick={onSignup}
-          className="text-xs font-medium text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+          className="text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
         >
           Create account
         </button>
@@ -326,7 +320,7 @@ function SignUpForm({ onSignin }: { onSignin: () => void }) {
             <Link
               href="/support/terms"
               onClick={event => event.stopPropagation()}
-              className="font-medium text-foreground underline-offset-4 hover:underline"
+              className="font-medium text-foreground transition-colors hover:text-primary"
             >
               Terms of Service
             </Link>{" "}
@@ -334,7 +328,7 @@ function SignUpForm({ onSignin }: { onSignin: () => void }) {
             <Link
               href="/support/privacy"
               onClick={event => event.stopPropagation()}
-              className="font-medium text-foreground underline-offset-4 hover:underline"
+              className="font-medium text-foreground transition-colors hover:text-primary"
             >
               Privacy Policy
             </Link>
@@ -359,7 +353,7 @@ function SignUpForm({ onSignin }: { onSignin: () => void }) {
       <button
         type="button"
         onClick={onSignin}
-        className="w-full text-center text-xs font-medium text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+        className="w-full text-center text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
       >
         Already have an account? Sign in
       </button>
@@ -464,7 +458,7 @@ function ForgotForm({
           <button
             type="button"
             onClick={onSignin}
-            className="w-full text-center text-xs font-medium text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+            className="w-full text-center text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
           >
             Back to sign in
           </button>
@@ -502,8 +496,12 @@ function ForgotForm({
   );
 }
 
-export default function AuthStage() {
-  const [panel, setPanel] = useState<Panel>("idle");
+export default function AuthStage({
+  initial = "idle",
+}: {
+  initial?: Panel;
+}) {
+  const [panel, setPanel] = useState<Panel>(initial);
 
   return (
     <MotionConfig reducedMotion="user">
@@ -582,13 +580,7 @@ export default function AuthStage() {
                 transition={FADE}
                 className="max-w-md mx-auto"
               >
-                <button
-                  type="button"
-                  onClick={() => setPanel("idle")}
-                  className="mb-4 text-muted-foreground hover:text-foreground"
-                >
-                  <ArrowLeft className="size-4" />
-                </button>
+                <BackButton onClick={() => setPanel("idle")} />
                 <div className="flex flex-col items-center text-center">
                   <div className="flex items-center gap-2">
                     <LogIn className="size-5 text-muted-foreground" />
@@ -625,13 +617,7 @@ export default function AuthStage() {
                 transition={FADE}
                 className="max-w-md mx-auto"
               >
-                <button
-                  type="button"
-                  onClick={() => setPanel("idle")}
-                  className="mb-4 text-muted-foreground hover:text-foreground"
-                >
-                  <ArrowLeft className="size-4" />
-                </button>
+                <BackButton onClick={() => setPanel("idle")} />
                 <div className="flex flex-col items-center text-center">
                   <div className="flex items-center gap-2">
                     <UserPlus className="size-5 text-muted-foreground" />
@@ -665,13 +651,7 @@ export default function AuthStage() {
                 transition={FADE}
                 className="max-w-md mx-auto"
               >
-                <button
-                  type="button"
-                  onClick={() => setPanel("signin")}
-                  className="mb-4 text-muted-foreground hover:text-foreground"
-                >
-                  <ArrowLeft className="size-4" />
-                </button>
+                <BackButton onClick={() => setPanel("signin")} />
                 <div className="flex flex-col items-center text-center">
                   <div className="flex items-center gap-2">
                     <KeyRound className="size-5 text-muted-foreground" />

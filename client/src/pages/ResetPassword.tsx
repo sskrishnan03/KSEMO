@@ -55,7 +55,7 @@ export default function ResetPassword() {
           <p>
             <Link
               href="/forgot-password"
-              className="font-medium text-foreground underline-offset-4 hover:underline"
+              className="font-medium text-foreground transition-colors hover:text-primary"
             >
               Request a new reset link
             </Link>
@@ -82,7 +82,7 @@ export default function ResetPassword() {
           <p>
             <Link
               href="/signin"
-              className="font-medium text-foreground underline-offset-4 hover:underline"
+              className="font-medium text-foreground transition-colors hover:text-primary"
             >
               Continue to sign in
             </Link>
@@ -114,7 +114,7 @@ export default function ResetPassword() {
           Trouble with this link?{" "}
           <Link
             href="/forgot-password"
-            className="font-medium text-foreground underline-offset-4 hover:underline"
+            className="font-medium text-foreground transition-colors hover:text-primary"
           >
             Request a new one
           </Link>

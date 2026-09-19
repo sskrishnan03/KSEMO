@@ -73,7 +73,7 @@ export default function ChangePassword() {
             <button
               type="button"
               onClick={() => navigate("/")}
-              className="font-medium text-foreground underline-offset-4 hover:underline"
+              className="font-medium text-foreground transition-colors hover:text-primary"
             >
               Back to KSEMO
             </button>
@@ -110,7 +110,7 @@ export default function ChangePassword() {
             <button
               type="button"
               onClick={() => navigate("/")}
-              className="font-medium text-foreground underline-offset-4 hover:underline"
+              className="font-medium text-foreground transition-colors hover:text-primary"
             >
               Back to KSEMO
             </button>
@@ -145,7 +145,7 @@ export default function ChangePassword() {
           <button
             type="button"
             onClick={() => navigate("/")}
-            className="font-medium text-foreground underline-offset-4 hover:underline"
+            className="font-medium text-foreground transition-colors hover:text-primary"
           >
             Back to KSEMO
           </button>
@@ -204,7 +204,7 @@ export default function ChangePassword() {
             onKeyDown={event => {
               if (event.key === "Enter") navigate("/forgot-password");
             }}
-            className="cursor-pointer font-medium text-foreground underline-offset-4 hover:underline"
+            className="cursor-pointer font-medium text-foreground transition-colors hover:text-primary"
           >
             Request a reset link
           </span>

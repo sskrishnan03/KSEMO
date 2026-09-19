@@ -20,9 +20,12 @@ function Router() {
       <Route path={"/support/faq"} component={FaqPage} />
       <Route path={"/support/privacy"} component={PrivacyPage} />
       <Route path={"/support/terms"} component={TermsPage} />
-      <Route path={"/signin"} component={AuthStage} />
-      <Route path={"/signup"} component={AuthStage} />
-      <Route path={"/forgot-password"} component={AuthStage} />
+      <Route path={"/signin"} component={() => <AuthStage initial="signin" />} />
+      <Route path={"/signup"} component={() => <AuthStage initial="signup" />} />
+      <Route
+        path={"/forgot-password"}
+        component={() => <AuthStage initial="forgot" />}
+      />
       <Route path={"/reset-password"} component={ResetPassword} />
       <Route path={"/settings/password"} component={ChangePassword} />
       <Route path={"/404"} component={NotFound} />

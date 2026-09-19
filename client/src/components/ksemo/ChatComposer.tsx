@@ -209,6 +209,7 @@ export const ChatComposer = memo(function ChatComposer({
   audioLevel,
   focusToken = 0,
   temporary = false,
+  guestMode = false,
 }: {
   onSend: (content: string) => void;
   onCancel: () => void;
@@ -278,6 +279,8 @@ export const ChatComposer = memo(function ChatComposer({
   focusToken?: number;
   /** Temporary ("incognito") chat: renders a soft white glow around the input. */
   temporary?: boolean;
+  /** Signed-out guest mode: disables attachments, voice, and create-file tools. */
+  guestMode?: boolean;
 }) {
   const editorRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -329,6 +332,7 @@ export const ChatComposer = memo(function ChatComposer({
   );
   const isSlashActive =
     !isEditingMessage &&
+    !guestMode &&
     !voiceChatActive &&
     activeMode === "chat" &&
     value.startsWith("/") &&
@@ -557,7 +561,7 @@ export const ChatComposer = memo(function ChatComposer({
       .filter(item => item.kind === "file")
       .map(item => item.getAsFile())
       .filter((file): file is File => file !== null);
-    if (files.length) {
+    if (files.length && !guestMode) {
       event.preventDefault();
       for (const file of files) onAttachment?.(file);
       return;
@@ -570,6 +574,7 @@ export const ChatComposer = memo(function ChatComposer({
   }
 
   useEffect(() => {
+    if (guestMode) return;
     const dragHasFiles = (e: DragEvent) =>
       Array.from(e.dataTransfer?.types ?? []).includes("Files");
     const onDragEnter = (e: DragEvent) => {
@@ -610,7 +615,7 @@ export const ChatComposer = memo(function ChatComposer({
       document.removeEventListener("dragleave", onDragLeave);
       document.removeEventListener("drop", onDrop);
     };
-  }, [onAttachment]);
+  }, [onAttachment, guestMode]);
 
   return (
     <div
@@ -879,7 +884,7 @@ export const ChatComposer = memo(function ChatComposer({
           <div className="flex items-center justify-between pt-1">
             {/* Left Side Controls */}
             <div className="flex items-center gap-1.5">
-              {!isEditingMessage && (
+              {!isEditingMessage && !guestMode && (
                 <DropdownMenu
                   open={toolsOpen && !libraryOpen}
                   onOpenChange={setToolsOpen}
@@ -1147,6 +1152,7 @@ export const ChatComposer = memo(function ChatComposer({
                       </TooltipContent>
                     </Tooltip>
                   ) : !temporary &&
+                    !guestMode &&
                     !value.trim() &&
                     !visibleAttachmentNotices.length &&
                     (!activeMode || activeMode === "chat") &&

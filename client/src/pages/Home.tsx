@@ -22,9 +22,11 @@ import { cn } from "@/lib/utils";
 import {
   ChevronsRight,
   FolderOpen,
+  LogIn,
   MoreHorizontal,
   Pin,
   Trash2,
+  UserPlus,
 } from "lucide-react";
 import {
   ShareIcon,
@@ -70,6 +72,8 @@ import { toast } from "sonner";
 import { detectFileRequest } from "@shared/docDetect";
 
 import { SettingsDialog } from "../components/ksemo/SettingsDialog";
+import { SignInPrompt } from "../components/ksemo/SignInPrompt";
+import { setGuestModeActive } from "@/lib/guestMode";
 import { useGlobalShortcuts } from "../hooks/useGlobalShortcuts";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { useVisualViewportHeight } from "../hooks/useVisualViewportHeight";
@@ -333,6 +337,11 @@ export default function Home() {
   const isTemporaryChatRef = useRef(false);
   const temporaryConversationIdsRef = useRef<Set<string>>(new Set());
   const [chatMessages, setChatMessages] = useState<KsemoMessage[]>([]);
+  // Guest ("signed-out") mode state. Guests keep the same Home screen, but
+  // sending a message (or opening any locked feature) asks them to sign in via
+  // a dismissible card in the bottom-right corner.
+  const guestMode = !user;
+  const [guestPromptOpen, setGuestPromptOpen] = useState(false);
   const [composerValue, setComposerValue] = useState("");
   const [composerFocusToken, setComposerFocusToken] = useState(0);
   const requestComposerFocus = useCallback(() => {
@@ -592,7 +601,16 @@ export default function Home() {
     isTemporaryChatRef.current = false;
     setIsTemporaryChat(false);
     temporaryConversationIdsRef.current.clear();
+    setGuestPromptOpen(false);
+    setSettingsOpen(false);
   }, [user]);
+
+  // Mirror guest mode into the global flag so main.tsx can suppress the
+  // auto-redirect-to-login that 401 responses would otherwise trigger.
+  useEffect(() => {
+    setGuestModeActive(guestMode);
+    return () => setGuestModeActive(false);
+  }, [guestMode]);
   const renameMutation = trpc.conversation.rename.useMutation({
     onSuccess: () => utils.conversation.list.invalidate(),
   });
@@ -1170,6 +1188,10 @@ export default function Home() {
       replaceUserMessageId?: string;
     } = {}
   ) {
+    if (!user) {
+      setGuestPromptOpen(true);
+      return;
+    }
     const conversationId = activeConversationId;
     // Snapshot the temporary flag at send time: the toggle may change while the
     // stream is in flight.
@@ -2285,6 +2307,20 @@ export default function Home() {
   }
 
   function newChat() {
+    // Guest mode: New Chat simply resets the local thread and sign-in prompt.
+    if (!user) {
+      setGuestPromptOpen(false);
+      setChatMessages([]);
+      seededConversationIdRef.current = null;
+      setSeededConversationId(null);
+      isNearBottomRef.current = true;
+      pendingOpenScrollRef.current = true;
+      setActiveMode("chat");
+      setComposerValue("");
+      setAttachmentNotices([]);
+      requestComposerFocus();
+      return;
+    }
     // Ending the view also ends any temporary session: purge its chats so
     // nothing lingers, and return to normal chat.
     purgeTemporaryConversations();
@@ -2551,6 +2587,10 @@ export default function Home() {
   }
 
   async function attachFromComposer(file: File) {
+    if (!user) {
+      toast.info("Sign in to attach files.");
+      return;
+    }
     if (file.size > 25 * 1024 * 1024) {
       toast.error(`"${file.name}" exceeds the 25MB limit.`);
       return;
@@ -2930,12 +2970,21 @@ export default function Home() {
         title: conversation.title,
       })
   );
+  const stableOnLoginPrompt = usePersistFn(() => setGuestPromptOpen(true));
   const stableOnSearch = usePersistFn(() => {
+    if (guestMode) {
+      setGuestPromptOpen(true);
+      return;
+    }
     closePdf();
     setPrimaryWorkspace("search");
     setSidebarOpen(false);
   });
   const stableOnWorkspace = usePersistFn((_section: "files") => {
+    if (guestMode) {
+      setGuestPromptOpen(true);
+      return;
+    }
     closePdf();
     setPrimaryWorkspace("library");
     setSidebarOpen(false);
@@ -2956,6 +3005,10 @@ export default function Home() {
     }
   });
   const stableOnSettings = usePersistFn(() => {
+    if (guestMode) {
+      setGuestPromptOpen(true);
+      return;
+    }
     setSettingsOpen(true);
     setSidebarOpen(false);
   });
@@ -2982,10 +3035,14 @@ export default function Home() {
       }
     },
     onOpenSettings: tab => {
+      if (guestMode) {
+        setGuestPromptOpen(true);
+        return;
+      }
       if (tab) setSettingsInitialTab(tab as any);
       setSettingsOpen(true);
     },
-    onModeChange: mode => setActiveMode(mode),
+    onModeChange: guestMode ? undefined : (mode => setActiveMode(mode)),
     focusTargetId: "ksemo-composer-textarea",
   });
   const stableOnSupport = usePersistFn((topic: "faq" | "privacy" | "terms") => {
@@ -3069,12 +3126,18 @@ export default function Home() {
     voicePreferencesMutation.mutate({ speechRate: rate });
   });
 
-  const renderComposer = (options: { hideVoiceInput?: boolean } = {}) => (
+  const renderComposer = (options: {
+    hideVoiceInput?: boolean;
+    menuPlacement?: "above" | "below";
+    isCentered?: boolean;
+    compactBottomSpacing?: boolean;
+    initialToolsOpen?: boolean;
+  } = {}) => (
     <ChatComposer
       onSend={stableComposerSend}
       onCancel={stableStopGeneration}
       onVoice={stableVoiceAction}
-      onVoiceChat={stableOpenVoiceChat}
+      onVoiceChat={guestMode ? undefined : stableOpenVoiceChat}
       onCancelRecording={stableVoiceCancel}
       isGenerating={isGenerating}
       isRecording={voice.state === "recording"}
@@ -3084,11 +3147,13 @@ export default function Home() {
       audioLevel={voice.audioLevel}
       value={composerValue}
       onValueChange={setComposerValue}
-      activeMode={activeMode}
-      onModeChange={mode => setActiveMode(mode || "chat")}
+      activeMode={guestMode ? "chat" : activeMode}
+      onModeChange={
+        guestMode ? undefined : (mode => setActiveMode(mode || "chat"))
+      }
       pptConfig={pptConfig}
       onPptConfigChange={setPptConfig}
-      onAttachment={stableAttachFromComposer}
+      onAttachment={guestMode ? undefined : stableAttachFromComposer}
       attachmentNotices={
         isAttachmentPreview
           ? [
@@ -3101,18 +3166,21 @@ export default function Home() {
           : attachmentNotices
       }
       onClearAttachment={stableOnClearAttachment}
-      libraryFiles={libraryFilesQuery.data}
-      onLibraryFile={stableAttachLibraryFiles}
+      libraryFiles={guestMode ? [] : libraryFilesQuery.data}
+      onLibraryFile={guestMode ? undefined : stableAttachLibraryFiles}
       initialLibraryOpen={isLibraryPreview}
-      menuPlacement="above"
-      compactBottomSpacing
-      onTakeScreenshot={stableCaptureScreenshot}
-      hideVoiceInput={options.hideVoiceInput}
+      initialToolsOpen={options.initialToolsOpen}
+      menuPlacement={options.menuPlacement ?? "above"}
+      compactBottomSpacing={options.compactBottomSpacing ?? true}
+      isCentered={options.isCentered ?? false}
+      onTakeScreenshot={guestMode ? undefined : stableCaptureScreenshot}
+      hideVoiceInput={guestMode || Boolean(options.hideVoiceInput)}
       focusToken={composerFocusToken}
       isEditingMessage={Boolean(editingMessage)}
       onSaveEdit={stableEditAction}
       onCancelEdit={stableCancelEdit}
       temporary={isTemporaryChat}
+      guestMode={guestMode}
     />
   );
   const composerElement = renderComposer();
@@ -3144,7 +3212,10 @@ export default function Home() {
     );
   }
 
-  if (!user || isSignedOutPreview) return <AuthStage />;
+  // Signed-out visitors stay inside the app in a locked "guest" preview: the
+  // layout looks identical, the sidebar is gated, and a local demo chat runs
+  // until they sign in. Only the dev-only signed-out preview shows AuthStage.
+  if (isSignedOutPreview) return <AuthStage />;
 
   return (
     <div
@@ -3177,7 +3248,9 @@ export default function Home() {
         onSettings={stableOnSettings}
         onSupport={stableOnSupport}
         onLogout={stableLogout}
-        user={user}
+        user={user ?? {}}
+        locked={guestMode}
+        onLoginPrompt={stableOnLoginPrompt}
       />
 
       <main className="relative flex min-w-0 flex-1 flex-col">
@@ -3207,8 +3280,10 @@ export default function Home() {
               <ChevronsRight className="size-5" />
             </Button>
 
-            {!activeConversationId && visibleMessages.length === 0 && (
-              <div className="absolute right-2 top-2 z-10">
+            {!guestMode &&
+              !activeConversationId &&
+              visibleMessages.length === 0 && (
+                <div className="absolute right-2 top-2 z-10">
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
@@ -3263,9 +3338,39 @@ export default function Home() {
               </div>
             )}
 
+            {guestMode && (
+              <div className="absolute right-2 top-2 z-10 flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    window.location.href = "/signup";
+                  }}
+                  className="h-9 rounded-lg border-border text-foreground transition-colors duration-150 hover:border-transparent hover:bg-[oklch(0.21_0.008_80)] hover:text-[oklch(0.95_0.003_80)] active:scale-[0.98]"
+                  aria-label="Create account"
+                  data-testid="guest-create-account-button"
+                >
+                  <span className="inline-flex items-center gap-1.5 text-sm font-medium">
+                    <UserPlus className="size-4" />
+                    Create account
+                  </span>
+                </Button>
+                <Button
+                  onClick={() => startLogin()}
+                  className="h-9 rounded-lg bg-[oklch(0.95_0.003_80)] text-[oklch(0.21_0.008_80)] shadow-sm transition-colors duration-150 hover:bg-[oklch(0.93_0.003_80)] active:scale-[0.98]"
+                  aria-label="Sign in"
+                  data-testid="guest-sign-in-button"
+                >
+                  <span className="inline-flex items-center gap-1.5 text-sm font-medium">
+                    <LogIn className="size-4" />
+                    Sign in
+                  </span>
+                </Button>
+              </div>
+            )}
+
             {/* Chat action menu has no place in a temporary chat, so the
                 three-dots button is hidden there entirely. */}
-            {visibleMessages.length > 0 && !isTemporaryChat && (
+            {!guestMode && visibleMessages.length > 0 && !isTemporaryChat && (
               <div className="absolute right-2 top-2 z-10">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -3439,17 +3544,19 @@ export default function Home() {
                             generatingMessageId === message.id &&
                             (activeMode !== "chat" || Boolean(fileGeneration)))
                         )}
-                        onEdit={stableEditMessage}
+                        onEdit={guestMode ? undefined : stableEditMessage}
                         isEditing={editingMessage?.id === message.id}
                         editValue={editValue}
                         onEditValueChange={setEditValue}
                         onSaveEdit={stableEditAction}
                         onCancelEdit={stableCancelEdit}
-                        onRegenerate={stableRegenerateMessage}
-                        onRetry={stableRegenerateMessage}
-                        onShare={stableShareMessage}
-                        onDelete={stableDeleteMessage}
-                        onFeedback={stableOnFeedback}
+                        onRegenerate={
+                          guestMode ? undefined : stableRegenerateMessage
+                        }
+                        onRetry={guestMode ? undefined : stableRegenerateMessage}
+                        onShare={guestMode ? undefined : stableShareMessage}
+                        onDelete={guestMode ? undefined : stableDeleteMessage}
+                        onFeedback={guestMode ? undefined : stableOnFeedback}
                       />
                     );
                   })}
@@ -3465,49 +3572,14 @@ export default function Home() {
                   greeting={greeting}
                   temporary={isTemporaryChat}
                   composer={
-                    isMobile ? null : (
-                      <ChatComposer
-                        onSend={stableComposerSend}
-                        onCancel={stableStopGeneration}
-                        onVoice={stableVoiceAction}
-                        onVoiceChat={stableOpenVoiceChat}
-                        onCancelRecording={stableVoiceCancel}
-                        isGenerating={isGenerating}
-                        isRecording={voice.state === "recording"}
-                        isTranscribing={voice.state === "transcribing"}
-                        recordingSeconds={voice.seconds}
-                        audioBars={voice.audioBars}
-                        audioLevel={voice.audioLevel}
-                        value={composerValue}
-                        onValueChange={setComposerValue}
-                        activeMode={activeMode}
-                        onModeChange={mode => setActiveMode(mode || "chat")}
-                        pptConfig={pptConfig}
-                        onPptConfigChange={setPptConfig}
-                        onAttachment={stableAttachFromComposer}
-                        attachmentNotices={
-                          isAttachmentPreview
-                            ? [
-                                {
-                                  fileId: "preview-file",
-                                  name: "project-brief.pdf",
-                                  linked: true,
-                                },
-                              ]
-                            : attachmentNotices
-                        }
-                        onClearAttachment={stableOnClearAttachment}
-                        libraryFiles={libraryFilesQuery.data}
-                        onLibraryFile={stableAttachLibraryFiles}
-                        initialLibraryOpen={isLibraryPreview}
-                        initialToolsOpen={isLibraryPreview}
-                        menuPlacement={isMobile ? "above" : "below"}
-                        isCentered={visibleMessages.length === 0}
-                        onTakeScreenshot={stableCaptureScreenshot}
-                        focusToken={composerFocusToken}
-                        temporary={isTemporaryChat}
-                      />
-                    )
+                    isMobile
+                      ? null
+                      : renderComposer({
+                          menuPlacement: isMobile ? "above" : "below",
+                          isCentered: true,
+                          compactBottomSpacing: false,
+                          initialToolsOpen: isLibraryPreview,
+                        })
                   }
                 />
               )}
@@ -3544,16 +3616,18 @@ export default function Home() {
         <PdfDrawer />
       </main>
 
-      <SettingsDialog
-        open={settingsOpen || isSettingsPreview}
-        onOpenChange={setSettingsOpen}
-        initialTab={settingsInitialTab}
-        user={user}
-        onSignOut={stableLogout}
-        onAllChatsDeleted={stableOnAllChatsDeleted}
-        onOpenConversation={stableOnOpenArchivedConversation}
-        onAccountDeleted={stableOnAccountDeleted}
-      />
+      {!guestMode && (
+        <SettingsDialog
+          open={settingsOpen || isSettingsPreview}
+          onOpenChange={setSettingsOpen}
+          initialTab={settingsInitialTab}
+          user={user!}
+          onSignOut={stableLogout}
+          onAllChatsDeleted={stableOnAllChatsDeleted}
+          onOpenConversation={stableOnOpenArchivedConversation}
+          onAccountDeleted={stableOnAccountDeleted}
+        />
+      )}
       <WorkspacePanel
         open={isWorkspaceDeletePreview}
         onOpenChange={stableWorkspaceOnOpenChange}
@@ -3619,6 +3693,13 @@ export default function Home() {
         confirmLabel="Delete"
         onConfirm={stableDeleteAction}
       />
+
+      {guestMode && (
+        <SignInPrompt
+          open={guestPromptOpen}
+          onClose={() => setGuestPromptOpen(false)}
+        />
+      )}
     </div>
   );
 }

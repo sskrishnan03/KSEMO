@@ -8,6 +8,7 @@ import App from "./App";
 import { startLogin } from "./const";
 import "./index.css";
 import { getAuthHeaders } from "./lib/authHeaders";
+import { isGuestModeActive } from "./lib/guestMode";
 import { initTouchHover } from "./lib/touchHover";
 
 initTouchHover();
@@ -17,6 +18,9 @@ const queryClient = new QueryClient();
 const redirectToLoginIfUnauthorized = (error: unknown) => {
   if (!(error instanceof TRPCClientError)) return;
   if (typeof window === "undefined") return;
+  // Signed-out guests wander the app without a session; a stray 401 from any
+  // leftover query must never force them onto the login screen.
+  if (isGuestModeActive()) return;
 
   const isUnauthorized = error.message === UNAUTHED_ERR_MSG;
 
