@@ -1634,15 +1634,14 @@ function ArchivedChatsWorkspace({
             type="button"
             onClick={onBack}
             aria-label="Back to Data Control"
-            className="flex size-7 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            className="flex size-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors outline-none hover:bg-accent hover:text-foreground focus-visible:ring-0 focus-visible:outline-none"
           >
             <ArrowLeft className="size-4" />
           </button>
           <div className="min-w-0">
             <p className="text-base font-semibold">Archived chats</p>
             <p className="text-xs text-muted-foreground">
-              Tap a chat to open it, restore to unarchive, or delete
-              permanently.
+              Open, restore, or delete.
             </p>
           </div>
         </div>
@@ -1676,7 +1675,7 @@ function ArchivedChatsWorkspace({
                             variant="ghost"
                             size="icon"
                             aria-label="Unarchive chat"
-                            className="size-8 shrink-0 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground"
+                            className="size-8 shrink-0 rounded-lg text-muted-foreground transition-colors outline-none hover:bg-foreground/10 hover:text-foreground focus-visible:ring-0 focus-visible:outline-none"
                             disabled={restorePending}
                             onClick={() => restoreChat(c.id)}
                           >
@@ -1786,15 +1785,14 @@ function SharedChatsWorkspace({
             type="button"
             onClick={onBack}
             aria-label="Back to Data Control"
-            className="flex size-7 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            className="flex size-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors outline-none hover:bg-accent hover:text-foreground focus-visible:ring-0 focus-visible:outline-none"
           >
             <ArrowLeft className="size-4" />
           </button>
           <div className="min-w-0">
             <p className="text-base font-semibold">Shared chats</p>
             <p className="text-xs text-muted-foreground">
-              Everything you've shared with a public link. Tap a chat to open
-              it, copy its link, stop sharing, or delete it permanently.
+              Copy a link or stop sharing.
             </p>
           </div>
         </div>
@@ -1841,7 +1839,7 @@ function SharedChatsWorkspace({
                             variant="ghost"
                             size="icon"
                             aria-label="Stop sharing"
-                            className="size-8 shrink-0 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground"
+                            className="size-8 shrink-0 rounded-lg text-muted-foreground transition-colors outline-none hover:bg-foreground/10 hover:text-foreground focus-visible:ring-0 focus-visible:outline-none"
                             disabled={busy}
                             onClick={() =>
                               unpublishMutation.mutate({
