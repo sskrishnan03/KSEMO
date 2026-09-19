@@ -599,129 +599,60 @@ export function registerChatStream(app: Express) {
         if (targetFormat) {
           const cleanUserMessage = detected?.cleanedPrompt || cleanPromptText(content ?? "", targetFormat);
 
-          if (targetFormat === "pptx") {
-            // ── Phase 1 (pptx): OUTLINE ONLY ─────────────────────────────
-            // Produce the user-editable presentation outline (analysis +
-            // structured slides), persist it to message metadata, and stream a
-            // `file.outline` event. The .pptx is NOT generated yet — the user
-            // reviews/edits the outline and approves it, which runs the second
-            // phase via POST /api/chat/presentation/stream.
-            try {
-              const outline = await runPresentationOutline({
-                userId: user.id,
-                assistantMessageId,
-                conversationId: conversation.id,
-                userMessage: cleanUserMessage || content || "",
-                history: filteredAssistantContext,
-                presentationConfig: body.pptConfig,
-                presentationStyle: body.pptStyle,
-                onProgress: (event: PipelineProgressEvent) => {
-                  writeEvent(res, "file.progress", {
-                    messageId: assistantMessageId,
-                    stage: event.stage,
-                    format: event.format,
-                    message: event.message,
-                    researchSourceCount: event.researchSourceCount,
-                    researchFindingCount: event.researchFindingCount,
-                  });
-                },
-                signal: generationSignal,
-              });
-
-              await updateMessage(assistantMessageId, {
-                metadata: {
-                  pptOutline: buildOutlineMetadata(
-                    outline,
-                    cleanUserMessage || content || ""
-                  ),
-                },
-              });
-
-              writeEvent(res, "file.progress", {
-                messageId: assistantMessageId,
-                stage: "outline",
-                format: "pptx",
-                message: "Outline ready — review & approve",
-              });
-
-              writeEvent(res, "file.outline", {
-                messageId: assistantMessageId,
-                outline,
-              });
-
-              // Settle the assistant message with the outline summary so the
-              // turn completes; the client renders the outline editor instead
-              // of a plain text answer, and no file exists yet.
-              responseText = outline.summary;
-              outlineDelivered = true;
-            } catch (error) {
-              console.warn("[ChatStream] presentation outline failed", error);
-              fileModeFailed = true;
-              writeEvent(res, "file.error", {
-                messageId: assistantMessageId,
-                message:
-                  error instanceof Error
-                    ? `Could not plan your presentation: ${error.message}`
-                    : "Could not plan your presentation. Please try again.",
-              });
-            }
-          } else {
-            try {
-              // Clean command prefixes if present while preserving core prompt
-              // Run the full intelligent document generation pipeline.
-              // Each pipeline stage emits real progress events that the
-              // client renders as meaningful live stages.
-              deliveredFile = await runDocumentPipeline({
-                userId: user.id,
-                assistantMessageId,
-                conversationId: conversation.id,
-                userMessage: cleanUserMessage || content || "",
-                format: targetFormat,
-                history: filteredAssistantContext,
-                // pptx never reaches this branch — it uses the outline flow.
-                presentationConfig: undefined,
-                presentationStyle: undefined,
-                onProgress: (event: PipelineProgressEvent) => {
-                  writeEvent(res, "file.progress", {
-                    messageId: assistantMessageId,
-                    stage: event.stage,
-                    format: event.format,
-                    message: event.message,
-                    researchSourceCount: event.researchSourceCount,
-                    researchFindingCount: event.researchFindingCount,
-                    qualityPassed: event.qualityPassed,
-                    qualityIssueCount: event.qualityIssueCount,
-                    code: event.code,
-                  });
-                },
-                signal: generationSignal,
-              });
-
-              writeEvent(res, "file.created", {
-                messageId: assistantMessageId,
-                file: deliveredFile,
-              });
-
-              responseText = deliveredFile.summary;
-              for (let i = 0; i < responseText.length; i += 64) {
-                writeEvent(res, "assistant.delta", {
+          try {
+            // Clean command prefixes if present while preserving core prompt
+            // Run the full intelligent document generation pipeline.
+            // Each pipeline stage emits real progress events that the
+            // client renders as meaningful live stages.
+            deliveredFile = await runDocumentPipeline({
+              userId: user.id,
+              assistantMessageId,
+              conversationId: conversation.id,
+              userMessage: cleanUserMessage || content || "",
+              format: targetFormat,
+              history: filteredAssistantContext,
+              presentationConfig: body.pptConfig,
+              presentationStyle: body.pptStyle,
+              onProgress: (event: PipelineProgressEvent) => {
+                writeEvent(res, "file.progress", {
                   messageId: assistantMessageId,
-                  delta: responseText.slice(i, i + 64),
+                  stage: event.stage,
+                  format: event.format,
+                  message: event.message,
+                  researchSourceCount: event.researchSourceCount,
+                  researchFindingCount: event.researchFindingCount,
+                  qualityPassed: event.qualityPassed,
+                  qualityIssueCount: event.qualityIssueCount,
+                  code: event.code,
                 });
-              }
-            } catch (error) {
-              console.warn(
-                "[ChatStream] file generation failed",
-                error
-              );
-              fileModeFailed = true;
-              writeEvent(res, "file.error", {
+              },
+              signal: generationSignal,
+            });
+
+            writeEvent(res, "file.created", {
+              messageId: assistantMessageId,
+              file: deliveredFile,
+            });
+
+            responseText = deliveredFile.summary;
+            for (let i = 0; i < responseText.length; i += 64) {
+              writeEvent(res, "assistant.delta", {
                 messageId: assistantMessageId,
-                message: error instanceof Error
-                  ? `File generation failed: ${error.message}`
-                  : "File generation could not be completed. Please try again.",
+                delta: responseText.slice(i, i + 64),
               });
             }
+          } catch (error) {
+            console.warn(
+              "[ChatStream] file generation failed",
+              error
+            );
+            fileModeFailed = true;
+            writeEvent(res, "file.error", {
+              messageId: assistantMessageId,
+              message: error instanceof Error
+                ? `File generation failed: ${error.message}`
+                : "File generation could not be completed. Please try again.",
+            });
           }
         }
 

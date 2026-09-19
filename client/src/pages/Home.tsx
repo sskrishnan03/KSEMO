@@ -56,7 +56,6 @@ import {
   type FileMetrics,
   type FileSource,
 } from "../components/ksemo/FileCreationCard";
-import { PresentationOutlineCard } from "../components/ksemo/PresentationOutlineCard";
 import { PdfDrawer } from "../components/ksemo/PdfDrawer";
 import type { DocFormat } from "@/lib/docFormats";
 import { usePdfViewer } from "@/contexts/PdfViewerContext";
@@ -3387,69 +3386,31 @@ export default function Home() {
                             }
                           : null;
 
-                    const outlinePlan = activeFileGen?.outline;
-                    const showOutlineEditor = Boolean(
-                      outlinePlan && activeFileGen?.status !== "created"
-                    );
-
                     const fileCreationNode = activeFileGen ? (
                       <div className="animate-in fade-in-0 duration-150">
-                        {showOutlineEditor && outlinePlan ? (
-                          <PresentationOutlineCard
-                            outline={outlinePlan}
-                            generating={
-                              outlineGenerating &&
-                              fileGeneration?.messageId === message.id
-                            }
-                            progressLabel={activeFileGen.message}
-                            regenerationError={outlineRegenError}
-                            onChange={next =>
-                              handleOutlineChange(message.id, next)
-                            }
-                            onApprove={next =>
-                              void approvePresentationOutline(message.id, next)
-                            }
-                            onRegenerateOutline={next =>
-                              handleRegenerateOutline(message.id, next)
-                            }
-                            onRegenerateSlide={(
-                              slideId,
-                              currentOutline,
-                              instruction
-                            ) =>
-                              handleRegenerateSlide(
-                                message.id,
-                                slideId,
-                                currentOutline,
-                                instruction
-                              )
-                            }
-                          />
-                        ) : (
-                          <FileCreationCard
-                            stage={
-                              activeFileGen.status === "created"
-                                ? "completed"
-                                : activeFileGen.stage === "interrupted"
-                                  ? "interrupted"
-                                  : activeFileGen.status === "error"
-                                    ? "error"
-                                    : (activeFileGen.stage as FileCreationStage)
-                            }
-                            format={
-                              (activeFileGen.format as DocFormat) || undefined
-                            }
-                            filename={message.attachments?.[0]?.filename}
-                            fileUrl={message.attachments?.[0]?.url}
-                            fileSizeBytes={message.attachments?.[0]?.sizeBytes}
-                            fileId={message.attachments?.[0]?.id}
-                            researchSourceCount={
-                              activeFileGen.researchSourceCount
-                            }
-                            onRetry={() => regenerateMessage(message)}
-                            code={activeFileGen.code}
-                          />
-                        )}
+                        <FileCreationCard
+                          stage={
+                            activeFileGen.status === "created"
+                              ? "completed"
+                              : activeFileGen.stage === "interrupted"
+                                ? "interrupted"
+                                : activeFileGen.status === "error"
+                                  ? "error"
+                                  : (activeFileGen.stage as FileCreationStage)
+                          }
+                          format={
+                            (activeFileGen.format as DocFormat) || undefined
+                          }
+                          filename={message.attachments?.[0]?.filename}
+                          fileUrl={message.attachments?.[0]?.url}
+                          fileSizeBytes={message.attachments?.[0]?.sizeBytes}
+                          fileId={message.attachments?.[0]?.id}
+                          researchSourceCount={
+                            activeFileGen.researchSourceCount
+                          }
+                          onRetry={() => regenerateMessage(message)}
+                          code={activeFileGen.code}
+                        />
                       </div>
                     ) : null;
 
