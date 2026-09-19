@@ -32,6 +32,7 @@ import { ConfirmDeleteDialog } from "./ConfirmDeleteDialog";
 import {
   Archive,
   ArchiveRestore,
+  ArrowLeft,
   Brain,
   Bug,
   CalendarDays,
@@ -380,14 +381,20 @@ export const SettingsDialog = memo(function SettingsDialog({
   const [activeTab, setActiveTab] = useState<SettingsTab>(
     initialTab || "account"
   );
+  const [dataWorkspace, setDataWorkspace] = useState<
+    null | "archived" | "shared"
+  >(null);
+
+  const changeTab = (tab: SettingsTab) => {
+    setDataWorkspace(null);
+    setActiveTab(tab);
+  };
 
   useEffect(() => {
     if (initialTab && open) {
-      setActiveTab(initialTab);
+      changeTab(initialTab);
     }
   }, [initialTab, open]);
-  const [archivedOpen, setArchivedOpen] = useState(false);
-  const [sharedOpen, setSharedOpen] = useState(false);
   const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
   const [confirmDeleteAccount, setConfirmDeleteAccount] = useState(false);
   const utils = trpc.useUtils();
@@ -412,7 +419,7 @@ export const SettingsDialog = memo(function SettingsDialog({
   });
 
   useEffect(() => {
-    if (open) setActiveTab("account");
+    if (open) changeTab("account");
   }, [open]);
 
   return (
@@ -452,7 +459,7 @@ export const SettingsDialog = memo(function SettingsDialog({
                 Settings
               </span>
             </div>
-            <SettingsSearch onSelect={setActiveTab} />
+            <SettingsSearch onSelect={changeTab} />
             <nav className="space-y-0.5">
               {settingsNavItems.map(item => {
                 const Icon = item.icon;
@@ -460,7 +467,7 @@ export const SettingsDialog = memo(function SettingsDialog({
                 return (
                   <button
                     key={item.id}
-                    onClick={() => setActiveTab(item.id)}
+                    onClick={() => changeTab(item.id)}
                     className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm transition-colors outline-none focus-visible:ring-0 focus-visible:outline-none ${
                       active
                         ? "bg-accent font-medium text-foreground"
@@ -489,16 +496,16 @@ export const SettingsDialog = memo(function SettingsDialog({
 
           <div className="flex flex-col border-b border-border bg-sidebar md:hidden">
             <div className="px-3 pt-2.5 pb-1.5">
-              <SettingsSearch onSelect={setActiveTab} />
+<SettingsSearch onSelect={changeTab} />
             </div>
-            <nav className="flex overflow-x-auto px-2 pb-2 scrollbar-none">
+            <nav className="flex flex-col gap-0.5">
               {settingsNavItems.map(item => {
                 const Icon = item.icon;
                 const active = activeTab === item.id;
                 return (
                   <button
                     key={item.id}
-                    onClick={() => setActiveTab(item.id)}
+                    onClick={() => changeTab(item.id)}
                     className={`flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs transition-colors outline-none focus-visible:ring-0 focus-visible:outline-none ${
                       active
                         ? "bg-accent font-medium text-foreground"
@@ -524,7 +531,13 @@ export const SettingsDialog = memo(function SettingsDialog({
                 <X className="size-4" />
               </button>
             </DialogPrimitive.Close>
-            <div className="min-h-0 flex-1 overflow-y-auto p-4 md:p-5">
+            <div
+              className={
+                activeTab === "data" && dataWorkspace
+                  ? "flex min-h-0 flex-1 flex-col overflow-hidden"
+                  : "min-h-0 flex-1 overflow-y-auto p-4 md:p-5"
+              }
+            >
               {activeTab === "account" && (
                 <AccountSection
                   user={user}
@@ -534,19 +547,30 @@ export const SettingsDialog = memo(function SettingsDialog({
               )}
               {activeTab === "security" && <SecuritySection user={user} />}
               {activeTab === "appearance" && <AppearanceSection />}
-              {activeTab === "data" && (
-                <DataSection
-                  onOpenArchived={() => {
-                    setArchivedOpen(true);
-                    onOpenChange(false);
-                  }}
-                  onOpenShared={() => {
-                    setSharedOpen(true);
-                    onOpenChange(false);
-                  }}
-                  onDeleteAll={() => setConfirmDeleteAll(true)}
-                />
-              )}
+              {activeTab === "data" &&
+                (dataWorkspace === null ? (
+                  <DataSection
+                    onOpenArchived={() => setDataWorkspace("archived")}
+                    onOpenShared={() => setDataWorkspace("shared")}
+                    onDeleteAll={() => setConfirmDeleteAll(true)}
+                  />
+                ) : dataWorkspace === "archived" ? (
+                  <ArchivedChatsWorkspace
+                    onBack={() => setDataWorkspace(null)}
+                    onOpenChat={id => {
+                      onOpenConversation?.(id);
+                      onOpenChange(false);
+                    }}
+                  />
+                ) : (
+                  <SharedChatsWorkspace
+                    onBack={() => setDataWorkspace(null)}
+                    onOpenChat={id => {
+                      onOpenConversation?.(id);
+                      onOpenChange(false);
+                    }}
+                  />
+                ))}
               {activeTab === "memory" && <MemorySection />}
               {activeTab === "feedback" && <FeedbackSection />}
             </div>
@@ -554,18 +578,6 @@ export const SettingsDialog = memo(function SettingsDialog({
         </div>
       </DialogContent>
 
-      <ManagedChatsDialog
-        open={archivedOpen}
-        onOpenChange={setArchivedOpen}
-        onCloseSettings={() => onOpenChange(false)}
-        onOpenConversation={onOpenConversation}
-      />
-      <SharedChatsDialog
-        open={sharedOpen}
-        onOpenChange={setSharedOpen}
-        onCloseSettings={() => onOpenChange(false)}
-        onOpenConversation={onOpenConversation}
-      />
       <ConfirmDeleteDialog
         open={confirmDeleteAll}
         onOpenChange={setConfirmDeleteAll}
@@ -1576,21 +1588,14 @@ function FeedbackSection() {
   );
 }
 
-function ManagedChatsDialog({
-  open,
-  onOpenChange,
-  onCloseSettings,
-  onOpenConversation,
+function ArchivedChatsWorkspace({
+  onBack,
+  onOpenChat,
 }: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onCloseSettings?: () => void;
-  onOpenConversation?: (conversationId: string) => void;
+  onBack: () => void;
+  onOpenChat: (conversationId: string) => void;
 }) {
-  const chatsQuery = trpc.conversation.list.useQuery(
-    { scope: "archived" },
-    { enabled: open }
-  );
+  const chatsQuery = trpc.conversation.list.useQuery({ scope: "archived" });
   const utils = trpc.useUtils();
   const [deleteTarget, setDeleteTarget] = useState<{
     id: string;
@@ -1615,12 +1620,6 @@ function ManagedChatsDialog({
     updatedAt?: Date | string | null;
   }>;
 
-  const openChat = (id: string) => {
-    onOpenConversation?.(id);
-    onOpenChange(false);
-    onCloseSettings?.();
-  };
-
   const restorePending = restoreMutation.isPending;
 
   const restoreChat = (id: string) => {
@@ -1629,16 +1628,25 @@ function ManagedChatsDialog({
 
   return (
     <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="flex max-h-[80dvh] w-[calc(100%-1.5rem)] max-w-2xl flex-col gap-0 overflow-hidden rounded-2xl p-0">
-          <div className="shrink-0 border-b border-border px-4 pb-3 pt-4">
+      <div className="flex h-full flex-col">
+        <div className="flex shrink-0 items-center gap-3 border-b border-border px-4 py-3">
+          <button
+            type="button"
+            onClick={onBack}
+            aria-label="Back to Data Control"
+            className="flex size-7 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          >
+            <ArrowLeft className="size-4" />
+          </button>
+          <div className="min-w-0">
             <p className="text-base font-semibold">Archived chats</p>
             <p className="text-xs text-muted-foreground">
               Tap a chat to open it, restore to unarchive, or delete
               permanently.
             </p>
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto p-3">
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto p-3 md:p-4">
             {chatsQuery.isLoading ? (
               <Loading className="py-6" />
             ) : !conversations.length ? (
@@ -1652,7 +1660,7 @@ function ManagedChatsDialog({
                   <li key={c.id}>
                     <div className="group flex items-center gap-2 rounded-xl border border-border px-3 py-2 transition-colors hover:bg-accent">
                       <button
-                        onClick={() => openChat(c.id)}
+                        onClick={() => onOpenChat(c.id)}
                         className="min-w-0 flex-1 rounded-lg py-0.5 text-left focus-visible:ring-0 focus-visible:outline-none"
                       >
                         <p className="truncate text-[13px] font-medium">
@@ -1700,8 +1708,7 @@ function ManagedChatsDialog({
               </ul>
             )}
           </div>
-        </DialogContent>
-      </Dialog>
+        </div>
 
       <ConfirmDeleteDialog
         open={Boolean(deleteTarget)}
@@ -1720,21 +1727,14 @@ function ManagedChatsDialog({
   );
 }
 
-function SharedChatsDialog({
-  open,
-  onOpenChange,
-  onCloseSettings,
-  onOpenConversation,
+function SharedChatsWorkspace({
+  onBack,
+  onOpenChat,
 }: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onCloseSettings?: () => void;
-  onOpenConversation?: (conversationId: string) => void;
+  onBack: () => void;
+  onOpenChat: (conversationId: string) => void;
 }) {
-  const chatsQuery = trpc.conversation.list.useQuery(
-    { scope: "shared" },
-    { enabled: open }
-  );
+  const chatsQuery = trpc.conversation.list.useQuery({ scope: "shared" });
   const utils = trpc.useUtils();
   const [deleteTarget, setDeleteTarget] = useState<{
     id: string;
@@ -1761,12 +1761,6 @@ function SharedChatsDialog({
     updatedAt?: Date | string | null;
   }>;
 
-  const openChat = (id: string) => {
-    onOpenConversation?.(id);
-    onOpenChange(false);
-    onCloseSettings?.();
-  };
-
   const copyLink = async (shareToken: string | null | undefined) => {
     if (!shareToken) return;
     setCopyPending(true);
@@ -1786,16 +1780,25 @@ function SharedChatsDialog({
 
   return (
     <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="flex max-h-[80dvh] w-[calc(100%-1.5rem)] max-w-2xl flex-col gap-0 overflow-hidden rounded-2xl p-0">
-          <div className="shrink-0 border-b border-border px-4 pb-3 pt-4">
+      <div className="flex h-full flex-col">
+        <div className="flex shrink-0 items-center gap-3 border-b border-border px-4 py-3">
+          <button
+            type="button"
+            onClick={onBack}
+            aria-label="Back to Data Control"
+            className="flex size-7 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          >
+            <ArrowLeft className="size-4" />
+          </button>
+          <div className="min-w-0">
             <p className="text-base font-semibold">Shared chats</p>
             <p className="text-xs text-muted-foreground">
               Everything you've shared with a public link. Tap a chat to open
               it, copy its link, stop sharing, or delete it permanently.
             </p>
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto p-3">
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto p-3 md:p-4">
             {chatsQuery.isLoading ? (
               <Loading className="py-6" />
             ) : !conversations.length ? (
@@ -1812,7 +1815,7 @@ function SharedChatsDialog({
                   <li key={c.id}>
                     <div className="flex items-center gap-2 rounded-xl border border-border px-3 py-2 transition-colors hover:bg-accent">
                       <button
-                        onClick={() => openChat(c.id)}
+                        onClick={() => onOpenChat(c.id)}
                         className="min-w-0 flex-1 rounded-lg py-0.5 text-left focus-visible:ring-0 focus-visible:outline-none"
                       >
                         <p className="truncate text-[13px] font-medium">
@@ -1877,8 +1880,7 @@ function SharedChatsDialog({
               </ul>
             )}
           </div>
-        </DialogContent>
-      </Dialog>
+        </div>
 
       <ConfirmDeleteDialog
         open={Boolean(deleteTarget)}
