@@ -305,12 +305,13 @@ describe("FileCreationCard", () => {
       expect(markup).toContain('data-testid="file-code-container"');
       expect(markup).toContain("hidden md:flex");
 
-      // Mobile container: flex on mobile, hidden on md+
+      // Mobile container: flex on mobile, hidden on md+, simple and unique without different filename or line counts
       expect(markup).toContain('data-testid="file-code-container-mobile"');
       expect(markup).toContain("flex md:hidden");
-      expect(markup).toContain("report.py");
-      expect(markup).toContain("Python code");
       expect(markup).toContain("Show Code");
+      expect(markup).toContain("Python");
+      expect(markup).not.toContain("report.py");
+      expect(markup).not.toContain("lines");
     });
   });
 });

@@ -1,6 +1,7 @@
 import type { DocFormat } from "@/lib/docFormats";
 import {
   Check,
+  ChevronRight,
   Code2,
   Eye,
   RotateCw,
@@ -593,7 +594,7 @@ export const FileCreationCard = memo(function FileCreationCard({
         </div>
       )}
 
-      {/* ── Mobile Code Container: Compact, touch-first card tailored specifically for mobile ── */}
+      {/* ── Mobile Code Container: Simple, sleek & unique Show Code bar for mobile & phone ── */}
       {code && (
         <div
           role="button"
@@ -607,40 +608,21 @@ export const FileCreationCard = memo(function FileCreationCard({
           }}
           data-testid="file-code-container-mobile"
           aria-label="Show code"
-          className="group/code-mobile flex md:hidden w-full flex-col overflow-hidden rounded-2xl border border-sidebar-border bg-sidebar p-3 shadow-xs cursor-pointer select-none active:scale-[0.99] transition-all duration-150 hover:border-border"
+          className="group/code-mobile flex md:hidden w-full items-center justify-between gap-3 h-[48px] rounded-2xl border border-sidebar-border bg-sidebar px-3.5 shadow-xs cursor-pointer select-none active:scale-[0.98] transition-all duration-150 hover:border-border"
         >
-          {/* Top row: Icon squircle + Filename & line count + Touch Show Code button */}
-          <div className="flex items-center justify-between gap-2.5">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className="size-8 shrink-0 rounded-xl border border-sidebar-border bg-card flex items-center justify-center shadow-2xs">
-                <Code2 className="size-4 text-foreground" />
-              </div>
-              <div className="min-w-0">
-                <p className="truncate font-mono text-[13px] font-semibold text-foreground leading-tight">
-                  {cleanBaseName}.py
-                </p>
-                <p className="text-[11px] text-muted-foreground mt-0.5">
-                  Python code <span className="text-muted-foreground/60">•</span> {codeLineCount} lines
-                </p>
-              </div>
+          <div className="flex items-center gap-2.5">
+            <div className="size-7 rounded-lg border border-sidebar-border bg-card flex items-center justify-center shadow-2xs">
+              <Code2 className="size-3.5 text-foreground" />
             </div>
-
-            <span className="shrink-0 inline-flex items-center gap-1.5 rounded-xl border border-border/80 bg-card px-3 py-1.5 text-[12px] font-semibold text-foreground shadow-2xs">
-              <Code2 className="size-3 text-foreground" />
+            <span className="text-[13px] font-semibold text-foreground">
               Show Code
             </span>
           </div>
 
-          {/* Compact 2-line syntax peek with elegant gradient fade */}
-          {codePreviewLines && (
-            <div className="relative mt-2.5 pt-2 border-t border-sidebar-border/60 overflow-hidden max-h-[42px] pointer-events-none opacity-85 [&_.ksemo-code-body_pre]:p-0! [&_.ksemo-code-body_pre]:bg-transparent! [&_.ksemo-code-body]:text-[11px]">
-              <CodeSurface
-                code={codePreviewLines.split("\n").slice(0, 2).join("\n")}
-                rawLanguage="python"
-              />
-              <div className="pointer-events-none absolute inset-x-0 bottom-0 h-4 bg-gradient-to-t from-sidebar to-transparent" />
-            </div>
-          )}
+          <span className="inline-flex items-center gap-1 text-[12px] font-medium text-muted-foreground group-hover/code-mobile:text-foreground transition-colors">
+            Python
+            <ChevronRight className="size-3.5 text-muted-foreground/80" />
+          </span>
         </div>
       )}
     </div>
