@@ -88,9 +88,10 @@ const supabaseUrl =
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 const SUPABASE_REQUEST_TIMEOUT_MS = 20_000;
+const SUPABASE_RETRY_DELAY_MS = 500;
 
 function createBoundedFetch(): typeof fetch {
-  return (input, init) => {
+  const singleFetch: typeof fetch = (input, init) => {
     const controller = new AbortController();
     const timer = setTimeout(
       () =>
@@ -114,6 +115,30 @@ function createBoundedFetch(): typeof fetch {
     return fetch(input, { ...init, signal: controller.signal }).finally(() =>
       clearTimeout(timer)
     );
+  };
+
+  // A single flaky Supabase call (brief network hiccup, one slow request)
+  // must never surface to users as "data store unavailable". Retry once on
+  // transient (network/timeout/abort) failures before giving up.
+  return async (input, init) => {
+    const attempt = async (): Promise<
+      { ok: true; res: Response } | { ok: false; error: unknown }
+    > => {
+      try {
+        return { ok: true, res: await singleFetch(input, init) };
+      } catch (error) {
+        return { ok: false, error };
+      }
+    };
+
+    const first = await attempt();
+    if (first.ok) return first.res;
+    if (init?.signal?.aborted) throw first.error;
+
+    await new Promise(resolve => setTimeout(resolve, SUPABASE_RETRY_DELAY_MS));
+    const second = await attempt();
+    if (second.ok) return second.res;
+    throw second.error;
   };
 }
 

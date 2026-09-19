@@ -3191,7 +3191,10 @@ export default function Home() {
   // The server could not verify the session (data store/OAuth temporarily
   // down). Do NOT show the sign-in screen: the user may still be signed in,
   // and bouncing them to login on an outage looks like a forced logout.
-  if (authUnavailable) {
+  // Only signed-in users need to wait on this: after signing out (or while
+  // signed out) a data-store blip must never flash this screen over the guest
+  // UI — that read as "everything is broken / flickering" on deployed devices.
+  if (authUnavailable && user) {
     return (
       <main className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-background px-5 text-center">
         <p className="text-sm font-medium text-foreground">
