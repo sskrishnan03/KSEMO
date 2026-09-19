@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { startLogin } from "@/const";
 import { AnimatePresence, motion } from "framer-motion";
+import { useEffect, useRef } from "react";
 import {
   Library,
   LogIn,
@@ -199,21 +200,36 @@ export function SignInPrompt({
   open: boolean;
   onClose: () => void;
 }) {
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  // Dismiss when the user taps anywhere outside the card. There is deliberately
+  // NO full-screen overlay here: on mobile that invisible layer would swallow
+  // every tap and make the app feel frozen while the prompt is open.
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (cardRef.current && !cardRef.current.contains(event.target as Node)) {
+        onClose();
+      }
+    };
+    document.addEventListener("pointerdown", onPointerDown, true);
+    return () => document.removeEventListener("pointerdown", onPointerDown, true);
+  }, [open, onClose]);
+
   return (
     <AnimatePresence>
       {open && (
-        <motion.div className="fixed inset-0 z-50" onClick={onClose}>
-          <motion.div
-            className="absolute bottom-4 right-4 w-[calc(100vw-2rem)] max-w-sm"
-            initial={{ opacity: 0, y: 18, scale: 0.97 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 18, scale: 0.97 }}
-            transition={{ duration: 0.24, ease: [0.32, 0.72, 0, 1] }}
-            onClick={event => event.stopPropagation()}
-            role="dialog"
-            aria-modal="false"
-            aria-label="Sign in to continue"
-          >
+        <motion.div
+          ref={cardRef}
+          className="fixed bottom-4 right-4 z-50 w-[calc(100vw-2rem)] max-w-sm"
+          initial={{ opacity: 0, y: 18, scale: 0.97 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 18, scale: 0.97 }}
+          transition={{ duration: 0.24, ease: [0.32, 0.72, 0, 1] }}
+          role="dialog"
+          aria-modal="false"
+          aria-label="Sign in to continue"
+        >
             <button
               type="button"
               onClick={onClose}
@@ -257,7 +273,6 @@ export function SignInPrompt({
               </p>
             </div>
           </motion.div>
-        </motion.div>
       )}
     </AnimatePresence>
   );
