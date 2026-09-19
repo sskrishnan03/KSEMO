@@ -4,11 +4,22 @@
 @custom-variant dark (&:is(.dark *));
 
 /* Touch devices: taps should behave like a desktop hover. The
-   .ksemo-touch-hover class is applied to the tapped element (and its
-   ancestors) by client/src/lib/touchHover.ts, so overriding the built-in
-   hover variants here makes every hover:/group-hover: style respond to
-   touches too, on top of real mouse hover on desktop. */
-@custom-variant hover (&:hover, &.ksemo-touch-hover);
+   .ksemo-touch-hover class is applied by client/src/lib/touchHover.ts while
+   the finger is down on the tapped element (and its ancestors) and removed
+   on release, so every hover:/group-hover: style responds to touches just
+   like a real hover — and, as on desktop, it goes away once released. Real
+   :hover stays limited to hover-capable devices so the phone's own sticky
+   hover can never keep the state stuck. */
+@custom-variant hover {
+  @media (hover: hover) {
+    &:hover {
+      @slot;
+    }
+  }
+  &.ksemo-touch-hover {
+    @slot;
+  }
+}
 
 @theme {
   /* Mobile browsers in "Desktop site" mode report a ~980px viewport. Lower the
