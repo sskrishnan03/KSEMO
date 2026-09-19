@@ -536,8 +536,14 @@ export const SettingsDialog = memo(function SettingsDialog({
               {activeTab === "appearance" && <AppearanceSection />}
               {activeTab === "data" && (
                 <DataSection
-                  onOpenArchived={() => setArchivedOpen(true)}
-                  onOpenShared={() => setSharedOpen(true)}
+                  onOpenArchived={() => {
+                    setArchivedOpen(true);
+                    onOpenChange(false);
+                  }}
+                  onOpenShared={() => {
+                    setSharedOpen(true);
+                    onOpenChange(false);
+                  }}
                   onDeleteAll={() => setConfirmDeleteAll(true)}
                 />
               )}
@@ -1624,7 +1630,7 @@ function ManagedChatsDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="flex max-h-[32rem] w-[calc(100%-1.5rem)] max-w-lg flex-col gap-0 overflow-hidden rounded-2xl p-0">
+        <DialogContent className="flex max-h-[80dvh] w-[calc(100%-1.5rem)] max-w-2xl flex-col gap-0 overflow-hidden rounded-2xl p-0">
           <div className="shrink-0 border-b border-border px-4 pb-3 pt-4">
             <p className="text-base font-semibold">Archived chats</p>
             <p className="text-xs text-muted-foreground">
@@ -1781,7 +1787,7 @@ function SharedChatsDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="flex max-h-[32rem] w-[calc(100%-1.5rem)] max-w-lg flex-col gap-0 overflow-hidden rounded-2xl p-0">
+        <DialogContent className="flex max-h-[80dvh] w-[calc(100%-1.5rem)] max-w-2xl flex-col gap-0 overflow-hidden rounded-2xl p-0">
           <div className="shrink-0 border-b border-border px-4 pb-3 pt-4">
             <p className="text-base font-semibold">Shared chats</p>
             <p className="text-xs text-muted-foreground">
