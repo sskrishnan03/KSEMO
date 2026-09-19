@@ -291,6 +291,27 @@ describe("FileCreationCard", () => {
       // Strips shebang
       expect(markup).not.toContain("#!/usr/bin/env");
     });
+
+    it("renders distinct responsive code containers for desktop (side-by-side) and mobile (compact touch card)", () => {
+      const markup = renderCard({
+        stage: "completed",
+        format: "pdf",
+        filename: "report.pdf",
+        fileUrl: "https://example.com/report.pdf",
+        code: "import reportlab\nprint('Generated PDF')",
+      });
+
+      // Desktop container: hidden on mobile, flex on md+
+      expect(markup).toContain('data-testid="file-code-container"');
+      expect(markup).toContain("hidden md:flex");
+
+      // Mobile container: flex on mobile, hidden on md+
+      expect(markup).toContain('data-testid="file-code-container-mobile"');
+      expect(markup).toContain("flex md:hidden");
+      expect(markup).toContain("report.py");
+      expect(markup).toContain("Python code");
+      expect(markup).toContain("Show Code");
+    });
   });
 });
 

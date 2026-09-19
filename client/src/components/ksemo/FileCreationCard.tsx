@@ -559,7 +559,7 @@ export const FileCreationCard = memo(function FileCreationCard({
         </div>
       </div>
 
-      {/* ── Right Container: Code container in sidebar color, exact same height as file container ── */}
+      {/* ── Desktop Right Container: Code container in sidebar color, exact same height as file container ── */}
       {code && (
         <div
           role="button"
@@ -573,7 +573,7 @@ export const FileCreationCard = memo(function FileCreationCard({
           }}
           data-testid="file-code-container"
           aria-label="Show code"
-          className="group/code relative flex flex-1 min-w-[140px] h-[302px] max-h-[302px] flex-col overflow-hidden rounded-2xl border border-sidebar-border bg-sidebar p-3 shadow-sm cursor-pointer select-none transition-all duration-200 hover:border-border hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 animate-in fade-in-0 slide-in-from-bottom-2 zoom-in-95"
+          className="group/code relative hidden md:flex flex-1 min-w-[140px] h-[302px] max-h-[302px] flex-col overflow-hidden rounded-2xl border border-sidebar-border bg-sidebar p-3 shadow-sm cursor-pointer select-none transition-all duration-200 hover:border-border hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 animate-in fade-in-0 slide-in-from-bottom-2 zoom-in-95"
         >
           {/* Colorful code snippet: starts from line 1, filling exact height with zero dead space */}
           <div className="relative z-0 flex-1 overflow-hidden pointer-events-none select-none [&_.ksemo-code-body_pre]:p-0! [&_.ksemo-code-body_pre]:bg-transparent!">
@@ -590,6 +590,57 @@ export const FileCreationCard = memo(function FileCreationCard({
               Show Code
             </span>
           </div>
+        </div>
+      )}
+
+      {/* ── Mobile Code Container: Compact, touch-first card tailored specifically for mobile ── */}
+      {code && (
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={handleOpenCode}
+          onKeyDown={e => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              handleOpenCode();
+            }
+          }}
+          data-testid="file-code-container-mobile"
+          aria-label="Show code"
+          className="group/code-mobile flex md:hidden w-full flex-col overflow-hidden rounded-2xl border border-sidebar-border bg-sidebar p-3 shadow-xs cursor-pointer select-none active:scale-[0.99] transition-all duration-150 hover:border-border"
+        >
+          {/* Top row: Icon squircle + Filename & line count + Touch Show Code button */}
+          <div className="flex items-center justify-between gap-2.5">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="size-8 shrink-0 rounded-xl border border-sidebar-border bg-card flex items-center justify-center shadow-2xs">
+                <Code2 className="size-4 text-foreground" />
+              </div>
+              <div className="min-w-0">
+                <p className="truncate font-mono text-[13px] font-semibold text-foreground leading-tight">
+                  {cleanBaseName}.py
+                </p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  Python code <span className="text-muted-foreground/60">•</span> {codeLineCount} lines
+                </p>
+              </div>
+            </div>
+
+            <span className="shrink-0 inline-flex items-center gap-1.5 rounded-xl border border-border/80 bg-card px-3 py-1.5 text-[12px] font-semibold text-foreground shadow-2xs">
+              <Code2 className="size-3 text-foreground" />
+              Show Code
+            </span>
+          </div>
+
+          {/* Compact 2-line syntax peek with elegant gradient fade */}
+          {codePreviewLines && (
+            <div className="relative mt-2.5 pt-2 border-t border-sidebar-border/60 overflow-hidden max-h-[42px] pointer-events-none opacity-85 [&_.ksemo-code-body_pre]:p-0! [&_.ksemo-code-body_pre]:bg-transparent! [&_.ksemo-code-body]:text-[11px]">
+              <CodeSurface
+                code={codePreviewLines.split("\n").slice(0, 2).join("\n")}
+                rawLanguage="python"
+              />
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 h-4 bg-gradient-to-t from-sidebar to-transparent" />
+            </div>
+          )}
         </div>
       )}
     </div>
