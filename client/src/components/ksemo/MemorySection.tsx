@@ -54,10 +54,7 @@ export function MemorySection() {
       <div>
         <h3 className="text-base font-semibold tracking-[-0.02em]">Memory</h3>
         <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-          KSEMO automatically analyzes your conversations, remembers the
-          facts, preferences, and context that matter, and uses them to give
-          you consistent, personal answers. Everything is saved automatically
-          and stays in your account.
+          Save facts and preferences from your conversations automatically.
         </p>
       </div>
 

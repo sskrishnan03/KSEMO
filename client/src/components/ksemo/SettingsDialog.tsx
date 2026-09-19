@@ -1496,8 +1496,7 @@ function FeedbackSection() {
       <div>
         <h3 className="text-base font-semibold tracking-[-0.02em]">Feedback</h3>
         <p className="mt-1 text-sm text-muted-foreground">
-          Tell us what you think, report a problem, or suggest something new.
-          Your feedback directly helps us improve KSEMO.
+          Share ideas, report bugs, or ask questions.
         </p>
       </div>
       {submitted ? (
@@ -1802,9 +1801,6 @@ function SharedChatsWorkspace({
               <div className="py-8 text-center">
                 <Link2 className="mx-auto size-6 text-muted-foreground" />
                 <p className="mt-3 text-sm font-medium">Nothing shared yet</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Chats you make public will show up here.
-                </p>
               </div>
             ) : (
               <ul className="space-y-1.5">
@@ -1819,19 +1815,26 @@ function SharedChatsWorkspace({
                           {c.title}
                         </p>
                         <p className="mt-0.5 text-[11px] text-muted-foreground">
-                          Public link active
+                          Shared
                         </p>
                       </button>
-                      <button
-                        type="button"
-                        disabled={!c.shareToken || busy}
-                        onClick={() => copyLink(c.shareToken)}
-                        aria-label="Copy public link"
-                        className="shrink-0 inline-flex items-center gap-1 rounded-lg bg-foreground px-2.5 py-1.5 text-[11px] font-semibold text-background transition-opacity hover:opacity-90 disabled:pointer-events-none disabled:opacity-50"
-                      >
-                        <Copy className="size-3" />
-                        Copy link
-                      </button>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            aria-label="Copy public link"
+                            className="size-8 shrink-0 rounded-lg text-muted-foreground transition-colors outline-none hover:bg-foreground/10 hover:text-foreground focus-visible:ring-0 focus-visible:outline-none"
+                            disabled={!c.shareToken || busy}
+                            onClick={() => copyLink(c.shareToken)}
+                          >
+                            <Copy className="size-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom">
+                          Copy link
+                        </TooltipContent>
+                      </Tooltip>
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button
