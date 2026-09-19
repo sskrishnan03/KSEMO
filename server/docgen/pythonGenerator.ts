@@ -234,6 +234,21 @@ export function generatePdfScript(spec: DocumentSpec): string {
     }
   }
 
+  if (spec.sources && spec.sources.length > 0) {
+    scriptParts.push(
+      `    story.append(Spacer(1, 14))`,
+      `    story.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor('#${theme.border}'), spaceAfter=10))`,
+      `    story.append(Paragraph("References &amp; Authoritative Sources", h2_style))`,
+      `    story.append(Spacer(1, 6))`
+    );
+    for (const src of spec.sources) {
+      const pubStr = src.publisher ? ` &mdash; <i>${src.publisher.replace(/&/g, "&amp;")}</i>` : "";
+      const urlStr = src.url ? `<br/>&nbsp;&nbsp;&nbsp;&nbsp;<font color="#${theme.accent}"><u>${src.url}</u></font>` : "";
+      const line = `&bull; <b>${(src.title || "Reference").replace(/&/g, "&amp;")}</b>${pubStr}${urlStr}`;
+      scriptParts.push(`    story.append(Paragraph(${pyStr(line)}, bullet_style))`);
+    }
+  }
+
   scriptParts.push(
     `    doc.build(story, canvasmaker=NumberedCanvas)`,
     ``,
@@ -368,6 +383,33 @@ export function generateDocxScript(spec: DocumentSpec): string {
     }
   }
 
+  if (spec.sources && spec.sources.length > 0) {
+    scriptParts.push(
+      `    doc.add_heading("References & Authoritative Sources", level=2)`
+    );
+    for (const src of spec.sources) {
+      scriptParts.push(
+        `    p_ref = doc.add_paragraph(style='List Bullet')`,
+        `    r_title = p_ref.add_run(${pyStr(src.title || "Reference")})`,
+        `    r_title.bold = True`
+      );
+      if (src.publisher) {
+        scriptParts.push(
+          `    r_pub = p_ref.add_run(${pyStr(" — " + src.publisher)})`,
+          `    r_pub.italic = True`
+        );
+      }
+      if (src.url) {
+        scriptParts.push(
+          `    p_url = doc.add_paragraph()`,
+          `    p_url.paragraph_format.left_indent = Inches(0.25)`,
+          `    r_url = p_url.add_run(${pyStr(src.url)})`,
+          `    r_url.font.color.rgb = RGBColor.from_string('${theme.accent}')`
+        );
+      }
+    }
+  }
+
   scriptParts.push(
     `    doc.save(filename)`,
     ``,
@@ -444,6 +486,30 @@ export function generateXlsxScript(spec: DocumentSpec): string {
     scriptParts.push(`        col_letter = get_column_letter(col[0].column)`);
     scriptParts.push(`        ${sheetVar}.column_dimensions[col_letter].width = max(max_len + 3, 12)`);
   });
+
+  if (spec.sources && spec.sources.length > 0) {
+    const sVar = `ws_sources`;
+    scriptParts.push(
+      `    ${sVar} = wb.create_sheet(title="Sources")`,
+      `    ${sVar}.views.sheetView[0].showGridLines = True`,
+      `    ${sVar}.append(["Title", "Publisher", "URL"])`,
+      `    for cell in ${sVar}[1]:`,
+      `        cell.font = Font(name='Calibri', size=11, bold=True, color='FFFFFF')`,
+      `        cell.fill = PatternFill(start_color='1F4E79', end_color='1F4E79', fill_type='solid')`,
+      `        cell.alignment = Alignment(horizontal='center', vertical='center')`
+    );
+    for (const src of spec.sources) {
+      scriptParts.push(
+        `    ${sVar}.append([${pyStr(src.title || "")}, ${pyStr(src.publisher || "")}, ${pyStr(src.url || "")}])`
+      );
+    }
+    scriptParts.push(
+      `    for col in ${sVar}.columns:`,
+      `        max_len = max(len(str(cell.value or '')) for cell in col)`,
+      `        col_letter = get_column_letter(col[0].column)`,
+      `        ${sVar}.column_dimensions[col_letter].width = max(max_len + 3, 14)`
+    );
+  }
 
   scriptParts.push(
     `    wb.save(filename)`,
@@ -550,6 +616,34 @@ export function generatePptxScript(spec: DocumentSpec): string {
     }
   });
 
+  if (spec.sources && spec.sources.length > 0) {
+    scriptParts.push(
+      `    # --- References Slide ---`,
+      `    ref_slide = prs.slides.add_slide(blank_layout)`,
+      `    ref_tbox = ref_slide.shapes.add_textbox(Inches(0.8), Inches(0.8), Inches(11.7), Inches(1.0))`,
+      `    ref_tf = ref_tbox.text_frame`,
+      `    ref_p = ref_tf.paragraphs[0]`,
+      `    ref_p.text = "References & Authoritative Sources"`,
+      `    ref_p.font.bold = True`,
+      `    ref_p.font.size = Pt(28)`,
+      `    ref_p.font.color.rgb = RGBColor(26, 54, 93)`,
+      `    ref_bbox = ref_slide.shapes.add_textbox(Inches(0.8), Inches(2.0), Inches(11.7), Inches(4.8))`,
+      `    ref_btf = ref_bbox.text_frame`,
+      `    ref_btf.word_wrap = True`
+    );
+    spec.sources.slice(0, 6).forEach((src, sIdx) => {
+      const pVar = sIdx === 0 ? `ref_btf.paragraphs[0]` : `ref_btf.add_paragraph()`;
+      const label = src.publisher ? `${src.title} (${src.publisher})` : src.title;
+      scriptParts.push(
+        `    ref_item = ${pVar}`,
+        `    ref_item.text = "• " + ${pyStr(label)} + (" - " + ${pyStr(src.url)} if ${pyStr(src.url || "")} else "")`,
+        `    ref_item.font.size = Pt(14)`,
+        `    ref_item.font.color.rgb = RGBColor(51, 65, 85)`,
+        `    ref_item.space_after = Pt(8)`
+      );
+    });
+  }
+
   scriptParts.push(
     `    prs.save(filename)`,
     ``,
@@ -568,13 +662,20 @@ export function generatePlainTextScript(spec: DocumentSpec): string {
   const format = (spec.format as DocFormat) || "txt";
   const filename = resolveTargetFilename(spec, format);
   const title = resolveEffectiveTitle(spec, filename);
-  const contentStr = spec.blocks ? spec.blocks.map(b => {
+  let contentStr = spec.blocks ? spec.blocks.map(b => {
     if (b.type === 'heading') return `${'#'.repeat(b.level)} ${b.text}\n`;
     if (b.type === 'paragraph') return `${b.text}\n`;
     if (b.type === 'bulletList') return (b.items || []).map(i => `* ${i}`).join('\n') + '\n';
     if (b.type === 'numberedList') return (b.items || []).map((item, i) => `${i + 1}. ${item}`).join('\n') + '\n';
     return '';
   }).join('\n') : title;
+
+  if (spec.sources && spec.sources.length > 0) {
+    contentStr += "\n\n--- References & Authoritative Sources ---\n";
+    for (const src of spec.sources) {
+      contentStr += `• ${src.title}${src.publisher ? ` (${src.publisher})` : ""}${src.url ? ` - ${src.url}` : ""}\n`;
+    }
+  }
 
   return `"""
 Generated by KSEMO Document Engine.

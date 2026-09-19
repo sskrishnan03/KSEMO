@@ -1,7 +1,6 @@
 import type { DocFormat } from "@/lib/docFormats";
 import {
   Check,
-  ChevronDown,
   Code2,
   Eye,
   RotateCw,
@@ -189,6 +188,24 @@ export function getLiveStatusPhrase(
   }
 }
 
+export function getCreatingStatusPhrase(format?: DocFormat): string {
+  switch (format) {
+    case "xlsx":
+    case "csv":
+      return "Creating spreadsheet...";
+    case "pptx":
+      return "Creating presentation...";
+    case "txt":
+      return "Creating text file...";
+    case "markdown":
+      return "Creating document...";
+    case "pdf":
+    case "docx":
+    default:
+      return "Creating document...";
+  }
+}
+
 export const STAGE_NUMBERS: Record<FileCreationStage, number> = {
   analyzing: 1,
   researching: 2,
@@ -246,7 +263,6 @@ export const FileCreationCard = memo(function FileCreationCard({
   onOpenCode,
 }: FileCreationCardProps) {
   const { openPdf } = usePdfViewer();
-  const [isExpanded, setIsExpanded] = useState(defaultExpanded);
   const [showReady, setShowReady] = useState(initialShowReady);
   const prevStageRef = useRef<FileCreationStage | null>(stage);
   const stageRef = useRef<HTMLDivElement>(null);
@@ -314,6 +330,38 @@ export const FileCreationCard = memo(function FileCreationCard({
   const config = FORMAT_CONFIGS[format] || FORMAT_CONFIGS.pdf;
   const variant = FORMAT_TO_VARIANT[format] || "generic";
   const displayName = filename || `document.${format}`;
+
+  const cleanBaseName = useMemo(() => {
+    return displayName.replace(/\.\w+$/, "");
+  }, [displayName]);
+
+  const handleOpenCode = useCallback(() => {
+    if (!cleanCode) return;
+    const codeDataUrl = `data:text/x-python;charset=utf-8,${encodeURIComponent(cleanCode)}`;
+    openPdf({
+      url: codeDataUrl,
+      filename: `${cleanBaseName}.py`,
+      sizeBytes: new Blob([cleanCode]).size,
+      mimeType: "text/x-python",
+      isCode: true,
+    });
+    onOpenCode?.(cleanCode);
+  }, [cleanCode, cleanBaseName, openPdf, onOpenCode]);
+
+  useEffect(() => {
+    if (
+      (initialShowCodeDrawer || initialShowCodeModal || initialShowCodeExpanded) &&
+      cleanCode
+    ) {
+      handleOpenCode();
+    }
+  }, [
+    initialShowCodeDrawer,
+    initialShowCodeModal,
+    initialShowCodeExpanded,
+    cleanCode,
+    handleOpenCode,
+  ]);
 
   // ── Error state ─────────────────────────────────────────────────────────
   if (stage === "error") {
@@ -390,58 +438,22 @@ export const FileCreationCard = memo(function FileCreationCard({
     );
   }
 
-  // ── In-Progress / Creating state (CONTAINER-FREE, PYTHON CODE DROPDOWN) ───────
+  // ── In-Progress / Creating state (CLEAN, CONTAINER-FREE, NO DROPDOWN) ───────
   if (stage !== "completed") {
-    const statusPhrase = getLiveStatusPhrase(
-      stage as FileCreationStage,
-      format
-    );
-    const defaultDraftCode = `# Generating ${displayName} via Python...\nimport os\nimport sys\n\n# Preparing document structure and content...\n`;
+    const creatingPhrase = getCreatingStatusPhrase(format);
 
     return (
       <div
         data-testid="file-creation-drafting"
-        className="my-2 flex flex-col items-start select-none animate-in fade-in duration-150"
+        className="my-2 flex items-center gap-2.5 py-1 select-none animate-in fade-in duration-150"
       >
-        {/* Interactive process row as the dropdown trigger (minimal, container-free) */}
-        <button
-          type="button"
-          onClick={() => setIsExpanded(prev => !prev)}
-          aria-expanded={isExpanded}
-          aria-label={
-            isExpanded
-              ? "Collapse generation process"
-              : "Expand generation process"
-          }
-          className="group/process flex min-h-[36px] items-center gap-2 py-1 text-left cursor-pointer transition-colors focus-visible:outline-none"
-        >
-          <FileBrandMark
-            variant={variant}
-            className="size-6 shrink-0 select-none"
-          />
-          <span className="text-[14.5px] font-medium text-foreground transition-opacity duration-200">
-            {statusPhrase}
-          </span>
-          <ChevronDown
-            className={cn(
-              "size-4 text-muted-foreground transition-transform duration-200 group-hover/process:text-foreground",
-              isExpanded && "rotate-180"
-            )}
-          />
-        </button>
-
-        {/* Process dropdown: Python code block directly instead of artificial checklist */}
-        {isExpanded && (
-          <div
-            data-testid="file-creation-process-list"
-            className="mt-2 w-full max-w-[560px] animate-in fade-in slide-in-from-top-1 duration-150"
-          >
-            <KsemoCodeBlock
-              code={code || defaultDraftCode}
-              rawLanguage="python"
-            />
-          </div>
-        )}
+        <FileBrandMark
+          variant={variant}
+          className="size-6 shrink-0 select-none"
+        />
+        <span className="ksemo-shimmer-text text-[14.5px] font-medium select-none">
+          {creatingPhrase}
+        </span>
       </div>
     );
   }
@@ -466,38 +478,6 @@ export const FileCreationCard = memo(function FileCreationCard({
       window.open(fileUrl, "_blank");
     }
   };
-
-  const cleanBaseName = useMemo(() => {
-    return displayName.replace(/\.\w+$/, "");
-  }, [displayName]);
-
-  const handleOpenCode = useCallback(() => {
-    if (!cleanCode) return;
-    const codeDataUrl = `data:text/x-python;charset=utf-8,${encodeURIComponent(cleanCode)}`;
-    openPdf({
-      url: codeDataUrl,
-      filename: `${cleanBaseName}.py`,
-      sizeBytes: new Blob([cleanCode]).size,
-      mimeType: "text/x-python",
-      isCode: true,
-    });
-    onOpenCode?.(cleanCode);
-  }, [cleanCode, cleanBaseName, openPdf, onOpenCode]);
-
-  useEffect(() => {
-    if (
-      (initialShowCodeDrawer || initialShowCodeModal || initialShowCodeExpanded) &&
-      cleanCode
-    ) {
-      handleOpenCode();
-    }
-  }, [
-    initialShowCodeDrawer,
-    initialShowCodeModal,
-    initialShowCodeExpanded,
-    cleanCode,
-    handleOpenCode,
-  ]);
 
   return (
     <div

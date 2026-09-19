@@ -517,3 +517,38 @@ html.ksemo-reduce-motion .ksemo-voice-bar {
   }
 }
 
+/* Continuous Left-to-Right Text Shimmer for live file creation */
+@keyframes ksemo-text-shimmer-ltr {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.ksemo-shimmer-text {
+  background: linear-gradient(
+    90deg,
+    var(--muted-foreground) 0%,
+    var(--muted-foreground) 25%,
+    var(--foreground) 50%,
+    var(--muted-foreground) 75%,
+    var(--muted-foreground) 100%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  animation: ksemo-text-shimmer-ltr 2.2s linear infinite;
+  display: inline-block;
+}
+
+html.ksemo-reduce-motion .ksemo-shimmer-text {
+  animation: none;
+  -webkit-text-fill-color: currentColor;
+  color: currentColor;
+}
+
+

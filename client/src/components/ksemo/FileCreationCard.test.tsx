@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import {
   FileCreationCard,
+  getCreatingStatusPhrase,
   type FileCreationCardProps,
 } from "./FileCreationCard";
 
@@ -14,8 +15,8 @@ function renderCard(props: FileCreationCardProps) {
 }
 
 describe("FileCreationCard", () => {
-  describe("In-Progress Creating State (Container-Free & Live Milestone Paced)", () => {
-    it("renders without any boxed container, without Details/Hide text, without vertical border lines, and with single concise status phrase", () => {
+  describe("In-Progress Creating State (Clean Minimal Shimmer Text, No Dropdown)", () => {
+    it("renders without any boxed container, without dropdown chevron, without process list, and with continuous shimmer text", () => {
       const markup = renderCard({
         stage: "generating",
         format: "docx",
@@ -30,93 +31,40 @@ describe("FileCreationCard", () => {
       expect(markup).not.toContain("border-destructive");
       expect(markup).not.toContain("border-l");
 
-      // Per user request: no "Details" or "Hide" words
-      expect(markup).not.toContain("Details");
-      expect(markup).not.toContain("Hide");
+      // Per user request: no dropdown chevron and no process list dropdown
+      expect(markup).not.toContain("lucide-chevron-down");
+      expect(markup).not.toContain('data-testid="file-creation-process-list"');
 
-      // Displays single concise live status phrase directly from real backend stage
-      expect(markup).toContain("Compiling the file");
-
-      // Displays toggle chevron
-      expect(markup).toContain("lucide-chevron-down");
+      // Permanent status phrase with continuous left-to-right shimmer
+      expect(markup).toContain("Creating document...");
+      expect(markup).toContain("ksemo-shimmer-text");
     });
 
-    it("displays stage-specific single concise status phrases matching the backend pipeline", () => {
-      const analyzingMarkup = renderCard({
+    it("displays permanent 2-word status phrases matching document format", () => {
+      expect(getCreatingStatusPhrase("pdf")).toBe("Creating document...");
+      expect(getCreatingStatusPhrase("docx")).toBe("Creating document...");
+      expect(getCreatingStatusPhrase("xlsx")).toBe("Creating spreadsheet...");
+      expect(getCreatingStatusPhrase("csv")).toBe("Creating spreadsheet...");
+      expect(getCreatingStatusPhrase("pptx")).toBe("Creating presentation...");
+      expect(getCreatingStatusPhrase("txt")).toBe("Creating text file...");
+
+      const pdfMarkup = renderCard({
         stage: "analyzing",
         format: "pdf",
       });
-      expect(analyzingMarkup).toContain("Crafting the intelligence");
+      expect(pdfMarkup).toContain("Creating document...");
 
-      const planningMarkup = renderCard({
-        stage: "planning",
-        format: "pdf",
-      });
-      expect(planningMarkup).toContain("Structuring the content");
-
-      const researchingMarkup = renderCard({
+      const xlsxMarkup = renderCard({
         stage: "researching",
-        format: "pdf",
-      });
-      expect(researchingMarkup).toContain("Gathering verified insights");
-
-      const writingDocMarkup = renderCard({
-        stage: "content_generated",
-        format: "pdf",
-      });
-      expect(writingDocMarkup).toContain("Writing the document");
-
-      const writingSheetMarkup = renderCard({
-        stage: "content_generated",
         format: "xlsx",
       });
-      expect(writingSheetMarkup).toContain("Writing the spreadsheet");
+      expect(xlsxMarkup).toContain("Creating spreadsheet...");
 
-      const designingMarkup = renderCard({
+      const pptxMarkup = renderCard({
         stage: "designing",
-        format: "docx",
+        format: "pptx",
       });
-      expect(designingMarkup).toContain("Formatting the layout");
-
-      const validatingMarkup = renderCard({
-        stage: "validating",
-        format: "pdf",
-      });
-      expect(validatingMarkup).toContain("Validating document integrity");
-    });
-
-    it("renders Python code block directly inside the expanded process dropdown without artificial checklist steps", () => {
-      const docxMarkup = renderCard({
-        stage: "generating",
-        format: "docx",
-        defaultExpanded: true,
-      });
-
-      // Must render process list
-      expect(docxMarkup).toContain('data-testid="file-creation-process-list"');
-
-      // Replaces artificial checklist steps with Python code block
-      expect(docxMarkup).not.toContain("Analyzing the request");
-      expect(docxMarkup).not.toContain("Structuring the content");
-      expect(docxMarkup).not.toContain("Validating document integrity");
-
-      // Displays Python code block
-      expect(docxMarkup).toContain("Python");
-      expect(docxMarkup).toContain("Generating document.docx via Python");
-    });
-
-    it("renders custom streamed Python code inside the expanded dropdown when provided", () => {
-      const customCode = "from docx import Document\ndoc = Document()\ndoc.add_heading('Hello', 0)\ndoc.save('out.docx')";
-      const markup = renderCard({
-        stage: "generating",
-        format: "docx",
-        defaultExpanded: true,
-        code: customCode,
-      });
-
-      expect(markup).toContain('data-testid="file-creation-process-list"');
-      expect(markup).toContain("from docx import Document");
-      expect(markup).toContain("doc.save");
+      expect(pptxMarkup).toContain("Creating presentation...");
     });
   });
 
