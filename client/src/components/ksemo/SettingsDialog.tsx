@@ -581,10 +581,9 @@ export const SettingsDialog = memo(function SettingsDialog({
       <ConfirmDeleteDialog
         open={confirmDeleteAll}
         onOpenChange={setConfirmDeleteAll}
-        title="Delete all chats?"
-        description="Every conversation, including archived ones, will be permanently removed."
-        confirmLabel="Delete"
-        confirmKeyword="DELETE"
+        title="Are you sure you want to delete all chats?"
+        description="Every conversation, including archived ones, will be permanently removed. This cannot be undone."
+        confirmLabel="Delete all"
         busy={removeAllMutation.isPending}
         onConfirm={() => removeAllMutation.mutate()}
       />

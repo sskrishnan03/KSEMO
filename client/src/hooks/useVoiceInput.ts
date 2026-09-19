@@ -94,6 +94,28 @@ export function useVoiceInput({
       );
       return;
     }
+    // Create the AudioContext synchronously inside the click gesture, before
+    // any await. Created after an await it is left "suspended" by the browser
+    // autoplay policy, so the live meter's analyser reads silence while you
+    // speak — the recording still captures audio, but the bars never move and
+    // the mic looks dead. Creating + resuming it up front keeps the meter
+    // running for the whole clip.
+    let audioCtx: AudioContext | null = null;
+    try {
+      const AudioCtx =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext })
+          .webkitAudioContext;
+      if (AudioCtx) {
+        audioCtx = new AudioCtx();
+        void audioCtx.resume().catch(() => undefined);
+        audioContextRef.current = audioCtx;
+      }
+    } catch {
+      audioCtx = null;
+      audioContextRef.current = null;
+    }
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
@@ -154,13 +176,12 @@ export function useVoiceInput({
       );
 
       try {
-        const AudioCtx =
-          window.AudioContext ||
-          (window as unknown as { webkitAudioContext: typeof AudioContext })
-            .webkitAudioContext;
-        if (AudioCtx) {
-          const audioCtx = new AudioCtx();
-          audioContextRef.current = audioCtx;
+        if (audioCtx && audioContextRef.current) {
+          // Safety net: if the fresh context still ended up suspended (some
+          // mobile browsers delay it), resume before wiring up the meter.
+          if (audioCtx.state === "suspended") {
+            void audioCtx.resume().catch(() => undefined);
+          }
           const source = audioCtx.createMediaStreamSource(stream);
           const analyser = audioCtx.createAnalyser();
           analyser.fftSize = 64;
