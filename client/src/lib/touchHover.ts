@@ -42,6 +42,10 @@ function arm() {
     true
   );
 
+  const release = (e: Event) => {
+    if (!(e instanceof PointerEvent) || e.pointerType === "touch") clear();
+  };
+  window.addEventListener("pointerup", release, true);
   window.addEventListener(
     "pointercancel",
     (e) => {
@@ -50,6 +54,7 @@ function arm() {
     true
   );
 
+  document.addEventListener("touchend", clear, true);
   document.addEventListener("touchcancel", clear, true);
 }
 
