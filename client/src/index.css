@@ -3,6 +3,13 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Touch devices: taps should behave like a desktop hover. The
+   .ksemo-touch-hover class is applied to the tapped element (and its
+   ancestors) by client/src/lib/touchHover.ts, so overriding the built-in
+   hover variants here makes every hover:/group-hover: style respond to
+   touches too, on top of real mouse hover on desktop. */
+@custom-variant hover (&:hover, &.ksemo-touch-hover);
+
 @theme {
   /* Mobile browsers in "Desktop site" mode report a ~980px viewport. Lower the
      lg breakpoint so that width renders the full desktop layout instead of
