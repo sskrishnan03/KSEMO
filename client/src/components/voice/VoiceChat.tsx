@@ -127,12 +127,8 @@ export function VoiceChat({
           
           if (attachmentNotices && attachmentNotices.length > 0) {
             attachments = [...attachmentNotices];
-            console.log('[VoiceChat] Sending with attachmentNotices:', attachments);
           } else if (attachmentNotice) {
             attachments = [attachmentNotice];
-            console.log('[VoiceChat] Sending with attachmentNotice:', attachments);
-          } else {
-            console.log('[VoiceChat] No attachments found');
           }
           
           // Send via voice chat with attachments

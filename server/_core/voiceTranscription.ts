@@ -11,8 +11,8 @@ const GEMINI_BASE_URL =
 // NOTE: gemini-2.0-flash returns 404 ("no longer available") and has been
 // removed — it only wasted the request budget before the working models ran.
 const TRANSCRIBE_MODELS = [
-  "gemini-3.7-flash",
-  "gemini-3.6-flash",
+  "gemini-2.0-flash",
+  "gemini-1.5-flash",
 ];
 
 // Hard cap on total transcription time so the UI never hangs on an unresponsive

@@ -16,7 +16,6 @@ import { createServer } from "http";
 import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerGoogleOAuthRoutes } from "./googleOAuth";
-import { registerOAuthRoutes } from "./oauth";
 import { registerStorageProxy } from "./storageProxy";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
@@ -105,10 +104,11 @@ function validateProductionConfig() {
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
     const server = net.createServer();
-    server.listen(port, () => {
+    server.once("error", () => resolve(false));
+    server.once("listening", () => {
       server.close(() => resolve(true));
     });
-    server.on("error", () => resolve(false));
+    server.listen(port, "0.0.0.0");
   });
 }
 
@@ -149,7 +149,6 @@ async function startServer() {
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
   registerStorageProxy(app);
-  registerOAuthRoutes(app);
   registerGoogleOAuthRoutes(app);
   // Plain-Express logout — registered BEFORE the tRPC middleware so it never
   // runs through createContext (which performs Supabase round-trips that can
@@ -171,7 +170,8 @@ async function startServer() {
     serveStatic(app);
   }
 
-  const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+  const basePort = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+  const port = process.env.PORT ? basePort : await findAvailablePort(basePort);
   server.listen(port, "0.0.0.0", () => {
     console.log(`\n  ➜  Local:   http://localhost:${port}/\n`);
   });

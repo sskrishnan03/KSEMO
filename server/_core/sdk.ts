@@ -405,22 +405,6 @@ class SDKServer {
       return null;
     }
 
-    if (session.openId.startsWith(CRON_OPEN_ID_PREFIX)) {
-      let userInfo;
-      try {
-        userInfo = await this.getUserInfoWithJwt(sessionToken);
-      } catch {
-        // Valid JWT but the OAuth server is not reachable right now. Preserve
-        // the session; this is an infrastructure problem, not a logout.
-        throw new SessionLookupError("OAuth user-info lookup failed for cron session");
-      }
-      const taskUid = userInfo.taskUid ?? null;
-      if (taskUid) {
-        return buildCronUser(userInfo);
-      }
-      return null;
-    }
-
     const sessionUserId = session.openId;
     const signedInAt = new Date();
 
@@ -432,35 +416,8 @@ class SDKServer {
       throw new SessionLookupError("user lookup failed");
     }
 
-    // A signed session whose account no longer exists (e.g. the account was
-    // deleted) must NOT be turned into a phantom user. First try to
-    // re-sync from the OAuth server; only if that genuinely resolves an
-    // account do we recreate it.
     if (!user) {
-      try {
-        const userInfo = await this.getUserInfoWithJwt(sessionToken ?? "");
-        await db.upsertUser({
-          openId: userInfo.openId,
-          name: userInfo.name || null,
-          email: userInfo.email ?? null,
-          loginMethod: userInfo.loginMethod ?? userInfo.platform ?? null,
-          lastSignedIn: signedInAt,
-        });
-        user = (await db.getUserByOpenId(userInfo.openId)) ?? null;
-      } catch (e) {
-        if (e instanceof DatabaseUnavailableError) throw e;
-        if (e instanceof SessionLookupError) throw e;
-        // The JWT is valid but neither the DB nor the OAuth server could
-        // resolve the account. Don't log the user out over an outage: surface
-        // an infrastructure error so the client keeps the session.
-        throw new SessionLookupError("account sync failed while resolving session");
-      }
-    }
-
-    if (!user) {
-      // After a successful sync attempt the account still does not exist. The
-      // JWT was signed for an account that no longer exists — treat as logged
-      // out so the client returns to the sign-in screen.
+      // The session token does not correspond to an existing account.
       return null;
     }
 
@@ -478,31 +435,7 @@ class SDKServer {
   }
 }
 
-const CRON_OPEN_ID_PREFIX = "cron_";
-
-/** Result of `sdk.authenticateRequest`. Cron callbacks set `isCron=true` and `taskUid`; see `/home/ubuntu/skills/webdev-periodic-updates/SKILL.md`. */
-export type AuthenticatedUser = User & {
-  taskUid?: string;
-  isCron?: boolean;
-};
-
-function buildCronUser(
-  userInfo: GetUserInfoWithJwtResponse
-): AuthenticatedUser {
-  const now = new Date();
-  return {
-    id: -1,
-    openId: userInfo.openId,
-    name: userInfo.name || "Scheduled Task",
-    email: null,
-    loginMethod: null,
-    role: "user",
-    createdAt: now,
-    updatedAt: now,
-    lastSignedIn: now,
-    taskUid: userInfo.taskUid ?? undefined,
-    isCron: true,
-  } as any;
-}
+/** Result of `sdk.authenticateRequest`. */
+export type AuthenticatedUser = User;
 
 export const sdk = new SDKServer();
