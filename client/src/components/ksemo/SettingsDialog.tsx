@@ -579,21 +579,6 @@ export const SettingsDialog = memo(function SettingsDialog({
               {activeTab === "feedback" && <FeedbackSection />}
             </div>
           </div>
-
-          {/* Mobile Sign-Out — single compact full-width row, always visible */}
-          <div className="flex shrink-0 border-t border-border bg-sidebar md:hidden">
-            <button
-              type="button"
-              onClick={() => {
-                onOpenChange(false);
-                onSignOut();
-              }}
-              className="flex h-12 w-full items-center gap-2.5 px-4 text-sm font-medium text-destructive transition-colors outline-none hover:bg-destructive/10 focus-visible:ring-0 focus-visible:outline-none active:bg-destructive/15"
-            >
-              <LogOut className="size-4 shrink-0" />
-              Sign out
-            </button>
-          </div>
         </div>
       </DialogContent>
 
