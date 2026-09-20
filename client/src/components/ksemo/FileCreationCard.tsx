@@ -581,7 +581,7 @@ export const FileCreationCard = memo(function FileCreationCard({
           }}
           data-testid="file-code-container"
           aria-label="Show code"
-          className="group/code relative hidden md:flex flex-1 min-w-[140px] h-[302px] max-h-[302px] flex-col overflow-hidden rounded-2xl border border-sidebar-border bg-sidebar p-3 shadow-sm cursor-pointer select-none transition-all duration-200 hover:border-border hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 animate-in fade-in-0 slide-in-from-bottom-2 zoom-in-95"
+          className="group/code relative hidden md:flex flex-1 min-w-[140px] h-[302px] max-h-[302px] flex-col overflow-hidden rounded-2xl border border-sidebar-border bg-sidebar p-3 shadow-sm cursor-pointer select-none transition-colors duration-100 hover:border-border hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
         >
           {/* Colorful code snippet: starts from line 1, filling exact height with zero dead space */}
           <div className="relative z-0 flex-1 overflow-hidden pointer-events-none select-none [&_.ksemo-code-body_pre]:p-0! [&_.ksemo-code-body_pre]:bg-transparent!">

@@ -60,7 +60,7 @@ export const CodeViewerPanel = memo(function CodeViewerPanel({
       ref={panelRef}
       role="dialog"
       aria-label="Code"
-      className="fixed right-2 top-2 bottom-5 z-50 flex h-[calc(100dvh-1.75rem)] w-[min(calc(100vw-1rem),27rem)] flex-col overflow-hidden rounded-2xl border border-border bg-popover/95 text-popover-foreground shadow-lg backdrop-blur-md"
+      className="ksemo-code-panel-enter fixed right-2 top-2 bottom-5 z-50 flex h-[calc(100dvh-1.75rem)] w-[min(calc(100vw-1rem),27rem)] flex-col overflow-hidden rounded-2xl border border-border bg-popover/95 text-popover-foreground shadow-lg backdrop-blur-md"
     >
       <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border/80 px-3.5 py-2.5 bg-muted/20">
         <div className="flex items-center gap-2.5 min-w-0">
