@@ -495,10 +495,13 @@ export const SettingsDialog = memo(function SettingsDialog({
           </aside>
 
           <div className="flex flex-col border-b border-border bg-sidebar md:hidden">
-            <div className="px-3 pt-2.5 pb-1.5">
-<SettingsSearch onSelect={changeTab} />
+            <div className="px-3 pt-2.5 pb-2">
+              <SettingsSearch onSelect={changeTab} />
             </div>
-            <nav className="flex flex-col gap-0.5">
+            <nav
+              aria-label="Settings navigation"
+              className="flex items-center gap-1.5 overflow-x-auto px-3 pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            >
               {settingsNavItems.map(item => {
                 const Icon = item.icon;
                 const active = activeTab === item.id;
@@ -506,10 +509,11 @@ export const SettingsDialog = memo(function SettingsDialog({
                   <button
                     key={item.id}
                     onClick={() => changeTab(item.id)}
-                    className={`flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs transition-colors outline-none focus-visible:ring-0 focus-visible:outline-none ${
+                    aria-current={active ? "page" : undefined}
+                    className={`flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors outline-none focus-visible:ring-0 focus-visible:outline-none active:scale-[0.98] ${
                       active
-                        ? "bg-accent font-medium text-foreground"
-                        : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                        ? "bg-foreground text-background"
+                        : "bg-accent/60 text-muted-foreground hover:bg-accent hover:text-foreground"
                     }`}
                   >
                     <Icon className="size-3.5 shrink-0" />
@@ -574,6 +578,32 @@ export const SettingsDialog = memo(function SettingsDialog({
               {activeTab === "memory" && <MemorySection />}
               {activeTab === "feedback" && <FeedbackSection />}
             </div>
+          </div>
+
+          {/* Mobile Sign-Out Bar — always visible at the bottom of settings */}
+          <div className="flex shrink-0 items-center gap-3 border-t border-border bg-sidebar px-3.5 py-2.5 md:hidden">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-foreground text-sm font-bold text-background">
+              {(user.name || "U").trim().charAt(0).toUpperCase()}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-[13px] font-semibold text-foreground">
+                {user.name || "KSEMO user"}
+              </p>
+              <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+                {user.email || "Account"}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                onOpenChange(false);
+                onSignOut();
+              }}
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs font-semibold text-destructive transition-colors outline-none hover:bg-destructive/10 focus-visible:ring-0 focus-visible:outline-none active:scale-[0.98]"
+            >
+              <LogOut className="size-3.5" />
+              Sign out
+            </button>
           </div>
         </div>
       </DialogContent>
