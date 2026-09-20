@@ -56,6 +56,7 @@ import {
   type FileSource,
 } from "../components/ksemo/FileCreationCard";
 import { PdfDrawer } from "../components/ksemo/PdfDrawer";
+import { CodeViewerPanel } from "../components/ksemo/CodeViewerPanel";
 import type { DocFormat } from "@/lib/docFormats";
 import { usePdfViewer } from "@/contexts/PdfViewerContext";
 import AuthStage from "./AuthStage";
@@ -398,6 +399,10 @@ export default function Home() {
     "library" | "search" | null
   >(() => inlineWorkspaceSection);
   const [chatFilesOpen, setChatFilesOpen] = useState(false);
+  const [showCode, setShowCode] = useState<{
+    code: string;
+    filename?: string;
+  } | null>(null);
   const [voiceChatOpen, setVoiceChatOpen] = useState(false);
   const activePrimaryWorkspace = primaryWorkspace;
   const [shareTarget, setShareTarget] = useState<{
@@ -3545,6 +3550,9 @@ export default function Home() {
                           }
                           onRetry={() => regenerateMessage(message)}
                           code={activeFileGen.code}
+                          onOpenCode={(code, filename) =>
+                            setShowCode({ code, filename })
+                          }
                         />
                       </div>
                     ) : null;
@@ -3646,6 +3654,12 @@ export default function Home() {
           </>
         )}
         <PdfDrawer />
+        <CodeViewerPanel
+          open={Boolean(showCode)}
+          code={showCode?.code ?? ""}
+          filename={showCode?.filename}
+          onClose={() => setShowCode(null)}
+        />
       </main>
 
       {!guestMode && (

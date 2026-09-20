@@ -120,7 +120,7 @@ function LanguageIcon() {
   );
 }
 
-function CopyCodeButton({ code }: { code: string }) {
+export function CopyCodeButton({ code }: { code: string }) {
   const [copied, setCopied] = useState(false);
   const timerRef = useRef<number | null>(null);
 
@@ -175,7 +175,7 @@ function CopyCodeButton({ code }: { code: string }) {
           aria-label={label}
         >
           {copied ? (
-            <Check className="size-3.5 stroke-[2.2]" aria-hidden />
+            <Check className="size-3.5" aria-hidden />
           ) : (
             <Copy className="size-3.5" aria-hidden />
           )}
@@ -186,7 +186,7 @@ function CopyCodeButton({ code }: { code: string }) {
   );
 }
 
-function DownloadCodeButton({
+export function DownloadCodeButton({
   code,
   rawLanguage,
 }: {

@@ -1,18 +1,23 @@
 import type { DocFormat } from "@/lib/docFormats";
-import {
-  Check,
-  ChevronRight,
-  Code2,
-  Eye,
-  RotateCw,
-} from "lucide-react";
-import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Check, ChevronRight, Code2, Eye, RotateCw } from "lucide-react";
+import React, {
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   FileBrandMark,
   type FileBrandVariant,
 } from "@/components/ksemo/FileBrandIcons";
 import { cn } from "@/lib/utils";
-import { KsemoCodeBlock, CodeSurface, stripShebang } from "@/components/ksemo/code-block";
+import {
+  KsemoCodeBlock,
+  CodeSurface,
+  stripShebang,
+} from "@/components/ksemo/code-block";
 import {
   loadFilePreview,
   type FilePreviewData,
@@ -242,7 +247,7 @@ export type FileCreationCardProps = {
   initialShowCodeExpanded?: boolean;
   initialShowCodeModal?: boolean;
   initialShowCodeDrawer?: boolean;
-  onOpenCode?: (code: string) => void;
+  onOpenCode?: (code: string, filename?: string) => void;
 };
 
 // ── Main card ──────────────────────────────────────────────────────────────
@@ -275,10 +280,7 @@ export const FileCreationCard = memo(function FileCreationCard({
 
   const codePreviewLines = useMemo(() => {
     if (!cleanCode) return "";
-    return cleanCode
-      .split("\n")
-      .slice(0, 16)
-      .join("\n");
+    return cleanCode.split("\n").slice(0, 16).join("\n");
   }, [cleanCode]);
 
   const codeLineCount = useMemo(() => {
@@ -338,6 +340,10 @@ export const FileCreationCard = memo(function FileCreationCard({
 
   const handleOpenCode = useCallback(() => {
     if (!cleanCode) return;
+    if (onOpenCode) {
+      onOpenCode(cleanCode, `${cleanBaseName}.${config.ext}`);
+      return;
+    }
     const codeDataUrl = `data:text/x-python;charset=utf-8,${encodeURIComponent(cleanCode)}`;
     openPdf({
       url: codeDataUrl,
@@ -346,12 +352,13 @@ export const FileCreationCard = memo(function FileCreationCard({
       mimeType: "text/x-python",
       isCode: true,
     });
-    onOpenCode?.(cleanCode);
-  }, [cleanCode, cleanBaseName, openPdf, onOpenCode]);
+  }, [cleanCode, cleanBaseName, config.ext, openPdf, onOpenCode]);
 
   useEffect(() => {
     if (
-      (initialShowCodeDrawer || initialShowCodeModal || initialShowCodeExpanded) &&
+      (initialShowCodeDrawer ||
+        initialShowCodeModal ||
+        initialShowCodeExpanded) &&
       cleanCode
     ) {
       handleOpenCode();
@@ -1170,19 +1177,16 @@ function FileDocumentPreview({
       );
       break;
     case "pptx":
-      body = data.slides.length || data.spec ? (
-        <SlideMini
-          slides={data.slides}
-          spec={data.spec}
-          width={pageWidth}
-        />
-      ) : (
-        <PreviewFallback
-          variant={variant}
-          displayName={displayName}
-          message="Preview unavailable"
-        />
-      );
+      body =
+        data.slides.length || data.spec ? (
+          <SlideMini slides={data.slides} spec={data.spec} width={pageWidth} />
+        ) : (
+          <PreviewFallback
+            variant={variant}
+            displayName={displayName}
+            message="Preview unavailable"
+          />
+        );
       break;
     case "csv":
       body = data.rows.length ? (

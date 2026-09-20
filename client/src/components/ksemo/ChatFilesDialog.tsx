@@ -2,6 +2,12 @@ import { getFileKind, IMAGE_EXT } from "@/lib/fileKinds";
 import { ExternalLink, FolderOpen, X } from "lucide-react";
 import React, { memo, useEffect, useMemo } from "react";
 import { usePdfViewer, isViewableDocument } from "@/contexts/PdfViewerContext";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 export type ChatFile = {
   id: string;
@@ -58,14 +64,21 @@ export const ChatFilesDialog = memo(function ChatFilesDialog({
             Files in this chat
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => onOpenChange(false)}
-          className="flex size-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
-          aria-label="Close files panel"
-        >
-          <X className="size-4.5" />
-        </button>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={() => onOpenChange(false)}
+                className="flex size-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
+                aria-label="Close files panel"
+              >
+                <X className="size-4.5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">Close</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto p-2">
