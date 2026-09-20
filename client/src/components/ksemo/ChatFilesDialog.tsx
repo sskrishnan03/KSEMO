@@ -1,7 +1,6 @@
 import { getFileKind, IMAGE_EXT } from "@/lib/fileKinds";
-import { cn } from "@/lib/utils";
 import { ExternalLink, FolderOpen, X } from "lucide-react";
-import React, { memo, useEffect, useMemo, useRef } from "react";
+import React, { memo, useEffect, useMemo } from "react";
 import { usePdfViewer, isViewableDocument } from "@/contexts/PdfViewerContext";
 
 export type ChatFile = {
@@ -30,29 +29,15 @@ export const ChatFilesDialog = memo(function ChatFilesDialog({
 }: Props) {
   const { openPdf } = usePdfViewer();
   const rows = useMemo(() => files, [files]);
-  const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") onOpenChange(false);
     };
-    const onPointerDown = (event: MouseEvent) => {
-      if (
-        panelRef.current &&
-        !panelRef.current.contains(event.target as Node)
-      ) {
-        onOpenChange(false);
-      }
-    };
     window.addEventListener("keydown", onKey);
-    const timer = setTimeout(() => {
-      window.addEventListener("pointerdown", onPointerDown);
-    }, 50);
     return () => {
-      clearTimeout(timer);
       window.removeEventListener("keydown", onKey);
-      window.removeEventListener("pointerdown", onPointerDown);
     };
   }, [open, onOpenChange]);
 
@@ -60,27 +45,26 @@ export const ChatFilesDialog = memo(function ChatFilesDialog({
 
   return (
     <div
-      ref={panelRef}
       role="dialog"
       aria-label="Files in this chat"
-      className="fixed right-2 top-2 bottom-5 z-50 flex h-[calc(100dvh-1.75rem)] w-[min(calc(100vw-1rem),23rem)] flex-col overflow-hidden rounded-2xl border border-border bg-popover/95 text-popover-foreground shadow-2xl backdrop-blur-md animate-in fade-in-0 zoom-in-95 origin-top-right duration-150"
+      className="fixed right-2 top-2 bottom-5 z-50 flex h-[calc(100dvh-1.75rem)] w-[min(calc(100vw-1rem),23rem)] flex-col overflow-hidden rounded-2xl border border-border bg-popover/95 text-popover-foreground shadow-lg backdrop-blur-md"
     >
       <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border/80 px-3.5 py-2.5 bg-muted/20">
         <div className="flex items-center gap-2.5 min-w-0">
           <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-foreground">
             <FolderOpen className="size-4" />
           </span>
-          <p className="text-[13px] font-semibold leading-tight text-foreground truncate">
+          <p className="text-[15px] font-semibold leading-tight text-foreground truncate">
             Files in this chat
           </p>
         </div>
         <button
           type="button"
           onClick={() => onOpenChange(false)}
-          className="flex size-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
+          className="flex size-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
           aria-label="Close files panel"
         >
-          <X className="size-4" />
+          <X className="size-4.5" />
         </button>
       </div>
 

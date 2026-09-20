@@ -28,10 +28,7 @@ import {
   Trash2,
   UserPlus,
 } from "lucide-react";
-import {
-  ShareIcon,
-  TemporaryChatIcon,
-} from "../components/ksemo/icons";
+import { ShareIcon, TemporaryChatIcon } from "../components/ksemo/icons";
 import {
   Tooltip,
   TooltipContent,
@@ -250,7 +247,10 @@ function writeStoredTemporaryChat(
       localStorage.removeItem(temporaryChatStorageKey(userId));
       return;
     }
-    localStorage.setItem(temporaryChatStorageKey(userId), JSON.stringify(state));
+    localStorage.setItem(
+      temporaryChatStorageKey(userId),
+      JSON.stringify(state)
+    );
   } catch {}
 }
 
@@ -268,9 +268,11 @@ function isSameTabReload(): boolean {
   } catch {}
   try {
     // Legacy fallback: 0 = navigate, 1 = reload, 2 = back/forward.
-    const type = (performance as unknown as {
-      navigation?: { type?: number };
-    }).navigation?.type;
+    const type = (
+      performance as unknown as {
+        navigation?: { type?: number };
+      }
+    ).navigation?.type;
     return type === 1 || type === 2;
   } catch {}
   return false;
@@ -533,8 +535,8 @@ export default function Home() {
   // chat" greeting so nothing flashes.
   const isPendingSeed = Boolean(
     activeConversationId &&
-      seededConversationId !== activeConversationId &&
-      !activeQuery.isError
+    seededConversationId !== activeConversationId &&
+    !activeQuery.isError
   );
   const activeConversation = useMemo(() => {
     if (!activeConversationId) return null;
@@ -745,8 +747,7 @@ export default function Home() {
         | undefined;
 
       const metadata = (message as Record<string, unknown>).metadata as
-        | { pptOutline?: { outline?: unknown } }
-        | undefined;
+        { pptOutline?: { outline?: unknown } } | undefined;
       const restoredOutline = isPptOutlinePlan(metadata?.pptOutline?.outline)
         ? (metadata!.pptOutline!.outline as PptOutlinePlan)
         : undefined;
@@ -2804,7 +2805,7 @@ export default function Home() {
       // newest message (e.g. after scrolling up to read older messages).
       if (chatMessages.length === 0 && activeQuery.data?.messages) {
         seededConversationIdRef.current = null;
-    setSeededConversationId(null);
+        setSeededConversationId(null);
       }
       isNearBottomRef.current = true;
       scrollChatToEnd("auto");
@@ -2913,7 +2914,7 @@ export default function Home() {
       // Spoken turns stream straight to the server, so the open chat must
       // re-seed from the database for the exchange to read as a normal chat.
       seededConversationIdRef.current = null;
-    setSeededConversationId(null);
+      setSeededConversationId(null);
       void utils.conversation.get.refetch({ id: activeConversationId });
     }
     utils.conversation.list.invalidate();
@@ -3050,7 +3051,7 @@ export default function Home() {
       if (tab) setSettingsInitialTab(tab as any);
       setSettingsOpen(true);
     },
-    onModeChange: guestMode ? undefined : (mode => setActiveMode(mode)),
+    onModeChange: guestMode ? undefined : mode => setActiveMode(mode),
     focusTargetId: "ksemo-composer-textarea",
   });
   const stableOnSupport = usePersistFn((topic: "faq" | "privacy" | "terms") => {
@@ -3137,13 +3138,15 @@ export default function Home() {
     voicePreferencesMutation.mutate({ speechRate: rate });
   });
 
-  const renderComposer = (options: {
-    hideVoiceInput?: boolean;
-    menuPlacement?: "above" | "below";
-    isCentered?: boolean;
-    compactBottomSpacing?: boolean;
-    initialToolsOpen?: boolean;
-  } = {}) => (
+  const renderComposer = (
+    options: {
+      hideVoiceInput?: boolean;
+      menuPlacement?: "above" | "below";
+      isCentered?: boolean;
+      compactBottomSpacing?: boolean;
+      initialToolsOpen?: boolean;
+    } = {}
+  ) => (
     <ChatComposer
       onSend={stableComposerSend}
       onCancel={stableStopGeneration}
@@ -3160,7 +3163,7 @@ export default function Home() {
       onValueChange={setComposerValue}
       activeMode={guestMode ? "chat" : activeMode}
       onModeChange={
-        guestMode ? undefined : (mode => setActiveMode(mode || "chat"))
+        guestMode ? undefined : mode => setActiveMode(mode || "chat")
       }
       pptConfig={pptConfig}
       onPptConfigChange={setPptConfig}
@@ -3267,7 +3270,12 @@ export default function Home() {
         onLoginPrompt={stableOnLoginPrompt}
       />
 
-      <main className="relative flex min-w-0 flex-1 flex-col">
+      <main
+        className={cn(
+          "relative flex min-w-0 flex-1 flex-col transition-[margin] duration-300 ease-out",
+          chatFilesOpen && "md:ml-6 md:mr-[25rem]"
+        )}
+      >
         {activePrimaryWorkspace === "library" ? (
           <LibraryWorkspace
             onClose={stableCloseWorkspace}
@@ -3298,59 +3306,59 @@ export default function Home() {
               !activeConversationId &&
               visibleMessages.length === 0 && (
                 <div className="absolute right-2 top-2 z-10">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      data-testid="temporary-chat-toggle"
-                      aria-label={
-                        isTemporaryChat
-                          ? "Exit temporary chat"
-                          : "Temporary chat"
-                      }
-                      aria-pressed={isTemporaryChat}
-                      onClick={() => {
-                        const next = !isTemporaryChatRef.current;
-                        isTemporaryChatRef.current = next;
-                        setIsTemporaryChat(next);
-                        if (next) {
-                          temporaryConversationIdsRef.current = new Set();
-                          writeStoredTemporaryChat(user?.id, {
-                            active: true,
-                            activeConversationId: null,
-                            ids: [],
-                          });
-                        } else {
-                          purgeTemporaryConversations();
-                          writeStoredTemporaryChat(user?.id, {
-                            active: false,
-                            activeConversationId: null,
-                            ids: [],
-                          });
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        data-testid="temporary-chat-toggle"
+                        aria-label={
+                          isTemporaryChat
+                            ? "Exit temporary chat"
+                            : "Temporary chat"
                         }
-                      }}
-                      // Hover effect is always the same (ghost default);
-                      // active state adds a staying rounded-square highlight.
-                      className={cn(
-                        "size-10 rounded-xl text-foreground transition-colors",
-                        isTemporaryChat && "bg-foreground/10"
-                      )}
-                    >
-                      <TemporaryChatIcon
-                        active={false}
-                        className="size-[26px]"
-                      />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom" sideOffset={6}>
-                    {isTemporaryChat
-                      ? "Exit temporary chat"
-                      : "Temporary chat"}
-                  </TooltipContent>
-                </Tooltip>
-              </div>
-            )}
+                        aria-pressed={isTemporaryChat}
+                        onClick={() => {
+                          const next = !isTemporaryChatRef.current;
+                          isTemporaryChatRef.current = next;
+                          setIsTemporaryChat(next);
+                          if (next) {
+                            temporaryConversationIdsRef.current = new Set();
+                            writeStoredTemporaryChat(user?.id, {
+                              active: true,
+                              activeConversationId: null,
+                              ids: [],
+                            });
+                          } else {
+                            purgeTemporaryConversations();
+                            writeStoredTemporaryChat(user?.id, {
+                              active: false,
+                              activeConversationId: null,
+                              ids: [],
+                            });
+                          }
+                        }}
+                        // Hover effect is always the same (ghost default);
+                        // active state adds a staying rounded-square highlight.
+                        className={cn(
+                          "size-10 rounded-xl text-foreground transition-colors",
+                          isTemporaryChat && "bg-foreground/10"
+                        )}
+                      >
+                        <TemporaryChatIcon
+                          active={false}
+                          className="size-[26px]"
+                        />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" sideOffset={6}>
+                      {isTemporaryChat
+                        ? "Exit temporary chat"
+                        : "Temporary chat"}
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+              )}
 
             {guestMode && (
               <div className="absolute right-2 top-2 z-10 flex items-center gap-2">
@@ -3384,86 +3392,94 @@ export default function Home() {
 
             {/* Chat action menu has no place in a temporary chat, so the
                 three-dots button is hidden there entirely. */}
-            {!guestMode && visibleMessages.length > 0 && !isTemporaryChat && (
-              <div className="absolute right-2 top-2 z-10">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="size-9 rounded-lg bg-neutral-900 text-neutral-50 hover:bg-neutral-800"
-                      aria-label="Chat actions"
+            {!guestMode &&
+              visibleMessages.length > 0 &&
+              !isTemporaryChat &&
+              !chatFilesOpen && (
+                <div className="absolute right-2 top-2 z-10">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-9 rounded-lg bg-neutral-900 text-neutral-50 hover:bg-neutral-800"
+                        aria-label="Chat actions"
+                      >
+                        <MoreHorizontal
+                          className="size-4.5"
+                          strokeWidth={2.75}
+                          fill="currentColor"
+                        />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent
+                      align="end"
+                      className="w-44 rounded-xl"
                     >
-                      <MoreHorizontal
-                        className="size-4.5"
-                        strokeWidth={2.75}
-                        fill="currentColor"
-                      />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-44 rounded-xl">
-                    <DropdownMenuItem
-                      disabled={!activeConversationId}
-                      onSelect={() => {
-                        if (activeConversationId) {
-                          const pinned = activeConversation?.isPinned ?? false;
-                          stableOnPin({
-                            id: activeConversationId,
-                            isPinned: pinned,
-                          });
-                        }
-                      }}
-                    >
-                      <Pin className="mr-2 size-4" />
-                      {activeConversation?.isPinned ? "Unpin" : "Pin"}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      disabled={!activeConversationId}
-                      onSelect={() => {
-                        if (activeConversationId) {
-                          stableOnShareConversation(
-                            activeConversation
-                              ? {
-                                  id: activeConversationId,
-                                  title: activeConversation.title,
-                                  isPublic: activeConversation.isPublic,
-                                  shareToken: activeConversation.shareToken,
-                                }
-                              : {
-                                  id: activeConversationId,
-                                  title: "this conversation",
-                                }
-                          );
-                        }
-                      }}
-                    >
-                      <ShareIcon className="mr-2 size-4" />
-                      Share
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => setChatFilesOpen(true)}>
-                      <FolderOpen className="mr-2 size-4" />
-                      View files
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      disabled={!activeConversationId}
-                      variant="destructive"
-                      onSelect={() => {
-                        if (activeConversationId)
-                          stableOnDelete({
-                            id: activeConversationId,
-                            title:
-                              activeConversation?.title ?? "this conversation",
-                          });
-                      }}
-                    >
-                      <Trash2 className="mr-2 size-4" />
-                      Delete
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            )}
+                      <DropdownMenuItem
+                        disabled={!activeConversationId}
+                        onSelect={() => {
+                          if (activeConversationId) {
+                            const pinned =
+                              activeConversation?.isPinned ?? false;
+                            stableOnPin({
+                              id: activeConversationId,
+                              isPinned: pinned,
+                            });
+                          }
+                        }}
+                      >
+                        <Pin className="mr-2 size-4" />
+                        {activeConversation?.isPinned ? "Unpin" : "Pin"}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        disabled={!activeConversationId}
+                        onSelect={() => {
+                          if (activeConversationId) {
+                            stableOnShareConversation(
+                              activeConversation
+                                ? {
+                                    id: activeConversationId,
+                                    title: activeConversation.title,
+                                    isPublic: activeConversation.isPublic,
+                                    shareToken: activeConversation.shareToken,
+                                  }
+                                : {
+                                    id: activeConversationId,
+                                    title: "this conversation",
+                                  }
+                            );
+                          }
+                        }}
+                      >
+                        <ShareIcon className="mr-2 size-4" />
+                        Share
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => setChatFilesOpen(true)}>
+                        <FolderOpen className="mr-2 size-4" />
+                        View files
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        disabled={!activeConversationId}
+                        variant="destructive"
+                        onSelect={() => {
+                          if (activeConversationId)
+                            stableOnDelete({
+                              id: activeConversationId,
+                              title:
+                                activeConversation?.title ??
+                                "this conversation",
+                            });
+                        }}
+                      >
+                        <Trash2 className="mr-2 size-4" />
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              )}
             <ChatFilesDialog
               open={chatFilesOpen}
               onOpenChange={setChatFilesOpen}
@@ -3567,7 +3583,9 @@ export default function Home() {
                         onRegenerate={
                           guestMode ? undefined : stableRegenerateMessage
                         }
-                        onRetry={guestMode ? undefined : stableRegenerateMessage}
+                        onRetry={
+                          guestMode ? undefined : stableRegenerateMessage
+                        }
                         onShare={guestMode ? undefined : stableShareMessage}
                         onDelete={guestMode ? undefined : stableDeleteMessage}
                         onFeedback={guestMode ? undefined : stableOnFeedback}
