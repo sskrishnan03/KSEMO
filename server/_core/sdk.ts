@@ -6,6 +6,7 @@ import {
 } from "@shared/const";
 import { ForbiddenError } from "@shared/_core/errors";
 import axios, { type AxiosInstance } from "axios";
+import { randomUUID } from "crypto";
 import { parse as parseCookieHeader } from "cookie";
 import type { Request } from "express";
 import { SignJWT, jwtVerify } from "jose";
@@ -28,7 +29,56 @@ export type SessionPayload = {
   openId: string;
   appId: string;
   name: string;
+  /**
+   * Unique session identifier. Attached at signing time so a session can be
+   * revoked server-side on logout. Without this a stateless JWT stays valid
+   * for its whole lifetime no matter how often the user signs out, and any
+   * request that still carries the old token (a retried query, a background
+   * refetch that captured the token before logout, a second tab, the
+   * localStorage fallback) re-authenticates the user a second later.
+   */
+  jti?: string;
 };
+
+/**
+ * Server-side revocation of signed sessions.
+ *
+ * KSEMO sessions are stateless JWTs signed with the shared secret. A JWT is
+ * only invalidated by its `exp`, so "sign out" used to merely clear the
+ * cookie/hash — the same token kept authenticating requests that still carried
+ * it (bearer header fallback, retries, races), which made logouts bounce back
+ * to signed-in within a second on deployed environments.
+ *
+ * Each session is now minted with a unique `jti`. When a session is revoked
+ * (logout, account deletion) its `jti` is recorded here and `verifySession`
+ * rejects it on all future requests — regardless of whether the client still
+ * sends it via cookie, header, or both.
+ *
+ * The denylist is held in memory. On the Render free plan the app runs as a
+ * single instance, so this is globally authoritative. Multi-instance or
+ * restart clears the list, which degrades gracefully (revoked tokens expire
+ * naturally within a year and clients drop them on logout anyway). Keyed by
+ * `jti` so revoking one browser never signs out the user's other devices.
+ */
+const MAX_REVOKED_SESSIONS = 50_000;
+const revokedSessionIds = new Map<string, number>(); // jti -> unix expiry (seconds)
+
+let lastRevokedPrune = 0;
+
+function pruneRevokedSessions() {
+  const now = Math.floor(Date.now() / 1000);
+  if (now - lastRevokedPrune < 5 * 60) return;
+  lastRevokedPrune = now;
+  for (const [jti, exp] of revokedSessionIds) {
+    if (exp <= now) revokedSessionIds.delete(jti);
+  }
+}
+
+function isSessionRevoked(jti: string | undefined): boolean {
+  if (!isNonEmptyString(jti)) return false;
+  pruneRevokedSessions();
+  return revokedSessionIds.has(jti);
+}
 
 /**
  * The request carried a cryptographically-valid session JWT, but the account
@@ -204,6 +254,7 @@ class SDKServer {
       openId: payload.openId,
       appId: payload.appId,
       name: payload.name,
+      jti: payload.jti || randomUUID(),
     })
       .setProtectedHeader({ alg: "HS256", typ: "JWT" })
       .setExpirationTime(expirationSeconds)
@@ -223,6 +274,14 @@ class SDKServer {
       const { payload } = await jwtVerify(cookieValue, secretKey, {
         algorithms: ["HS256"],
       });
+
+      // A session that was explicitly revoked (sign out, account deletion)
+      // is invalid on every channel: cookie, Authorization header, or both.
+      // Without this check a logged-out token kept working for up to a year.
+      if (isSessionRevoked(payload.jti)) {
+        return null;
+      }
+
       const { openId, appId, name } = payload as Record<string, unknown>;
 
       if (
@@ -240,6 +299,52 @@ class SDKServer {
       };
     } catch {
       return null;
+    }
+  }
+
+  /**
+   * Pull the session token this request is presenting — from the
+   * Authorization header (used by the client as a localStorage fallback) or,
+   * failing that, the `app_session_id` cookie. Used by logout/account-deletion
+   * so the exact session being ended can be revoked.
+   */
+  extractSessionToken(req: Request): string | undefined {
+    const authHeader = req.headers.authorization;
+    if (typeof authHeader === "string" && authHeader.startsWith("Bearer ")) {
+      const token = authHeader.slice(7).trim();
+      if (token) return token;
+    }
+
+    const cookies = this.parseCookies(req.headers.cookie);
+    const cookieToken = cookies.get(COOKIE_NAME);
+    return cookieToken || undefined;
+  }
+
+  /**
+   * Permanently invalidate a session token on the server. After this returns
+   * true, `verifySession` rejects the token on every future request, so the
+   * user cannot be re-authenticated by a stale cookie or a stale
+   * Authorization header.
+   */
+  async revokeSession(token: string | undefined | null): Promise<boolean> {
+    if (!token) return false;
+    try {
+      const secretKey = this.getSessionSecret();
+      const { payload } = await jwtVerify(token, secretKey, {
+        algorithms: ["HS256"],
+      });
+      const jti = payload.jti;
+      if (!isNonEmptyString(jti)) return false;
+
+      const exp = typeof payload.exp === "number" ? payload.exp : Infinity;
+      revokedSessionIds.set(jti, exp === Infinity ? Math.floor(Date.now() / 1000) + 60 * 60 : exp);
+
+      if (revokedSessionIds.size > MAX_REVOKED_SESSIONS) {
+        pruneRevokedSessions();
+      }
+      return true;
+    } catch {
+      return false;
     }
   }
 

@@ -366,6 +366,12 @@ export const updateProfileProcedure = protectedProcedure
 export const deleteAccountProcedure = protectedProcedure.mutation(
   async ({ ctx }) => {
     try {
+      // Revoke the session token server-side so no stale header/cookie can
+      // bring the deleted account (or its cached queries) back to life.
+      const token = sdk.extractSessionToken(ctx.req);
+      if (token) {
+        await sdk.revokeSession(token);
+      }
       const deleted = await db.deleteUserAccount(ctx.user.id);
       if (!deleted) {
         throw new TRPCError({

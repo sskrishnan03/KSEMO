@@ -1,5 +1,7 @@
 import { startLogin } from "@/const";
 import { trpc } from "@/lib/trpc";
+import { setGuestModeActive } from "@/lib/guestMode";
+import { queryClient } from "@/lib/queryClient";
 import { TRPCClientError } from "@trpc/client";
 import { useCallback, useEffect, useMemo } from "react";
 
@@ -29,28 +31,51 @@ export function useAuth(options?: UseAuthOptions) {
   });
 
   const logout = useCallback(async () => {
+    // 1) Destroy every locally-cached credential FIRST. From this instant no
+    //    request can still be minted carrying the old token — otherwise a
+    //    straggler query (retry, refetch, another tab) would replay it.
+    try {
+      sessionStorage.removeItem("ksemo-cookie");
+      localStorage.removeItem("ksemo-cookie");
+      sessionStorage.removeItem("ksemo-token");
+      localStorage.removeItem("ksemo-token");
+      localStorage.removeItem("ksemo-user-info");
+    } catch {}
+    // The session is now over from the client's point of view. Any 401 that
+    // fires while the guest UI settles must not bounce the user to the
+    // sign-in screen (the stale queries still in the cache can briefly error).
+    setGuestModeActive(true);
+
+    let serverClearedSession = false;
     try {
       await logoutMutation.mutateAsync();
+      serverClearedSession = true;
     } catch (error: unknown) {
       if (
         error instanceof TRPCClientError &&
         error.data?.code === "UNAUTHORIZED"
       ) {
-        return;
+        // Already signed out server-side.
+        serverClearedSession = true;
       }
-      throw error;
+      // Any other failure: the HttpOnly cookie may not have been cleared by
+      // the server. Never throw — the user must still be brought back to the
+      // guest UI instead of being trapped in a half-logged-out state.
     } finally {
-      // Clear the auto-login token mirrored into sessionStorage, so
-      // header-based sessions are logged out too. The backend cookie is cleared by the logout mutation.
-      try {
-        sessionStorage.removeItem("ksemo-cookie");
-        localStorage.removeItem("ksemo-cookie");
-        sessionStorage.removeItem("ksemo-token");
-        localStorage.removeItem("ksemo-token");
-        localStorage.removeItem("ksemo-user-info");
-      } catch {}
-      utils.auth.me.setData(undefined, null);
-      await utils.auth.me.invalidate();
+      if (serverClearedSession) {
+        // The server cleared the cookie AND revoked the token. Wipe every
+        // cached query so no stale signed-in data survives the logout
+        // (conversations, preferences, user object, …), then re-check `me`.
+        queryClient.clear();
+        await utils.auth.me.invalidate();
+      } else {
+        // Server unreachable: the HttpOnly cookie may still be valid and
+        // in-flight refetches would travel with it and instantly re-auth.
+        // Do NOT clear/invalidate — just drop the user in place so the UI
+        // lands on the guest screen. (The next successful logout/sign-in
+        // cycle revokes the session properly server-side.)
+        utils.auth.me.setData(undefined, null);
+      }
     }
   }, [logoutMutation, utils]);
 

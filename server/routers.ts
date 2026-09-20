@@ -1,6 +1,7 @@
 import { COOKIE_NAME } from "@shared/const";
 import { TRPCError } from "@trpc/server";
 import { getSessionCookieOptions } from "./_core/cookies";
+import { sdk } from "./_core/sdk";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
 import { authCredentialsRouterProcedures } from "./routers/authCredentials";
@@ -35,7 +36,16 @@ export const appRouter = router({
         ? { id: user.id, name: user.name, email: user.email }
         : null;
     }),
-    logout: publicProcedure.mutation(({ ctx }) => {
+    logout: publicProcedure.mutation(async ({ ctx }) => {
+      // Revoke the presented session BEFORE clearing the cookie, so neither
+      // the stale cookie nor the Authorization-header fallback can ever
+      // re-authenticate this user after sign-out.
+      const token = ctx.req
+        ? sdk.extractSessionToken(ctx.req)
+        : undefined;
+      if (token) {
+        await sdk.revokeSession(token);
+      }
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, cookieOptions);
       return {

@@ -341,6 +341,14 @@ export default function Home() {
   // sending a message (or opening any locked feature) asks them to sign in via
   // a dismissible card in the bottom-right corner.
   const guestMode = !user;
+  // Mirror the guest state into the module flag used by main.tsx: while a
+  // signed-out visitor is on Home, a stray 401 from a leftover cached query
+  // must NOT bounce them to the sign-in screen. (Previously this flag was
+  // never set, so right after signing out the app yanked the user back to
+  // login — and an auto-login provider instantly signed them in again.)
+  useEffect(() => {
+    setGuestModeActive(guestMode);
+  }, [guestMode]);
   const [guestPromptOpen, setGuestPromptOpen] = useState(false);
   const [composerValue, setComposerValue] = useState("");
   const [composerFocusToken, setComposerFocusToken] = useState(0);
