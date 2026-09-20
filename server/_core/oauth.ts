@@ -38,16 +38,13 @@ export function registerOAuthRoutes(app: Express) {
     }
     const isLocal =
       req.hostname === "localhost" || req.hostname === "127.0.0.1";
-    const isIpAddress =
-      /^(\d{1,3}\.){3}\d{1,3}$/.test(req.hostname) ||
-      req.hostname.includes(":");
-    const domain = !isLocal && !isIpAddress ? `.${req.hostname}` : undefined;
 
+    // Clear state cookie using the same minimal options it was set with.
+    // Never set domain — mirrors how it is set on the client side.
     res.clearCookie(OAUTH_STATE_COOKIE, {
       path: "/",
-      domain,
       secure: !isLocal,
-      sameSite: isLocal ? "lax" : "none",
+      sameSite: "lax",
     });
 
     try {
@@ -78,7 +75,11 @@ export function registerOAuthRoutes(app: Express) {
         maxAge: ONE_YEAR_MS,
       });
 
-      res.redirect(302, "/");
+      // Include the session token in the URL hash so the client can cache it
+      // in localStorage — provides a reliable fallback when cookies are
+      // rejected (PSL hosts, Safari ITP, etc.). Hash is client-only, never
+      // sent to the server.
+      res.redirect(302, `/#_t=${encodeURIComponent(sessionToken)}`);
     } catch (error) {
       console.error("[OAuth] Callback failed", error);
       res.status(500).json({ error: "OAuth callback failed" });

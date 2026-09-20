@@ -210,8 +210,13 @@ export function registerGoogleOAuthRoutes(app: Express) {
         maxAge: ONE_YEAR_MS,
       });
 
-      console.log("[Google OAuth] Set cookie and redirecting to /");
-      res.redirect(302, "/");
+      console.log("[Google OAuth] Set cookie and redirecting to / with token hash");
+      // Include the session token in the URL hash so the client can extract
+      // and store it in localStorage. This provides a reliable auth fallback
+      // for environments where httpOnly cookies are rejected (e.g. Public
+      // Suffix List hosts like *.onrender.com, Safari ITP, etc.).
+      // The hash fragment is never sent to the server, so it stays client-only.
+      res.redirect(302, `/#_t=${encodeURIComponent(sessionToken)}`);
     } catch (err) {
       console.error("[Google OAuth] Callback failed", err);
       const errorMessage = err instanceof Error ? err.message : String(err);

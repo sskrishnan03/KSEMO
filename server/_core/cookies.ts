@@ -7,6 +7,7 @@ function isIpAddress(host: string) {
   if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) return true;
   return host.includes(":");
 }
+
 function isSecureRequest(req: Request) {
   if (req.protocol === "https") return true;
 
@@ -30,30 +31,23 @@ export function getSessionCookieOptions(
     hostname === "::1" ||
     isIpAddress(hostname);
 
-  // Avoid setting explicit wildcard domain for Cloud Run (*.run.app) as it is on the Public Suffix List
-  const isCloudRun = hostname.endsWith(".run.app");
-  const shouldSetDomain = hostname && !isLocal && !isCloudRun;
-
-  const domain =
-    shouldSetDomain && !hostname.startsWith(".")
-      ? `.${hostname}`
-      : shouldSetDomain
-        ? hostname
-        : undefined;
-
   const secure = !isLocal || isSecureRequest(req);
 
-  // KSEMO runs as a same-origin application (browser ⇄ its own HTTPS origin).
-  // SameSite=Lax keeps the session cookie sent on same-origin navigation and on
-  // top-level redirects (which is what the Google OAuth callback uses), while
-  // blocking cross-site CSRF cookies. SameSite=None would only be needed if the
-  // site were embedded in cross-origin iframes or called cross-site, which KSEMO
-  // does not do. Partitioned cookies are unnecessary for this deployment.
+  // Never set an explicit Domain attribute.
+  //
+  // When Domain is omitted the browser scopes the cookie to the exact
+  // hostname that set it — which is exactly what a same-origin app needs.
+  //
+  // Setting Domain to ".ksemo.onrender.com" (or any *.onrender.com /
+  // *.run.app subdomain) is actively harmful: those TLDs are on the Public
+  // Suffix List (PSL) and browsers silently reject cookies whose Domain
+  // attribute falls under a PSL entry, causing the session cookie to never
+  // be stored at all.
   return {
     httpOnly: true,
     path: "/",
-    domain,
     sameSite: "lax",
     secure,
+    // domain intentionally omitted — browser defaults to exact hostname
   };
 }

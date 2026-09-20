@@ -3065,10 +3065,13 @@ export default function Home() {
   const stableOnAccountDeleted = usePersistFn(() => {
     setSettingsOpen(false);
     newChat();
+    // Clear every auth storage key up-front so there is no window where a
+    // stale token could re-authenticate the user between now and logout().
     try {
       localStorage.removeItem("ksemo-user-info");
-    } catch {}
-    try {
+      localStorage.removeItem("ksemo-token");
+      localStorage.removeItem("ksemo-cookie");
+      sessionStorage.removeItem("ksemo-token");
       sessionStorage.removeItem("ksemo-cookie");
     } catch {}
     void logout();

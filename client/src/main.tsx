@@ -13,6 +13,42 @@ import { initTouchHover } from "./lib/touchHover";
 
 initTouchHover();
 
+/**
+ * Google OAuth (and generic OAuth) callbacks redirect to /#_t=<sessionToken>
+ * so the client can extract and persist the token in localStorage without
+ * the server needing to expose it through any other channel.
+ *
+ * We do this as early as possible (before React hydrates) so the very first
+ * trpc/auth.me query already has the token available in getAuthHeaders().
+ *
+ * The hash is cleared immediately afterwards — it must not appear in browser
+ * history, be sent to analytics, or leak via Referer headers.
+ */
+function extractSessionTokenFromHash() {
+  try {
+    const hash = window.location.hash;
+    if (!hash.startsWith("#_t=") && !hash.includes("_t=")) return;
+
+    const params = new URLSearchParams(hash.slice(1));
+    const token = params.get("_t");
+    if (!token) return;
+
+    const COOKIE_VALUE = `${COOKIE_NAME}=${token}`;
+    sessionStorage.setItem("ksemo-token", token);
+    localStorage.setItem("ksemo-token", token);
+    sessionStorage.setItem("ksemo-cookie", COOKIE_VALUE);
+    localStorage.setItem("ksemo-cookie", COOKIE_VALUE);
+
+    // Remove the token hash from the URL immediately so it isn't visible
+    // in browser history, analytics tools, or Referer headers.
+    window.history.replaceState(null, "", window.location.pathname + window.location.search);
+  } catch {
+    // Storage or history API unavailable — silently continue.
+  }
+}
+
+extractSessionTokenFromHash();
+
 const queryClient = new QueryClient();
 
 const redirectToLoginIfUnauthorized = (error: unknown) => {
