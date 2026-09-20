@@ -24,6 +24,59 @@ import { serveStatic, setupVite } from "./vite";
 import { registerChatStream } from "../chatStream";
 import { isSupabaseConfigured, supabase } from "../supabase-db";
 import { ensureStorageBucket } from "../storage";
+import { COOKIE_NAME } from "@shared/const";
+import { parse as parseCookieHeader } from "cookie";
+import type { Request, Response } from "express";
+import { getSessionCookieOptions } from "./cookies";
+import { sdk } from "./sdk";
+
+/**
+ * Fast, context-free logout handler registered on plain Express — NOT tRPC.
+ *
+ * The tRPC `auth.logout` procedure goes through `createContext`, which shrugs
+ * off the session token and does two Supabase round-trips. When Supabase or
+ * the OAuth server is slow, that sign-out request hangs — and the client used
+ * to await it before touching the UI, leaving the whole app on a full-screen
+ * loading spinner ("sign out is not working at all").
+ *
+ * This endpoint revokes the session token(s) this request is carrying
+ * (Authorization header and/or the HttpOnly cookie) and clears the cookie in
+ * pure middleware — no database, no OAuth — so it always succeeds.
+ */
+function registerLogoutRoute(app: express.Express) {
+  const handleLogout = (req: Request, res: Response) => {
+    try {
+      const authHeader = req.headers.authorization;
+      const headerToken =
+        typeof authHeader === "string" && authHeader.startsWith("Bearer ")
+          ? authHeader.slice(7).trim()
+          : undefined;
+      const cookieToken = parseCookieHeader(
+        req.headers.cookie ?? ""
+      )[COOKIE_NAME];
+
+      // Revoke every distinct token the request presented, best-effort. A JWT
+      // cannot be un-issued, so revoking is what actually de-scopes the session
+      // (the cookie clear alone would leave stale tokens working).
+      for (const token of new Set(
+        [headerToken, cookieToken].filter(Boolean) as string[]
+      )) {
+        void sdk.revokeSession(token);
+      }
+    } catch {
+      // Best-effort revocation; the cookie is still cleared below.
+    }
+
+    const cookieOptions = getSessionCookieOptions(req);
+    res.clearCookie(COOKIE_NAME, cookieOptions);
+    res.setHeader("Cache-Control", "no-store");
+    res.setHeader("Pragma", "no-cache");
+    res.json({ ok: true });
+  };
+
+  app.post("/api/auth/logout", handleLogout);
+  app.get("/api/auth/logout", handleLogout);
+}
 
 function validateProductionConfig() {
   const isProduction = process.env.NODE_ENV === "production";
@@ -98,6 +151,10 @@ async function startServer() {
   registerStorageProxy(app);
   registerOAuthRoutes(app);
   registerGoogleOAuthRoutes(app);
+  // Plain-Express logout — registered BEFORE the tRPC middleware so it never
+  // runs through createContext (which performs Supabase round-trips that can
+  // hang a slow sign-out).
+  registerLogoutRoute(app);
   // tRPC API
   app.use(
     "/api/trpc",
