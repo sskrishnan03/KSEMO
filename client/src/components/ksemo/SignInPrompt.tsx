@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useRef } from "react";
 import {
   AudioLines,
+  Brain,
   Camera,
   Code2,
   FilePlus2,
@@ -14,7 +15,6 @@ import {
   Paperclip,
   Search,
   Share2,
-  Sparkles,
   SquarePen,
   Volume2,
   X,
@@ -36,11 +36,11 @@ type TickerItem = {
 
 const ROW_1: TickerItem[] = [
   { id: "new-chat", title: "New chat", icon: SquarePen },
-  { id: "voice-chat", title: "Voice chat", icon: Mic },
+  { id: "voice-chat", title: "Voice chat", icon: AudioLines },
   { id: "create-files", title: "Create files", icon: FilePlus2 },
   { id: "browse-library", title: "Browse library", icon: Library },
   { id: "pdf-export", title: "PDF export", icon: PdfLogo, isBrand: true },
-  { id: "voice-dictation", title: "Voice dictation", icon: AudioLines },
+  { id: "voice-dictate", title: "Voice dictate", icon: Mic },
 ];
 
 const ROW_2: TickerItem[] = [
@@ -57,7 +57,7 @@ const ROW_3: TickerItem[] = [
   { id: "take-screenshot", title: "Take screenshot", icon: Camera },
   { id: "read-aloud", title: "Read aloud", icon: Volume2 },
   { id: "code-snippets", title: "Code snippets", icon: Code2 },
-  { id: "smart-memory", title: "Smart memory", icon: Sparkles },
+  { id: "memory", title: "Memory", icon: Brain },
   { id: "share-chats", title: "Share chats", icon: Share2 },
 ];
 
