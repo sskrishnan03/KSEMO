@@ -2361,6 +2361,7 @@ export default function Home() {
     // Starting a fresh chat aborts any stream targeting the current view so the
     // composer is free, but never touches background streams in other chats.
     closePdf();
+    setChatFilesOpen(false);
     const target = activeConversationId;
     for (const stream of streamsRef.current) {
       if (stream.active && stream.conversationId === target) {
@@ -2802,6 +2803,7 @@ export default function Home() {
 
   function selectConversation(id: string) {
     closePdf();
+    setChatFilesOpen(false);
     setPrimaryWorkspace(null);
     setSidebarOpen(false);
 
@@ -3290,8 +3292,11 @@ export default function Home() {
 
       <main
         className={cn(
-          "relative flex min-w-0 flex-1 flex-col transition-[margin] duration-300 ease-out",
-          chatFilesOpen && "md:ml-6 md:mr-[25rem]"
+          "relative flex min-w-0 flex-1 flex-col",
+          chatFilesOpen &&
+            !activePrimaryWorkspace &&
+            "transition-[margin] duration-300 ease-out",
+          chatFilesOpen && !activePrimaryWorkspace && "md:ml-6 md:mr-[25rem]"
         )}
       >
         {activePrimaryWorkspace === "library" ? (
