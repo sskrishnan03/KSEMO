@@ -90,7 +90,7 @@ function SupportShell({ topic }: { topic: SupportTopic }) {
               {meta.label}
             </span>
             <span aria-hidden>·</span>
-            <span>Last updated 21 August 2026</span>
+            <span>Last updated 21 September 2026</span>
           </div>
           <h1 className="mt-3 text-3xl font-semibold tracking-[-0.035em] sm:text-4xl">
             {meta.title}
@@ -162,20 +162,28 @@ function policySectionId(title: string): string {
 const PRIVACY_SECTION_TITLES = [
   "Overview",
   "What KSEMO stores",
+  "Information we collect automatically",
   "How your information is used",
+  "Artificial intelligence processing",
   "Conversations and message history",
   "Memory",
   "Files and Library storage",
   "Sharing and public links",
   "Authentication and account security",
   "Cookies and local storage",
+  "Do not track and online tracking",
+  "How we share information",
   "Service providers",
+  "Legal compliance and law enforcement",
   "Data retention and deletion",
+  "Data breach response",
   "Your choices and controls",
   "Your privacy rights",
+  "Regional privacy rights",
   "Security measures",
   "Children's privacy",
   "International transfers",
+  "Business transfers",
   "Changes to this policy",
   "Contact",
 ];
@@ -190,9 +198,11 @@ const TERMS_SECTION_TITLES = [
   "AI output",
   "Your content",
   "Files and Library",
+  "Feedback and suggestions",
   "Sharing links",
   "Fees, usage limits, and plans",
   "Intellectual property",
+  "Copyright and takedowns",
   "Third-party services",
   "Availability and changes",
   "Termination",
@@ -420,7 +430,7 @@ function FaqContent() {
                         id={`faq-answer-${item.id}`}
                         className="border-t border-border px-5 py-4"
                       >
-                        <p className="text-sm leading-6 text-muted-foreground">
+                        <p className="whitespace-pre-line text-sm leading-6 text-muted-foreground">
                           {item.answer}
                         </p>
                       </div>
@@ -808,6 +818,41 @@ function PrivacyContent() {
           of information unless you choose to place them in your own content.
         </p>
       </PolicySection>
+      <PolicySection title="Information we collect automatically">
+        <p>
+          Beyond what you explicitly provide, KSEMO automatically collects a
+          small set of technical information needed to keep the service running
+          securely and reliably:
+        </p>
+        <PolicyBullets
+          items={[
+            <>
+              Session records: the fact that you signed in, from which browser
+              and device, and roughly when — used to keep your session valid and
+              to detect unusual access patterns.
+            </>,
+            <>
+              Diagnostics: anonymous error reports and performance indicators
+              that help us find and fix faults. Where possible these are
+              aggregated and contain no conversation content.
+            </>,
+            <>
+              Basic request telemetry: the endpoints your browser calls and
+              their status codes, used to protect against misuse and to plan
+              capacity.
+            </>,
+            <>
+              No tracking pixels, no advertising identifiers, and no
+              fingerprinting scripts run inside KSEMO.
+            </>,
+          ]}
+        />
+        <p>
+          This technical data is kept to the minimum necessary to operate,
+          secure, and improve the service, and is not combined with your content
+          for profiling or advertising.
+        </p>
+      </PolicySection>
       <PolicySection title="How your information is used">
         <PolicyBullets
           items={[
@@ -847,6 +892,46 @@ function PrivacyContent() {
           train third-party foundation models beyond the transient processing
           needed to answer your requests.
         </p>
+      </PolicySection>
+      <PolicySection title="Artificial intelligence processing">
+        <p>
+          KSEMO is an AI assistant. Every time you send a message in the main
+          chat, memory-enabled replies, or file analysis workflows, the content
+          required to produce that single reply — your prompt, selected
+          memories, and any files you explicitly attach — is transmitted to the
+          configured server-side AI service. This is the core function of the
+          product: without sending your request, no response can be generated.
+        </p>
+        <PolicyBullets
+          items={[
+            <>
+              Transmission is request-scoped: only the material relevant to the
+              active message is sent, and only at the moment you send it.
+            </>,
+            <>
+              Your conversations, files, and memories are your private
+              workspace. They are not sold, and they are not used to train
+              third-party foundation models so they can be served to other
+              users.
+            </>,
+            <>
+              Generated responses are temporary products: the reply is stored in
+              your conversation like any message and remains under the same
+              retention and deletion controls as the rest of your content.
+            </>,
+            <>
+              AI providers receive data only on our instructions, under
+              confidentiality and security commitments, and may retain limited
+              request records for abuse prevention as required by law and their
+              own policies.
+            </>,
+            <>
+              If you would rather not have any content sent to an AI model, stop
+              sending messages or delete your content; KSEMO has no hidden
+              background processing that runs without a request.
+            </>,
+          ]}
+        />
       </PolicySection>
       <PolicySection title="Conversations and message history">
         <p>
@@ -1033,6 +1118,57 @@ function PrivacyContent() {
           ]}
         />
       </PolicySection>
+      <PolicySection title="Do not track and online tracking">
+        <p>
+          KSEMO does not engage in cross-site tracking and does not build
+          advertising profiles. Because the service simply has no third-party
+          trackers, browser “Do Not Track” signals and Global Privacy Control
+          (GPC) flags require no additional enforcement on our side — there is
+          no cross-site data collection to stop.
+        </p>
+        <p>
+          The only persistent identifiers KSEMO relies on are the session cookie
+          that keeps you signed in and local-storage preferences, both scoped
+          strictly to the KSEMO application and both documented in the Cookies
+          section above.
+        </p>
+      </PolicySection>
+      <PolicySection title="How we share information">
+        <p>
+          KSEMO shares your information only in the specific, limited
+          circumstances described in this policy. We treat sharing as the
+          exception, not the rule, and the general rule is: we do not sell,
+          rent, trade, or license your personal information or your content to
+          anyone.
+        </p>
+        <PolicyBullets
+          items={[
+            <>
+              With you, within your own workspace: your conversations and files
+              are shown to you on the device and browser you sign in with.
+            </>,
+            <>
+              With the recipients you choose: only when you enable a public
+              sharing link or send a conversation by email.
+            </>,
+            <>
+              With service providers: the independent companies that operate
+              authentication, hosting, storage, AI generation, and email on our
+              behalf, limited to what they need for their function under
+              confidentiality commitments.
+            </>,
+            <>
+              With authorities: only where we are legally required to respond to
+              a valid request, as described in the Legal compliance section.
+            </>,
+            <>
+              In a business transaction: if KSEMO is acquired, merged, or sold,
+              the buyer inherits the data needed to operate the service, under
+              notice as described in the Business transfers section.
+            </>,
+          ]}
+        />
+      </PolicySection>
       <PolicySection title="Service providers">
         <p>KSEMO relies on a small set of independent providers to operate:</p>
         <PolicyBullets
@@ -1060,6 +1196,33 @@ function PrivacyContent() {
           reflect material changes.
         </p>
       </PolicySection>
+      <PolicySection title="Legal compliance and law enforcement">
+        <p>
+          KSEMO is not in the business of sharing your workspace with third
+          parties, including law enforcement. We will not voluntarily provide
+          your conversations or content, and we will push back on overbroad or
+          informal requests where lawful to do so.
+        </p>
+        <PolicyBullets
+          items={[
+            <>
+              We respond to lawful process (for example a valid court order or
+              subpoena) only to the extent required by law, and we notify the
+              affected user in advance where we are permitted to do so.
+            </>,
+            <>
+              In emergencies involving imminent serious harm to a person, we may
+              share limited information necessary to prevent that harm.
+            </>,
+            <>
+              We typically require government requests to come through
+              established legal channels and to be specific and proportionate;
+              requests based on content, viewpoint, or political speech are
+              scrutinized especially carefully.
+            </>,
+          ]}
+        />
+      </PolicySection>
       <PolicySection title="Data retention and deletion">
         <p>
           You control retention. Conversations and files persist only while you
@@ -1086,6 +1249,36 @@ function PrivacyContent() {
             <>
               We retain the minimum operational records required for security
               and compliance, for as long as necessary.
+            </>,
+          ]}
+        />
+      </PolicySection>
+      <PolicySection title="Data breach response">
+        <p>
+          We take the security of your workspace seriously and plan for the
+          possibility of an incident even though we work hard to prevent one.
+        </p>
+        <PolicyBullets
+          items={[
+            <>
+              Monitoring: the service is watched for suspicious activity,
+              unauthorized access, and anomalous patterns on an ongoing basis.
+            </>,
+            <>
+              Response: suspected incidents are investigated promptly, affected
+              systems are secured, and access is revoked where needed.
+            </>,
+            <>
+              Notification: if we confirm a breach that materially compromises
+              your personal information — for example your messages, files, or
+              account data — we will notify affected users without undue delay,
+              describe what happened and what we are doing, and notify
+              regulators where the law requires it.
+            </>,
+            <>
+              Coordination: our hosting, storage, and AI providers operate under
+              contractual incident-response commitments so notifications reach
+              us quickly.
             </>,
           ]}
         />
@@ -1151,6 +1344,55 @@ function PrivacyContent() {
           applicable law.
         </p>
       </PolicySection>
+      <PolicySection title="Regional privacy rights">
+        <p>
+          Privacy law varies by region, and KSEMO aims to honor the strongest
+          protections that apply to you. Built-in tools cover most rights
+          directly; the details below describe how common regional laws map to
+          the product.
+        </p>
+        <PolicyBullets
+          items={[
+            <>
+              EU/EEA and UK (GDPR): the rights to access, rectification,
+              erasure, restriction, objection, portability, and withdrawal of
+              consent. Processing relies on performance of the contract,
+              legitimate interests, consent, or legal obligation as described in
+              “How your information is used”. You may lodge a complaint with
+              your local supervisory authority at any time.
+            </>,
+            <>
+              California (CCPA/CPRA): rights to know, access, correct, delete,
+              and opt out of “sales” or “sharing” of personal information, and
+              limits on the use of sensitive personal information. KSEMO does
+              not sell or share personal information and does not use it for
+              cross-context behavioral advertising. You may authorize an agent
+              to make requests on your behalf, and we will not discriminate
+              against you for exercising your rights.
+            </>,
+            <>
+              Other U.S. states: consumer privacy statutes in states such as
+              Colorado, Connecticut, Utah, and Virginia grant similar access,
+              correction, deletion, and portability rights; the same built-in
+              tools satisfy them.
+            </>,
+            <>
+              Canada (PIPEDA): accountability, consent, access, and correction
+              rights, with complaints available to the Privacy Commissioner.
+            </>,
+            <>
+              Brazil (LGPD): rights to access, correction, anonymization,
+              portability, and revocation of consent, enforceable through the
+              ANPD.
+            </>,
+            <>
+              Rest of the world: users outside these regions still receive the
+              product's full self-serve controls — view, export, edit, delete —
+              and can always contact us with a request.
+            </>,
+          ]}
+        />
+      </PolicySection>
       <PolicySection title="Security measures">
         <PolicyBullets
           items={[
@@ -1206,6 +1448,21 @@ function PrivacyContent() {
           applicable law.
         </p>
       </PolicySection>
+      <PolicySection title="Business transfers">
+        <p>
+          If KSEMO is involved in a merger, acquisition, sale of assets, or
+          similar transaction, your account data may be transferred as part of
+          the business being sold, in the same form it exists today. The
+          receiving entity would be bound to honor this policy or to replace it
+          only with a policy that provides at least equivalent protections.
+        </p>
+        <p>
+          We will provide notice before your data is transferred in such a
+          transaction and before it becomes subject to a materially different
+          policy, with an opportunity for you to export or delete your content
+          in the meantime.
+        </p>
+      </PolicySection>
       <PolicySection title="Changes to this policy">
         <p>
           We may update this policy as KSEMO evolves — for example when features
@@ -1227,6 +1484,21 @@ function PrivacyContent() {
           reach us through Settings → Feedback. Describe your request clearly
           and include the email address on your account so we can verify and
           assist quickly.
+        </p>
+        <p>
+          For formal privacy or data-subject requests — for example an access,
+          correction, or erasure request that you prefer not to make through the
+          product's own tools — or issues concerning how your information is
+          handled in a particular region, contact us from Settings → Feedback
+          and note the region and the right you are exercising. We will respond
+          within the window required by the applicable law. If your request is
+          declined, you will be told why and, where the law gives you the
+          option, how to escalate — including to your local supervisory
+          authority or data protection regulator.
+        </p>
+        <p>
+          For time-sensitive account or security matters, include “security” in
+          your message so it is routed to the appropriate team.
         </p>
       </PolicySection>
     </div>
@@ -1465,6 +1737,22 @@ function TermsContent() {
         />
       </PolicySection>
 
+      <PolicySection title="Feedback and suggestions">
+        <p>
+          We value your input. When you send feedback, bug reports, feature
+          ideas, or other suggestions through Settings → Feedback, you grant
+          KSEMO a non-exclusive, perpetual, royalty-free license to use, modify,
+          and incorporate that feedback into the product without obligation or
+          attribution to you.
+        </p>
+        <p>
+          You are not required to provide feedback, and you retain whatever
+          rights you have in your own underlying ideas. Do not include
+          confidential information you are not authorized to share, because
+          feedback is treated as non-confidential.
+        </p>
+      </PolicySection>
+
       <PolicySection title="Sharing links">
         <PolicyBullets
           items={[
@@ -1534,6 +1822,42 @@ function TermsContent() {
           material; we will investigate and remove infringing content where a
           claim is valid, and may suspend repeat infringers' accounts.
         </p>
+      </PolicySection>
+      <PolicySection title="Copyright and takedowns">
+        <p>
+          KSEMO respects the intellectual-property rights of others and asks its
+          users to do the same. Material that infringes copyright has no
+          legitimate place in your conversations, your Library, or your shared
+          links.
+        </p>
+        <PolicyBullets
+          items={[
+            <>
+              Notices: if you believe content accessible through KSEMO (for
+              example within a shared link) infringes your copyright, send us a
+              takedown notice through Settings → Feedback containing: a
+              description of the protected work, a description and location of
+              the allegedly infringing material, your contact information, a
+              statement of good-faith belief that the use is unauthorized, and,
+              where applicable, a declaration that the information is accurate
+              and that you are the rights holder or authorized to act on their
+              behalf.
+            </>,
+            <>
+              Action: valid notices are acted on promptly, including removal of
+              the material and disabling of the relevant shared link.
+            </>,
+            <>
+              Counter-notices: if you believe material you shared was removed in
+              error, you may file a counter-notice with the same contact path;
+              we will evaluate it in accordance with applicable law.
+            </>,
+            <>
+              Repeat infringers: accounts that repeatedly host infringing
+              content may be suspended or terminated.
+            </>,
+          ]}
+        />
       </PolicySection>
       <PolicySection title="Third-party services">
         <p>
@@ -1658,6 +1982,12 @@ function TermsContent() {
           individually; nothing here prevents either party from seeking
           injunctive relief to protect intellectual property or confidential
           information.
+        </p>
+        <p>
+          If you are a consumer in the EU/EEA or the UK, you may also access the
+          European Commission's online dispute resolution platform at any time,
+          and statutory consumer-protection provisions of your country of
+          residence always take precedence over this section.
         </p>
       </PolicySection>
       <PolicySection title="Changes to these terms">
