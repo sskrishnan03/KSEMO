@@ -35,7 +35,6 @@ import {
   Brain,
   Bug,
   Check,
-  ChevronRight,
   Copy,
   HelpCircle,
   Lightbulb,
@@ -383,24 +382,15 @@ export const SettingsDialog = memo(function SettingsDialog({
   const [dataWorkspace, setDataWorkspace] = useState<
     null | "archived" | "shared"
   >(null);
-  // On mobile the settings open as a clean menu list; picking an item pushes
-  // into that section (with a back button) instead of squeezing two panes.
-  const [mobileMenu, setMobileMenu] = useState(true);
 
   const changeTab = (tab: SettingsTab) => {
     setDataWorkspace(null);
     setActiveTab(tab);
   };
 
-  const openSection = (tab: SettingsTab) => {
-    setDataWorkspace(null);
-    setActiveTab(tab);
-    setMobileMenu(false);
-  };
-
   useEffect(() => {
     if (initialTab && open) {
-      openSection(initialTab);
+      changeTab(initialTab);
     }
   }, [initialTab, open]);
   const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
@@ -435,10 +425,7 @@ export const SettingsDialog = memo(function SettingsDialog({
   });
 
   useEffect(() => {
-    if (open) {
-      changeTab("account");
-      setMobileMenu(true);
-    }
+    if (open) changeTab("account");
   }, [open]);
 
   const sectionContent = (
@@ -482,11 +469,9 @@ export const SettingsDialog = memo(function SettingsDialog({
     </>
   );
 
-  const workspacePane = activeTab === "data" && dataWorkspace !== null;
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent showCloseButton={false} className="flex h-[70dvh] w-[60vw] !max-w-none max-md:h-dvh max-md:w-full max-md:!rounded-none flex-col gap-0 overflow-hidden rounded-2xl p-0">
+      <DialogContent showCloseButton={false} className="flex h-[70dvh] w-[60vw] !max-w-none max-md:h-[min(85dvh,560px)] max-md:w-[calc(100%-1rem)] flex-col gap-0 overflow-hidden rounded-2xl p-0">
         <DialogHeader className="sr-only">
           <DialogTitle>Settings</DialogTitle>
           <DialogDescription>
@@ -495,36 +480,12 @@ export const SettingsDialog = memo(function SettingsDialog({
         </DialogHeader>
 
         {/* Dedicated Mobile Header Bar */}
-        <div className="flex h-12 shrink-0 items-center justify-between border-b border-border bg-card px-2 md:hidden">
-          <div className="flex min-w-0 items-center gap-1">
-            {mobileMenu ? (
-              <>
-                <Settings2 className="size-4 shrink-0 text-muted-foreground" />
-                <span className="truncate text-sm font-semibold tracking-[-0.02em] text-foreground">
-                  Settings
-                </span>
-              </>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setDataWorkspace(null);
-                    setMobileMenu(true);
-                  }}
-                  aria-label="Back to settings"
-                  className="flex size-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors outline-none hover:bg-accent hover:text-foreground focus-visible:ring-0 focus-visible:outline-none"
-                >
-                  <ArrowLeft className="size-4" />
-                </button>
-                <span className="truncate text-sm font-semibold tracking-[-0.02em] text-foreground">
-                  {
-                    settingsNavItems.find(item => item.id === activeTab)
-                      ?.label ?? "Settings"
-                  }
-                </span>
-              </>
-            )}
+        <div className="flex h-12 shrink-0 items-center justify-between border-b border-border bg-card px-3.5 md:hidden">
+          <div className="flex items-center gap-2">
+            <Settings2 className="size-4 text-muted-foreground" />
+            <span className="text-sm font-semibold tracking-[-0.02em] text-foreground">
+              Settings
+            </span>
           </div>
           <DialogPrimitive.Close asChild>
             <button
@@ -537,9 +498,35 @@ export const SettingsDialog = memo(function SettingsDialog({
           </DialogPrimitive.Close>
         </div>
 
-        {/* Full-width search on mobile so the same search is never lost */}
-        <div className="shrink-0 border-b border-border bg-sidebar px-3 pt-2.5 pb-2 md:hidden">
-          <SettingsSearch onSelect={openSection} />
+        {/* Full-width search + settings options on mobile, so options and the
+            workspace both stay visible without any back-and-forth navigation */}
+        <div className="shrink-0 border-b border-border bg-sidebar px-3 pt-2.5 pb-2.5 md:hidden">
+          <SettingsSearch onSelect={changeTab} />
+          <nav
+            aria-label="Settings navigation"
+            className="mt-2 flex items-center gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          >
+            {settingsNavItems.map(item => {
+              const Icon = item.icon;
+              const active = activeTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => changeTab(item.id)}
+                  aria-current={active ? "page" : undefined}
+                  className={`flex shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-2 text-[13px] font-medium transition-colors outline-none focus-visible:ring-0 focus-visible:outline-none active:scale-[0.98] ${
+                    active
+                      ? "bg-foreground text-background shadow-sm"
+                      : "bg-accent/60 text-muted-foreground hover:bg-accent hover:text-foreground"
+                  }`}
+                >
+                  <Icon className="size-4 shrink-0" />
+                  {item.label}
+                </button>
+              );
+            })}
+          </nav>
         </div>
 
         <div className="flex min-h-0 flex-1 flex-col md:flex-row">
@@ -598,72 +585,12 @@ export const SettingsDialog = memo(function SettingsDialog({
             </DialogPrimitive.Close>
             <div
               className={
-                workspacePane
+                activeTab === "data" && dataWorkspace
                   ? "flex min-h-0 flex-1 flex-col overflow-hidden"
                   : "min-h-0 flex-1 overflow-y-auto p-4 md:p-5"
               }
             >
-              {/* Mobile: menu list, then a section once one is picked */}
-              <div
-                className={`md:hidden ${
-                  workspacePane ? "flex min-h-0 flex-1 flex-col" : ""
-                }`}
-              >
-                {mobileMenu ? (
-                  <div className="space-y-3">
-                    <RowGroup>
-                      {settingsNavItems.map(item => {
-                        const Icon = item.icon;
-                        const active = activeTab === item.id;
-                        return (
-                          <button
-                            key={item.id}
-                            type="button"
-                            onClick={() => openSection(item.id)}
-                            className={`flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors active:bg-accent/70 ${
-                              active ? "bg-accent" : "hover:bg-accent"
-                            }`}
-                          >
-                            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted/80 text-muted-foreground">
-                              <Icon className="size-4" />
-                            </span>
-                            <span className="min-w-0 flex-1 truncate text-sm font-medium">
-                              {item.label}
-                            </span>
-                            <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-                          </button>
-                        );
-                      })}
-                    </RowGroup>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onOpenChange(false);
-                        onSignOut();
-                      }}
-                      className="flex w-full items-center gap-3 rounded-xl border border-border bg-card px-4 py-3.5 text-left text-sm font-medium text-destructive transition-colors hover:bg-destructive/10 active:bg-destructive/10"
-                    >
-                      <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-destructive/10 text-destructive">
-                        <LogOut className="size-4" />
-                      </span>
-                      <span className="flex-1">Sign out</span>
-                    </button>
-                  </div>
-                ) : (
-                  sectionContent
-                )}
-              </div>
-
-              {/* Desktop: sections with sidebar */}
-              <div
-                className={`hidden ${
-                  workspacePane
-                    ? "md:flex min-h-0 flex-1 flex-col"
-                    : "md:block"
-                }`}
-              >
-                {sectionContent}
-              </div>
+              {sectionContent}
             </div>
           </div>
         </div>
