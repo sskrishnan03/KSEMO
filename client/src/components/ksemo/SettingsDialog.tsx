@@ -430,7 +430,7 @@ export const SettingsDialog = memo(function SettingsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent showCloseButton={false} className="flex h-[70dvh] w-[60vw] !max-w-none max-md:h-[min(85dvh,540px)] max-md:w-[calc(100%-1rem)] flex-col gap-0 overflow-hidden rounded-2xl p-0">
+      <DialogContent showCloseButton={false} className="flex h-[70dvh] w-[60vw] !max-w-none max-md:h-dvh max-md:w-full max-md:!rounded-none flex-col gap-0 overflow-hidden rounded-2xl p-0">
         <DialogHeader className="sr-only">
           <DialogTitle>Settings</DialogTitle>
           <DialogDescription>
@@ -455,6 +455,11 @@ export const SettingsDialog = memo(function SettingsDialog({
               <X className="size-4" />
             </button>
           </DialogPrimitive.Close>
+        </div>
+
+        {/* Full-width search on mobile so the same search is never lost */}
+        <div className="shrink-0 border-b border-border bg-sidebar px-3 pt-2.5 pb-2 md:hidden">
+          <SettingsSearch onSelect={changeTab} />
         </div>
 
         <div className="flex min-h-0 flex-1 flex-col md:flex-row">
@@ -500,13 +505,11 @@ export const SettingsDialog = memo(function SettingsDialog({
             </div>
           </aside>
 
-          <div className="flex flex-col border-b border-border bg-sidebar md:hidden">
-            <div className="px-3 pt-2.5 pb-2">
-              <SettingsSearch onSelect={changeTab} />
-            </div>
+          {/* Mobile sidebar rail — mirrors the desktop sidebar, just narrower */}
+          <div className="flex w-[8.25rem] min-h-0 shrink-0 flex-col overflow-y-auto border-r border-border bg-sidebar px-2.5 py-3 md:hidden">
             <nav
               aria-label="Settings navigation"
-              className="flex items-center gap-1.5 overflow-x-auto px-3 pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              className="flex min-h-0 flex-1 flex-col gap-0.5"
             >
               {settingsNavItems.map(item => {
                 const Icon = item.icon;
@@ -516,18 +519,30 @@ export const SettingsDialog = memo(function SettingsDialog({
                     key={item.id}
                     onClick={() => changeTab(item.id)}
                     aria-current={active ? "page" : undefined}
-                    className={`flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors outline-none focus-visible:ring-0 focus-visible:outline-none active:scale-[0.98] ${
+                    className={`flex w-full shrink-0 items-center gap-2 rounded-lg px-2 py-2 text-left text-[13px] transition-colors outline-none focus-visible:ring-0 focus-visible:outline-none active:scale-[0.98] ${
                       active
-                        ? "bg-foreground text-background"
-                        : "bg-accent/60 text-muted-foreground hover:bg-accent hover:text-foreground"
+                        ? "bg-accent font-medium text-foreground"
+                        : "text-muted-foreground hover:bg-accent hover:text-foreground"
                     }`}
                   >
-                    <Icon className="size-3.5 shrink-0" />
-                    {item.label}
+                    <Icon className="size-4 shrink-0" />
+                    <span className="truncate">{item.label}</span>
                   </button>
                 );
               })}
             </nav>
+            <div className="mt-2.5 shrink-0 border-t border-border pt-2.5">
+              <button
+                onClick={() => {
+                  onOpenChange(false);
+                  onSignOut();
+                }}
+                className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-[13px] text-destructive transition-colors outline-none hover:bg-destructive/10 focus-visible:ring-0 focus-visible:outline-none"
+              >
+                <LogOut className="size-4 shrink-0" />
+                <span className="truncate">Sign out</span>
+              </button>
+            </div>
           </div>
 
           <div className="relative flex min-h-0 flex-1 flex-col">
@@ -1523,7 +1538,7 @@ function FeedbackSection() {
           <div className="px-4 py-4">
             <div className="space-y-2">
               <Label className="text-sm">Category</Label>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-2">
                 {feedbackCategories.map(cat => {
                   const Icon = cat.icon;
                   const active = category === cat.id;
