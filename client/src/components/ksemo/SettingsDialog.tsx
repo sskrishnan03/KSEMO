@@ -479,8 +479,9 @@ export const SettingsDialog = memo(function SettingsDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {/* Dedicated Mobile Header Bar */}
-        <div className="flex h-12 shrink-0 items-center justify-between border-b border-border bg-card px-3.5 md:hidden">
+        {/* Dedicated Mobile Header Bar — compact, no search, so the options and
+            content get the space */}
+        <div className="flex h-11 shrink-0 items-center justify-between border-b border-border bg-card px-3 md:hidden">
           <div className="flex items-center gap-2">
             <Settings2 className="size-4 text-muted-foreground" />
             <span className="text-sm font-semibold tracking-[-0.02em] text-foreground">
@@ -498,13 +499,11 @@ export const SettingsDialog = memo(function SettingsDialog({
           </DialogPrimitive.Close>
         </div>
 
-        {/* Full-width search + settings options on mobile, so options and the
-            workspace both stay visible without any back-and-forth navigation */}
-        <div className="shrink-0 border-b border-border bg-sidebar px-3 pt-2.5 pb-2.5 md:hidden">
-          <SettingsSearch onSelect={changeTab} />
+        {/* Compact settings options row on mobile */}
+        <div className="shrink-0 border-b border-border bg-sidebar px-3 py-2 md:hidden">
           <nav
             aria-label="Settings navigation"
-            className="mt-2 flex items-center gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            className="flex items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           >
             {settingsNavItems.map(item => {
               const Icon = item.icon;
@@ -515,13 +514,13 @@ export const SettingsDialog = memo(function SettingsDialog({
                   type="button"
                   onClick={() => changeTab(item.id)}
                   aria-current={active ? "page" : undefined}
-                  className={`flex shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-2 text-[13px] font-medium transition-colors outline-none focus-visible:ring-0 focus-visible:outline-none active:scale-[0.98] ${
+                  className={`flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors outline-none focus-visible:ring-0 focus-visible:outline-none active:scale-[0.98] ${
                     active
                       ? "bg-foreground text-background shadow-sm"
                       : "bg-accent/60 text-muted-foreground hover:bg-accent hover:text-foreground"
                   }`}
                 >
-                  <Icon className="size-4 shrink-0" />
+                  <Icon className="size-3.5 shrink-0" />
                   {item.label}
                 </button>
               );

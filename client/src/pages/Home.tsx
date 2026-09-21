@@ -352,6 +352,19 @@ export default function Home() {
   useEffect(() => {
     setGuestModeActive(guestMode);
   }, [guestMode]);
+  // Opening the drawer sidebar on mobile must dismiss the on-screen keyboard:
+  // tapping the hamburger doesn't blur the chat input underneath on touch
+  // devices, so the keyboard would stay covering half the sidebar.
+  useEffect(() => {
+    if (!sidebarOpen || !isMobile) return;
+    const frame = requestAnimationFrame(() => {
+      const active = document.activeElement as HTMLElement | null;
+      if (active && typeof active.blur === "function") {
+        active.blur();
+      }
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [sidebarOpen, isMobile]);
   const [guestPromptOpen, setGuestPromptOpen] = useState(false);
   const [composerValue, setComposerValue] = useState("");
   const [composerFocusToken, setComposerFocusToken] = useState(0);
