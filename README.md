@@ -1,327 +1,298 @@
 <p align="center">
-  <img src="client/src/img/ksemo.png" alt="KSEMO" width="100%" />
+  <img src="client/src/img/ksemo.png" alt="KSEMO Banner" width="100%" />
 </p>
-
 
 <h1 align="center">KSEMO</h1>
 
-
 <p align="center">
-  An intelligent AI assistant platform with durable memory, document creation, and voice capabilities.
+  <strong>Next-Generation AI Workspace with Durable Memory, Document Generation, Voice Intelligence & Knowledge Management</strong>
 </p>
 
+<p align="center">
+  <img src="https://img.shields.io/badge/React-19.2-61DAFB?logo=react&logoColor=black" alt="React 19" />
+  <img src="https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript&logoColor=white" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/TailwindCSS-v4.0-38B2AC?logo=tailwind-css&logoColor=white" alt="Tailwind CSS" />
+  <img src="https://img.shields.io/badge/Express-4.21-000000?logo=express&logoColor=white" alt="Express" />
+  <img src="https://img.shields.io/badge/tRPC-v11-2563EB?logo=trpc&logoColor=white" alt="tRPC" />
+  <img src="https://img.shields.io/badge/Supabase-PostgreSQL-3ECF8E?logo=supabase&logoColor=white" alt="Supabase" />
+  <img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License MIT" />
+</p>
 
 <p align="center">
   <a href="#overview">Overview</a> &nbsp;&middot;&nbsp;
-  <a href="#key-features">Features</a> &nbsp;&middot;&nbsp;
-  <a href="#how-it-works">How It Works</a> &nbsp;&middot;&nbsp;
-  <a href="#installation">Installation</a> &nbsp;&middot;&nbsp;
-  <a href="#usage">Usage</a> &nbsp;&middot;&nbsp;
+  <a href="#visual-interface-walkthrough--image-analysis">Visual Interface Analysis</a> &nbsp;&middot;&nbsp;
+  <a href="#key-features">Key Features</a> &nbsp;&middot;&nbsp;
+  <a href="#architecture--tech-stack">Architecture</a> &nbsp;&middot;&nbsp;
+  <a href="#installation--setup">Installation</a> &nbsp;&middot;&nbsp;
+  <a href="#environment-variables">Environment</a> &nbsp;&middot;&nbsp;
+  <a href="#usage-guide">Usage Guide</a> &nbsp;&middot;&nbsp;
   <a href="#license">License</a>
 </p>
 
-
-<br/>
-
+---
 
 ## Overview
 
+**KSEMO** is an all-in-one AI assistant and productivity platform built to unify conversational intelligence, multi-format document authoring, real-time voice streaming, and personal knowledge management into a seamless, distraction-free desktop-grade web application.
 
-KSEMO is an AI-powered assistant platform built to bring chat, document creation, voice interaction, and personal knowledge management into one unified experience. From real-time conversations to professional document generation, everything happens inside a single application.
+Unlike conventional chat interfaces that operate in silos, KSEMO integrates **durable cross-session memory**, **native document generation** (PDF, Word, Excel, PowerPoint, Text), **full-duplex voice interactions**, and a **centralized file library**. Whether you are brainstorming, drafting complex analytical reports, searching past conversations, or querying uploaded data files, KSEMO delivers a coherent, context-aware environment powered by modern LLMs.
 
+---
 
-The platform connects to AI language models, streams responses in real time, and generates professional documents directly from conversation. It remembers user preferences and facts across sessions, supports voice conversations with speech-to-text and text-to-speech, and organizes work through a project-based workspace with a file library.
+## Visual Interface Walkthrough & Image Analysis
 
+The application architecture and user journey are organized across five core interface states. Below is a detailed feature breakdown and UI/UX analysis of each screen in numerical order:
 
-Whether you are drafting a report, brainstorming ideas, managing reference files, or simply having a conversation, KSEMO gives you a single interface that handles it all — with memory, context, and voice built in from the ground up.
+---
 
+### 1. Core Chat Workspace & Multi-Format Document Generation
 
-<br/>
+<p align="center">
+  <img src="client/src/img/1.png" alt="1. Core Chat & Document Creation Menu" width="100%" style="border-radius: 8px; border: 1px solid #2d2d2d;" />
+</p>
 
+#### 🔍 Analysis & Capabilities:
+- **Central Conversational Hub**: Features a sleek dark-themed workspace with a distraction-free conversational canvas and responsive prompt input box (*"Ask KSEMO anything..."*).
+- **Multimodal Composer & Action Menu**:
+  - **Upload Files**: Direct attachment of documents, raw text, and images for real-time document Q&A.
+  - **Take Screenshot**: Integrated screen capture tool to seamlessly paste visual snapshots into the prompt.
+  - **Browse Library**: Rapid access to previously uploaded and processed documents stored in your private library.
+  - **Create Files (Submenu)**: Direct on-the-fly document compilation into **PDF**, **Microsoft Word (`.docx`)**, **Microsoft Excel (`.xlsx`)**, **Microsoft PowerPoint (`.pptx`)**, and **Plain Text (`.txt`)**.
+- **Sidebar & Quick Navigation**: Accessible sidebar navigation for *New Chat*, global *Search*, *Library*, *Recent Sessions*, and profile/account settings.
 
-## Project Overview
+---
 
+### 2. Interactive Hands-Free Voice Assistant & Live Audio Mode
 
-KSEMO is designed around one core idea: working with an AI assistant should feel effortless, not scattered. The platform takes you from a single prompt to a complete result — whether that is a conversation, a document, or a voice interaction — in seconds.
+<p align="center">
+  <img src="client/src/img/2.png" alt="2. Real-Time Voice Conversation Mode" width="100%" style="border-radius: 8px; border: 1px solid #2d2d2d;" />
+</p>
 
+#### 🔍 Analysis & Capabilities:
+- **Immersive Voice Interaction**: Dedicated voice interface with a centered pulsating audio visualizer that provides real-time visual feedback for listening and speaking states.
+- **Bi-Directional Speech Streaming**:
+  - Continuous speech-to-text (STT) captures natural speech with instant transcription.
+  - Natural text-to-speech (TTS) synthesis delivers low-latency spoken responses.
+- **Real-Time Voice Controls**:
+  - Voice selector dropdown (e.g., custom persona tone and speed adjustment).
+  - Speaker output toggle and master stop/interrupt button to pause audio playback instantly.
+  - Fallback hybrid input allowing users to speak out loud or type questions interchangeably.
 
-The experience begins on the main chat interface, where you can type or speak your message, attach files, and watch the assistant respond in real time. From there, you can switch into document creation modes to generate PDFs, Word documents, Excel spreadsheets, PowerPoint presentations, or text files directly from your conversation.
+---
 
+### 3. Ephemeral & Privacy-Preserving Temporary Chat
 
-When you are ready to go further, the platform offers a durable memory system that learns about you over time, a file library for storing and referencing documents, project organization for grouping related conversations, and message editing with full version history.
+<p align="center">
+  <img src="client/src/img/3.png" alt="3. Temporary Chat Incognito Mode" width="100%" style="border-radius: 8px; border: 1px solid #2d2d2d;" />
+</p>
 
+#### 🔍 Analysis & Capabilities:
+- **Zero Data Retention**: A dedicated incognito mode designed for disposable inquiries, sensitive data processing, and quick brainstorming.
+- **Visual Privacy Feedback**: Distinctive top notification and glowing input badge (*"Temporary chat — This conversation won't be saved to your chat history"*).
+- **Ephemeral State Lifecycle**:
+  - Conversations exist exclusively in client memory for the duration of the session.
+  - No database logging, no analytics tracking, and excluded from long-term memory extraction.
 
-Beyond that, KSEMO includes a personal settings hub for managing your AI model, persona, and speech preferences, a full voice conversation mode with hands-free interaction, conversation sharing through public links and email, and support pages that answer your questions directly.
+---
 
+### 4. Global Full-Text Search & Context Retrieval Engine
 
-<br/>
+<p align="center">
+  <img src="client/src/img/4.png" alt="4. Global Search & Message History" width="100%" style="border-radius: 8px; border: 1px solid #2d2d2d;" />
+</p>
 
+#### 🔍 Analysis & Capabilities:
+- **Deep Historical Search**: Instant indexing and querying across all past conversation titles, user prompts, assistant answers, and attached notes.
+- **Time-Range Filters**: Dropdown filtering system (*"All time"*, today, past week, past month) to quickly narrow down relevant insights.
+- **Quick Jump & Preview**: Clean search result cards enabling instant message navigation and one-click session resumption.
+
+---
+
+### 5. Centralized Knowledge Base & Private File Library
+
+<p align="center">
+  <img src="client/src/img/5.png" alt="5. File & Knowledge Library Workspace" width="100%" style="border-radius: 8px; border: 1px solid #2d2d2d;" />
+</p>
+
+#### 🔍 Analysis & Capabilities:
+- **Private Asset Vault**: A secure hub for storing, organizing, and referencing documents, spreadsheets, slides, and images across conversations.
+- **Automated Text & Data Extraction**: Uploaded files (PDFs, Word docs, Excel sheets) are automatically parsed and indexed for context injection.
+- **Advanced Asset Organization**:
+  - **Categorical Filters**: Filter by *All*, *Images*, *Files*, or *Favorites*.
+  - **View Layout Switching**: Toggle between responsive **Grid View** and detailed **List View**.
+  - **Direct Search**: In-library instant keyword search to locate specific uploaded assets in seconds.
+
+---
 
 ## Key Features
 
-
-**Real-Time AI Chat**
-
-
-Type a message and receive a streaming response in real time. The assistant appears to write as it goes, with the ability to stop it mid-response. Every conversation is saved automatically with an intelligently generated title.
-
-
-**Durable Memory**
-
-
-KSEMO automatically extracts important facts from your conversations — your preferences, relationships, habits, and important details — and stores them across sessions. In future conversations, the assistant recalls what it knows about you so responses feel personal and continuous. The memory system is fully user-controlled and categorizes entries by sensitivity.
-
-
-**Document Creation**
-
-
-Select a format from the chat composer — PDF, Word, Excel, PowerPoint, or Text — and the assistant creates a complete, downloadable document from your conversation. Content is planned intelligently and produced with proper headings, tables, lists, and structured layouts.
-
-
-**Voice Conversation**
-
-
-Switch to voice mode for a hands-free conversational experience. Speak naturally and the assistant listens through your microphone, transcribes your speech, processes your request, and speaks the response back. You can interrupt mid-speech, and live subtitles display during playback.
-
-
-**File Library**
-
-
-Upload documents, spreadsheets, and presentations and the platform extracts their text content automatically. Browse your library in grid or list views, search by name, mark files as favorites, and attach any file to a conversation to give the assistant direct context from your documents.
-
-
-**Message Editing and History**
-
-
-Edit any of your own messages after sending them, and the assistant regenerates its response. Every edit is stored as a version, letting you browse an older version and restore it whenever you like.
-
-
-**Conversation Management**
-
-
-Pin, archive, rename, duplicate, export, or delete any conversation. Search across all your messages and conversation titles with a single shortcut. Group related conversations into projects for better organization.
-
-
-**Sharing and Export**
-
-
-Share any conversation through a public link that anyone can view in a read-only format, or send it directly by email. Export conversations as PDF or Word documents for offline use.
-
-
-**Feedback System**
-
-
-Rate any assistant response with a thumbs up or thumbs down. Your ratings are stored per message so the experience can be improved based on what you find useful.
-
-
-**Settings and Preferences**
-
-
-A comprehensive settings hub covers your account, security, appearance, keyboard shortcuts, data controls, memory settings, and feedback. Choose your AI model, select a persona, add custom instructions, and adjust the speech rate to your liking.
-
-
-**Support Pages**
-
-
-Browse a searchable FAQ with curated answers across topics, an assistant chatbot that answers from the FAQ, and complete Privacy Policy and Terms of Service documents.
-
-
-<br/>
-
-
-## How It Works
-
-
-**1. Sign In and Authenticate**
-
-
-Register with your email and password, or sign in through Google. You can also use the platform's own sign-in flow, recover your password by email, and reset it with a secure link. Sessions are managed securely with automatic sign-in detection.
-
-
-**2. Start a Conversation**
-
-
-Open the main chat interface and begin typing your message. The assistant responds in real time with streaming text. Your conversation is saved automatically, and a title is generated from your first exchange.
-
-
-**3. Create Documents**
-
-
-Open the plus menu in the composer and select a document format. Describe what you want — for example, "Create a weekly project report" — and the assistant generates a complete, downloadable file you can open in your favorite document applications.
-
-
-**4. Upload and Reference Files**
-
-
-Open the Library workspace to upload your documents. The platform extracts and reads their text automatically. Attach any file to a conversation and the assistant uses its content as context when responding to your messages.
-
-
-**5. Talk with Voice**
-
-
-Press the microphone button to record your voice and have it inserted as text, or enter full voice mode for a hands-free conversation. The assistant listens, processes, and speaks back — with the ability to interrupt at any time.
-
-
-**6. Let Memory Learn**
-
-
-Enable the memory system in Settings and the platform begins automatically extracting facts from your conversations. Over time it builds a profile of your preferences and context, and in future conversations relevant memories are silently brought into the assistant's context so responses feel personal.
-
-
-**7. Organize with Projects**
-
-
-Group your conversations into projects to keep related work together. Archive projects you are done with or delete them entirely. Files can sit in your library and be attached to any conversation at any time.
-
-
-**8. Share and Export**
-
-
-Toggle public sharing on any conversation to generate a shareable link, or send it by email. Export conversations as PDF or Word documents whenever you need a copy outside the platform.
-
-
-<br/>
-
-
-## Installation
-
-
-**Prerequisites**
-
-
-- Node.js
-- pnpm
-- A Supabase PostgreSQL database
-- An API key for the AI language model
-- Google OAuth credentials (optional, for Google Sign-In)
-- SMTP email credentials (optional, for password reset and email sharing)
-- A JWT secret for secure session signing
-
-
-**Setup**
-
-
+### 🧠 Durable Cross-Session Memory
+- Automatically identifies and retains key user facts, preferences, project requirements, and personal contexts.
+- Contextually injects relevant memories into future prompts without manual re-prompting.
+- Full user control to view, edit, sensitive-tag, or delete stored memories.
+
+### 📄 Native Document Creation Engine
+- **PDF Generation**: High-fidelity structured PDF rendering via `pdf-lib` and `unpdf`.
+- **Word (`.docx`)**: Formatted document compilation with headings, bullet points, and styled callouts using `docx`.
+- **Excel (`.xlsx`)**: Structured multi-column analytical spreadsheets powered by `xlsx`.
+- **PowerPoint (`.pptx`)**: Polished presentation decks with slides and title layouts via `pptxgenjs`.
+
+### 🎙️ Full-Duplex Voice & Audio Processing
+- Hands-free live conversation with customizable speech rates and natural TTS synthesis.
+- Audio activity visualization with immediate mid-sentence interruption handling.
+- Live subtitle rendering during voice playback.
+
+### 🔄 Message Branching & Version History
+- Edit previous prompts to regenerate alternative reasoning paths.
+- Linear version history lets you switch between past iterations without losing data.
+
+### 🌐 Secure Sharing & Collaboration
+- Generate public, read-only shareable links with cryptographic tokens.
+- Export transcripts directly to PDF or Word documents for offline sharing.
+- Built-in email sharing integration via SMTP.
+
+---
+
+## Architecture & Tech Stack
+
+```
+KSEMO/
+├── client/                 # React 19 Single Page Application
+│   ├── src/
+│   │   ├── components/     # UI components (Radix UI, Tailwind CSS, Lucide Icons)
+│   │   ├── hooks/          # Audio recording, streaming, theme, and query hooks
+│   │   ├── pages/          # Chat, Library, Search, Settings, Auth, and Support pages
+│   │   ├── lib/            # tRPC client, Supabase client, utility helpers
+│   │   └── img/            # Platform screenshot assets and brand graphics
+├── server/                 # Express & tRPC Node.js Backend
+│   ├── _core/              # Server entry point, context, and middleware
+│   ├── routers/            # tRPC routers (chat, memory, library, documents, voice, auth)
+│   ├── services/           # LLM connector, document builders, OCR/text parsers, mailer
+│   └── storage/            # In-memory database fallback & file management
+├── shared/                 # Shared TypeScript schemas, types, and Zod validators
+└── supabase-schema/        # PostgreSQL migrations, triggers, RLS policies, and search functions
+```
+
+### Technology Highlights:
+- **Frontend**: React 19, TypeScript, Tailwind CSS v4, Radix UI Primitives, Framer Motion, TanStack Query.
+- **Backend & API**: Node.js, Express, tRPC v11, Zod schema validation, Jose (JWT authentication).
+- **Database & Storage**: Supabase (PostgreSQL with Row Level Security & full-text search) + in-memory development store fallback.
+- **Document Engines**: `docx`, `pdf-lib`, `xlsx`, `pptxgenjs`, `mammoth`, `unpdf`.
+- **AI / LLM Integration**: Gemini API & OpenAI-compatible streaming endpoints.
+
+---
+
+## System Data Flow
+
+```mermaid
+flowchart TD
+    User([User / Client]) -->|1. Text / Voice / File| ChatInterface[Chat & Voice Workspace]
+    ChatInterface -->|2. tRPC Mutation| BackendServer[Express + tRPC Server]
+    
+    subgraph Core Services
+        BackendServer --> MemoryService[Memory Extraction & Vector Search]
+        BackendServer --> DocGen[Document Engine: PDF / DOCX / XLSX / PPTX]
+        BackendServer --> LLMService[LLM Streaming Gateway: Gemini API]
+    end
+
+    BackendServer -->|3. Persist State| SupabaseDB[(Supabase PostgreSQL)]
+    MemoryService <--> SupabaseDB
+    DocGen -->|4. Return File Stream| User
+    LLMService -->|5. Real-time Token Stream| User
+```
+
+---
+
+## Installation & Setup
+
+### Prerequisites
+- **Node.js**: `v20.x` or higher
+- **pnpm**: `v10.x` or higher
+- **Supabase Account**: (Optional for cloud database; in-memory demo mode runs automatically if unset)
+- **AI API Key**: Gemini API key or compatible LLM provider key
+
+### 1. Clone & Install Dependencies
 ```bash
 git clone https://github.com/your-username/KSEMO.git
 cd KSEMO
 
-
 pnpm install
 ```
 
-
-**Environment Configuration**
-
-
+### 2. Configure Environment Variables
 Create a `.env` file in the project root:
 
+```env
+# Server & Authentication
+PORT=3000
+JWT_SECRET=your-secure-jwt-secret-key-min-32-chars
 
-```
-JWT_SECRET=your-jwt-secret
-SUPABASE_URL=your-supabase-url
+# Supabase Database (Optional for Production)
+SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_ANON_KEY=your-supabase-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
-LLM_BASE_URL=your-llm-base-url
-GEMINI_API_KEY=your-llm-api-key
+
+# AI / LLM Configuration
+LLM_BASE_URL=https://generativelanguage.googleapis.com
+GEMINI_API_KEY=your-gemini-api-key
+
+# Google OAuth (Optional)
 GOOGLE_CLIENT_ID=your-google-client-id
 GOOGLE_CLIENT_SECRET=your-google-client-secret
-GOOGLE_OAUTH_REDIRECT_URI=your-oauth-redirect-uri
-SMTP_USER=your-smtp-user
+GOOGLE_OAUTH_REDIRECT_URI=http://localhost:3000/api/auth/google/callback
+
+# SMTP Email Service (Optional for sharing & password reset)
+SMTP_USER=your-smtp-username
 SMTP_PASS=your-smtp-password
-SMTP_FROM=your-smtp-sender
-VITE_APP_ID=your-app-identifier
+SMTP_FROM=noreply@ksemo.ai
 ```
 
+### 3. Initialize Database Schema (Supabase)
+Execute the SQL migrations found in the `supabase-schema/` directory within the Supabase SQL editor to set up tables, triggers, and Row Level Security (RLS) policies.
 
-**Initialize the Database**
-
-
-Apply the database schema in the `supabase-schema` folder to your Supabase project. The schema includes all tables, row-level security policies, search functions, and triggers.
-
-
-
-**Start the Application**
-
-
+### 4. Run Development Server
 ```bash
 pnpm dev
 ```
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
+---
 
-The application will be available at `http://localhost:3000`. When no database is configured, the platform runs on a built-in in-memory store with a demo account so you can try everything immediately.
+## Usage Guide
 
+| Action | Steps |
+| :--- | :--- |
+| **Start Chatting** | Type any query into the central prompt box or click the microphone to dictate. |
+| **Create Documents** | Click the `+` button in the composer &rarr; select **Create Files** &rarr; choose PDF, Word, Excel, PowerPoint, or Text. |
+| **Hands-Free Voice** | Click the audio visualizer icon in the chat composer to open Voice Mode with real-time speech synthesis. |
+| **Temporary Incognito Mode** | Toggle temporary chat mode to conduct private, unlogged conversational sessions. |
+| **Manage File Library** | Navigate to `Library` from the sidebar to upload documents, preview assets, and organize favorites. |
+| **Full-Text Search** | Navigate to `Search` to query conversation history and message logs by keyword and date filters. |
+| **Share Conversation** | Open conversation settings &rarr; generate a public link or send directly via email. |
 
-<br/>
+---
 
+## NPM Scripts
 
-## Usage
+```bash
+pnpm dev      # Start development server with hot reload
+pnpm build    # Build production client (Vite) and bundle backend (esbuild)
+pnpm start    # Run production build from dist/index.js
+pnpm check    # Run TypeScript static type checking
+pnpm format   # Format entire codebase with Prettier
+pnpm test     # Run test suite with Vitest
+```
 
-
-Once the application is running, sign in to reach the main chat interface.
-
-
-**Create an Account**
-
-
-Register with your email and password or sign in with Google. This gives you access to the full platform — conversations, document generation, memory, file library, and the AI assistant.
-
-
-**Start a Conversation**
-
-
-Type a message and press Enter. The assistant responds in real time. Your conversation is saved automatically and titled for you.
-
-
-**Generate Documents**
-
-
-Open the plus menu in the composer and choose PDF, Word, Excel, PowerPoint, or Text. Describe what you need and download the generated file.
-
-
-**Upload Files**
-
-
-Open the Library workspace to upload documents and browse them in grid or list view. Attach any file to a conversation to give the assistant its content as context.
-
-
-**Use the AI Assistant**
-
-
-Hold the microphone to speak your message, or enter voice mode for a full hands-free conversation with the assistant. Subtitles display during responses.
-
-
-**Manage Your Conversations**
-
-
-Use the sidebar to pin, archive, rename, duplicate, export, or delete conversations. Search all your messages with the search shortcut, and revisit any older version of an edited message.
-
-
-**Share Conversations**
-
-
-Open the share dialog on any conversation to generate a public link or send it by email. Recipients can view the full conversation in a read-only format.
-
-
-**Configure Settings**
-
-
-Open Settings to manage your account, change your password, choose your AI model and persona, add custom instructions, adjust speech settings, switch themes, and review your stored memories. Use the Data tab to export or delete your account and all associated data.
-
-
-<br/>
-
+---
 
 ## License
 
-
-MIT
-
+This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
 
 <br/>
 
-
 <div align="center">
-  <sub>KSEMO</sub>
+  <sub>Designed & Developed for <strong>KSEMO</strong></sub>
   <br/>
-  <sub>&copy; 2026</sub>
+  <sub>&copy; 2026 KSEMO Platform. All rights reserved.</sub>
 </div>
