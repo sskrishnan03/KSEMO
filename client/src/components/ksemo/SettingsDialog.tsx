@@ -479,31 +479,33 @@ export const SettingsDialog = memo(function SettingsDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {/* Dedicated Mobile Header Bar — compact, no search, so the options and
-            content get the space */}
-        <div className="flex h-11 shrink-0 items-center justify-between border-b border-border bg-card px-3 md:hidden">
-          <div className="flex items-center gap-2">
-            <Settings2 className="size-4 text-muted-foreground" />
-            <span className="text-sm font-semibold tracking-[-0.02em] text-foreground">
-              Settings
-            </span>
+        {/* Mobile top panel — mirrors the laptop sidebar: the same background, the
+            same title, the same search bar, and the same option buttons with
+            the same hover and active states */}
+        <div className="shrink-0 border-b border-border bg-sidebar md:hidden">
+          <div className="flex h-11 items-center justify-between gap-2 px-3">
+            <div className="flex min-w-0 items-center gap-2">
+              <Settings2 className="size-4 shrink-0 text-muted-foreground" />
+              <span className="truncate text-sm font-semibold tracking-[-0.02em]">
+                Settings
+              </span>
+            </div>
+            <DialogPrimitive.Close asChild>
+              <button
+                type="button"
+                className="flex size-7 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                aria-label="Close settings"
+              >
+                <X className="size-4" />
+              </button>
+            </DialogPrimitive.Close>
           </div>
-          <DialogPrimitive.Close asChild>
-            <button
-              type="button"
-              className="flex size-7 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-              aria-label="Close settings"
-            >
-              <X className="size-4" />
-            </button>
-          </DialogPrimitive.Close>
-        </div>
-
-        {/* Compact settings options row on mobile */}
-        <div className="shrink-0 border-b border-border bg-sidebar px-3 py-2 md:hidden">
+          <div className="px-3 pb-1">
+            <SettingsSearch onSelect={changeTab} />
+          </div>
           <nav
             aria-label="Settings navigation"
-            className="flex items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            className="flex items-center gap-1 overflow-x-auto px-3 pt-1 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           >
             {settingsNavItems.map(item => {
               const Icon = item.icon;
@@ -514,13 +516,13 @@ export const SettingsDialog = memo(function SettingsDialog({
                   type="button"
                   onClick={() => changeTab(item.id)}
                   aria-current={active ? "page" : undefined}
-                  className={`flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors outline-none focus-visible:ring-0 focus-visible:outline-none active:scale-[0.98] ${
+                  className={`flex shrink-0 items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm transition-colors outline-none focus-visible:ring-0 focus-visible:outline-none ${
                     active
-                      ? "bg-foreground text-background shadow-sm"
-                      : "bg-accent/60 text-muted-foreground hover:bg-accent hover:text-foreground"
+                      ? "bg-accent font-medium text-foreground"
+                      : "text-muted-foreground hover:bg-accent hover:text-foreground"
                   }`}
                 >
-                  <Icon className="size-3.5 shrink-0" />
+                  <Icon className="size-4 shrink-0" />
                   {item.label}
                 </button>
               );
