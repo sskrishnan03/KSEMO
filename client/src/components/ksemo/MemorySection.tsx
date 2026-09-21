@@ -59,11 +59,11 @@ export function MemorySection() {
       </div>
 
       {loadFailed && (
-        <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-3.5">
+        <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-4">
           <p className="text-sm font-medium text-destructive">
             Memory couldn't be loaded
           </p>
-          <p className="mt-0.5 text-xs text-muted-foreground">
+          <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
             KSEMO couldn't reach the memory store. Check that your database is
             reachable and that the{" "}
             <code className="rounded bg-muted px-1 py-0.5">
@@ -78,53 +78,49 @@ export function MemorySection() {
         </div>
       )}
 
-      <div className="flex w-full items-center justify-between gap-3 rounded-xl border border-border p-3.5">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <p className="text-sm font-medium">Memory</p>
-            {settingsBusy && (
-              <Loader2 className="size-3 animate-spin text-muted-foreground" />
-            )}
+      <div className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card">
+        <div className="flex w-full items-center gap-3 px-4 py-3.5">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <p className="truncate text-sm font-medium">Memory</p>
+              {settingsBusy && (
+                <Loader2 className="size-3 animate-spin text-muted-foreground" />
+              )}
+            </div>
+            <p className="mt-0.5 truncate text-xs text-muted-foreground">
+              {memoryEnabled
+                ? "On — KSEMO remembers facts from your conversations automatically"
+                : "Off — no conversations are analyzed or remembered right now"}
+            </p>
           </div>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            {memoryEnabled
-              ? "On — KSEMO remembers facts from your conversations automatically"
-              : "Off — no conversations are analyzed or remembered right now"}
-          </p>
+          <Switch
+            checked={memoryEnabled}
+            disabled={settingsBusy}
+            onCheckedChange={next => {
+              setOptimisticEnabled(next);
+              settingsMutation.mutate({ memoryEnabled: next });
+            }}
+            aria-label="Toggle memory"
+          />
         </div>
-        <Switch
-          checked={memoryEnabled}
-          disabled={settingsBusy}
-          onCheckedChange={next => {
-            setOptimisticEnabled(next);
-            settingsMutation.mutate({ memoryEnabled: next });
-          }}
-          aria-label="Toggle memory"
-        />
       </div>
 
-      {!memoryEnabled ? (
-        <div className="rounded-xl border border-border bg-muted/40 p-3.5">
-          <p className="text-sm font-medium">Memory is off</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            New conversations are not analyzed and existing memories are not
-            used in your replies. Turn on Memory to start remembering.
-          </p>
-        </div>
-      ) : (
-        <div className="rounded-xl border border-border bg-muted/40 p-3.5">
-          <p className="text-sm font-medium">
-            {memoryCount === 0
+      <div className="rounded-2xl border border-border bg-card px-4 py-3.5">
+        <p className="text-sm font-medium">
+          {!memoryEnabled
+            ? "Memory is off"
+            : memoryCount === 0
               ? "Nothing saved yet"
               : `${memoryCount} saved ${memoryCount === 1 ? "memory" : "memories"}`}
-          </p>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            {memoryCount === 0
+        </p>
+        <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
+          {!memoryEnabled
+            ? "New conversations are not analyzed and existing memories are not used in your replies. Turn on Memory to start remembering."
+            : memoryCount === 0
               ? "After your next conversation, KSEMO will remember the important facts automatically and use them in future replies."
               : "These memories are used automatically when they are relevant to a conversation. Turn Memory off at any time to stop saving and using them."}
-          </p>
-        </div>
-      )}
+        </p>
+      </div>
     </div>
   );
 }

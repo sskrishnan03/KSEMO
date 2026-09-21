@@ -528,6 +528,22 @@ class InMemoryStore {
     return count;
   }
 
+  async archiveAllConversationsForUser(userId: number): Promise<number> {
+    let count = 0;
+    const now = new Date();
+    for (const conv of this.conversations.values()) {
+      if (conv.userId !== userId || conv.deletedAt !== null || conv.isArchived) {
+        continue;
+      }
+      conv.isArchived = true;
+      conv.isPinned = false;
+      conv.updatedAt = now;
+      count++;
+    }
+    if (count > 0) this.requestPersist();
+    return count;
+  }
+
   async moveConversationToTrash(
     id: string,
     userId: number

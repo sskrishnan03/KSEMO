@@ -30,26 +30,19 @@ import { trpc } from "@/lib/trpc";
 import { createPublicConversationUrl } from "@/lib/ksemoInteraction";
 import { ConfirmDeleteDialog } from "./ConfirmDeleteDialog";
 import {
-  Archive,
   ArchiveRestore,
   ArrowLeft,
   Brain,
   Bug,
-  CalendarDays,
   Check,
   Copy,
-  ExternalLink,
   HelpCircle,
-  KeyRound,
   Lightbulb,
-  Link2,
   LogOut,
-  Mail,
   MessageSquare,
   Palette,
   Search,
   ShieldCheck,
-  ShieldOff,
   Settings2,
   Star,
   Trash2,
@@ -176,6 +169,11 @@ const settingsSearchIndex: Array<{
   {
     tab: "data",
     label: "Archived chats",
+    hint: "Data Control",
+  },
+  {
+    tab: "data",
+    label: "Archive all chats",
     hint: "Data Control",
   },
   {
@@ -396,6 +394,7 @@ export const SettingsDialog = memo(function SettingsDialog({
     }
   }, [initialTab, open]);
   const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
+  const [confirmArchiveAll, setConfirmArchiveAll] = useState(false);
   const [confirmDeleteAccount, setConfirmDeleteAccount] = useState(false);
   const utils = trpc.useUtils();
   const removeAllMutation = trpc.conversation.removeAll.useMutation({
@@ -404,6 +403,13 @@ export const SettingsDialog = memo(function SettingsDialog({
       setConfirmDeleteAll(false);
       onOpenChange(false);
       onAllChatsDeleted();
+    },
+    onError: () => {},
+  });
+  const archiveAllMutation = trpc.conversation.archiveAll.useMutation({
+    onSuccess: () => {
+      utils.conversation.list.invalidate();
+      setConfirmArchiveAll(false);
     },
     onError: () => {},
   });
@@ -556,6 +562,7 @@ export const SettingsDialog = memo(function SettingsDialog({
                   <DataSection
                     onOpenArchived={() => setDataWorkspace("archived")}
                     onOpenShared={() => setDataWorkspace("shared")}
+                    onArchiveAll={() => setConfirmArchiveAll(true)}
                     onDeleteAll={() => setConfirmDeleteAll(true)}
                   />
                 ) : dataWorkspace === "archived" ? (
@@ -592,6 +599,16 @@ export const SettingsDialog = memo(function SettingsDialog({
         onConfirm={() => removeAllMutation.mutate()}
       />
       <ConfirmDeleteDialog
+        open={confirmArchiveAll}
+        onOpenChange={setConfirmArchiveAll}
+        title="Archive all chats?"
+        description="Every active conversation will be archived and hidden from your sidebar. You can restore any of them later."
+        confirmLabel="Archive all"
+        busyLabel="Archiving…"
+        busy={archiveAllMutation.isPending}
+        onConfirm={() => archiveAllMutation.mutate()}
+      />
+      <ConfirmDeleteDialog
         open={confirmDeleteAccount}
         onOpenChange={setConfirmDeleteAccount}
         title="Delete account?"
@@ -604,6 +621,69 @@ export const SettingsDialog = memo(function SettingsDialog({
     </Dialog>
   );
 });
+
+const actionBtnClass =
+  "inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-foreground px-2.5 py-1.5 text-[11px] font-semibold text-background transition-opacity hover:opacity-90 disabled:pointer-events-none disabled:opacity-60 focus-visible:outline-none";
+
+const pillClass =
+  "shrink-0 rounded-full border border-border bg-muted/60 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground";
+
+// Shared section heading (title + subtitle) used across the settings tabs.
+function SectionHeading({ title, subtitle }: { title: string; subtitle?: string }) {
+  return (
+    <div>
+      <h3 className="text-base font-semibold tracking-[-0.02em]">{title}</h3>
+      {subtitle && (
+        <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
+      )}
+    </div>
+  );
+}
+
+// One rounded card holding divide-y rows, matching the settings list style.
+function RowGroup({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card">
+      {children}
+    </div>
+  );
+}
+
+function SettingRow({
+  title,
+  description,
+  action,
+  danger = false,
+}: {
+  title: string;
+  description?: string;
+  action?: React.ReactNode;
+  danger?: boolean;
+}) {
+  return (
+    <div
+      className={`flex w-full items-center gap-3 px-4 py-3.5 ${
+        danger && "bg-destructive/[0.04]"
+      }`}
+    >
+      <div className="min-w-0 flex-1">
+        <p
+          className={`truncate text-sm font-medium ${
+            danger && "text-destructive"
+          }`}
+        >
+          {title}
+        </p>
+        {description && (
+          <p className="mt-0.5 truncate text-xs text-muted-foreground">
+            {description}
+          </p>
+        )}
+      </div>
+      {action}
+    </div>
+  );
+}
 
 function AccountSection({
   user,
@@ -667,100 +747,57 @@ function AccountSection({
 
   return (
     <div className="space-y-4">
-      <div>
-        <h3 className="text-base font-semibold tracking-[-0.02em]">
-          Your account
-        </h3>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Manage your account information.
-        </p>
-      </div>
+      <SectionHeading
+        title="Your account"
+        subtitle="Manage your account information."
+      />
 
       <div className="space-y-2">
-        {/* Full name */}
-        <div className="rounded-xl border border-border p-4">
-          <div className="flex items-center gap-3">
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-foreground text-sm font-bold text-background">
-              {displayName.charAt(0).toUpperCase()}
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium">Full name</p>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                Represents you across KSEMO
-              </p>
+        <RowGroup>
+          <div className="px-4 py-4">
+            <div className="flex items-center gap-3">
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-foreground text-sm font-bold text-background">
+                {displayName.charAt(0).toUpperCase()}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium">Full name</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Represents you across KSEMO
+                </p>
+              </div>
             </div>
+            <Input
+              id="account-full-name"
+              value={name}
+              maxLength={120}
+              onChange={e => setName(e.target.value)}
+              placeholder="Your name"
+              className="mt-3 h-9 rounded-lg text-sm"
+            />
+            <p className="mt-1.5 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+              {saveState === "saving" ? (
+                <>
+                  <Zap className="size-3" />
+                  Saving…
+                </>
+              ) : saveState === "saved" ? (
+                <>
+                  <Check className="size-3 text-emerald-600 dark:text-emerald-400" />
+                  Saved
+                </>
+              ) : (
+                "Enter your name to update it"
+              )}
+            </p>
           </div>
-          <Input
-            id="account-full-name"
-            value={name}
-            maxLength={120}
-            onChange={e => setName(e.target.value)}
-            placeholder="Your name"
-            className="mt-3 h-9 rounded-lg text-sm"
+          <SettingRow
+            title="Email"
+            description={user.email || "—"}
           />
-          <p className="mt-1.5 flex items-center gap-1.5 text-[11px] text-muted-foreground">
-            {saveState === "saving" ? (
-              <>
-                <Zap className="size-3" />
-                Saving…
-              </>
-            ) : saveState === "saved" ? (
-              <>
-                <Check className="size-3 text-emerald-600 dark:text-emerald-400" />
-                Saved
-              </>
-            ) : (
-              "Enter your name to update it"
-            )}
-          </p>
-        </div>
+          <SettingRow title="Account created" description={createdLabel} />
+          <SettingRow title="Sign-in method" description={signInMethod} />
+        </RowGroup>
 
-        {/* Email */}
-        <div className="rounded-xl border border-border p-4">
-          <div className="flex items-center gap-3">
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted">
-              <Mail className="size-4 text-muted-foreground" />
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium">Email</p>
-              <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                {user.email || "—"}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Account created */}
-        <div className="rounded-xl border border-border p-4">
-          <div className="flex items-center gap-3">
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted">
-              <CalendarDays className="size-4 text-muted-foreground" />
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium">Account created</p>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                {createdLabel}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Sign-in method */}
-        <div className="rounded-xl border border-border p-4">
-          <div className="flex items-center gap-3">
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted">
-              <KeyRound className="size-4 text-muted-foreground" />
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium">Sign-in method</p>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                {signInMethod}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Delete account */}
         <div className="flex w-full items-center justify-between gap-3 rounded-xl border border-destructive/30 bg-destructive/5 p-3.5">
           <div className="min-w-0">
             <p className="text-sm font-medium text-destructive">
@@ -774,7 +811,7 @@ function AccountSection({
             type="button"
             disabled={deleteBusy}
             onClick={onDeleteAccount}
-            className="shrink-0 inline-flex items-center rounded-lg bg-destructive px-3 py-1.5 text-[11px] font-semibold text-destructive-foreground transition-opacity hover:opacity-90 disabled:pointer-events-none disabled:opacity-60"
+            className="shrink-0 rounded-lg bg-destructive px-3 py-1.5 text-[11px] font-semibold text-destructive-foreground transition-opacity hover:opacity-90 disabled:pointer-events-none disabled:opacity-60"
           >
             {deleteBusy ? "Deleting…" : "Delete Account"}
           </button>
@@ -791,19 +828,14 @@ function SecuritySection({ user }: { user: User }) {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h3 className="text-base font-semibold tracking-[-0.02em]">Security</h3>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Manage your password and account security.
-        </p>
-      </div>
+      <SectionHeading
+        title="Security"
+        subtitle="Manage your password and account security."
+      />
 
-      <div className="space-y-2">
-        <div className="rounded-xl border border-border p-4">
+      <RowGroup>
+        <div className="px-4 py-4">
           <div className="flex items-center gap-3">
-            <span className="flex size-9 items-center justify-center rounded-lg bg-muted">
-              <KeyRound className="size-4 text-muted-foreground" />
-            </span>
             <div className="min-w-0 flex-1">
               <p className="text-sm font-medium">Password</p>
               <p className="mt-0.5 text-xs text-muted-foreground">
@@ -816,13 +848,11 @@ function SecuritySection({ user }: { user: User }) {
               onClick={() => {
                 window.location.href = "/settings/password";
               }}
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-foreground px-3.5 py-2 text-xs font-semibold text-background transition-opacity hover:opacity-90 disabled:pointer-events-none disabled:opacity-50"
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-foreground px-2.5 py-1.5 text-[11px] font-semibold text-background transition-opacity hover:opacity-90 disabled:pointer-events-none disabled:opacity-50"
             >
-              <KeyRound className="size-3.5" />
               Reset password
             </button>
           </div>
-
           {isGoogle ? (
             <div className="mt-3.5 rounded-lg bg-muted/60 px-3.5 py-3 text-xs text-muted-foreground">
               <p>
@@ -840,56 +870,30 @@ function SecuritySection({ user }: { user: User }) {
             </div>
           )}
         </div>
-
-        <div className="rounded-xl border border-border p-4">
-          <div className="flex items-center gap-3">
-            <span className="flex size-9 items-center justify-center rounded-lg bg-muted">
-              <ShieldOff className="size-4 text-muted-foreground" />
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium">Two-factor authentication</p>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                Add an extra layer of security to your account.
-              </p>
-            </div>
-            <span className="rounded-full bg-muted px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-              Coming soon
-            </span>
+        <div className="flex items-center gap-3 px-4 py-3.5">
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium">Two-factor authentication</p>
+            <p className="mt-0.5 truncate text-xs text-muted-foreground">
+              Add an extra layer of security to your account.
+            </p>
           </div>
+          <span className={pillClass}>Coming soon</span>
         </div>
-
-        <div className="rounded-xl border border-border p-4">
-          <div className="flex items-center gap-3">
-            <span className="flex size-9 items-center justify-center rounded-lg bg-muted">
-              <ShieldCheck className="size-4 text-muted-foreground" />
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium">Session</p>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                You are signed in on this device. Sessions expire after 1 year.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="rounded-xl border border-border p-4">
-          <div className="flex items-center gap-3">
-            <span className="flex size-9 items-center justify-center rounded-lg bg-muted">
-              <ExternalLink className="size-4 text-muted-foreground" />
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium">Login method</p>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                {isGoogle
-                  ? "Connected via Google OAuth."
-                  : hasPassword
-                    ? "Email and password authentication."
-                    : "No sign-in method recorded."}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
+        <SettingRow
+          title="Session"
+          description="You are signed in on this device. Sessions expire after 1 year."
+        />
+        <SettingRow
+          title="Login method"
+          description={
+            isGoogle
+              ? "Connected via Google OAuth."
+              : hasPassword
+                ? "Email and password authentication."
+                : "No sign-in method recorded."
+          }
+        />
+      </RowGroup>
     </div>
   );
 }
@@ -1264,11 +1268,8 @@ function AppearanceSection() {
 
   return (
     <div className="space-y-5">
-      <div>
-        <h3 className="text-base font-semibold tracking-[-0.02em]">
-          Appearance
-        </h3>
-      </div>
+      <SectionHeading title="Appearance" />
+
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
         <p className="w-20 shrink-0 pt-1 text-sm font-medium text-muted-foreground">
           Theme
@@ -1343,10 +1344,12 @@ function AppearanceSection() {
 function DataSection({
   onOpenArchived,
   onOpenShared,
+  onArchiveAll,
   onDeleteAll,
 }: {
   onOpenArchived: () => void;
   onOpenShared: () => void;
+  onArchiveAll: () => void;
   onDeleteAll: () => void;
 }) {
   const exportQuery = trpc.workspace.data.exportAll.useQuery(undefined, {
@@ -1380,88 +1383,87 @@ function DataSection({
     }
   };
 
-  const manageButtonClass =
-    "shrink-0 rounded-lg bg-foreground px-3 py-1.5 text-[11px] font-semibold text-background transition-opacity hover:opacity-90 focus-visible:outline-none";
-
   return (
     <div className="space-y-4">
-      <div>
-        <h3 className="text-base font-semibold tracking-[-0.02em]">
-          Data Control
-        </h3>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Manage your conversations, uploaded files, and personal data.
-        </p>
-      </div>
+      <SectionHeading
+        title="Data Control"
+        subtitle="Manage your conversations, uploaded files, and personal data."
+      />
 
       <div className="space-y-2">
-        <div className="flex w-full items-center justify-between gap-3 rounded-xl border border-border p-3.5">
+        <RowGroup>
+          <SettingRow
+            title="Archived chats"
+            description="Hidden from your sidebar, kept safe"
+            action={
+              <button
+                type="button"
+                onClick={onOpenArchived}
+                className={actionBtnClass}
+              >
+                Manage
+              </button>
+            }
+          />
+          <SettingRow
+            title="Archive all chats"
+            description="Archive every active conversation at once"
+            action={
+              <button
+                type="button"
+                onClick={onArchiveAll}
+                className={actionBtnClass}
+              >
+                Archive all
+              </button>
+            }
+          />
+          <SettingRow
+            title="Shared chats"
+            description="Chats you made public — copy a link or stop sharing"
+            action={
+              <button
+                type="button"
+                onClick={onOpenShared}
+                className={actionBtnClass}
+              >
+                Manage
+              </button>
+            }
+          />
+          <SettingRow
+            title="Download my data"
+            description="Export all of your conversations, files, and account data as a JSON file"
+            action={
+              <button
+                type="button"
+                disabled={exportBusy}
+                onClick={() => void handleExport()}
+                className={actionBtnClass}
+              >
+                {exportBusy ? "Exporting…" : "Export"}
+              </button>
+            }
+          />
+        </RowGroup>
+
+        <div className="flex w-full items-center justify-between gap-3 rounded-xl border border-destructive/30 bg-destructive/5 p-3.5">
           <div className="min-w-0">
-            <p className="text-sm font-medium">Archived chats</p>
+            <p className="text-sm font-medium text-destructive">
+              Delete all chats
+            </p>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              Hidden from your sidebar, kept safe
+              Permanent, cannot be undone
             </p>
           </div>
           <button
             type="button"
-            onClick={onOpenArchived}
-            className={manageButtonClass}
+            onClick={onDeleteAll}
+            className="shrink-0 rounded-lg bg-destructive px-3 py-1.5 text-[11px] font-semibold text-destructive-foreground transition-opacity hover:opacity-90 focus-visible:outline-none"
           >
-            Manage
+            Delete all
           </button>
         </div>
-
-        <div className="flex w-full items-center justify-between gap-3 rounded-xl border border-border p-3.5">
-          <div className="min-w-0">
-            <p className="text-sm font-medium">Shared chats</p>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              Chats you made public — copy a link or stop sharing
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onOpenShared}
-            className={manageButtonClass}
-          >
-            Manage
-          </button>
-        </div>
-
-        <div className="flex w-full items-center justify-between gap-3 rounded-xl border border-border p-3.5">
-          <div className="min-w-0">
-            <p className="text-sm font-medium">Download my data</p>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              Export all of your conversations, files, and account data as a
-              JSON file
-            </p>
-          </div>
-          <button
-            type="button"
-            disabled={exportBusy}
-            onClick={() => void handleExport()}
-            className="shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-foreground px-3 py-1.5 text-[11px] font-semibold text-background transition-opacity hover:opacity-90 disabled:pointer-events-none disabled:opacity-60 focus-visible:outline-none"
-          >
-            {exportBusy ? "Exporting…" : "Export"}
-          </button>
-        </div>
-      </div>
-
-      <div className="flex w-full items-center justify-between gap-3 rounded-xl border border-destructive/30 bg-destructive/5 p-3.5">
-        <div className="min-w-0">
-          <p className="text-sm font-medium text-destructive">
-            Delete all chats
-          </p>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            Permanent, cannot be undone
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={onDeleteAll}
-          className="shrink-0 rounded-lg bg-destructive px-3 py-1.5 text-[11px] font-semibold text-destructive-foreground transition-opacity hover:opacity-90 focus-visible:outline-none"
-        >
-          Delete all
-        </button>
       </div>
     </div>
   );
@@ -1497,12 +1499,10 @@ function FeedbackSection() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h3 className="text-base font-semibold tracking-[-0.02em]">Feedback</h3>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Share ideas, report bugs, or ask questions.
-        </p>
-      </div>
+      <SectionHeading
+        title="Feedback"
+        subtitle="Share ideas, report bugs, or ask questions."
+      />
       {submitted ? (
         <div className="rounded-xl border border-border p-6 text-center">
           <p className="text-sm font-medium">Thank you for your feedback!</p>
@@ -1519,60 +1519,64 @@ function FeedbackSection() {
           </Button>
         </div>
       ) : (
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label className="text-sm">Category</Label>
-            <div className="grid grid-cols-2 gap-2">
-              {feedbackCategories.map(cat => {
-                const Icon = cat.icon;
-                const active = category === cat.id;
-                return (
-                  <button
-                    key={cat.id}
-                    onClick={() =>
-                      setCategory(prev => (prev === cat.id ? "" : cat.id))
-                    }
-                    className={`flex items-center gap-2 rounded-xl border p-2.5 text-left text-sm transition-colors ${
-                      active
-                        ? "border-transparent bg-accent font-medium text-foreground"
-                        : "border-border text-muted-foreground hover:bg-accent hover:text-foreground"
-                    }`}
-                  >
-                    <Icon className="size-4 shrink-0" />
-                    {cat.label}
-                    {active && (
-                      <Check className="ml-auto size-4 shrink-0 text-foreground" />
-                    )}
-                  </button>
-                );
-              })}
+        <RowGroup>
+          <div className="px-4 py-4">
+            <div className="space-y-2">
+              <Label className="text-sm">Category</Label>
+              <div className="grid grid-cols-2 gap-2">
+                {feedbackCategories.map(cat => {
+                  const Icon = cat.icon;
+                  const active = category === cat.id;
+                  return (
+                    <button
+                      key={cat.id}
+                      onClick={() =>
+                        setCategory(prev => (prev === cat.id ? "" : cat.id))
+                      }
+                      className={`flex items-center gap-2 rounded-xl border p-2.5 text-left text-sm transition-colors ${
+                        active
+                          ? "border-transparent bg-accent font-medium text-foreground"
+                          : "border-border text-muted-foreground hover:bg-accent hover:text-foreground"
+                      }`}
+                    >
+                      <Icon className="size-4 shrink-0" />
+                      {cat.label}
+                      {active && (
+                        <Check className="ml-auto size-4 shrink-0 text-foreground" />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="feedback-text" className="text-sm">
-              Your feedback
-            </Label>
-            <Textarea
-              id="feedback-text"
-              value={feedbackText}
-              onChange={e => setFeedbackText(e.target.value)}
-              maxLength={2000}
-              className="min-h-24 max-h-40 resize-none overflow-y-auto rounded-xl border border-border text-sm"
-              placeholder={
-                category === "bug"
-                  ? "Describe the issue: what happened, what you expected, and steps to reproduce…"
-                  : category === "idea"
-                    ? "Describe the feature you'd like to see and why it would be useful…"
-                    : category === "question"
-                      ? "Ask us anything or share what you'd like to know about KSEMO…"
-                      : "Share your thoughts, praise, or ideas for improving KSEMO…"
-              }
-            />
-            <p className="text-right text-[11px] text-muted-foreground">
-              {feedbackText.length}/2000
-            </p>
+          <div className="px-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="feedback-text" className="text-sm">
+                Your feedback
+              </Label>
+              <Textarea
+                id="feedback-text"
+                value={feedbackText}
+                onChange={e => setFeedbackText(e.target.value)}
+                maxLength={2000}
+                className="min-h-24 max-h-40 resize-none overflow-y-auto rounded-xl border border-border text-sm"
+                placeholder={
+                  category === "bug"
+                    ? "Describe the issue: what happened, what you expected, and steps to reproduce…"
+                    : category === "idea"
+                      ? "Describe the feature you'd like to see and why it would be useful…"
+                      : category === "question"
+                        ? "Ask us anything or share what you'd like to know about KSEMO…"
+                        : "Share your thoughts, praise, or ideas for improving KSEMO…"
+                }
+              />
+              <p className="text-right text-[11px] text-muted-foreground">
+                {feedbackText.length}/2000
+              </p>
+            </div>
           </div>
-          <div className="flex justify-end">
+          <div className="flex justify-end px-4 py-3.5">
             <Button
               size="sm"
               onClick={handleSubmit}
@@ -1584,7 +1588,7 @@ function FeedbackSection() {
               {sendFeedback.isPending ? "Sending…" : "Send feedback"}
             </Button>
           </div>
-        </div>
+        </RowGroup>
       )}
     </div>
   );
@@ -1647,69 +1651,69 @@ function ArchivedChatsWorkspace({
             </p>
           </div>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto p-3 md:p-4">
-            {chatsQuery.isLoading ? (
-              <Loading className="py-6" />
-            ) : !conversations.length ? (
-              <div className="py-8 text-center">
-                <Archive className="mx-auto size-6 text-muted-foreground" />
-                <p className="mt-3 text-sm font-medium">Nothing archived</p>
-              </div>
-            ) : (
-              <ul className="space-y-1.5">
-                {conversations.map(c => (
-                  <li key={c.id}>
-                    <div className="group flex items-center gap-2 rounded-xl border border-border px-3 py-2 transition-colors hover:bg-accent">
-                      <button
-                        onClick={() => onOpenChat(c.id)}
-                        className="min-w-0 flex-1 rounded-lg py-0.5 text-left focus-visible:ring-0 focus-visible:outline-none"
+        <div className="min-h-0 flex-1 overflow-y-auto p-4 md:p-5">
+          {chatsQuery.isLoading ? (
+            <Loading className="py-6" />
+          ) : !conversations.length ? (
+            <div className="grid min-h-56 place-items-center rounded-2xl border border-dashed border-border bg-muted/20 p-7 text-center">
+              <p className="text-sm font-medium">Nothing archived</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card">
+              {conversations.map(c => (
+                <div
+                  key={c.id}
+                  className="flex items-center gap-2 px-4 py-3 transition-colors hover:bg-accent/60"
+                >
+                  <button
+                    onClick={() => onOpenChat(c.id)}
+                    className="min-w-0 flex-1 rounded-lg py-0.5 text-left focus-visible:ring-0 focus-visible:outline-none"
+                  >
+                    <p className="truncate text-[13px] font-medium">
+                      {c.title}
+                    </p>
+                    <p className="mt-0.5 text-[11px] text-muted-foreground">
+                      Archived
+                    </p>
+                  </button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label="Unarchive chat"
+                        className="size-8 shrink-0 rounded-lg text-muted-foreground transition-colors outline-none hover:bg-foreground/10 hover:text-foreground focus-visible:ring-0 focus-visible:outline-none"
+                        disabled={restorePending}
+                        onClick={() => restoreChat(c.id)}
                       >
-                        <p className="truncate text-[13px] font-medium">
-                          {c.title}
-                        </p>
-                        <p className="mt-0.5 text-[11px] text-muted-foreground">
-                          Archived
-                        </p>
-                      </button>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            aria-label="Unarchive chat"
-                            className="size-8 shrink-0 rounded-lg text-muted-foreground transition-colors outline-none hover:bg-foreground/10 hover:text-foreground focus-visible:ring-0 focus-visible:outline-none"
-                            disabled={restorePending}
-                            onClick={() => restoreChat(c.id)}
-                          >
-                            <ArchiveRestore className="size-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent side="bottom">Unarchive</TooltipContent>
-                      </Tooltip>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            aria-label="Delete chat"
-                            className="size-8 shrink-0 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                            disabled={deleteMutation.isPending}
-                            onClick={() =>
-                              setDeleteTarget({ id: c.id, title: c.title })
-                            }
-                          >
-                            <Trash2 className="size-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent side="bottom">Delete</TooltipContent>
-                      </Tooltip>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+                        <ArchiveRestore className="size-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">Unarchive</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label="Delete chat"
+                        className="size-8 shrink-0 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                        disabled={deleteMutation.isPending}
+                        onClick={() =>
+                          setDeleteTarget({ id: c.id, title: c.title })
+                        }
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">Delete</TooltipContent>
+                  </Tooltip>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
+      </div>
 
       <ConfirmDeleteDialog
         open={Boolean(deleteTarget)}
@@ -1798,90 +1802,90 @@ function SharedChatsWorkspace({
             </p>
           </div>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto p-3 md:p-4">
+        <div className="min-h-0 flex-1 overflow-y-auto p-4 md:p-5">
             {chatsQuery.isLoading ? (
               <Loading className="py-6" />
             ) : !conversations.length ? (
-              <div className="py-8 text-center">
-                <Link2 className="mx-auto size-6 text-muted-foreground" />
-                <p className="mt-3 text-sm font-medium">Nothing shared yet</p>
+              <div className="grid min-h-56 place-items-center rounded-2xl border border-dashed border-border bg-muted/20 p-7 text-center">
+                <p className="text-sm font-medium">Nothing shared yet</p>
               </div>
             ) : (
-              <ul className="space-y-1.5">
+              <div className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card">
                 {conversations.map(c => (
-                  <li key={c.id}>
-                    <div className="flex items-center gap-2 rounded-xl border border-border px-3 py-2 transition-colors hover:bg-accent">
-                      <button
-                        onClick={() => onOpenChat(c.id)}
-                        className="min-w-0 flex-1 rounded-lg py-0.5 text-left focus-visible:ring-0 focus-visible:outline-none"
-                      >
-                        <p className="truncate text-[13px] font-medium">
-                          {c.title}
-                        </p>
-                        <p className="mt-0.5 text-[11px] text-muted-foreground">
-                          Shared
-                        </p>
-                      </button>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            aria-label="Copy public link"
-                            className="size-8 shrink-0 rounded-lg text-muted-foreground transition-colors outline-none hover:bg-foreground/10 hover:text-foreground focus-visible:ring-0 focus-visible:outline-none"
-                            disabled={!c.shareToken || busy}
-                            onClick={() => copyLink(c.shareToken)}
-                          >
-                            <Copy className="size-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent side="bottom">
-                          Copy link
-                        </TooltipContent>
-                      </Tooltip>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            aria-label="Stop sharing"
-                            className="size-8 shrink-0 rounded-lg text-muted-foreground transition-colors outline-none hover:bg-foreground/10 hover:text-foreground focus-visible:ring-0 focus-visible:outline-none"
-                            disabled={busy}
-                            onClick={() =>
-                              unpublishMutation.mutate({
-                                id: c.id,
-                                isPublic: false,
-                              })
-                            }
-                          >
-                            <Unlink className="size-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent side="bottom">
-                          Stop sharing
-                        </TooltipContent>
-                      </Tooltip>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            aria-label="Delete chat"
-                            className="size-8 shrink-0 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                            disabled={busy}
-                            onClick={() =>
-                              setDeleteTarget({ id: c.id, title: c.title })
-                            }
-                          >
-                            <Trash2 className="size-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent side="bottom">Delete</TooltipContent>
-                      </Tooltip>
-                    </div>
-                  </li>
+                  <div
+                    key={c.id}
+                    className="flex items-center gap-2 px-4 py-3 transition-colors hover:bg-accent/60"
+                  >
+                    <button
+                      onClick={() => onOpenChat(c.id)}
+                      className="min-w-0 flex-1 rounded-lg py-0.5 text-left focus-visible:ring-0 focus-visible:outline-none"
+                    >
+                      <p className="truncate text-[13px] font-medium">
+                        {c.title}
+                      </p>
+                      <p className="mt-0.5 text-[11px] text-muted-foreground">
+                        Shared
+                      </p>
+                    </button>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label="Copy public link"
+                          className="size-8 shrink-0 rounded-lg text-muted-foreground transition-colors outline-none hover:bg-foreground/10 hover:text-foreground focus-visible:ring-0 focus-visible:outline-none"
+                          disabled={!c.shareToken || busy}
+                          onClick={() => copyLink(c.shareToken)}
+                        >
+                          <Copy className="size-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom">
+                        Copy link
+                      </TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label="Stop sharing"
+                          className="size-8 shrink-0 rounded-lg text-muted-foreground transition-colors outline-none hover:bg-foreground/10 hover:text-foreground focus-visible:ring-0 focus-visible:outline-none"
+                          disabled={busy}
+                          onClick={() =>
+                            unpublishMutation.mutate({
+                              id: c.id,
+                              isPublic: false,
+                            })
+                          }
+                        >
+                          <Unlink className="size-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom">
+                        Stop sharing
+                      </TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label="Delete chat"
+                          className="size-8 shrink-0 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                          disabled={busy}
+                          onClick={() =>
+                            setDeleteTarget({ id: c.id, title: c.title })
+                          }
+                        >
+                          <Trash2 className="size-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom">Delete</TooltipContent>
+                    </Tooltip>
+                  </div>
                 ))}
-              </ul>
+              </div>
             )}
           </div>
         </div>

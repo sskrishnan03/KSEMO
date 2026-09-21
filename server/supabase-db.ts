@@ -489,6 +489,23 @@ export async function deleteAllConversationsForUser(
   return Array.isArray(data) ? data.length : 0;
 }
 
+export async function archiveAllConversationsForUser(
+  userId: number
+): Promise<number> {
+  if (useMemoryFallback()) {
+    return inMemoryStore.archiveAllConversationsForUser(userId);
+  }
+  const { data, error } = await supabase
+    .from("conversations")
+    .update({ is_archived: true, is_pinned: false })
+    .eq("user_id", userId)
+    .eq("is_archived", false)
+    .is("deleted_at", null)
+    .select("id");
+  if (error) throwDb("archiveAllConversationsForUser", error);
+  return Array.isArray(data) ? data.length : 0;
+}
+
 export async function moveConversationToTrash(
   id: string,
   userId: number

@@ -64,4 +64,49 @@ describe("inMemoryStore durable persistence", () => {
     expect(fresh.getUserByOpenId).toBeDefined();
     expect(await fresh.getUserByOpenId(Array.from(fresh.users.values())[0].openId)).toBeDefined();
   });
+
+  it("archives every active conversation and leaves already-archived and trashed ones alone", async () => {
+    const base = path
+      .resolve(process.cwd(), "server", "inMemoryStore.ts")
+      .split(path.sep)
+      .join("/");
+    const url = "file:///" + (base.startsWith("/") ? base : "/" + base);
+
+    const { inMemoryStore } = await import(`${url}?archiveAllTest=1`);
+    const uid = Array.from(inMemoryStore.users.keys())[0];
+
+    const active = await inMemoryStore.createConversationForUser({
+      id: crypto.randomUUID(),
+      userId: uid,
+      conversationType: "text",
+    });
+    const alreadyArchived = await inMemoryStore.createConversationForUser({
+      id: crypto.randomUUID(),
+      userId: uid,
+      conversationType: "text",
+    });
+    await inMemoryStore.updateConversationForUser(alreadyArchived.id, uid, {
+      isArchived: true,
+    });
+    const trashed = await inMemoryStore.createConversationForUser({
+      id: crypto.randomUUID(),
+      userId: uid,
+      conversationType: "text",
+    });
+    await inMemoryStore.moveConversationToTrash(trashed.id, uid);
+
+    const archivedCount = await inMemoryStore.archiveAllConversationsForUser(uid);
+    expect(archivedCount).toBeGreaterThanOrEqual(1);
+
+    const activeList = await inMemoryStore.listConversationsForUser(uid, "active");
+    const archivedList = await inMemoryStore.listConversationsForUser(uid, "archived");
+    const trashList = await inMemoryStore.listConversationsForUser(uid, "trash");
+
+    expect(activeList).toHaveLength(0);
+    expect(archivedList.map(c => c.id)).toEqual(
+      expect.arrayContaining([active.id, alreadyArchived.id])
+    );
+    expect(trashList.map(c => c.id)).toEqual([trashed.id]);
+    expect(archivedList.find(c => c.id === active.id)?.isPinned).toBe(false);
+  });
 });
