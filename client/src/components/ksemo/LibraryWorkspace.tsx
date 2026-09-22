@@ -57,6 +57,7 @@ import React, {
   memo,
   useCallback,
   type ChangeEvent,
+  useLayoutEffect,
   useEffect,
   useMemo,
   useRef,
@@ -457,50 +458,18 @@ export function LibraryWorkspace({
             )}
           </div>
           <div className="flex items-center justify-between gap-1.5 sm:gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            <div
-              className="flex shrink-0 rounded-xl border border-border bg-card p-0.5 sm:p-1"
-              role="group"
-              aria-label="Filter Library"
-            >
-              <FilterButton
-                label="All"
-                active={filter === "all"}
-                onClick={() => setFilter("all")}
-              />
-              <FilterButton
-                label="Images"
-                active={filter === "images"}
-                onClick={() => setFilter("images")}
-              />
-              <FilterButton
-                label="Files"
-                active={filter === "files"}
-                onClick={() => setFilter("files")}
-              />
-              <FilterButton
-                label="Favorites"
-                active={filter === "favorites"}
-                onClick={() => setFilter("favorites")}
-              />
-            </div>
-            <div
-              className="flex shrink-0 rounded-xl border border-border bg-card p-0.5 sm:p-1"
-              role="group"
-              aria-label="Library view"
-            >
-              <ViewButton
-                label="Grid"
-                icon={<Grid2X2 className="size-3.5 sm:size-4" />}
-                active={view === "grid"}
-                onClick={() => setView("grid")}
-              />
-              <ViewButton
-                label="List"
-                icon={<List className="size-3.5 sm:size-4" />}
-                active={view === "list"}
-                onClick={() => setView("list")}
-              />
-            </div>
+            <SegmentedTags
+              description="Filter Library"
+              value={filter}
+              onChange={setFilter}
+              options={LIBRARY_FILTERS}
+            />
+            <SegmentedTags
+              description="Library view"
+              value={view}
+              onChange={setView}
+              options={LIBRARY_VIEWS}
+            />
           </div>
         </section>
 
@@ -802,54 +771,116 @@ export function LibraryWorkspace({
   );
 }
 
-function FilterButton({
-  label,
-  active,
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={cn(
-        "rounded-lg px-2.5 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm font-medium transition-colors",
-        active
-          ? "bg-foreground text-background"
-          : "text-muted-foreground hover:bg-accent hover:text-foreground"
-      )}
-    >
-      {label}
-    </button>
-  );
-}
-function ViewButton({
-  label,
-  icon,
-  active,
-  onClick,
-}: {
+const LIBRARY_FILTERS: readonly { value: LibraryFilter; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "images", label: "Images" },
+  { value: "files", label: "Files" },
+  { value: "favorites", label: "Favorites" },
+];
+
+const LIBRARY_VIEWS: readonly {
+  value: LibraryView;
   label: string;
   icon: React.ReactNode;
-  active: boolean;
-  onClick: () => void;
+}[] = [
+  {
+    value: "grid",
+    label: "Grid",
+    icon: <Grid2X2 className="size-3.5 sm:size-4" />,
+  },
+  {
+    value: "list",
+    label: "List",
+    icon: <List className="size-3.5 sm:size-4" />,
+  },
+];
+
+function SegmentedTags<T extends string>({
+  options,
+  value,
+  onChange,
+  description,
+}: {
+  options: readonly { value: T; label: string; icon?: React.ReactNode }[];
+  value: T;
+  onChange: (value: T) => void;
+  description: string;
 }) {
+  const trackRef = useRef<HTMLDivElement>(null);
+  const [thumb, setThumb] = useState<{ left: number; width: number } | null>(
+    null
+  );
+
+  const measure = useCallback(() => {
+    if (typeof window === "undefined") return;
+    const track = trackRef.current;
+    if (!track) return;
+    let target: HTMLElement | null = null;
+    for (const child of Array.from(track.children)) {
+      if (
+        child instanceof HTMLElement &&
+        child.getAttribute("data-value") === value
+      ) {
+        target = child;
+        break;
+      }
+    }
+    if (!target) return;
+    const trackRect = track.getBoundingClientRect();
+    const targetRect = target.getBoundingClientRect();
+    setThumb({
+      left: targetRect.left - trackRect.left - track.clientLeft,
+      width: targetRect.width,
+    });
+  }, [value]);
+
+  useLayoutEffect(() => {
+    measure();
+  }, [measure]);
+
+  useEffect(() => {
+    const onResize = () => measure();
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [measure]);
+
   return (
-    <button
-      onClick={onClick}
-      className={cn(
-        "flex items-center gap-1 sm:gap-1.5 rounded-lg px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm font-medium transition-colors",
-        active
-          ? "bg-foreground text-background"
-          : "text-muted-foreground hover:bg-accent hover:text-foreground"
-      )}
-      aria-pressed={active}
+    <div
+      ref={trackRef}
+      className="animate-[ksemo-tag-pop_400ms_ease-out_both] relative flex shrink-0 items-center rounded-xl border border-border bg-card p-0.5 sm:p-1"
+      role="group"
+      aria-label={description}
     >
-      {icon}
-      {label}
-    </button>
+      <span
+        aria-hidden="true"
+        className={cn(
+          "absolute rounded-lg bg-foreground text-background transition-[left,width] duration-300 ease-out top-0.5 bottom-0.5 sm:top-1 sm:bottom-1",
+          thumb ? "opacity-100" : "opacity-0"
+        )}
+        style={thumb ? { left: thumb.left, width: thumb.width } : undefined}
+      />
+      {options.map(option => {
+        const active = option.value === value;
+        return (
+          <button
+            type="button"
+            key={option.value}
+            data-value={option.value}
+            onClick={() => onChange(option.value)}
+            aria-pressed={active}
+            className={cn(
+              "relative z-10 flex items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-1 text-xs font-medium outline-none transition-colors duration-200 sm:px-3 sm:py-1.5 sm:text-sm",
+              active
+                ? "text-background"
+                : "text-muted-foreground hover:bg-accent hover:text-foreground"
+            )}
+          >
+            {option.icon}
+            {option.label}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 function SelectionCircle({ selected }: { selected: boolean }) {
