@@ -110,11 +110,11 @@ export const DictateRecordingPill = memo(function DictateRecordingPill({
 
   return (
     <div
-      className="flex min-w-[210px] items-center justify-between gap-3 overflow-hidden rounded-full border border-border bg-muted/80 backdrop-blur-xs px-4 py-1.5 shadow-sm animate-in fade-in zoom-in-95 duration-150"
+      className="flex min-w-0 items-center justify-between gap-2 overflow-hidden rounded-full border border-border bg-muted/80 backdrop-blur-xs px-2.5 py-1 shadow-sm animate-in fade-in zoom-in-95 duration-150 sm:min-w-[250px] sm:gap-3 sm:px-4 sm:py-1.5"
       role="region"
       aria-label="Dictation recording controls"
     >
-      <div className="flex h-6 items-center gap-1" aria-hidden="true">
+      <div className="hidden h-6 items-center gap-1 sm:flex" aria-hidden="true">
         {bars.map((val, index) => {
           const height = Math.max(4, Math.min(22, Math.round(4 + val * 18)));
           return (
@@ -129,11 +129,11 @@ export const DictateRecordingPill = memo(function DictateRecordingPill({
           );
         })}
       </div>
-      <span className="text-[13px] font-semibold tabular-nums text-foreground tracking-tight select-none">
+      <span className="text-xs font-semibold tabular-nums text-foreground tracking-tight select-none sm:text-[13px]">
         {String(Math.floor(recordingSeconds / 60)).padStart(2, "0")}:
         {String(recordingSeconds % 60).padStart(2, "0")}
       </span>
-      <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-1 sm:gap-1.5">
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
@@ -999,9 +999,7 @@ export const ChatComposer = memo(function ChatComposer({
                     aria-hidden="true"
                     className={cn(
                       "absolute top-0.5 bottom-0.5 w-[calc(50%-2px)] rounded-full bg-foreground text-background shadow-sm transition-[left] duration-300 ease-out",
-                      activeTag === "bot"
-                        ? "left-[calc(50%+2px)]"
-                        : "left-0.5"
+                      activeTag === "bot" ? "left-1/2" : "left-0.5"
                     )}
                   />
                   <button
