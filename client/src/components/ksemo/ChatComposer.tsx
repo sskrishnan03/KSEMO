@@ -886,6 +886,37 @@ export const ChatComposer = memo(function ChatComposer({
             )}
           </div>
 
+          {/* Mobile dictation / voice-chat bar — own row so it never squeezes Chat/Bot */}
+          {isMobile &&
+            !isEditingMessage &&
+            (voiceChatActive || (!hideVoiceInput && (isRecording || isTranscribing))) && (
+              <div className="animate-in fade-in zoom-in-95 flex items-center justify-end gap-1.5 px-1 pb-1 duration-150">
+                {voiceChatActive ? (
+                  <VoiceChatInlineControls
+                    muted={voiceChatMuted ?? false}
+                    onMicToggle={onVoiceChatMicToggle ?? (() => undefined)}
+                    onEnd={onVoiceChatEnd ?? (() => undefined)}
+                    voices={voices}
+                    selectedVoiceName={selectedVoiceName}
+                    onVoiceSelect={onVoiceChatVoiceSelect}
+                  />
+                ) : isRecording ? (
+                  <DictateRecordingPill
+                    recordingSeconds={recordingSeconds}
+                    audioBars={audioBars}
+                    audioLevel={audioLevel}
+                    onStop={onCancelRecording}
+                    onTranscribe={onVoice}
+                  />
+                ) : (
+                  <div className="flex items-center gap-2 rounded-full border border-border bg-muted/80 px-3 py-1 text-xs font-medium text-muted-foreground">
+                    <Loader2 className="size-3.5 animate-spin" />
+                    Transcribing…
+                  </div>
+                )}
+              </div>
+            )}
+
           {/* Bottom Control Row */}
           <div className="flex flex-wrap items-center justify-between gap-x-1.5 gap-y-1.5 pt-1">
             {/* Left Side Controls */}
@@ -994,7 +1025,7 @@ export const ChatComposer = memo(function ChatComposer({
 
               {!isEditingMessage && !guestMode && (
                 <div
-                  className="animate-[ksemo-tag-pop_400ms_ease-out_both] relative flex h-8 w-auto shrink-0 items-center rounded-full border border-border bg-popover p-0.5 shadow-sm sm:w-[10.5rem]"
+                  className="animate-[ksemo-tag-pop_400ms_ease-out_both] relative flex h-8 w-[10.5rem] shrink-0 items-center rounded-full border border-border bg-popover p-0.5 shadow-sm"
                   role="group"
                   aria-label="Composer mode"
                 >
@@ -1012,13 +1043,13 @@ export const ChatComposer = memo(function ChatComposer({
                     onClick={() => setActiveTag("chat")}
                     aria-pressed={activeTag === "chat"}
                     className={cn(
-                      "relative z-10 flex h-full flex-1 items-center justify-center gap-1 rounded-full text-xs font-medium outline-none transition-colors duration-200 sm:gap-1.5 sm:text-[13px]",
+                      "relative z-10 flex h-full flex-1 items-center justify-center gap-1.5 rounded-full text-[13px] font-medium outline-none transition-colors duration-200",
                       activeTag === "chat"
                         ? "text-background"
                         : "text-foreground hover:bg-accent/60 hover:text-foreground"
                     )}
                   >
-                    <MessageCircle className="size-3.5 sm:size-4" />
+                    <MessageCircle className="size-4" />
                     Chat
                   </button>
                   <button
@@ -1026,13 +1057,13 @@ export const ChatComposer = memo(function ChatComposer({
                     onClick={() => setActiveTag("bot")}
                     aria-pressed={activeTag === "bot"}
                     className={cn(
-                      "relative z-10 flex h-full flex-1 items-center justify-center gap-1 rounded-full text-xs font-medium outline-none transition-colors duration-200 sm:gap-1.5 sm:text-[13px]",
+                      "relative z-10 flex h-full flex-1 items-center justify-center gap-1.5 rounded-full text-[13px] font-medium outline-none transition-colors duration-200",
                       activeTag === "bot"
                         ? "text-background"
                         : "text-foreground hover:bg-accent/60 hover:text-foreground"
                     )}
                   >
-                    <Bot className="size-3.5 sm:size-4" />
+                    <Bot className="size-4" />
                     Bot
                   </button>
                 </div>
@@ -1129,44 +1160,50 @@ export const ChatComposer = memo(function ChatComposer({
                   </Tooltip>
                 </>
               ) : voiceChatActive ? (
-                <VoiceChatInlineControls
-                  muted={voiceChatMuted ?? false}
-                  onMicToggle={onVoiceChatMicToggle ?? (() => undefined)}
-                  onEnd={onVoiceChatEnd ?? (() => undefined)}
-                  voices={voices}
-                  selectedVoiceName={selectedVoiceName}
-                  onVoiceSelect={onVoiceChatVoiceSelect}
-                />
+                isMobile ? null : (
+                  <VoiceChatInlineControls
+                    muted={voiceChatMuted ?? false}
+                    onMicToggle={onVoiceChatMicToggle ?? (() => undefined)}
+                    onEnd={onVoiceChatEnd ?? (() => undefined)}
+                    voices={voices}
+                    selectedVoiceName={selectedVoiceName}
+                    onVoiceSelect={onVoiceChatVoiceSelect}
+                  />
+                )
               ) : (
                 <>
                   {/* Recording / Transcribing / Mic — opens in place of the mic when clicked */}
                   {!hideVoiceInput && (
                     <>
                       {isRecording ? (
-                        <DictateRecordingPill
-                          recordingSeconds={recordingSeconds}
-                          audioBars={audioBars}
-                          audioLevel={audioLevel}
-                          onStop={onCancelRecording}
-                          onTranscribe={onVoice}
-                        />
+                        !isMobile && (
+                          <DictateRecordingPill
+                            recordingSeconds={recordingSeconds}
+                            audioBars={audioBars}
+                            audioLevel={audioLevel}
+                            onStop={onCancelRecording}
+                            onTranscribe={onVoice}
+                          />
+                        )
                       ) : isTranscribing ? (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              disabled
-                              className="size-10 rounded-full bg-transparent text-muted-foreground transition-colors"
-                              aria-label="Converting speech to text"
-                            >
-                              <Loader2 className="size-4.5 animate-spin" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent side="bottom">
-                            Transcribing…
-                          </TooltipContent>
-                        </Tooltip>
+                        !isMobile && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                disabled
+                                className="size-10 rounded-full bg-transparent text-muted-foreground transition-colors"
+                                aria-label="Converting speech to text"
+                              >
+                                <Loader2 className="size-4.5 animate-spin" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom">
+                              Transcribing…
+                            </TooltipContent>
+                          </Tooltip>
+                        )
                       ) : (
                         <Tooltip>
                           <TooltipTrigger asChild>
