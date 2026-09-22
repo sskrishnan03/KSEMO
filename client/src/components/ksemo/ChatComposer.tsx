@@ -110,18 +110,18 @@ export const DictateRecordingPill = memo(function DictateRecordingPill({
 
   return (
     <div
-      className="flex min-w-0 items-center justify-between gap-2 overflow-hidden rounded-full border border-border bg-muted/80 backdrop-blur-xs px-2.5 py-1 shadow-sm animate-in fade-in zoom-in-95 duration-150 sm:min-w-[250px] sm:gap-3 sm:px-4 sm:py-1.5"
+      className="flex min-w-0 items-center justify-between gap-1.5 overflow-hidden rounded-full border border-border bg-muted/80 backdrop-blur-xs px-2.5 py-1 shadow-sm animate-in fade-in zoom-in-95 duration-150 sm:min-w-[250px] sm:gap-3 sm:px-4 sm:py-1.5"
       role="region"
       aria-label="Dictation recording controls"
     >
-      <div className="hidden h-6 items-center gap-1 sm:flex" aria-hidden="true">
+      <div className="flex h-6 items-center gap-0.5 sm:gap-1" aria-hidden="true">
         {bars.map((val, index) => {
           const height = Math.max(4, Math.min(22, Math.round(4 + val * 18)));
           return (
             <span
               key={index}
               className={cn(
-                "w-1 rounded-full transition-all duration-75 ease-out",
+                "w-0.5 rounded-full transition-all duration-75 ease-out sm:w-1",
                 val > 0.25 ? "bg-primary" : "bg-muted-foreground/50"
               )}
               style={{ height: `${height}px` }}
