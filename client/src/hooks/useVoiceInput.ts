@@ -153,10 +153,10 @@ export function useVoiceInput({
           );
           return;
         }
-        if (recording.size > 12 * 1024 * 1024) {
+        if (recording.size > 20 * 1024 * 1024) {
           setState("idle");
           onError(
-            "That recording is too large to transcribe. Please keep messages shorter than 12 MB."
+            "That recording is too long to transcribe. Please keep messages shorter than 20 MB."
           );
           return;
         }

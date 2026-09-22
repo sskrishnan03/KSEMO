@@ -17,7 +17,7 @@ const TRANSCRIBE_MODELS = [
 
 // Hard cap on total transcription time so the UI never hangs on an unresponsive
 // model; the remaining budget is shared across model fallbacks.
-const TRANSCRIPTION_DEADLINE_MS = 45_000;
+const TRANSCRIPTION_DEADLINE_MS = 110_000;
 
 export type TranscribeOptions = {
   audio: Buffer;
@@ -148,7 +148,7 @@ export async function transcribeAudio(
             "x-goog-api-key": apiKey,
           },
           body,
-          signal: AbortSignal.timeout(Math.min(20_000, remaining)),
+          signal: AbortSignal.timeout(Math.min(60_000, remaining)),
         });
       } catch (error) {
         lastError =

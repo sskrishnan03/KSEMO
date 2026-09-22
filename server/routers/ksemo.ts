@@ -701,10 +701,10 @@ export const voiceRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       const buffer = Buffer.from(input.audioBase64, "base64");
-      if (!buffer.length || buffer.length > 12 * 1024 * 1024) {
+      if (!buffer.length || buffer.length > 24 * 1024 * 1024) {
         throw new TRPCError({
           code: "PAYLOAD_TOO_LARGE",
-          message: "Recordings must be smaller than 12 MB.",
+          message: "Recordings must be smaller than 24 MB.",
         });
       }
       const result = await transcribeAudio({
