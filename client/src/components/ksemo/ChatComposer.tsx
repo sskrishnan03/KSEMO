@@ -1063,7 +1063,7 @@ export const ChatComposer = memo(function ChatComposer({
                               className="size-10 rounded-full bg-transparent text-muted-foreground transition-colors"
                               aria-label="Converting speech to text"
                             >
-                              <Loader2 className="size-4.5 animate-spin" />
+                              <div className="loader" style={{ width: 18 }} aria-hidden />
                             </Button>
                           </TooltipTrigger>
                           <TooltipContent side="bottom">
@@ -1159,7 +1159,7 @@ export const ChatComposer = memo(function ChatComposer({
                               className="size-10 rounded-full bg-transparent text-muted-foreground transition-colors"
                               aria-label="Converting speech to text"
                             >
-                              <Loader2 className="size-4.5 animate-spin" />
+                              <div className="loader" style={{ width: 18 }} aria-hidden />
                             </Button>
                           </TooltipTrigger>
                           <TooltipContent side="bottom">
