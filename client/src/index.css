@@ -532,6 +532,22 @@ html.ksemo-reduce-motion .ksemo-voice-bar {
   }
 }
 
+@keyframes ksemo-tag-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(6px) scale(0.94);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-\[ksemo-tag-pop_400ms_ease-out\] {
+    animation: none;
+  }
+}
+
 /* Hide scrollbar for Create & Explore submenu */
 [data-radix-dropdown-menu-content][class*="max-h"]::-webkit-scrollbar {
   display: none;

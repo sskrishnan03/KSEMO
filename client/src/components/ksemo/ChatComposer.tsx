@@ -26,12 +26,14 @@ import { PptConfigStrip } from "./PptConfigStrip";
 import {
   ArrowUp,
   AudioLines,
+  Bot,
   Check,
   ChevronDown,
   Camera,
   FilePlus2,
   Library,
   Loader2,
+  MessageCircle,
   Mic,
   Paperclip,
   Plus,
@@ -292,6 +294,7 @@ export const ChatComposer = memo(function ChatComposer({
   const [isDragActive, setIsDragActive] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [canExpand, setCanExpand] = useState(false);
+  const [activeTag, setActiveTag] = useState<"chat" | "bot">("chat");
   const dragCounterRef = useRef(0);
   const editorModeRef = useRef<CapabilityMode>("chat");
   const lastSyncedValueRef = useRef<string | null>(null);
@@ -984,6 +987,52 @@ export const ChatComposer = memo(function ChatComposer({
                     )}
                   </DropdownMenuContent>
                 </DropdownMenu>
+              )}
+
+              {!isEditingMessage && !guestMode && (
+                <div
+                  className="animate-[ksemo-tag-pop_400ms_ease-out_both] relative flex h-8 w-[10.5rem] items-center rounded-full border border-border bg-popover p-0.5 shadow-sm"
+                  role="group"
+                  aria-label="Composer mode"
+                >
+                  <span
+                    aria-hidden="true"
+                    className={cn(
+                      "absolute top-0.5 bottom-0.5 w-[calc(50%-2px)] rounded-full bg-foreground text-background shadow-sm transition-[left] duration-300 ease-out",
+                      activeTag === "bot"
+                        ? "left-[calc(50%+2px)]"
+                        : "left-0.5"
+                    )}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setActiveTag("chat")}
+                    aria-pressed={activeTag === "chat"}
+                    className={cn(
+                      "relative z-10 flex h-full flex-1 items-center justify-center gap-1.5 rounded-full text-[13px] font-medium outline-none transition-colors duration-200",
+                      activeTag === "chat"
+                        ? "text-background"
+                        : "text-foreground hover:bg-accent/60 hover:text-foreground"
+                    )}
+                  >
+                    <MessageCircle className="size-4" />
+                    Chat
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTag("bot")}
+                    aria-pressed={activeTag === "bot"}
+                    className={cn(
+                      "relative z-10 flex h-full flex-1 items-center justify-center gap-1.5 rounded-full text-[13px] font-medium outline-none transition-colors duration-200",
+                      activeTag === "bot"
+                        ? "text-background"
+                        : "text-foreground hover:bg-accent/60 hover:text-foreground"
+                    )}
+                  >
+                    <Bot className="size-4" />
+                    Bot
+                  </button>
+                </div>
               )}
             </div>
 
