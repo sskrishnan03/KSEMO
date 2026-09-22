@@ -82,7 +82,7 @@ const MAX_INLINE_IMAGE_BYTES = 18 * 1024 * 1024;
 const MAX_ATTACHMENTS_PER_MESSAGE = 12;
 
 // Separate free-tier quota bucket; used when the selected model's daily limit is hit.
-const QUOTA_FALLBACK_MODEL = "gemini-flash-lite-latest";
+const QUOTA_FALLBACK_MODEL = "models/gemini-2.5-flash";
 
 // Hard cap for a single response generation. Without it a stalled provider
 // (or its retry ladder) would hold the SSE connection open in silence while
@@ -138,6 +138,18 @@ async function retryPreparation<T>(
 const isQuotaError = (error: unknown) =>
   error instanceof Error &&
   /\b429\b|resource_exhausted|quota/i.test(error.message);
+
+// Provider-level availability problems that are worth retrying against a
+// different model: quota exhaustion (429), model-specific high-demand 503s
+// ("This model is currently experiencing high demand"), transient 5xx, and
+// models that are "no longer available". A user preference pointing at a
+// broken/retired/overloaded model must never take the whole chat down with it.
+const isRetryableProviderError = (error: unknown) =>
+  error instanceof Error &&
+  (isQuotaError(error) ||
+    /\b50\d\b|\b5\d\d\b|high demand|unavailable|no longer available|temporarily|try again later|overloaded/i.test(
+      error.message
+    ));
 
 async function runGeneration(
   model: string | undefined,
@@ -689,10 +701,10 @@ export function registerChatStream(app: Express) {
           generationError &&
           !controller.signal.aborted &&
           !responseText &&
-          isQuotaError(generationError)
+          isRetryableProviderError(generationError)
         ) {
           console.warn(
-            `[ChatStream] quota exceeded for "${preferences?.selectedModel ?? "default model"}"; retrying with ${QUOTA_FALLBACK_MODEL}`
+            `[ChatStream] "${preferences?.selectedModel ?? "default model"}" unavailable (or at its limit); retrying with ${QUOTA_FALLBACK_MODEL}`
           );
           try {
             responseText = await runGeneration(

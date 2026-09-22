@@ -284,7 +284,7 @@ class InMemoryStore {
 
     this.userPreferences.set(demoUser.id, {
       userId: demoUser.id,
-      selectedModel: "gemini-flash-lite-latest",
+      selectedModel: "models/gemini-2.5-flash",
       persona: "balanced",
       customInstructions: null,
       speechRate: 1.0,
@@ -769,7 +769,7 @@ class InMemoryStore {
     }
     const created: UserPreference = {
       userId,
-      selectedModel: values.selectedModel ?? "gemini-flash-lite-latest",
+      selectedModel: values.selectedModel ?? "models/gemini-2.5-flash",
       persona: values.persona ?? "balanced",
       customInstructions: values.customInstructions ?? null,
       speechRate: values.speechRate ?? 1.0,

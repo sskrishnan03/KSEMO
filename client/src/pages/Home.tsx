@@ -450,6 +450,8 @@ export default function Home() {
       conversationId: string | null;
       userMessageId: string | null;
       assistantMessageId: string | null;
+      userContent: string;
+      responseText: string;
       controller: AbortController;
       active: boolean;
     }>
@@ -483,8 +485,11 @@ export default function Home() {
   const pendingDeltasRef = useRef<Map<string, string>>(new Map());
   const deltaFlushRafRef = useRef<number>(0);
   // chatMessages is the single source of truth for the open conversation.
-  // Server data only seeds it ONCE per conversation id (when it is opened) and
-  // is never allowed to overwrite messages that are currently streaming.
+  // Server data seeds it ONCE per conversation id (when it is opened) and is
+  // never allowed to overwrite messages that are currently streaming — except
+  // that a still-generating conversation re-seeds from every fresh snapshot
+  // with its live stream content grafted on, so switching back mid-answer
+  // rebuilds the thread in place instead of latching onto a stale cache.
   const seededConversationIdRef = useRef<string | null>(null);
   // State mirror of seededConversationIdRef so rendering can tell whether the
   // currently-viewed conversation has been loaded yet (prevents the empty
@@ -511,6 +516,17 @@ export default function Home() {
   );
   const isGenerating = Boolean(activeStream);
   const generatingMessageId = activeStream?.assistantMessageId ?? null;
+
+  // Conversations whose response is still generating in the background. The
+  // sidebar renders a typing indicator on these rows so it is obvious that an
+  // answer is still being written while the user reads another chat.
+  const generatingConversationIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const stream of streams) {
+      if (stream.active && stream.conversationId) ids.add(stream.conversationId);
+    }
+    return ids;
+  }, [streams]);
 
   // -------------------------------------------------------------------
   // MODE SEPARATION: Normal Chat vs File Creation
@@ -679,11 +695,26 @@ export default function Home() {
   // Hard-delete every conversation created during the temporary session. These
   // are already hidden from all listings on the server; this removes the rows.
   // Uses the vanilla client so it is also safe to call from an unmount cleanup.
-  const purgeTemporaryConversations = () => {
+  // preserveStreaming keeps rows whose response is still generating so an
+  // in-flight answer is never deleted out from under the server; those are
+  // purged again once their stream settles.
+  const purgeTemporaryConversations = (options?: {
+    preserveStreaming?: boolean;
+  }) => {
     const ids = Array.from(temporaryConversationIdsRef.current);
     if (ids.length === 0) return;
-    temporaryConversationIdsRef.current.clear();
+    const streamingIds = options?.preserveStreaming
+      ? new Set(
+          streamsRef.current
+            .filter(stream => stream.active && stream.conversationId)
+            .map(stream => stream.conversationId as string)
+        )
+      : new Set<string>();
+    temporaryConversationIdsRef.current = new Set(
+      ids.filter(id => streamingIds.has(id))
+    );
     for (const id of ids) {
+      if (streamingIds.has(id)) continue;
       utils.client.conversation.remove.mutate({ id });
     }
   };
@@ -723,22 +754,34 @@ export default function Home() {
     onError: () => {},
   });
   // chatMessages is the single source of truth for the open conversation's
-  // messages. The server query only seeds it once per conversation and is
-  // never allowed to overwrite messages that are currently streaming or that
-  // arrived back from a completed / failed generation. Seeding is not blocked
-  // while a response streams so that switching back into a still-generating
-  // conversation still loads its in-progress messages.
+  // messages. The server query seeds it once per conversation, and a
+  // conversation that is still streaming re-seeds from every fresh snapshot so
+  // returning to it mid-generation rebuilds the in-progress answer (live
+  // stream content is grafted onto the snapshot below) instead of latching
+  // onto the stale pre-send cache forever.
   useEffect(() => {
     if (!activeConversationId) return;
-    if (seededConversationIdRef.current === activeConversationId) return;
+    const streamingTurn = streamsRef.current.find(
+      stream => stream.active && stream.conversationId === activeConversationId
+    );
+    if (
+      seededConversationIdRef.current === activeConversationId &&
+      !streamingTurn
+    )
+      return;
     if (activeQuery.isLoading || !activeQuery.data) return;
     if (activeQuery.data.conversation?.id !== activeConversationId) return;
+    const isFirstSeed =
+      seededConversationIdRef.current !== activeConversationId;
     seededConversationIdRef.current = activeConversationId;
     setSeededConversationId(activeConversationId);
-    // The conversation's full history is about to render into an empty thread,
-    // so the next scroll must snap to the newest message rather than animate.
-    pendingOpenScrollRef.current = true;
-    isNearBottomRef.current = true;
+    if (isFirstSeed) {
+      // The conversation's full history is about to render into an empty
+      // thread, so the next scroll must snap to the newest message rather than
+      // animate.
+      pendingOpenScrollRef.current = true;
+      isNearBottomRef.current = true;
+    }
     const serverMessages = activeQuery.data.messages.map(message => {
       const firstAttachment = message.attachments?.[0] as any;
       const rawExt = firstAttachment?.filename
@@ -855,13 +898,75 @@ export default function Home() {
               : undefined),
       };
     });
+    // A still-generating turn owns content the database does not have yet:
+    // graft the live stream state onto the snapshot so switching back into a
+    // generating conversation rebuilds the in-flight answer exactly where it
+    // left off (and later deltas/finalization keep landing on it).
+    let seededMessages: KsemoMessage[] = serverMessages;
+    if (streamingTurn?.assistantMessageId) {
+      const assistantId = streamingTurn.assistantMessageId;
+      const userId = streamingTurn.userMessageId;
+      const liveContent = streamingTurn.responseText;
+      // These deltas are already part of liveContent; dropping them prevents
+      // the pending rAF flush from appending them a second time.
+      pendingDeltasRef.current.delete(assistantId);
+      if (userId && !seededMessages.some(message => message.id === userId)) {
+        // The snapshot predates the send (stale cache) — rebuild the user
+        // message so the exchange stays visible.
+        const userMessage: KsemoMessage = {
+          id: userId,
+          role: "user",
+          content: streamingTurn.userContent,
+          status: "completed",
+        };
+        const assistantIndex = seededMessages.findIndex(
+          message => message.id === assistantId
+        );
+        seededMessages =
+          assistantIndex < 0
+            ? [...seededMessages, userMessage]
+            : [
+                ...seededMessages.slice(0, assistantIndex),
+                userMessage,
+                ...seededMessages.slice(assistantIndex),
+              ];
+      }
+      const assistantIndex = seededMessages.findIndex(
+        message => message.id === assistantId
+      );
+      if (assistantIndex < 0) {
+        // No assistant row in the snapshot yet — append the streaming message
+        // so incoming deltas and finalization have a message to land on.
+        seededMessages = [
+          ...seededMessages,
+          {
+            id: assistantId,
+            role: "assistant",
+            content: liveContent,
+            status: "streaming",
+          },
+        ];
+      } else if (seededMessages[assistantIndex].status === "streaming") {
+        // Mid-stream the database row still holds empty/partial content;
+        // the client-side accumulation is authoritative until completion.
+        seededMessages = seededMessages.map((message, index) =>
+          index === assistantIndex
+            ? {
+                ...message,
+                status: "streaming" as const,
+                content: liveContent || message.content,
+              }
+            : message
+        );
+      }
+    }
     setChatMessages(current => {
-      if (!current.length) return serverMessages;
-      const serverIds = new Set(serverMessages.map(message => message.id));
+      if (!current.length) return seededMessages;
+      const serverIds = new Set(seededMessages.map(message => message.id));
       const previousById = new Map(
         current.map(message => [message.id, message])
       );
-      const mergedMessages = serverMessages.map(message => {
+      const mergedMessages = seededMessages.map(message => {
         // Keep the live file card on screen while the server record for an
         // interrupted document pipeline is still settling. The backend only
         // marks the message cancelled-with-file once the pipeline finishes,
@@ -1285,6 +1390,8 @@ export default function Home() {
       userMessageId: null as string | null,
       assistantMessageId:
         options.regenerateAssistantMessageId ?? `local-assistant-${draftNow}`,
+      userContent: content,
+      responseText: "",
       controller,
       active: true,
     };
@@ -1392,6 +1499,10 @@ export default function Home() {
             streamEntry.conversationId = conv.conversationId;
             streamEntry.userMessageId = conv.userMessageId;
             streamEntry.assistantMessageId = conv.assistantMessageId;
+            // Refresh the streams array so memoized consumers (e.g. the
+            // sidebar's generating-id set) recompute with the newly assigned
+            // conversation id.
+            setStreams(current => [...current]);
             if (temporary) {
               // Remember this conversation so it can be purged when the
               // temporary session ends. Never surface it in recents/history.
@@ -1432,6 +1543,7 @@ export default function Home() {
             const delta = str(data.delta);
             const messageId = str(data.messageId);
             responseText += delta;
+            streamEntry.responseText = responseText;
             // Only mutate the visible conversation's messages when it is the one
             // this stream belongs to. Otherwise the deltas ride along in
             // responseText and are written by the seed/sync path when the user
@@ -1697,7 +1809,10 @@ export default function Home() {
 
     // The stream is finished for this conversation. Mark it inactive so the
     // derived generating state for this conversation switches off, then
-    // finalize it. Streams in other conversations are left untouched.
+    // finalize it. Streams in other conversations are left untouched. The
+    // entry itself is flipped immediately (not just in state) so seed/purge
+    // reads through streamsRef see the settled turn without waiting a render.
+    streamEntry.active = false;
     setStreams(current =>
       current.map(stream =>
         stream.turnId === turnSequence ? { ...stream, active: false } : stream
@@ -1786,6 +1901,17 @@ export default function Home() {
       // Refresh the caching query for this conversation so that returning to it
       // shows the finished response immediately (server has already settled it).
       await syncConversationFromServer(completedConversation.conversationId);
+
+      // The temporary session may have ended while this response was still
+      // generating (switching chats keeps streaming chats alive through the
+      // purge). Now that the stream has settled, remove any temporary chats
+      // that are no longer part of a live session.
+      if (
+        !isTemporaryChatRef.current &&
+        temporaryConversationIdsRef.current.size > 0
+      ) {
+        purgeTemporaryConversations({ preserveStreaming: true });
+      }
 
       // A user stop during document creation does not cancel the backend
       // pipeline — it still attaches the finished file to the message. Poll
@@ -2349,8 +2475,9 @@ export default function Home() {
       return;
     }
     // Ending the view also ends any temporary session: purge its chats so
-    // nothing lingers, and return to normal chat.
-    purgeTemporaryConversations();
+    // nothing lingers, and return to normal chat. A temp chat whose response
+    // is still generating is kept until its stream settles (see sendMessage).
+    purgeTemporaryConversations({ preserveStreaming: true });
     isTemporaryChatRef.current = false;
     setIsTemporaryChat(false);
     writeStoredTemporaryChat(user?.id, {
@@ -2837,8 +2964,10 @@ export default function Home() {
     // finished response is saved to its original conversation.
     // Selecting a saved conversation ends any temporary session: its chats are
     // tucked away (and purged) and this chat is a normal, persisted one.
+    // Temporary chats that are still generating survive the purge until their
+    // stream settles, so their in-flight answer is never deleted mid-write.
     if (isTemporaryChatRef.current) {
-      purgeTemporaryConversations();
+      purgeTemporaryConversations({ preserveStreaming: true });
       isTemporaryChatRef.current = false;
       setIsTemporaryChat(false);
       writeStoredTemporaryChat(user?.id, {
@@ -3266,6 +3395,7 @@ export default function Home() {
       <ConversationSidebar
         conversations={conversationQuery.data ?? []}
         activeConversationId={activeConversationId}
+        generatingConversationIds={generatingConversationIds}
         open={sidebarOpen}
         collapsed={sidebarCollapsed}
         onClose={stableOnCloseSidebar}
@@ -3353,7 +3483,9 @@ export default function Home() {
                               ids: [],
                             });
                           } else {
-                            purgeTemporaryConversations();
+                            purgeTemporaryConversations({
+                              preserveStreaming: true,
+                            });
                             writeStoredTemporaryChat(user?.id, {
                               active: false,
                               activeConversationId: null,

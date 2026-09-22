@@ -451,7 +451,7 @@ html.ksemo-reduce-motion [data-state] .ksemo-orb-morph-b {
 
 /* KSEMO loader — segmented white ring */
 .loader {
-  width: 35px;
+  width: 30px;
   --b: 8px;
   aspect-ratio: 1;
   border-radius: 50%;
@@ -474,6 +474,12 @@ html.ksemo-reduce-motion [data-state] .ksemo-orb-morph-b {
   -webkit-mask-composite: destination-in;
   mask-composite: intersect;
   animation: ksemoloader 1s infinite steps(10);
+}
+
+/* KSEMO loader — compact ring for list rows (e.g. a chat responding in the background) */
+.loader-sm {
+  width: 20px;
+  --b: 4px;
 }
 
 @keyframes ksemoloader {

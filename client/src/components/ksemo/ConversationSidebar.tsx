@@ -58,6 +58,7 @@ type Conversation = {
 export const ConversationSidebar = memo(function ConversationSidebar({
   conversations,
   activeConversationId,
+  generatingConversationIds,
   open,
   collapsed,
   onClose,
@@ -83,6 +84,8 @@ export const ConversationSidebar = memo(function ConversationSidebar({
 }: {
   conversations: Conversation[];
   activeConversationId: string | null;
+  /** Conversations whose response is still generating — their rows show a typing indicator. */
+  generatingConversationIds?: ReadonlySet<string>;
   open: boolean;
   collapsed: boolean;
   onClose: () => void;
@@ -354,6 +357,7 @@ export const ConversationSidebar = memo(function ConversationSidebar({
                   label="Pinned"
                   conversations={pinned}
                   activeConversationId={activeConversationId}
+                  generatingConversationIds={generatingConversationIds}
                   openMenuId={openMenuId}
                   onMenuOpenChange={setOpenMenuId}
                   onSelect={onSelect}
@@ -376,6 +380,7 @@ export const ConversationSidebar = memo(function ConversationSidebar({
                 label="Recent"
                 conversations={recent}
                 activeConversationId={activeConversationId}
+                generatingConversationIds={generatingConversationIds}
                 openMenuId={openMenuId}
                 onMenuOpenChange={setOpenMenuId}
                 onSelect={onSelect}
@@ -555,6 +560,7 @@ const ConversationGroup = memo(function ConversationGroup({
   label,
   conversations,
   activeConversationId,
+  generatingConversationIds,
   onSelect,
   onRename,
   renamingId,
@@ -576,6 +582,7 @@ const ConversationGroup = memo(function ConversationGroup({
   label: string;
   conversations: Conversation[];
   activeConversationId: string | null;
+  generatingConversationIds?: ReadonlySet<string>;
   onSelect: (id: string) => void;
   onRename: (conversation: Conversation) => void;
   renamingId: string | null;
@@ -625,6 +632,8 @@ const ConversationGroup = memo(function ConversationGroup({
             const isHovered = hoveredId === conversation.id;
             const isMenuOpen = currentOpenMenuId === conversation.id;
             const isRenaming = renamingId === conversation.id;
+            const isGenerating =
+              generatingConversationIds?.has(conversation.id) ?? false;
             return (
               <div
                 key={conversation.id}
@@ -653,6 +662,23 @@ const ConversationGroup = memo(function ConversationGroup({
                       onSelect={onSelect}
                       isRowHovered={isHovered || isMenuOpen}
                     />
+                    {/*
+                      Only chats still responding in the background get an
+                      indicator; the chat being viewed never shows one here.
+                      The three-dot menu always stays usable alongside it.
+                    */}
+                    {isGenerating && !isRowActive && (
+                      <span
+                        role="status"
+                        aria-label={`Generating response in ${conversation.title}`}
+                        className="flex size-6 shrink-0 items-center justify-center"
+                      >
+                        <span
+                          className="loader loader-sm text-muted-foreground"
+                          aria-hidden
+                        />
+                      </span>
+                    )}
                     <ConversationActionsMenu
                       conversation={conversation}
                       isMenuOpen={isMenuOpen}

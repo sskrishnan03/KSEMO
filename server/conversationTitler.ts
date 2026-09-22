@@ -8,7 +8,7 @@ Rules:
 4. Prioritize the user's ultimate goal or problem over small-talk details.
 5. Output plain text only: exactly 3 to 5 words, Title Case.`;
 
-export const TITLER_MODEL = "gemini-flash-lite-latest";
+export const TITLER_MODEL = DEFAULT_LLM_MODEL;
 export const TITLER_TEMPERATURE = 0.2;
 export const TITLER_MAX_TOKENS = 25;
 export const TITLER_TIMEOUT_MS = 4000;
