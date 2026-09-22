@@ -1007,7 +1007,6 @@ export const ChatComposer = memo(function ChatComposer({
                     onClick={() => setActiveTag("chat")}
                     aria-pressed={activeTag === "chat"}
                     aria-label="Chat mode"
-                    title="Chat"
                     className={cn(
                       "relative z-10 flex h-full flex-1 items-center justify-center gap-1.5 rounded-full text-[13px] font-medium outline-none transition-colors duration-200",
                       activeTag === "chat"
@@ -1023,7 +1022,6 @@ export const ChatComposer = memo(function ChatComposer({
                     onClick={() => setActiveTag("bot")}
                     aria-pressed={activeTag === "bot"}
                     aria-label="Bot mode"
-                    title="Bot"
                     className={cn(
                       "relative z-10 flex h-full flex-1 items-center justify-center gap-1.5 rounded-full text-[13px] font-medium outline-none transition-colors duration-200",
                       activeTag === "bot"
