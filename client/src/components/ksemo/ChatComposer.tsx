@@ -110,14 +110,11 @@ export const DictateRecordingPill = memo(function DictateRecordingPill({
 
   return (
     <div
-      className="flex min-w-0 items-center justify-between gap-2 overflow-hidden rounded-full border border-border bg-muted/80 backdrop-blur-xs px-2.5 py-1 shadow-sm animate-in fade-in zoom-in-95 duration-150 sm:min-w-[250px] sm:gap-3 sm:px-4"
+      className="flex min-w-[210px] items-center justify-between gap-3 overflow-hidden rounded-full border border-border bg-muted/80 backdrop-blur-xs px-4 py-1.5 shadow-sm animate-in fade-in zoom-in-95 duration-150"
       role="region"
       aria-label="Dictation recording controls"
     >
-      <div
-        className="hidden h-6 items-center gap-1 sm:flex"
-        aria-hidden="true"
-      >
+      <div className="flex h-6 items-center gap-1" aria-hidden="true">
         {bars.map((val, index) => {
           const height = Math.max(4, Math.min(22, Math.round(4 + val * 18)));
           return (
@@ -132,11 +129,11 @@ export const DictateRecordingPill = memo(function DictateRecordingPill({
           );
         })}
       </div>
-      <span className="text-xs font-semibold tabular-nums text-foreground tracking-tight select-none sm:text-[13px]">
+      <span className="text-[13px] font-semibold tabular-nums text-foreground tracking-tight select-none">
         {String(Math.floor(recordingSeconds / 60)).padStart(2, "0")}:
         {String(recordingSeconds % 60).padStart(2, "0")}
       </span>
-      <div className="flex items-center gap-1 sm:gap-1.5">
+      <div className="flex items-center gap-1.5">
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
@@ -144,7 +141,7 @@ export const DictateRecordingPill = memo(function DictateRecordingPill({
               variant="ghost"
               size="icon"
               onClick={onStop}
-              className="size-7 rounded-full text-foreground/80 hover:bg-destructive/15 hover:text-destructive transition-colors sm:size-7"
+              className="size-7 rounded-full text-foreground/80 hover:bg-destructive/15 hover:text-destructive transition-colors"
               aria-label="Stop"
             >
               <Square className="size-2.5 fill-current" />
@@ -886,37 +883,6 @@ export const ChatComposer = memo(function ChatComposer({
             )}
           </div>
 
-          {/* Mobile dictation / voice-chat bar — own row so it never squeezes Chat/Bot */}
-          {isMobile &&
-            !isEditingMessage &&
-            (voiceChatActive || (!hideVoiceInput && (isRecording || isTranscribing))) && (
-              <div className="animate-in fade-in zoom-in-95 flex items-center justify-end gap-1.5 px-1 pb-1 duration-150">
-                {voiceChatActive ? (
-                  <VoiceChatInlineControls
-                    muted={voiceChatMuted ?? false}
-                    onMicToggle={onVoiceChatMicToggle ?? (() => undefined)}
-                    onEnd={onVoiceChatEnd ?? (() => undefined)}
-                    voices={voices}
-                    selectedVoiceName={selectedVoiceName}
-                    onVoiceSelect={onVoiceChatVoiceSelect}
-                  />
-                ) : isRecording ? (
-                  <DictateRecordingPill
-                    recordingSeconds={recordingSeconds}
-                    audioBars={audioBars}
-                    audioLevel={audioLevel}
-                    onStop={onCancelRecording}
-                    onTranscribe={onVoice}
-                  />
-                ) : (
-                  <div className="flex items-center gap-2 rounded-full border border-border bg-muted/80 px-3 py-1 text-xs font-medium text-muted-foreground">
-                    <Loader2 className="size-3.5 animate-spin" />
-                    Transcribing…
-                  </div>
-                )}
-              </div>
-            )}
-
           {/* Bottom Control Row */}
           <div className="flex flex-wrap items-center justify-between gap-x-1.5 gap-y-1.5 pt-1">
             {/* Left Side Controls */}
@@ -1025,7 +991,7 @@ export const ChatComposer = memo(function ChatComposer({
 
               {!isEditingMessage && !guestMode && (
                 <div
-                  className="animate-[ksemo-tag-pop_400ms_ease-out_both] relative flex h-8 w-[10.5rem] shrink-0 items-center rounded-full border border-border bg-popover p-0.5 shadow-sm"
+                  className="animate-[ksemo-tag-pop_400ms_ease-out_both] relative flex h-8 w-20 shrink-0 items-center rounded-full border border-border bg-popover p-0.5 shadow-sm sm:w-[10.5rem]"
                   role="group"
                   aria-label="Composer mode"
                 >
@@ -1042,6 +1008,8 @@ export const ChatComposer = memo(function ChatComposer({
                     type="button"
                     onClick={() => setActiveTag("chat")}
                     aria-pressed={activeTag === "chat"}
+                    aria-label="Chat mode"
+                    title="Chat"
                     className={cn(
                       "relative z-10 flex h-full flex-1 items-center justify-center gap-1.5 rounded-full text-[13px] font-medium outline-none transition-colors duration-200",
                       activeTag === "chat"
@@ -1050,12 +1018,14 @@ export const ChatComposer = memo(function ChatComposer({
                     )}
                   >
                     <MessageCircle className="size-4" />
-                    Chat
+                    <span className="hidden sm:inline">Chat</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setActiveTag("bot")}
                     aria-pressed={activeTag === "bot"}
+                    aria-label="Bot mode"
+                    title="Bot"
                     className={cn(
                       "relative z-10 flex h-full flex-1 items-center justify-center gap-1.5 rounded-full text-[13px] font-medium outline-none transition-colors duration-200",
                       activeTag === "bot"
@@ -1064,7 +1034,7 @@ export const ChatComposer = memo(function ChatComposer({
                     )}
                   >
                     <Bot className="size-4" />
-                    Bot
+                    <span className="hidden sm:inline">Bot</span>
                   </button>
                 </div>
               )}
@@ -1160,50 +1130,44 @@ export const ChatComposer = memo(function ChatComposer({
                   </Tooltip>
                 </>
               ) : voiceChatActive ? (
-                isMobile ? null : (
-                  <VoiceChatInlineControls
-                    muted={voiceChatMuted ?? false}
-                    onMicToggle={onVoiceChatMicToggle ?? (() => undefined)}
-                    onEnd={onVoiceChatEnd ?? (() => undefined)}
-                    voices={voices}
-                    selectedVoiceName={selectedVoiceName}
-                    onVoiceSelect={onVoiceChatVoiceSelect}
-                  />
-                )
+                <VoiceChatInlineControls
+                  muted={voiceChatMuted ?? false}
+                  onMicToggle={onVoiceChatMicToggle ?? (() => undefined)}
+                  onEnd={onVoiceChatEnd ?? (() => undefined)}
+                  voices={voices}
+                  selectedVoiceName={selectedVoiceName}
+                  onVoiceSelect={onVoiceChatVoiceSelect}
+                />
               ) : (
                 <>
                   {/* Recording / Transcribing / Mic — opens in place of the mic when clicked */}
                   {!hideVoiceInput && (
                     <>
                       {isRecording ? (
-                        !isMobile && (
-                          <DictateRecordingPill
-                            recordingSeconds={recordingSeconds}
-                            audioBars={audioBars}
-                            audioLevel={audioLevel}
-                            onStop={onCancelRecording}
-                            onTranscribe={onVoice}
-                          />
-                        )
+                        <DictateRecordingPill
+                          recordingSeconds={recordingSeconds}
+                          audioBars={audioBars}
+                          audioLevel={audioLevel}
+                          onStop={onCancelRecording}
+                          onTranscribe={onVoice}
+                        />
                       ) : isTranscribing ? (
-                        !isMobile && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                disabled
-                                className="size-10 rounded-full bg-transparent text-muted-foreground transition-colors"
-                                aria-label="Converting speech to text"
-                              >
-                                <Loader2 className="size-4.5 animate-spin" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent side="bottom">
-                              Transcribing…
-                            </TooltipContent>
-                          </Tooltip>
-                        )
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              disabled
+                              className="size-10 rounded-full bg-transparent text-muted-foreground transition-colors"
+                              aria-label="Converting speech to text"
+                            >
+                              <Loader2 className="size-4.5 animate-spin" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom">
+                            Transcribing…
+                          </TooltipContent>
+                        </Tooltip>
                       ) : (
                         <Tooltip>
                           <TooltipTrigger asChild>
@@ -1388,16 +1352,14 @@ function VoiceChatInlineControls({
         <DropdownMenuTrigger asChild>
           <Button
             variant="ghost"
-            className="h-10 gap-1.5 rounded-full px-2.5 text-foreground transition-colors hover:bg-accent hover:text-foreground sm:px-3.5"
+            className="h-10 gap-1.5 rounded-full px-3.5 text-foreground transition-colors hover:bg-accent hover:text-foreground"
             aria-label="Choose KSEMO's voice"
           >
             <AudioLines className="size-4" />
-            <span className="hidden text-sm font-medium leading-none sm:inline">
-              Voice
-            </span>
+            <span className="text-sm font-medium leading-none">Voice</span>
             <ChevronDown
               className={cn(
-                "hidden size-4 text-muted-foreground transition-transform duration-200 sm:block",
+                "size-4 text-muted-foreground transition-transform duration-200",
                 voiceMenuOpen ? "rotate-180" : ""
               )}
             />
