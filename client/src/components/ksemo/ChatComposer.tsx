@@ -26,7 +26,6 @@ import { PptConfigStrip } from "./PptConfigStrip";
 import {
   ArrowUp,
   AudioLines,
-  Bot,
   Check,
   ChevronDown,
   Camera,
@@ -74,6 +73,38 @@ const MODE_TOKEN_COLORS: Record<string, string> = {
   pptx: "#f97316",
   txt: "#0ea5e9",
 };
+
+/*
+ * KSEMO's own bot mark for the Composer "Bot" mode — a simple, clean robot:
+ * rounded head, antenna with a dot, two plain eye dots and a small smile.
+ * Nothing extra; inherits pill colors via currentColor.
+ */
+export const KseBotModeIcon = memo(function KseBotModeIcon({
+  className,
+}: {
+  className?: string;
+}) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <rect x="3.5" y="5.5" width="17" height="15" rx="4.5" />
+      <path d="M12 5.5V3.6" />
+      <circle cx="12" cy="2.7" r="0.9" fill="currentColor" stroke="none" />
+      <circle cx="9" cy="11.8" r="1.3" fill="currentColor" stroke="none" />
+      <circle cx="15" cy="11.8" r="1.3" fill="currentColor" stroke="none" />
+      <path d="M9.6 16.4h4.8" />
+    </svg>
+  );
+});
 
 const MODE_TOKEN_LABELS: Record<string, string> = {
   pdf: "pdf",
@@ -1029,7 +1060,7 @@ export const ChatComposer = memo(function ChatComposer({
                         : "text-foreground hover:bg-accent/60 hover:text-foreground"
                     )}
                   >
-                    <Bot className="size-4" />
+                    <KseBotModeIcon className="size-[18px]" />
                     <span className="hidden sm:inline">Bot</span>
                   </button>
                 </div>

@@ -27,7 +27,7 @@ function renderInMenu(element: React.ReactElement) {
 }
 
 describe("KSEMO conversation sidebar disclosure", () => {
-  it("renders label-adjacent Pinned and Recent disclosure controls without conversation counts", () => {
+  it("renders label-adjacent Pinned and Conversations disclosure controls without conversation counts", () => {
     const markup = renderWithTooltip(
       createElement(ConversationSidebar, {
         conversations: [
@@ -67,7 +67,7 @@ describe("KSEMO conversation sidebar disclosure", () => {
       })
     );
     expect(markup).toContain('data-disclosure-group="pinned"');
-    expect(markup).toContain('data-disclosure-group="recent"');
+    expect(markup).toContain('data-disclosure-group="conversations"');
     expect(markup).toContain("w-full");
     expect(markup).toContain("cursor-pointer");
     expect(markup).toContain("lucide-message-circle");
