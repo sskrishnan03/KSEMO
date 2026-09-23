@@ -3060,7 +3060,16 @@ export default function Home() {
   const stableAttachFromComposer = usePersistFn(attachFromComposer);
   const stableAttachLibraryFiles = usePersistFn(attachLibraryFiles);
   const stableCaptureScreenshot = usePersistFn(captureScreenshot);
-  const stableLogout = usePersistFn(logout);
+  const stableHandleSignOut = usePersistFn(() => {
+    // Sign out lands you on a fresh New Chat, no matter where you were
+    // (search, library, a conversation, an open PDF, …). Reset the whole
+    // view to the start screen before the session actually flips to guest.
+    setSidebarOpen(false);
+    setSettingsOpen(false);
+    setGuestPromptOpen(false);
+    newChat();
+    void logout();
+  });
   const stableSpeak = usePersistFn(speak);
   const stablePauseSpeech = usePersistFn(pauseSpeech);
   const stableResumeSpeech = usePersistFn(resumeSpeech);
@@ -3414,7 +3423,7 @@ export default function Home() {
         previewSupportOpen={isProfileSupportPreview}
         onSettings={stableOnSettings}
         onSupport={stableOnSupport}
-        onLogout={stableLogout}
+        onLogout={stableHandleSignOut}
         user={user ?? {}}
         locked={guestMode}
         onLoginPrompt={stableOnLoginPrompt}
@@ -3840,7 +3849,7 @@ export default function Home() {
           onOpenChange={setSettingsOpen}
           initialTab={settingsInitialTab}
           user={user!}
-          onSignOut={stableLogout}
+          onSignOut={stableHandleSignOut}
           onAllChatsDeleted={stableOnAllChatsDeleted}
           onOpenConversation={stableOnOpenArchivedConversation}
           onAccountDeleted={stableOnAccountDeleted}
