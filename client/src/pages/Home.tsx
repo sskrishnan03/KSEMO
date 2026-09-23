@@ -20,6 +20,7 @@ import { startLogin } from "@/const";
 import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
 import {
+  ArrowDown,
   ChevronsRight,
   FolderOpen,
   LogIn,
@@ -30,34 +31,6 @@ import {
 } from "lucide-react";
 import { ShareIcon, TemporaryChatIcon } from "../components/ksemo/icons";
 
-/*
- * KSEMO's own "jump to latest" mark — a down arrow landing on a baseline.
- * Distinct from the chevrons used elsewhere in the chat UI, and it inherits
- * the button colors via currentColor.
- */
-const JumpToLatestIcon = memo(function JumpToLatestIcon({
-  className,
-}: {
-  className?: string;
-}) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className={className}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      focusable="false"
-    >
-      <path d="M12 17V3" />
-      <path d="m6 11 6 6 6-6" />
-      <path d="M5 21h14" />
-    </svg>
-  );
-});
 import {
   Tooltip,
   TooltipContent,
@@ -127,6 +100,7 @@ import {
   isPptOutlinePlan,
   type PptOutlinePlan,
 } from "@shared/presentationOutline";
+
 type StreamConversation = {
   conversationId: string;
   title: string;
@@ -3828,7 +3802,7 @@ export default function Home() {
                           : "translate-y-2 opacity-0 pointer-events-none duration-100"
                       )}
                     >
-                      <JumpToLatestIcon className="size-4" />
+                      <ArrowDown className="size-4" />
                     </button>
                   </div>
                 )}
