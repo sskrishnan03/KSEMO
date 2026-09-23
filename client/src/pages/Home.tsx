@@ -29,6 +29,35 @@ import {
   UserPlus,
 } from "lucide-react";
 import { ShareIcon, TemporaryChatIcon } from "../components/ksemo/icons";
+
+/*
+ * KSEMO's own "jump to latest" mark — a down arrow landing on a baseline.
+ * Distinct from the chevrons used elsewhere in the chat UI, and it inherits
+ * the button colors via currentColor.
+ */
+const JumpToLatestIcon = memo(function JumpToLatestIcon({
+  className,
+}: {
+  className?: string;
+}) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path d="M12 17V3" />
+      <path d="m6 11 6 6 6-6" />
+      <path d="M5 21h14" />
+    </svg>
+  );
+});
 import {
   Tooltip,
   TooltipContent,
@@ -72,7 +101,6 @@ import { detectFileRequest } from "@shared/docDetect";
 import { SettingsDialog } from "../components/ksemo/SettingsDialog";
 import { SignInPrompt } from "../components/ksemo/SignInPrompt";
 import { setGuestModeActive } from "@/lib/guestMode";
-import { useGlobalShortcuts } from "../hooks/useGlobalShortcuts";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { useVisualViewportHeight } from "../hooks/useVisualViewportHeight";
 import { ShareConversationDialog } from "../components/ksemo/ShareConversationDialog";
@@ -479,6 +507,13 @@ export default function Home() {
   // re-opening a conversation and snaps (instead of animating) to the last
   // message, so the view never lands partway through the thread.
   const pendingOpenScrollRef = useRef(false);
+  // Whether the "Jump to latest" floating button is visible. Mirrors the
+  // opposite of isNearBottomRef so it only shows once the user has scrolled
+  // away from the newest messages.
+  const [showJumpToLatest, setShowJumpToLatest] = useState(false);
+  // While a button-triggered smooth scroll is still running, its onScroll
+  // events must not re-show the button half-way (which caused the blink).
+  const jumpScrollInFlightRef = useRef(false);
   // Streaming deltas arrive much faster than frames (dozens per token burst).
   // Batches them into one state commit per animation frame instead of forcing a
   // full Home re-render for every token.
@@ -523,7 +558,8 @@ export default function Home() {
   const generatingConversationIds = useMemo(() => {
     const ids = new Set<string>();
     for (const stream of streams) {
-      if (stream.active && stream.conversationId) ids.add(stream.conversationId);
+      if (stream.active && stream.conversationId)
+        ids.add(stream.conversationId);
     }
     return ids;
   }, [streams]);
@@ -781,6 +817,7 @@ export default function Home() {
       // animate.
       pendingOpenScrollRef.current = true;
       isNearBottomRef.current = true;
+      setShowJumpToLatest(false);
     }
     const serverMessages = activeQuery.data.messages.map(message => {
       const firstAttachment = message.attachments?.[0] as any;
@@ -1202,27 +1239,6 @@ export default function Home() {
     );
   }, [preferencesQuery.data?.reduceMotion]);
 
-  useEffect(() => {
-    const handleShortcut = (event: KeyboardEvent) => {
-      const modifier = event.metaKey || event.ctrlKey;
-      if (modifier && event.key.toLowerCase() === "k") {
-        event.preventDefault();
-        return;
-      }
-      if (modifier && event.shiftKey && event.key.toLowerCase() === "o") {
-        event.preventDefault();
-        newChat();
-        return;
-      }
-      if (event.key === "Escape" && isGenerating) {
-        event.preventDefault();
-        stopGeneration();
-      }
-    };
-    window.addEventListener("keydown", handleShortcut);
-    return () => window.removeEventListener("keydown", handleShortcut);
-  }, [isGenerating]);
-
   // Scrolls the conversation thread to its newest message. Prefers the end
   // sentinel so it always lands exactly on the last item of the thread.
   function scrollChatToEnd(mode: "auto" | "smooth") {
@@ -1309,8 +1325,34 @@ export default function Home() {
     const el = messagesContainerRef.current;
     if (!el) return;
     // Within ~96px of the bottom counts as pinned to the newest message.
-    isNearBottomRef.current =
-      el.scrollHeight - el.scrollTop - el.clientHeight < 96;
+    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 96;
+    isNearBottomRef.current = nearBottom;
+    // Suppress the button while a jump-click scroll is in flight so its own
+    // scroll events cannot flick the button on and off again.
+    if (jumpScrollInFlightRef.current) {
+      if (nearBottom) {
+        jumpScrollInFlightRef.current = false;
+        setShowJumpToLatest(false);
+      }
+      return;
+    }
+    setShowJumpToLatest(!nearBottom);
+  }
+
+  // Smoothly returns the reader to the newest message and hides the button.
+  // The pin is restored immediately so the streaming auto-scroll keeps the
+  // latest response in view while it is still generating.
+  function jumpToLatest() {
+    isNearBottomRef.current = true;
+    pendingOpenScrollRef.current = false;
+    setShowJumpToLatest(false);
+    jumpScrollInFlightRef.current = true;
+    scrollChatToEnd("smooth");
+    // Safety net: if the scroll never settles (e.g. content grows mid-scroll),
+    // stop suppressing the button so normal scroll-tracking resumes.
+    window.setTimeout(() => {
+      jumpScrollInFlightRef.current = false;
+    }, 700);
   }
 
   async function sendMessage(
@@ -2467,6 +2509,7 @@ export default function Home() {
       seededConversationIdRef.current = null;
       setSeededConversationId(null);
       isNearBottomRef.current = true;
+      setShowJumpToLatest(false);
       pendingOpenScrollRef.current = true;
       setActiveMode("chat");
       setComposerValue("");
@@ -2503,6 +2546,7 @@ export default function Home() {
     seededConversationIdRef.current = null;
     setSeededConversationId(null);
     isNearBottomRef.current = true;
+    setShowJumpToLatest(false);
     pendingOpenScrollRef.current = true;
     setChatMessages([]);
     setActiveConversationId(null);
@@ -2955,6 +2999,7 @@ export default function Home() {
         setSeededConversationId(null);
       }
       isNearBottomRef.current = true;
+      setShowJumpToLatest(false);
       scrollChatToEnd("auto");
       requestComposerFocus();
       return;
@@ -2980,6 +3025,7 @@ export default function Home() {
     seededConversationIdRef.current = null;
     setSeededConversationId(null);
     isNearBottomRef.current = true;
+    setShowJumpToLatest(false);
     pendingOpenScrollRef.current = true;
     setActiveConversationId(id);
     activeConversationIdRef.current = id;
@@ -3183,26 +3229,6 @@ export default function Home() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [activePrimaryWorkspace, stableCloseWorkspace, isDocumentOpen]);
 
-  useGlobalShortcuts({
-    onNewChat: stableNewChat,
-    onToggleSidebar: () => {
-      if (typeof window !== "undefined" && window.innerWidth < 768) {
-        setSidebarOpen(prev => !prev);
-      } else {
-        stableOnToggleCollapsed();
-      }
-    },
-    onOpenSettings: tab => {
-      if (guestMode) {
-        setGuestPromptOpen(true);
-        return;
-      }
-      if (tab) setSettingsInitialTab(tab as any);
-      setSettingsOpen(true);
-    },
-    onModeChange: guestMode ? undefined : mode => setActiveMode(mode),
-    focusTargetId: "ksemo-composer-textarea",
-  });
   const stableOnSupport = usePersistFn((topic: "faq" | "privacy" | "terms") => {
     setSidebarOpen(false);
     setLocation(`/support/${topic}`);
@@ -3784,6 +3810,28 @@ export default function Home() {
                     : "relative"
                 )}
               >
+                {visibleMessages.length > 0 && (
+                  <div
+                    className="relative mx-auto w-full max-w-3xl"
+                    aria-hidden={!showJumpToLatest}
+                  >
+                    <button
+                      type="button"
+                      onClick={jumpToLatest}
+                      tabIndex={showJumpToLatest ? 0 : -1}
+                      aria-label="Jump to latest"
+                      aria-hidden={!showJumpToLatest}
+                      className={cn(
+                        "absolute -top-10 right-4 z-20 flex size-10 items-center justify-center rounded-full border border-border bg-popover/95 text-popover-foreground shadow-md backdrop-blur transition-[opacity,transform] ease-out hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none active:scale-95 sm:right-6",
+                        showJumpToLatest
+                          ? "translate-y-0 opacity-100 pointer-events-auto duration-200"
+                          : "translate-y-2 opacity-0 pointer-events-none duration-100"
+                      )}
+                    >
+                      <JumpToLatestIcon className="size-4" />
+                    </button>
+                  </div>
+                )}
                 <div
                   aria-hidden="true"
                   className="pointer-events-none absolute -top-8 left-0 right-0 h-8 bg-gradient-to-b from-transparent to-background"

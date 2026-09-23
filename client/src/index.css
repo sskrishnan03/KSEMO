@@ -451,8 +451,8 @@ html.ksemo-reduce-motion [data-state] .ksemo-orb-morph-b {
 
 /* KSEMO loader — segmented white ring */
 .loader {
-  width: 30px;
-  --b: 8px;
+  width: 25px;
+  --b: 7px;
   aspect-ratio: 1;
   border-radius: 50%;
   padding: 1px;
