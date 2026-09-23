@@ -377,7 +377,7 @@ export const ConversationSidebar = memo(function ConversationSidebar({
                 />
               )}
               <ConversationGroup
-                label="Recent"
+                label="Conversations"
                 conversations={recent}
                 activeConversationId={activeConversationId}
                 generatingConversationIds={generatingConversationIds}
