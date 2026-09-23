@@ -6,6 +6,10 @@ import {
 } from "@/components/ksemo/AuthShell";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  CenteredLoading,
+  holdForRealisticLoading,
+} from "@/components/ui/loading";
 import { startGoogleLogin } from "@/const";
 import { trpc } from "@/lib/trpc";
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
@@ -17,7 +21,7 @@ import {
   Send,
   UserPlus,
 } from "lucide-react";
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { Link } from "wouter";
 
@@ -54,7 +58,10 @@ function AuthDivider() {
 function FooterLinks() {
   return (
     <div className="flex items-center justify-center gap-2 text-[11px] leading-5 text-muted-foreground">
-      <Link href="/support/faq" className="transition-colors hover:text-foreground">
+      <Link
+        href="/support/faq"
+        className="transition-colors hover:text-foreground"
+      >
         Help
       </Link>
       <span aria-hidden="true">·</span>
@@ -78,9 +85,11 @@ function FooterLinks() {
 function SignInForm({
   onForgot,
   onSignup,
+  setBusy,
 }: {
   onForgot: () => void;
   onSignup: () => void;
+  setBusy: (label: string | null) => void;
 }) {
   const [, navigate] = useLocation();
   const utils = trpc.useUtils();
@@ -92,6 +101,7 @@ function SignInForm({
     password?: string;
   }>({});
   const [formError, setFormError] = useState<string | null>(null);
+  const submitStartedAtRef = useRef<number | null>(null);
 
   const saveTokenAndProceed = async (data: { token?: string; user?: any }) => {
     if (data?.token) {
@@ -114,9 +124,15 @@ function SignInForm({
 
   const signIn = trpc.auth.signIn.useMutation({
     onSuccess: async data => {
-      await saveTokenAndProceed(data);
+      try {
+        await holdForRealisticLoading(submitStartedAtRef.current ?? Date.now());
+        await saveTokenAndProceed(data);
+      } finally {
+        setBusy(null);
+      }
     },
     onError: error => {
+      setBusy(null);
       setFormError(error.message || "Could not sign you in. Please try again.");
     },
   });
@@ -132,6 +148,8 @@ function SignInForm({
     setFieldErrors(errors);
     if (Object.keys(errors).length > 0) return;
 
+    submitStartedAtRef.current = Date.now();
+    setBusy("Signing you in…");
     signIn.mutate({ email: email.trim(), password });
   }
 
@@ -189,7 +207,13 @@ function SignInForm({
   );
 }
 
-function SignUpForm({ onSignin }: { onSignin: () => void }) {
+function SignUpForm({
+  onSignin,
+  setBusy,
+}: {
+  onSignin: () => void;
+  setBusy: (label: string | null) => void;
+}) {
   const [, navigate] = useLocation();
   const utils = trpc.useUtils();
 
@@ -206,6 +230,7 @@ function SignUpForm({ onSignin }: { onSignin: () => void }) {
     agreed?: string;
   }>({});
   const [formError, setFormError] = useState<string | null>(null);
+  const submitStartedAtRef = useRef<number | null>(null);
 
   const signUp = trpc.auth.signUp.useMutation({
     onSuccess: async data => {
@@ -213,20 +238,29 @@ function SignUpForm({ onSignin }: { onSignin: () => void }) {
         try {
           sessionStorage.setItem("ksemo-token", data.token);
           localStorage.setItem("ksemo-token", data.token);
-          sessionStorage.setItem("ksemo-cookie", `app_session_id=${data.token}`);
+          sessionStorage.setItem(
+            "ksemo-cookie",
+            `app_session_id=${data.token}`
+          );
           localStorage.setItem("ksemo-cookie", `app_session_id=${data.token}`);
         } catch {}
       }
       if (data?.user) {
         utils.auth.me.setData(undefined, data.user as any);
       }
-      await utils.auth.me.invalidate();
-      await utils.auth.me.refetch();
+      try {
+        await holdForRealisticLoading(submitStartedAtRef.current ?? Date.now());
+        await utils.auth.me.invalidate();
+        await utils.auth.me.refetch();
+      } finally {
+        setBusy(null);
+      }
       if (window.location.pathname !== "/") {
         navigate("/");
       }
     },
     onError: error => {
+      setBusy(null);
       if (error.data?.code === "CONFLICT") {
         setFieldErrors({ email: error.message });
         return;
@@ -253,6 +287,8 @@ function SignUpForm({ onSignin }: { onSignin: () => void }) {
     setFieldErrors(errors);
     if (Object.keys(errors).length > 0) return;
 
+    submitStartedAtRef.current = Date.now();
+    setBusy("Creating your account…");
     signUp.mutate({ name: name.trim(), email: email.trim(), password });
   }
 
@@ -496,16 +532,24 @@ function ForgotForm({
   );
 }
 
-export default function AuthStage({
-  initial = "idle",
-}: {
-  initial?: Panel;
-}) {
+export default function AuthStage({ initial = "idle" }: { initial?: Panel }) {
   const [panel, setPanel] = useState<Panel>(initial);
+  const [busy, setBusy] = useState<string | null>(null);
+
+  function handleGoogleStart() {
+    // No loading screen on the way out — that would show before the account
+    // picker. Stash a flag so the app shows "Signing you in…" only when Google
+    // redirects back after the account is chosen.
+    try {
+      sessionStorage.setItem("ksemo-pending-oauth", "1");
+    } catch {}
+    startGoogleLogin();
+  }
 
   return (
     <MotionConfig reducedMotion="user">
       <main className="relative flex min-h-dvh items-center justify-center bg-background px-5 py-10">
+        {busy && <CenteredLoading label={busy} />}
         <div className="pointer-events-none absolute inset-0 opacity-35 [background-image:radial-gradient(var(--border)_1px,transparent_1px)] [background-size:28px_28px]" />
 
         <div className="relative z-10 w-full max-w-5xl">
@@ -542,7 +586,7 @@ export default function AuthStage({
                 </div>
 
                 <div className="mt-8 space-y-3 max-w-xs mx-auto">
-                  <GoogleButton onClick={startGoogleLogin} />
+                  <GoogleButton onClick={handleGoogleStart} />
                   <AuthDivider />
                   <Button
                     onClick={() => setPanel("signin")}
@@ -594,11 +638,12 @@ export default function AuthStage({
                 </div>
 
                 <div className="mt-8 space-y-3 max-w-xs mx-auto">
-                  <GoogleButton onClick={startGoogleLogin} />
+                  <GoogleButton onClick={handleGoogleStart} />
                   <AuthDivider />
                   <SignInForm
                     onForgot={() => setPanel("forgot")}
                     onSignup={() => setPanel("signup")}
+                    setBusy={setBusy}
                   />
                 </div>
 
@@ -631,9 +676,12 @@ export default function AuthStage({
                 </div>
 
                 <div className="mt-8 space-y-3 max-w-xs mx-auto">
-                  <GoogleButton onClick={startGoogleLogin} />
+                  <GoogleButton onClick={handleGoogleStart} />
                   <AuthDivider />
-                  <SignUpForm onSignin={() => setPanel("signin")} />
+                  <SignUpForm
+                    onSignin={() => setPanel("signin")}
+                    setBusy={setBusy}
+                  />
                 </div>
 
                 <div className="mt-8">

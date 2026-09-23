@@ -1,6 +1,11 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import { Loading } from "@/components/ui/loading";
+import {
+  AUTH_LOADING_MIN_MS,
+  CenteredLoading,
+  holdForRealisticLoading,
+  Loading,
+} from "@/components/ui/loading";
 import {
   Dialog,
   DialogContent,
@@ -401,6 +406,27 @@ export default function Home() {
     ...DEFAULT_PRESENTATION_CONFIG,
   });
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+  const pendingOAuthReturnRef = useRef(
+    typeof window !== "undefined" &&
+      sessionStorage.getItem("ksemo-pending-oauth") === "1"
+  );
+  const [authReturnHolding, setAuthReturnHolding] = useState(true);
+  useEffect(() => {
+    if (!pendingOAuthReturnRef.current) return;
+    const timer = setTimeout(
+      () => setAuthReturnHolding(false),
+      AUTH_LOADING_MIN_MS
+    );
+    return () => clearTimeout(timer);
+  }, []);
+  useEffect(() => {
+    if (!pendingOAuthReturnRef.current) return;
+    if (loading || authReturnHolding) return;
+    try {
+      sessionStorage.removeItem("ksemo-pending-oauth");
+    } catch {}
+  }, [loading, authReturnHolding]);
   const [settingsInitialTab, setSettingsInitialTab] = useState<
     "account" | "security" | "appearance" | "data" | "memory" | "feedback"
   >("account");
@@ -3064,11 +3090,20 @@ export default function Home() {
     // Sign out lands you on a fresh New Chat, no matter where you were
     // (search, library, a conversation, an open PDF, …). Reset the whole
     // view to the start screen before the session actually flips to guest.
+    setSigningOut(true);
     setSidebarOpen(false);
     setSettingsOpen(false);
     setGuestPromptOpen(false);
     newChat();
-    void logout();
+    void (async () => {
+      const startedAt = Date.now();
+      try {
+        await logout();
+      } catch {}
+      // Keep the "Signing you out…" screen up long enough to feel real.
+      await holdForRealisticLoading(startedAt);
+      setSigningOut(false);
+    })();
   });
   const stableSpeak = usePersistFn(speak);
   const stablePauseSpeech = usePersistFn(pauseSpeech);
@@ -3358,7 +3393,15 @@ export default function Home() {
   const composerElement = renderComposer();
   const voiceComposerElement = renderComposer({ hideVoiceInput: true });
 
-  if (loading) return <Loading fullScreen />;
+  if (loading || (pendingOAuthReturnRef.current && authReturnHolding)) {
+    // Coming back from the Google account picker, hold the "Signing you in"
+    // screen until the session is verified and a realistic amount of time has
+    // passed — otherwise the whole thing blinks away in a fraction of a second.
+    if (pendingOAuthReturnRef.current) {
+      return <CenteredLoading label="Signing you in with Google…" />;
+    }
+    return <Loading fullScreen />;
+  }
 
   // The server could not verify the session (data store/OAuth temporarily
   // down). Do NOT show the sign-in screen: the user may still be signed in,
@@ -3927,6 +3970,8 @@ export default function Home() {
           onClose={() => setGuestPromptOpen(false)}
         />
       )}
+
+      {signingOut && <CenteredLoading label="Signing you out…" />}
     </div>
   );
 }
