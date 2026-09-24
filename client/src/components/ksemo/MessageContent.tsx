@@ -317,41 +317,6 @@ export const MessageContent = memo(function MessageContent({
                 const extra = images.length - 4;
                 return (
                   <div className="mb-2 flex max-w-full flex-col items-end gap-2">
-                    {documents.length > 0 && (
-                      <div className="flex max-w-full flex-wrap items-center justify-end gap-1.5">
-                        {documents.map(file => {
-                          const kind = getFileKind(
-                            file.filename,
-                            file.mimeType
-                          );
-                          const size = formatBytes(file.sizeBytes);
-                          return (
-                            <a
-                              key={file.id}
-                              href={file.url}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="group/file flex h-12 min-w-40 max-w-[15rem] items-center gap-2.5 rounded-xl border border-border/80 bg-muted/70 py-2 pl-2 pr-3 text-left shadow-sm transition-all hover:border-border hover:bg-accent/80 hover:shadow-md"
-                            >
-                              <kind.icon className="size-8 shrink-0" />
-                              <span className="min-w-0 flex-1">
-                                <span className="block truncate text-[12px] font-semibold text-foreground transition-colors group-hover/file:text-primary">
-                                  {file.filename}
-                                </span>
-                                <span className="mt-0.5 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                                  <span>{kind.label}</span>
-                                  {size ? (
-                                    <span className="opacity-80">
-                                      · {size}
-                                    </span>
-                                  ) : null}
-                                </span>
-                              </span>
-                            </a>
-                          );
-                        })}
-                      </div>
-                    )}
                     {images.length > 4 ? (
                       <CardWheelFan
                         images={images.map(file => ({
@@ -395,6 +360,56 @@ export const MessageContent = memo(function MessageContent({
                           })}
                         </div>
                       )
+                    )}
+                    {documents.length > 0 && (
+                      <div className="flex max-w-full flex-wrap items-center justify-end gap-1.5">
+                        {documents.map(file => {
+                          const kind = getFileKind(
+                            file.filename,
+                            file.mimeType
+                          );
+                          const size = formatBytes(file.sizeBytes);
+                          const opensInDrawer = isViewableDocument(
+                            file.filename,
+                            file.mimeType
+                          );
+                          return (
+                            <button
+                              key={file.id}
+                              type="button"
+                              onClick={() => {
+                                if (opensInDrawer) {
+                                  openPdf({
+                                    url: file.url,
+                                    filename: file.filename,
+                                    sizeBytes: file.sizeBytes,
+                                    id: file.id,
+                                  });
+                                } else {
+                                  setPreviewFile(file);
+                                }
+                              }}
+                              className="group/file flex h-12 min-w-40 max-w-[15rem] items-center gap-2.5 rounded-xl border border-border/80 bg-muted/70 py-2 pl-2 pr-3 text-left shadow-sm transition-all hover:border-border hover:bg-accent/80 hover:shadow-md"
+                              aria-label={`Preview ${file.filename}`}
+                            >
+                              <kind.icon className="size-8 shrink-0" />
+                              <span className="min-w-0 flex-1">
+                                <span className="block truncate text-[12px] font-semibold text-foreground transition-colors group-hover/file:text-primary">
+                                  {file.filename}
+                                </span>
+                                <span className="mt-0.5 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                                  <span>{kind.label}</span>
+                                  {size ? (
+                                    <span className="opacity-80">
+                                      · {size}
+                                    </span>
+                                  ) : null}
+                                </span>
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
                     )}
                   </div>
                 );
