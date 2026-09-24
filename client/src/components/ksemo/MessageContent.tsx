@@ -362,7 +362,7 @@ export const MessageContent = memo(function MessageContent({
                       )
                     )}
                     {documents.length > 0 && (
-                      <div className="flex max-w-full flex-wrap items-center justify-end gap-1.5">
+                      <div className="flex max-w-full flex-wrap items-center justify-end gap-1">
                         {documents.map(file => {
                           const kind = getFileKind(
                             file.filename,
@@ -389,15 +389,15 @@ export const MessageContent = memo(function MessageContent({
                                   setPreviewFile(file);
                                 }
                               }}
-                              className="group/file flex h-12 min-w-40 max-w-[15rem] items-center gap-2.5 rounded-xl border border-border/80 bg-muted/70 py-2 pl-2 pr-3 text-left shadow-sm transition-all hover:border-border hover:bg-accent/80 hover:shadow-md"
+                              className="group/file flex h-10 min-w-36 max-w-[14rem] items-center gap-2 rounded-lg border border-border/70 bg-muted/70 py-1.5 pl-1.5 pr-2.5 text-left transition-all hover:border-border hover:bg-accent/80"
                               aria-label={`Preview ${file.filename}`}
                             >
-                              <kind.icon className="size-8 shrink-0" />
+                              <kind.icon className="size-7 shrink-0" />
                               <span className="min-w-0 flex-1">
-                                <span className="block truncate text-[12px] font-semibold text-foreground transition-colors group-hover/file:text-primary">
+                                <span className="block truncate text-[11px] font-semibold leading-tight text-foreground transition-colors group-hover/file:text-primary">
                                   {file.filename}
                                 </span>
-                                <span className="mt-0.5 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                                <span className="mt-0.5 flex items-center gap-1 text-[9px] font-medium uppercase tracking-wide text-muted-foreground">
                                   <span>{kind.label}</span>
                                   {size ? (
                                     <span className="opacity-80">
