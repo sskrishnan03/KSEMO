@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { getFileKind } from "@/lib/fileKinds";
+import { CardWheelFan } from "@/components/ui/card-wheel-fan";
 import {
   Check,
   ChevronDown,
@@ -316,38 +317,49 @@ export const MessageContent = memo(function MessageContent({
                 const extra = images.length - 4;
                 return (
                   <div className="mb-2 flex max-w-full flex-wrap items-end gap-2.5">
-                    {images.length > 0 && (
-                      <div className="flex flex-wrap gap-2">
-                        {images.slice(0, 4).map((file, i) => {
-                          const isLastShown = i === 3;
-                          const isSingle = images.length === 1;
-                          return (
-                            <button
-                              key={file.id}
-                              type="button"
-                              onClick={() => setLightboxIndex(i)}
-                              className={cn(
-                                "group relative shrink-0 overflow-hidden rounded-xl border border-border/80 bg-muted/50 shadow-sm transition-all hover:border-border hover:shadow-md",
-                                isSingle
-                                  ? "size-28 sm:size-32"
-                                  : "size-24 sm:size-28"
-                              )}
-                              aria-label={`View ${file.filename}`}
-                            >
-                              <img
-                                src={file.url}
-                                alt={file.filename}
-                                className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
-                              />
-                              {isLastShown && extra > 0 && (
-                                <span className="absolute inset-0 flex items-center justify-center bg-black/55 text-lg font-semibold text-white">
-                                  +{extra}
-                                </span>
-                              )}
-                            </button>
-                          );
-                        })}
-                      </div>
+                    {images.length > 4 ? (
+                      <CardWheelFan
+                        images={images.map(file => ({
+                          src: file.url,
+                          alt: file.filename,
+                          label: file.filename,
+                        }))}
+                        size="lg"
+                      />
+                    ) : (
+                      images.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          {images.slice(0, 4).map((file, i) => {
+                            const isLastShown = i === 3;
+                            const isSingle = images.length === 1;
+                            return (
+                              <button
+                                key={file.id}
+                                type="button"
+                                onClick={() => setLightboxIndex(i)}
+                                className={cn(
+                                  "group relative shrink-0 overflow-hidden rounded-xl border border-border/80 bg-muted/50 shadow-sm transition-all hover:border-border hover:shadow-md",
+                                  isSingle
+                                    ? "size-28 sm:size-32"
+                                    : "size-24 sm:size-28"
+                                )}
+                                aria-label={`View ${file.filename}`}
+                              >
+                                <img
+                                  src={file.url}
+                                  alt={file.filename}
+                                  className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
+                                />
+                                {isLastShown && extra > 0 && (
+                                  <span className="absolute inset-0 flex items-center justify-center bg-black/55 text-lg font-semibold text-white">
+                                    +{extra}
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )
                     )}
                     {documents.length > 0 && (
                       <div className="flex max-w-full flex-wrap justify-end gap-2.5">

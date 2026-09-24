@@ -76,10 +76,16 @@ async function storageImageDataUri(
 // screenshot cannot fail the whole turn.
 const MAX_INLINE_IMAGE_BYTES = 18 * 1024 * 1024;
 
-// Maximum number of files attached to a single user message and sent to the
-// model in one turn. Keeps the request within the model's vision/input limits
-// while still allowing a generous number of images and files per message.
-const MAX_ATTACHMENTS_PER_MESSAGE = 12;
+// Maximum number of files persisted on a single user message. Images and files
+// are stored up to this many per message so a large batch ("upload 45 photos
+// and ask about them") survives a refresh and is shown in the thread. The
+// number inlined into the model context is capped separately below.
+const MAX_ATTACHMENTS_PER_MESSAGE = 100;
+
+// Maximum images inlined into a single model turn. Images are sent as base64
+// data URIs, so beyond this the remaining images are summarized as a text note
+// instead of blowing past the model's vision/input limits.
+const MAX_IMAGES_IN_MODEL_CONTEXT = 20;
 
 // Separate free-tier quota bucket; used when the selected model's daily limit is hit.
 const QUOTA_FALLBACK_MODEL = "models/gemini-2.5-flash";
@@ -474,8 +480,18 @@ export function registerChatStream(app: Express) {
                   > = message.content
                     ? [{ type: "text" as const, text: message.content }]
                     : [];
+                  let imagesInContext = 0;
+                  const oversizeImages: string[] = [];
                   for (const file of media) {
                     if (file.mimeType.startsWith("image/")) {
+                      // Keep every attachment persisted on the message, but only
+                      // inline the first batch so a very large set of images can
+                      // never exceed the model's per-turn input limits.
+                      if (imagesInContext >= MAX_IMAGES_IN_MODEL_CONTEXT) {
+                        oversizeImages.push(file.filename);
+                        continue;
+                      }
+                      imagesInContext += 1;
                       const dataUri = await storageImageDataUri(
                         file.storageKey,
                         file.mimeType
@@ -523,6 +539,17 @@ export function registerChatStream(app: Express) {
                         });
                       }
                     }
+                  }
+                  if (oversizeImages.length > 0) {
+                    const shown = oversizeImages.length === 1 ? "image" : "images";
+                    const listing = oversizeImages
+                      .slice(0, 8)
+                      .join(", ") +
+                      (oversizeImages.length > 8 ? ", …" : "");
+                    contentParts.push({
+                      type: "text",
+                      text: `A total of ${oversizeImages.length} additional attached ${shown} were not inlined because the message contains many files (names: ${listing}). They are still stored in the private library; ask the user which ones to review in detail if needed.`,
+                    });
                   }
                   if (!message.content?.trim() && contentParts.length > 0) {
                     contentParts.unshift({
