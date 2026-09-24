@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ThinkingIndicator } from "@/components/ui/thinking-indicator";
 import {
   Tooltip,
   TooltipContent,
@@ -632,19 +633,8 @@ function FaqAssistant() {
               </div>
             ))}
             {thinking && (
-              <div className="flex justify-start">
-                <div
-                  className="flex items-center gap-1.5 rounded-2xl rounded-bl-md bg-muted px-3.5 py-3"
-                  aria-label="Assistant is typing"
-                >
-                  {[0, 1, 2].map(dot => (
-                    <span
-                      key={dot}
-                      className="size-1.5 animate-pulse rounded-full bg-muted-foreground"
-                      style={{ animationDelay: `${dot * 160}ms` }}
-                    />
-                  ))}
-                </div>
+              <div className="flex justify-start" role="status">
+                <ThinkingIndicator />
               </div>
             )}
             {messages.length <= 1 && !thinking && (

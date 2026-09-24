@@ -13,6 +13,7 @@ import {
 import { cn } from "@/lib/utils";
 import { getFileKind } from "@/lib/fileKinds";
 import { CardWheelFan } from "@/components/ui/card-wheel-fan";
+import { ThinkingIndicator } from "@/components/ui/thinking-indicator";
 import {
   Check,
   ChevronDown,
@@ -541,13 +542,8 @@ export const MessageContent = memo(function MessageContent({
                 !message.fileGeneration &&
                 !fileCreationNode &&
                 !(message.attachments?.length && !isUser) ? (
-                <div
-                  className="flex h-7 items-center gap-1.5"
-                  aria-label="KSEMO is responding"
-                >
-                  <span className="size-1.5 animate-pulse rounded-full bg-muted-foreground" />
-                  <span className="size-1.5 animate-pulse rounded-full bg-muted-foreground [animation-delay:150ms]" />
-                  <span className="size-1.5 animate-pulse rounded-full bg-muted-foreground [animation-delay:300ms]" />
+                <div aria-label="KSEMO is responding">
+                  <ThinkingIndicator />
                 </div>
               ) : null}
             </div>
