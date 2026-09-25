@@ -227,6 +227,10 @@
   box-sizing: border-box;
 }
 
+.ksemo-markdown ul {
+  padding-left: 1.25em;
+}
+
 .ksemo-markdown li {
   position: relative;
   padding-left: 1.25em;
@@ -244,6 +248,8 @@
   position: absolute;
   left: 0;
   line-height: inherit;
+  font-size: 1.15em;
+  font-weight: 700;
 }
 
 /* Ordered list number via CSS counter */
