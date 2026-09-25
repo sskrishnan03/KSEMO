@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
 export type CardWheelFanImage = {
@@ -13,7 +13,6 @@ export type CardWheelFanSize = "sm" | "md" | "lg";
 export type CardWheelFanTheme = "light" | "dark";
 
 const SLOT_COUNT = 5;
-const CENTER = Math.floor(SLOT_COUNT / 2); // 2
 
 // The gallery only reveals this many images per page; the rest are reached with
 // the next/next/next (right-side) buttons.
@@ -47,13 +46,15 @@ function nearestScrollable(start: HTMLElement | null): HTMLElement | null {
 }
 
 /**
- * A linear card-spread of an uploaded image set — exactly the "five stacked
- * cards fan out sideways on hover" look. At rest the cards sit perfectly
- * stacked so only the latest image (and a small "+N" badge) is visible; on
- * hover the five cards spread horizontally with a springy slide while the
- * center card lifts + scales up. The spread is measured against the chat's
- * scrollable workspace and automatically shifts/tightens so the cards NEVER go
- * beyond the chat workspace.
+ * A linear card-spread of an uploaded image set — exactly the "stacked cards
+ * fan out sideways on hover" look. At rest the cards sit perfectly stacked so
+ * only the latest image (and a small "+N" badge) is visible; on hover the cards
+ * spread horizontally with a springy slide while the center card lifts +
+ * scales up. Any image count (1 to 5+ slots) uses the same structure, the same
+ * card size, and the same animation — the spread is always centered on the
+ * newest card. The spread is measured against the chat's scrollable workspace
+ * and automatically shifts/tightens so the cards NEVER go beyond the chat
+ * workspace.
  *
  * Clicking the fan opens a gallery that reveals at most `pageSize` images per
  * page (rest reached via the next/next/next right-side buttons); clicking any
@@ -93,23 +94,22 @@ function CardLinearSpreadImpl({
   const dims = SIZES[size];
   const desiredGap = gap ?? dims.gap;
 
-  // 5 fan slots; the newest image sits at the visual center (front, on top).
+  // Up to SLOT_COUNT fan slots; the newest image sits at the visual center
+  // (front, on top). The center is derived from however many cards are
+  // actually present, so a 1-image set centers exactly like a 5-image set.
   // Each entry keeps its absolute index so any revealed card can be opened
   // directly.
   const lastStart = Math.max(0, total - SLOT_COUNT);
   const lastIndexed = images
     .slice(lastStart)
     .map((image, i) => ({ image, index: lastStart + i }));
+  const center = Math.floor(lastIndexed.length / 2);
   const newest = lastIndexed[lastIndexed.length - 1];
   const rest = lastIndexed.slice(0, -1);
   const display =
     rest.length === 0
       ? lastIndexed
-      : [
-          ...rest.slice(0, CENTER),
-          newest,
-          ...rest.slice(CENTER),
-        ];
+      : [...rest.slice(0, center), newest, ...rest.slice(center)];
   const hiddenCount = Math.max(0, total - display.length);
 
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
@@ -219,10 +219,11 @@ function CardLinearSpreadImpl({
           className="flex h-full w-full cursor-pointer items-center justify-center rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-ring/70"
         >
           {display.map(({ image, index }, i) => {
-            const dist = i - CENTER;
-            const targetX = isHovered
-              ? (span.gap / CENTER) * dist - span.shift
-              : 0;
+            const dist = i - center;
+            const targetX =
+              isHovered && center > 0
+                ? (span.gap / center) * dist - span.shift
+                : 0;
             const isFront = dist === 0;
 
             return (
@@ -240,7 +241,7 @@ function CardLinearSpreadImpl({
                   duration,
                 }}
                 style={{
-                  zIndex: CENTER + 1 - Math.abs(dist),
+                  zIndex: center + 1 - Math.abs(dist),
                 }}
                 onClick={
                   isHovered

@@ -17,8 +17,6 @@ import { ThinkingIndicator } from "@/components/ui/thinking-indicator";
 import {
   Check,
   ChevronDown,
-  ChevronLeft,
-  ChevronRight,
   Copy,
   Download,
   Ellipsis,
@@ -197,7 +195,6 @@ export const MessageContent = memo(function MessageContent({
   onCancelEdit?: () => void;
 }) {
   const [copied, setCopied] = useState(false);
-  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [previewFile, setPreviewFile] = useState<KsemoFile | null>(null);
   const { openPdf } = usePdfViewer();
   const [userExpanded, setUserExpanded] = useState(false);
@@ -218,19 +215,6 @@ export const MessageContent = memo(function MessageContent({
     )
       ? ""
       : rawClean;
-
-  useEffect(() => {
-    if (lightboxIndex === null) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setLightboxIndex(null);
-      else if (e.key === "ArrowRight")
-        setLightboxIndex(i => (i! + 1) % images.length);
-      else if (e.key === "ArrowLeft")
-        setLightboxIndex(i => (i! - 1 + images.length) % images.length);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [lightboxIndex, images.length]);
 
   useEffect(() => {
     if (!previewFile) return;
@@ -315,10 +299,9 @@ export const MessageContent = memo(function MessageContent({
                 const documents = message.attachments.filter(
                   f => !f.mimeType?.startsWith("image/")
                 );
-                const extra = images.length - 4;
                 return (
                   <div className="mb-2 flex max-w-full flex-col items-end gap-2">
-                    {images.length > 4 ? (
+                    {images.length > 0 && (
                       <CardWheelFan
                         images={images.map(file => ({
                           src: file.url,
@@ -327,40 +310,6 @@ export const MessageContent = memo(function MessageContent({
                         }))}
                         size="lg"
                       />
-                    ) : (
-                      images.length > 0 && (
-                        <div className="flex max-w-full flex-wrap justify-end gap-1.5">
-                          {images.slice(0, 4).map((file, i) => {
-                            const isLastShown = i === 3;
-                            const isSingle = images.length === 1;
-                            return (
-                              <button
-                                key={file.id}
-                                type="button"
-                                onClick={() => setLightboxIndex(i)}
-                                className={cn(
-                                  "group relative shrink-0 overflow-hidden rounded-xl border border-border/80 bg-muted/50 shadow-sm transition-all hover:border-border hover:shadow-md",
-                                  isSingle
-                                    ? "size-28 sm:size-32"
-                                    : "size-24 sm:size-28"
-                                )}
-                                aria-label={`View ${file.filename}`}
-                              >
-                                <img
-                                  src={file.url}
-                                  alt={file.filename}
-                                  className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
-                                />
-                                {isLastShown && extra > 0 && (
-                                  <span className="absolute inset-0 flex items-center justify-center bg-black/55 text-lg font-semibold text-white">
-                                    +{extra}
-                                  </span>
-                                )}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )
                     )}
                     {documents.length > 0 && (
                       <div className="flex max-w-full flex-wrap items-center justify-end gap-1">
@@ -732,62 +681,6 @@ export const MessageContent = memo(function MessageContent({
             )}
         </div>
       </article>
-
-      {lightboxIndex !== null && images.length > 0 && (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90"
-          onClick={() => setLightboxIndex(null)}
-        >
-          <button
-            type="button"
-            onClick={() => setLightboxIndex(null)}
-            aria-label="Close"
-            className="absolute top-4 right-4 z-10 rounded-full bg-white/10 p-2 text-white transition-colors hover:bg-white/25"
-          >
-            <X className="size-5" />
-          </button>
-
-          {images.length > 1 && (
-            <>
-              <button
-                type="button"
-                onClick={e => {
-                  e.stopPropagation();
-                  setLightboxIndex(
-                    (lightboxIndex - 1 + images.length) % images.length
-                  );
-                }}
-                aria-label="Previous image"
-                className="absolute top-1/2 left-3 z-10 -translate-y-1/2 rounded-full bg-white/10 p-2.5 text-white transition-colors hover:bg-white/25"
-              >
-                <ChevronLeft className="size-5" />
-              </button>
-              <button
-                type="button"
-                onClick={e => {
-                  e.stopPropagation();
-                  setLightboxIndex((lightboxIndex + 1) % images.length);
-                }}
-                aria-label="Next image"
-                className="absolute top-1/2 right-3 z-10 -translate-y-1/2 rounded-full bg-white/10 p-2.5 text-white transition-colors hover:bg-white/25"
-              >
-                <ChevronRight className="size-5" />
-              </button>
-            </>
-          )}
-
-          <img
-            src={images[lightboxIndex].url}
-            alt={images[lightboxIndex].filename}
-            onClick={e => e.stopPropagation()}
-            className="max-h-[85vh] max-w-[90vw] rounded-lg object-contain shadow-2xl"
-          />
-
-          <span className="absolute bottom-4 left-1/2 -translate-x-1/2 text-sm font-medium text-white/90">
-            {lightboxIndex + 1} / {images.length}
-          </span>
-        </div>
-      )}
 
       {previewFile && (
         <div
