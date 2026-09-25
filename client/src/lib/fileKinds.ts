@@ -70,3 +70,9 @@ export function getFileKind(name: string, mimeType?: string): FileKind {
   }
   return { label: "File", icon: GenericFileIcon, colorClass: "" };
 }
+
+export function isImageFile(name: string, mimeType?: string): boolean {
+  return Boolean(
+    mimeType?.toLowerCase().startsWith("image/") || IMAGE_EXT.test(name)
+  );
+}

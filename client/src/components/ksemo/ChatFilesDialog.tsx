@@ -1,7 +1,8 @@
-import { getFileKind, IMAGE_EXT } from "@/lib/fileKinds";
-import { ExternalLink, FolderOpen, X } from "lucide-react";
-import React, { memo, useEffect, useMemo } from "react";
+import { getFileKind, isImageFile } from "@/lib/fileKinds";
+import { Eye, ExternalLink, FolderOpen, X } from "lucide-react";
+import React, { memo, useEffect, useMemo, useState } from "react";
 import { usePdfViewer, isViewableDocument } from "@/contexts/PdfViewerContext";
+import { ImageLightbox } from "@/components/ui/image-lightbox";
 import {
   Tooltip,
   TooltipContent,
@@ -22,12 +23,6 @@ type Props = {
   files: ChatFile[];
 };
 
-function isImage(file: ChatFile): boolean {
-  return Boolean(
-    file.mimeType?.startsWith("image/") || IMAGE_EXT.test(file.filename)
-  );
-}
-
 export const ChatFilesDialog = memo(function ChatFilesDialog({
   open,
   onOpenChange,
@@ -35,6 +30,7 @@ export const ChatFilesDialog = memo(function ChatFilesDialog({
 }: Props) {
   const { openPdf } = usePdfViewer();
   const rows = useMemo(() => files, [files]);
+  const [lightboxFile, setLightboxFile] = useState<ChatFile | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -47,9 +43,15 @@ export const ChatFilesDialog = memo(function ChatFilesDialog({
     };
   }, [open, onOpenChange]);
 
+  // Closing the panel should also drop any lightbox it opened.
+  useEffect(() => {
+    if (!open) setLightboxFile(null);
+  }, [open]);
+
   if (!open) return null;
 
   return (
+    <>
     <div
       role="dialog"
       aria-label="Files in this chat"
@@ -92,7 +94,7 @@ export const ChatFilesDialog = memo(function ChatFilesDialog({
           <ul className="space-y-1.5 p-1">
             {rows.map(file => {
               const kind = getFileKind(file.filename, file.mimeType);
-              const image = isImage(file);
+              const image = isImageFile(file.filename, file.mimeType);
               const isPdfFile = isViewableDocument(
                 file.filename,
                 file.mimeType
@@ -101,9 +103,14 @@ export const ChatFilesDialog = memo(function ChatFilesDialog({
                 <li key={file.id}>
                   <a
                     href={file.url}
-                    target={isPdfFile ? undefined : "_blank"}
-                    rel={isPdfFile ? undefined : "noreferrer"}
+                    target={isPdfFile || image ? undefined : "_blank"}
+                    rel={isPdfFile || image ? undefined : "noreferrer"}
                     onClick={e => {
+                      if (image) {
+                        e.preventDefault();
+                        setLightboxFile(file);
+                        return;
+                      }
                       if (isPdfFile) {
                         e.preventDefault();
                         openPdf({
@@ -135,9 +142,15 @@ export const ChatFilesDialog = memo(function ChatFilesDialog({
                         {kind.label}
                       </span>
                     </span>
-                    <span className="flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors group-hover:bg-background/80 group-hover:text-foreground">
-                      <ExternalLink className="size-3.5" />
-                    </span>
+                    {image ? (
+                      <span className="flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors group-hover:bg-background/80 group-hover:text-foreground">
+                        <Eye className="size-3.5" />
+                      </span>
+                    ) : isPdfFile ? null : (
+                      <span className="flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors group-hover:bg-background/80 group-hover:text-foreground">
+                        <ExternalLink className="size-3.5" />
+                      </span>
+                    )}
                   </a>
                 </li>
               );
@@ -146,5 +159,25 @@ export const ChatFilesDialog = memo(function ChatFilesDialog({
         )}
       </div>
     </div>
+    <ImageLightbox
+      images={
+        lightboxFile
+          ? [
+              {
+                src: lightboxFile.url,
+                alt: lightboxFile.filename,
+                label: lightboxFile.filename,
+                downloadUrl: lightboxFile.url,
+                downloadName: lightboxFile.filename,
+              },
+            ]
+          : []
+      }
+      index={lightboxFile ? 0 : null}
+      onIndexChange={() => {}}
+      onClose={() => setLightboxFile(null)}
+      title="Chat image"
+    />
+    </>
   );
 });

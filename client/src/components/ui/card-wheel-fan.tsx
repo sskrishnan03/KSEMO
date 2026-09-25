@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
+import { ImageLightbox } from "./image-lightbox";
 
 export type CardWheelFanImage = {
   src: string;
@@ -169,20 +170,15 @@ function CardLinearSpreadImpl({
   }, [open, viewerIndex]);
 
   useEffect(() => {
-    if (!open && viewerIndex === null) return;
+    // The enlarged viewer owns its own keyboard handling via ImageLightbox, so
+    // this only closes the gallery grid layer when the viewer is not stacked.
+    if (!open || viewerIndex !== null) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        if (viewerIndex !== null) setViewerIndex(null);
-        else setOpen(false);
-      } else if (viewerIndex !== null) {
-        if (e.key === "ArrowRight") setViewerIndex(v => (v! + 1) % total);
-        else if (e.key === "ArrowLeft")
-          setViewerIndex(v => (v! - 1 + total) % total);
-      }
+      if (e.key === "Escape") setOpen(false);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [open, viewerIndex, total]);
+  }, [open, viewerIndex]);
 
   // Reset the gallery to its first page whenever it is (re)opened.
   useEffect(() => {
@@ -383,66 +379,13 @@ function CardLinearSpreadImpl({
         )}
       </AnimatePresence>
 
-      <AnimatePresence>
-        {!onViewImage && viewerIndex !== null && images[viewerIndex] && (
-          <motion.div
-            role="dialog"
-            aria-modal="true"
-            aria-label="Image viewer"
-            className="fixed inset-0 z-[95] flex items-center justify-center bg-black/90 p-4"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.18 }}
-            onClick={() => setViewerIndex(null)}
-          >
-            <button
-              type="button"
-              onClick={() => setViewerIndex(null)}
-              aria-label="Close image viewer"
-              className="absolute top-4 right-4 z-10 rounded-full bg-white/10 p-2 text-white transition-colors hover:bg-white/25"
-            >
-              <X className="size-5" />
-            </button>
-            {total > 1 && (
-              <>
-                <button
-                  type="button"
-                  onClick={e => {
-                    e.stopPropagation();
-                    setViewerIndex(v => (v! - 1 + total) % total);
-                  }}
-                  aria-label="Previous image"
-                  className="absolute top-1/2 left-3 z-10 -translate-y-1/2 rounded-full bg-white/10 p-2.5 text-white transition-colors hover:bg-white/25"
-                >
-                  <ChevronLeft className="size-5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={e => {
-                    e.stopPropagation();
-                    setViewerIndex(v => (v! + 1) % total);
-                  }}
-                  aria-label="Next image"
-                  className="absolute top-1/2 right-3 z-10 -translate-y-1/2 rounded-full bg-white/10 p-2.5 text-white transition-colors hover:bg-white/25"
-                >
-                  <ChevronRight className="size-5" />
-                </button>
-              </>
-            )}
-            <img
-              src={images[viewerIndex].src}
-              alt={images[viewerIndex].alt ?? "Uploaded image"}
-              onClick={e => e.stopPropagation()}
-              className="max-h-[85vh] max-w-[90vw] rounded-lg object-contain shadow-2xl"
-            />
-            <p className="absolute bottom-4 left-1/2 -translate-x-1/2 max-w-[85vw] truncate text-sm font-medium text-white/90">
-              {images[viewerIndex].alt ?? `Image ${viewerIndex + 1}`} ·{" "}
-              {viewerIndex + 1} / {total}
-            </p>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <ImageLightbox
+        images={images}
+        index={onViewImage ? null : viewerIndex}
+        onIndexChange={setViewerIndex}
+        onClose={() => setViewerIndex(null)}
+        title="Image viewer"
+      />
     </>
   );
 }

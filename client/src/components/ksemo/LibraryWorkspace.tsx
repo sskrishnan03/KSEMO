@@ -12,6 +12,8 @@ import { Loading } from "@/components/ui/loading";
 import { trpc } from "@/lib/trpc";
 import { ConfirmDeleteDialog } from "./ConfirmDeleteDialog";
 import { KsemoFilePreviewOverlay } from "./KsemoFilePreviewOverlay";
+import { ImageLightbox } from "@/components/ui/image-lightbox";
+import { isImageFile } from "@/lib/fileKinds";
 import { usePdfViewer, isViewableDocument } from "@/contexts/PdfViewerContext";
 import {
   fileVisualFor,
@@ -151,12 +153,21 @@ export function LibraryWorkspace({
   const [openedFile, setOpenedFile] = useState<LibraryWorkspaceFile | null>(
     null
   );
+  // Images open in the in-app lightbox (never a new browser tab). Each click
+  // opens just that one image — the viewer is not seeded with the rest of the
+  // Library.
+  const [lightboxFile, setLightboxFile] = useState<LibraryWorkspaceFile | null>(
+    null
+  );
   const [openMenuFileId, setOpenMenuFileId] = useState<string | null>(null);
   const initialOpenedRef = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const utils = trpc.useUtils();
   const invalidateFiles = () => utils.workspace.files.list.invalidate();
   const filesQuery = trpc.workspace.files.list.useQuery();
+  const openImage = useCallback((file: LibraryWorkspaceFile) => {
+    setLightboxFile(file);
+  }, []);
 
   useEffect(() => {
     setOpenMenuFileId(null);
@@ -169,7 +180,9 @@ export function LibraryWorkspace({
     if (file) {
       initialOpenedRef.current = true;
       setSelectedIds(current => new Set(current).add(file.id));
-      if (isViewableDocument(file.filename, file.mimeType)) {
+      if (isImageFile(file.filename, file.mimeType)) {
+        openImage(file);
+      } else if (isViewableDocument(file.filename, file.mimeType)) {
         openPdf({
           url: file.url,
           filename: file.filename,
@@ -180,7 +193,7 @@ export function LibraryWorkspace({
         setOpenedFile(file);
       }
     }
-  }, [initialFileId, filesQuery.data, openPdf]);
+  }, [initialFileId, filesQuery.data, openPdf, openImage]);
   const uploadMutation = trpc.workspace.files.upload.useMutation({
     onSuccess: invalidateFiles,
     onError: () => {},
@@ -671,6 +684,7 @@ export function LibraryWorkspace({
                     onRename={requestRename}
                     onShare={requestShare}
                     onDelete={requestDelete}
+                    onOpenFile={openImage}
                   />
                 ))}
               </div>
@@ -690,6 +704,7 @@ export function LibraryWorkspace({
                     onRename={requestRename}
                     onShare={requestShare}
                     onDelete={requestDelete}
+                    onOpenFile={openImage}
                   />
                 ))}
               </div>
@@ -767,6 +782,25 @@ export function LibraryWorkspace({
           onClose={() => setOpenedFile(null)}
         />
       )}
+      <ImageLightbox
+        images={
+          lightboxFile
+            ? [
+                {
+                  src: lightboxFile.url,
+                  alt: lightboxFile.filename,
+                  label: lightboxFile.filename,
+                  downloadUrl: lightboxFile.url,
+                  downloadName: lightboxFile.filename,
+                },
+              ]
+            : []
+        }
+        index={lightboxFile ? 0 : null}
+        onIndexChange={() => {}}
+        onClose={() => setLightboxFile(null)}
+        title="Library image"
+      />
     </main>
   );
 }
@@ -966,6 +1000,7 @@ const LibraryGridCard = memo(function LibraryGridCard({
   onRename,
   onShare,
   onDelete,
+  onOpenFile,
 }: {
   file: LibraryWorkspaceFile;
   selected: boolean;
@@ -976,6 +1011,7 @@ const LibraryGridCard = memo(function LibraryGridCard({
   onRename: (file: LibraryWorkspaceFile) => void;
   onShare: (file: LibraryWorkspaceFile) => void;
   onDelete: (file: LibraryWorkspaceFile) => void;
+  onOpenFile: (file: LibraryWorkspaceFile) => void;
 }) {
   const isFavorite = Boolean(file.isFavorite);
   const { openPdf } = usePdfViewer();
@@ -1090,10 +1126,15 @@ const LibraryGridCard = memo(function LibraryGridCard({
       )}
       <a
         href={file.url}
-        target={isPdfFile ? undefined : "_blank"}
-        rel={isPdfFile ? undefined : "noreferrer"}
+        target={isPdfFile || isImageFile(file.filename, file.mimeType) ? undefined : "_blank"}
+        rel={isPdfFile || isImageFile(file.filename, file.mimeType) ? undefined : "noreferrer"}
         onClick={event => {
           event.stopPropagation();
+          if (isImageFile(file.filename, file.mimeType)) {
+            event.preventDefault();
+            onOpenFile(file);
+            return;
+          }
           if (isPdfFile) {
             event.preventDefault();
             openPdf({
@@ -1111,16 +1152,22 @@ const LibraryGridCard = memo(function LibraryGridCard({
       <div className="p-3">
         <a
           href={file.url}
-          target={isPdfFile ? undefined : "_blank"}
-          rel={isPdfFile ? undefined : "noreferrer"}
+          target={isPdfFile || isImageFile(file.filename, file.mimeType) ? undefined : "_blank"}
+          rel={isPdfFile || isImageFile(file.filename, file.mimeType) ? undefined : "noreferrer"}
           onClick={event => {
             event.stopPropagation();
+            if (isImageFile(file.filename, file.mimeType)) {
+              event.preventDefault();
+              onOpenFile(file);
+              return;
+            }
             if (isPdfFile) {
               event.preventDefault();
               openPdf({
                 url: file.url,
                 filename: file.filename,
                 sizeBytes: file.sizeBytes,
+                id: file.id,
               });
             }
           }}
@@ -1148,6 +1195,7 @@ const LibraryListRow = memo(function LibraryListRow({
   onRename,
   onShare,
   onDelete,
+  onOpenFile,
 }: {
   file: LibraryWorkspaceFile;
   selected: boolean;
@@ -1158,6 +1206,7 @@ const LibraryListRow = memo(function LibraryListRow({
   onRename: (file: LibraryWorkspaceFile) => void;
   onShare: (file: LibraryWorkspaceFile) => void;
   onDelete: (file: LibraryWorkspaceFile) => void;
+  onOpenFile: (file: LibraryWorkspaceFile) => void;
 }) {
   const isFavorite = Boolean(file.isFavorite);
   const { openPdf } = usePdfViewer();
@@ -1200,10 +1249,15 @@ const LibraryListRow = memo(function LibraryListRow({
       </button>
       <a
         href={file.url}
-        target={isPdfFile ? undefined : "_blank"}
-        rel={isPdfFile ? undefined : "noreferrer"}
+        target={isPdfFile || isImageFile(file.filename, file.mimeType) ? undefined : "_blank"}
+        rel={isPdfFile || isImageFile(file.filename, file.mimeType) ? undefined : "noreferrer"}
         onClick={event => {
           event.stopPropagation();
+          if (isImageFile(file.filename, file.mimeType)) {
+            event.preventDefault();
+            onOpenFile(file);
+            return;
+          }
           if (isPdfFile) {
             event.preventDefault();
             openPdf({
@@ -1220,10 +1274,15 @@ const LibraryListRow = memo(function LibraryListRow({
       </a>
       <a
         href={file.url}
-        target={isPdfFile ? undefined : "_blank"}
-        rel={isPdfFile ? undefined : "noreferrer"}
+        target={isPdfFile || isImageFile(file.filename, file.mimeType) ? undefined : "_blank"}
+        rel={isPdfFile || isImageFile(file.filename, file.mimeType) ? undefined : "noreferrer"}
         onClick={event => {
           event.stopPropagation();
+          if (isImageFile(file.filename, file.mimeType)) {
+            event.preventDefault();
+            onOpenFile(file);
+            return;
+          }
           if (isPdfFile) {
             event.preventDefault();
             openPdf({

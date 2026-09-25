@@ -23,6 +23,8 @@ import React, {
   useState,
 } from "react";
 import { ConfirmDeleteDialog } from "./ConfirmDeleteDialog";
+import { ImageLightbox } from "@/components/ui/image-lightbox";
+import { isImageFile } from "@/lib/fileKinds";
 import { usePdfViewer, isViewableDocument } from "@/contexts/PdfViewerContext";
 
 export type WorkspaceSection = "files";
@@ -59,6 +61,12 @@ export const WorkspacePanel = memo(function WorkspacePanel({
 }) {
   const { openPdf } = usePdfViewer();
   const [libraryQuery, setLibraryQuery] = useState("");
+  const [lightboxFile, setLightboxFile] = useState<{
+    id: string;
+    filename: string;
+    mimeType?: string;
+    url: string;
+  } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{
     kind: "file";
     id: string;
@@ -189,12 +197,22 @@ export const WorkspacePanel = memo(function WorkspacePanel({
                           file.filename,
                           file.mimeType
                         );
+                        const isImage = isImageFile(
+                          file.filename,
+                          file.mimeType
+                        );
                         return (
                           <a
                             href={file.url}
-                            target={isPdfFile ? undefined : "_blank"}
-                            rel={isPdfFile ? undefined : "noreferrer"}
+                            target={isPdfFile || isImage ? undefined : "_blank"}
+                            rel={isPdfFile || isImage ? undefined : "noreferrer"}
                             onClick={e => {
+                              if (isImage) {
+                                e.preventDefault();
+                                setLightboxFile(file);
+                                onOpenChange(false);
+                                return;
+                              }
                               if (isPdfFile) {
                                 e.preventDefault();
                                 openPdf({
@@ -268,6 +286,25 @@ export const WorkspacePanel = memo(function WorkspacePanel({
         description={`“${deleteTarget?.label}” will be permanently removed from your KSEMO workspace.`}
         confirmLabel="Delete"
         onConfirm={confirmDelete}
+      />
+      <ImageLightbox
+        images={
+          lightboxFile
+            ? [
+                {
+                  src: lightboxFile.url,
+                  alt: lightboxFile.filename,
+                  label: lightboxFile.filename,
+                  downloadUrl: lightboxFile.url,
+                  downloadName: lightboxFile.filename,
+                },
+              ]
+            : []
+        }
+        index={lightboxFile ? 0 : null}
+        onIndexChange={() => {}}
+        onClose={() => setLightboxFile(null)}
+        title="Library image"
       />
     </>
   );

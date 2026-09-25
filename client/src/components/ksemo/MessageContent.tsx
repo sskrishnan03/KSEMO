@@ -13,6 +13,8 @@ import {
 import { cn } from "@/lib/utils";
 import { getFileKind } from "@/lib/fileKinds";
 import { CardWheelFan } from "@/components/ui/card-wheel-fan";
+import { ImageLightbox } from "@/components/ui/image-lightbox";
+import { isImageFile } from "@/lib/fileKinds";
 import { ThinkingIndicator } from "@/components/ui/thinking-indicator";
 import {
   Check,
@@ -196,13 +198,14 @@ export const MessageContent = memo(function MessageContent({
 }) {
   const [copied, setCopied] = useState(false);
   const [previewFile, setPreviewFile] = useState<KsemoFile | null>(null);
+  const [lightboxFile, setLightboxFile] = useState<KsemoFile | null>(null);
   const { openPdf } = usePdfViewer();
   const [userExpanded, setUserExpanded] = useState(false);
   const [userLong, setUserLong] = useState(false);
   const userTextRef = useRef<HTMLParagraphElement | null>(null);
   const isUser = message.role === "user";
   const images = (message.attachments ?? []).filter(f =>
-    f.mimeType?.startsWith("image/")
+    isImageFile(f.filename, f.mimeType)
   );
 
   // Sanitize assistant content
@@ -507,7 +510,7 @@ export const MessageContent = memo(function MessageContent({
               {message.attachments.map(file => {
                 const kind = getFileKind(file.filename, file.mimeType);
                 const size = formatBytes(file.sizeBytes);
-                const isImage = file.mimeType?.startsWith("image/");
+                const isImage = isImageFile(file.filename, file.mimeType);
                 if (isImage) {
                   return (
                     <div
@@ -516,7 +519,7 @@ export const MessageContent = memo(function MessageContent({
                     >
                       <button
                         type="button"
-                        onClick={() => setPreviewFile(file)}
+                        onClick={() => setLightboxFile(file)}
                         className="block w-full"
                         aria-label={`View ${file.filename}`}
                       >
@@ -681,6 +684,26 @@ export const MessageContent = memo(function MessageContent({
             )}
         </div>
       </article>
+
+      <ImageLightbox
+        images={
+          lightboxFile
+            ? [
+                {
+                  src: lightboxFile.url,
+                  alt: lightboxFile.filename,
+                  label: lightboxFile.filename,
+                  downloadUrl: lightboxFile.url,
+                  downloadName: lightboxFile.filename,
+                },
+              ]
+            : []
+        }
+        index={lightboxFile ? 0 : null}
+        onIndexChange={() => {}}
+        onClose={() => setLightboxFile(null)}
+        title="Image viewer"
+      />
 
       {previewFile && (
         <div
