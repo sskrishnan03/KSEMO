@@ -6,13 +6,14 @@
 const GEMINI_BASE_URL =
   process.env.LLM_BASE_URL?.replace(/\/openai\/?$/, "") ??
   "https://generativelanguage.googleapis.com/v1beta";
-// Ordered by transcription speed as a best effort; each fallback is only used
-// when the previous model is busy or unavailable on the configured API key.
-// NOTE: gemini-2.0-flash returns 404 ("no longer available") and has been
-// removed — it only wasted the request budget before the working models ran.
+// Ordered by transcription fidelity; each fallback is only used when the
+// previous model is busy (429/503) or unavailable on the configured API key.
+// The dedicated transcribe model MUST stay first: the general-purpose flash
+// fallbacks happily invent text for non-speech audio, which puts words in the
+// user's message that they never said.
 const TRANSCRIBE_MODELS = [
-  "gemini-2.0-flash",
-  "gemini-1.5-flash",
+  "gemini-3.5-transcribe",
+  "gemini-3.6-flash",
 ];
 
 // Hard cap on total transcription time so the UI never hangs on an unresponsive
@@ -188,21 +189,37 @@ export async function transcribeAudio(
     }
 
     const data = (await response.json()) as {
-      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+      candidates?: Array<{
+        content?: {
+          parts?: Array<{
+            text?: string;
+            audioTranscription?: { text?: string };
+          }>;
+        };
+      }>;
     };
-    const text = (data.candidates?.[0]?.content?.parts ?? [])
-      .map(part => part.text ?? "")
-      .join("")
-      .trim();
-
-    if (!text) {
+    const candidate = data.candidates?.[0];
+    if (!candidate) {
       return {
         error: "Invalid transcription response",
         code: "SERVICE_ERROR",
-        details: "Transcription service returned an empty response",
+        details: "Transcription service returned no candidates",
       };
     }
+    // Two different part shapes carry the transcript, and reading only one of
+    // them yields a silent empty string:
+    //   - dedicated transcribe models return { audioTranscription: { text } }
+    //   - general multimodal models return { text }
+    // Read both, so the chain works no matter which model answers.
+    const text = (candidate.content?.parts ?? [])
+      .map(part => part.audioTranscription?.text ?? part.text ?? "")
+      .join("")
+      .trim();
 
+    // An empty result is a legitimate outcome — the dedicated transcribe model
+    // returns no parts for silence or non-speech audio. Report it as a
+    // successful empty transcript so the client can show its own "no speech
+    // detected" message, instead of surfacing a misleading service error.
     return {
       task: "transcribe",
       language: options.language ?? "unknown",
