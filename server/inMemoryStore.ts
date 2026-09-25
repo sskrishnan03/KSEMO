@@ -712,6 +712,29 @@ class InMemoryStore {
     this.requestPersist();
   }
 
+  async clearMessageFeedbackForUser(input: {
+    messageId: string;
+    userId: number;
+  }): Promise<void> {
+    if (this.messageFeedback.delete(`${input.messageId}:${input.userId}`)) {
+      this.requestPersist();
+    }
+  }
+
+  async listMessageFeedbackForUser(input: {
+    userId: number;
+    messageIds: string[];
+  }): Promise<Array<{ messageId: string; value: "up" | "down" }>> {
+    const wanted = new Set(input.messageIds);
+    const rows: Array<{ messageId: string; value: "up" | "down" }> = [];
+    for (const feedback of this.messageFeedback.values()) {
+      if (feedback.userId !== input.userId) continue;
+      if (!wanted.has(feedback.messageId)) continue;
+      rows.push({ messageId: feedback.messageId, value: feedback.value });
+    }
+    return rows;
+  }
+
   async searchConversationMessages(userId: number, query: string): Promise<any[]> {
     const q = query.toLowerCase().trim();
     if (!q) return [];

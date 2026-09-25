@@ -966,6 +966,19 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+-- Clear message feedback (the user toggled their rating back off)
+CREATE OR REPLACE FUNCTION clear_message_feedback(
+    p_message_id UUID,
+    p_user_id INTEGER
+)
+RETURNS BOOLEAN AS $$
+BEGIN
+    DELETE FROM message_feedback
+    WHERE message_id = p_message_id AND user_id = p_user_id;
+    RETURN FOUND;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 -- Upsert user preferences
 CREATE OR REPLACE FUNCTION upsert_user_preferences(
     p_user_id INTEGER,

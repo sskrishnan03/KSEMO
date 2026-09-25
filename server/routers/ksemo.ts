@@ -5,6 +5,7 @@ import {
   createMessage,
   createVoiceSession,
   archiveAllConversationsForUser,
+  clearMessageFeedbackForUser,
   deleteAllConversationsForUser,
   deleteConversationForUser,
   deleteMessageForUser,
@@ -16,6 +17,7 @@ import {
   listMessageFilesForUser,
   getUserPreferences,
   listConversationsForUser,
+  listMessageFeedbackForUser,
   listMessagesForConversation,
   moveConversationToTrash,
   restoreConversationForUser,
@@ -444,7 +446,8 @@ export const messageRouter = router({
     .input(
       z.object({
         messageId: z.string().min(8).max(36),
-        value: z.enum(["up", "down"]),
+        // null clears the rating — the client toggles the active thumb off.
+        value: z.enum(["up", "down"]).nullable(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -454,13 +457,33 @@ export const messageRouter = router({
           code: "NOT_FOUND",
           message: "Message not found",
         });
-      return setMessageFeedbackForUser({
+      if (input.value === null) {
+        await clearMessageFeedbackForUser({
+          messageId: input.messageId,
+          userId: ctx.user.id,
+        });
+        return { value: null };
+      }
+      await setMessageFeedbackForUser({
         id: crypto.randomUUID(),
         messageId: input.messageId,
         userId: ctx.user.id,
         value: input.value,
       });
+      return { value: input.value };
     }),
+  feedbackList: protectedProcedure
+    .input(
+      z.object({
+        messageIds: z.array(z.string().min(8).max(36)).max(500),
+      })
+    )
+    .query(({ ctx, input }) =>
+      listMessageFeedbackForUser({
+        userId: ctx.user.id,
+        messageIds: input.messageIds,
+      })
+    ),
 });
 
 const supportedAudioTypes = new Set([

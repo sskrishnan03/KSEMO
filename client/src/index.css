@@ -558,6 +558,49 @@ html.ksemo-reduce-motion .ksemo-voice-bar {
   }
 }
 
+/* ============================================
+   MESSAGE FEEDBACK TOGGLE (good / bad response)
+   ============================================ */
+
+/* Lucide thumbs are outline drawings, so a solid `fill` would flood the whole
+   glyph and erase every internal detail — the icon turns into a featureless
+   silhouette. Tinting the interior at low opacity keeps the stroke crisp and
+   fully readable while still reading as "selected". */
+.ksemo-feedback-thumb-active {
+  fill: currentColor;
+  fill-opacity: 0.35;
+}
+
+/* Squash, overshoot, settle — applied to the thumb glyph itself and nothing
+   else. The class is added and removed with the rating, so every press (in
+   either direction) replays it. */
+@keyframes ksemo-feedback-thumb-pop {
+  0% {
+    transform: scale(1) rotate(0deg);
+  }
+  28% {
+    transform: scale(0.62) rotate(-12deg);
+  }
+  56% {
+    transform: scale(1.3) rotate(7deg);
+  }
+  78% {
+    transform: scale(0.93) rotate(-2deg);
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+  }
+}
+.ksemo-feedback-thumb-pop {
+  animation: ksemo-feedback-thumb-pop 480ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ksemo-feedback-thumb-pop {
+    animation: none;
+  }
+}
+
 /* Hide scrollbar for Create & Explore submenu */
 [data-radix-dropdown-menu-content][class*="max-h"]::-webkit-scrollbar {
   display: none;

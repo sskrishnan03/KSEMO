@@ -33,6 +33,11 @@ import {
   X,
 } from "lucide-react";
 import { ShareIcon } from "./icons";
+import {
+  MessageFeedback,
+  type MessageFeedbackValue,
+} from "./MessageFeedback";
+import { usePersistFn } from "@/hooks/usePersistFn";
 import React, { memo, useEffect, useRef, useState } from "react";
 import { Streamdown } from "streamdown";
 import { KsemoMarkdownCode } from "./code-block";
@@ -164,6 +169,7 @@ export const MessageContent = memo(function MessageContent({
   onRegenerate,
   onRetry,
   onFeedback,
+  feedback = null,
   onShare,
   onDelete,
   isEditing = false,
@@ -188,6 +194,7 @@ export const MessageContent = memo(function MessageContent({
   onRegenerate?: (message: KsemoMessage) => void;
   onRetry?: (message: KsemoMessage) => void;
   onFeedback?: (messageId: string, value: "up" | "down") => void;
+  feedback?: MessageFeedbackValue | null;
   onShare?: (message: KsemoMessage) => void;
   onDelete?: (message: KsemoMessage) => void;
   isEditing?: boolean;
@@ -234,6 +241,12 @@ export const MessageContent = memo(function MessageContent({
     const overflows = el.scrollHeight > el.clientHeight + 1;
     setUserLong(overflows);
   }, [isUser, message.content]);
+
+  // Stable across renders so the memoized feedback pair is not re-rendered on
+  // every streaming flush.
+  const handleFeedbackToggle = usePersistFn((value: MessageFeedbackValue) =>
+    onFeedback?.(message.id, value)
+  );
 
   async function copyMessage() {
     await navigator.clipboard.writeText(cleanContent);
@@ -657,18 +670,10 @@ export const MessageContent = memo(function MessageContent({
                       onRegenerate ? onRegenerate(message) : onRetry?.(message)
                   )}
                 {onFeedback && message.content && (
-                  <>
-                    {action(
-                      "Good response",
-                      <ThumbsUp className="size-4" />,
-                      () => onFeedback(message.id, "up")
-                    )}
-                    {action(
-                      "Bad response",
-                      <ThumbsDown className="size-4" />,
-                      () => onFeedback(message.id, "down")
-                    )}
-                  </>
+                  <MessageFeedback
+                    value={feedback}
+                    onToggle={handleFeedbackToggle}
+                  />
                 )}
                 <MessageOverflow
                   message={message}

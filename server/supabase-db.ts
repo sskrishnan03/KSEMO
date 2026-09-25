@@ -763,6 +763,47 @@ export async function setMessageFeedbackForUser(input: {
   if (error) throwDb("setMessageFeedbackForUser", error);
 }
 
+export async function clearMessageFeedbackForUser(input: {
+  messageId: string;
+  userId: number;
+}): Promise<void> {
+  if (useMemoryFallback()) {
+    return inMemoryStore.clearMessageFeedbackForUser(input);
+  }
+  const { error } = await supabase.rpc("clear_message_feedback", {
+    p_message_id: input.messageId,
+    p_user_id: input.userId,
+  });
+  if (error) throwDb("clearMessageFeedbackForUser", error);
+}
+
+/**
+ * Ratings this user left on the given messages, keyed by message id. Messages
+ * without a rating are simply absent from the result.
+ */
+export async function listMessageFeedbackForUser(input: {
+  userId: number;
+  messageIds: string[];
+}): Promise<Record<string, "up" | "down">> {
+  if (input.messageIds.length === 0) return {};
+  if (useMemoryFallback()) {
+    const rows = await inMemoryStore.listMessageFeedbackForUser(input);
+    return Object.fromEntries(rows.map(row => [row.messageId, row.value]));
+  }
+  const { data, error } = await supabase
+    .from("message_feedback")
+    .select("message_id, value")
+    .eq("user_id", input.userId)
+    .in("message_id", input.messageIds);
+  if (error) throwDb("listMessageFeedbackForUser", error);
+  const ratings: Record<string, "up" | "down"> = {};
+  for (const row of data || []) {
+    if (row.value === "up" || row.value === "down")
+      ratings[row.message_id] = row.value;
+  }
+  return ratings;
+}
+
 export async function searchConversationMessages(
   userId: number,
   query: string

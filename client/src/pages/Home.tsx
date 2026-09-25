@@ -79,6 +79,11 @@ import { detectFileRequest } from "@shared/docDetect";
 import { SettingsDialog } from "../components/ksemo/SettingsDialog";
 import { SignInPrompt } from "../components/ksemo/SignInPrompt";
 import { setGuestModeActive } from "@/lib/guestMode";
+import {
+  isSameMessageFeedback,
+  toggleMessageFeedback,
+  type MessageFeedbackValue,
+} from "@/lib/messageFeedback";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { useVisualViewportHeight } from "../hooks/useVisualViewportHeight";
 import { ShareConversationDialog } from "../components/ksemo/ShareConversationDialog";
@@ -347,6 +352,13 @@ export default function Home() {
   const isTemporaryChatRef = useRef(false);
   const temporaryConversationIdsRef = useRef<Set<string>>(new Set());
   const [chatMessages, setChatMessages] = useState<KsemoMessage[]>([]);
+  // Good/bad response ratings for the open conversation, keyed by message id.
+  // The ref mirror lets the stable toggle callback read the current rating
+  // without being re-created on every render.
+  const [messageFeedback, setMessageFeedback] = useState<
+    Record<string, "up" | "down">
+  >({});
+  const messageFeedbackRef = useRef<Record<string, "up" | "down">>({});
   // Guest ("signed-out") mode state. Guests keep the same Home screen, but
   // sending a message (or opening any locked feature) asks them to sign in via
   // a dismissible card in the bottom-right corner.
@@ -767,9 +779,38 @@ export default function Home() {
     onError: () => {},
   });
   const messageFeedbackMutation = trpc.message.feedback.useMutation({
-    onSuccess: () => {},
-    onError: () => {},
+    onError: () => {
+      // The rating was applied optimistically but the server rejected it, so
+      // re-read the authoritative rows and let the effect below roll the UI back.
+      void utils.message.feedbackList.invalidate();
+    },
   });
+  // Ratings for the open conversation, re-read whenever the set of rateable
+  // messages changes so a reload restores the thumb the user pressed.
+  const ratedMessageIdsKey = useMemo(() => {
+    if (guestMode) return "";
+    return chatMessages
+      .filter(
+        message => message.role === "assistant" && Boolean(message.content)
+      )
+      .map(message => message.id)
+      .join(",");
+  }, [chatMessages, guestMode]);
+  const messageFeedbackQuery = trpc.message.feedbackList.useQuery(
+    {
+      messageIds: ratedMessageIdsKey ? ratedMessageIdsKey.split(",") : [],
+    },
+    { enabled: Boolean(ratedMessageIdsKey) }
+  );
+  useEffect(() => {
+    if (!messageFeedbackQuery.isSuccess) return;
+    const ratings = messageFeedbackQuery.data ?? {};
+    setMessageFeedback(current => {
+      if (isSameMessageFeedback(current, ratings)) return current;
+      messageFeedbackRef.current = ratings;
+      return ratings;
+    });
+  }, [messageFeedbackQuery.isSuccess, messageFeedbackQuery.data]);
   const messageRemoveMutation = trpc.message.remove.useMutation({
     onSuccess: () => {
       if (activeConversationId)
@@ -3132,9 +3173,22 @@ export default function Home() {
     }
     utils.conversation.list.invalidate();
   });
+  // Good/bad response is an exclusive pair: pressing the other thumb switches
+  // the rating, and pressing the active thumb again clears it.
   const stableOnFeedback = usePersistFn(
-    (messageId: string, value: "up" | "down") =>
-      messageFeedbackMutation.mutate({ messageId, value })
+    (messageId: string, value: MessageFeedbackValue) => {
+      const toggled = toggleMessageFeedback(
+        messageFeedbackRef.current,
+        messageId,
+        value
+      );
+      messageFeedbackRef.current = toggled.ratings;
+      setMessageFeedback(toggled.ratings);
+      messageFeedbackMutation.mutate({
+        messageId,
+        value: toggled.value,
+      });
+    }
   );
   const stableOnClearAttachment = usePersistFn((fileId?: string) =>
     setAttachmentNotices(current =>
@@ -3799,6 +3853,7 @@ export default function Home() {
                         onShare={guestMode ? undefined : stableShareMessage}
                         onDelete={guestMode ? undefined : stableDeleteMessage}
                         onFeedback={guestMode ? undefined : stableOnFeedback}
+                        feedback={messageFeedback[message.id] ?? null}
                       />
                     );
                   })}

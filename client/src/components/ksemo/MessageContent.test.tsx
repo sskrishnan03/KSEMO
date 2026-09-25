@@ -298,3 +298,60 @@ describe("MessageContent speech controls", () => {
     expect(markup).toContain('aria-label="Regenerate response"');
   });
 });
+
+describe("MessageContent response feedback", () => {
+  function renderFeedback(feedback: "up" | "down" | null) {
+    return renderWithTooltip(
+      createElement(MessageContent, {
+        message: assistantMessage,
+        ...callbacks,
+        isSpeaking: false,
+        speechState: "idle",
+        onFeedback: () => undefined,
+        feedback,
+      })
+    );
+  }
+
+  it("renders both thumbs unpressed for an unrated response", () => {
+    const markup = renderFeedback(null);
+
+    expect(markup).toContain('aria-label="Good response"');
+    expect(markup).toContain('aria-label="Bad response"');
+    expect(markup).toContain('aria-pressed="false"');
+    expect(markup).not.toContain("ksemo-feedback-thumb-pop");
+    expect(markup).not.toContain("ksemo-feedback-thumb-active");
+    expect(markup).not.toContain("ksemo-feedback-outline-in");
+  });
+
+  it("animates and fills only the good thumb when rated up", () => {
+    const markup = renderFeedback("up");
+
+    expect(markup.split('aria-pressed="true"').length - 1).toBe(1);
+    expect(markup.split("ksemo-feedback-thumb-pop").length - 1).toBe(1);
+    expect(markup.split("ksemo-feedback-thumb-active").length - 1).toBe(1);
+  });
+
+  it("animates and fills only the bad thumb when rated down", () => {
+    const markup = renderFeedback("down");
+
+    expect(markup.split('aria-pressed="true"').length - 1).toBe(1);
+    expect(markup.split("ksemo-feedback-thumb-pop").length - 1).toBe(1);
+    expect(markup.split("ksemo-feedback-thumb-active").length - 1).toBe(1);
+  });
+
+  it("hides the thumbs when no feedback handler is supplied", () => {
+    const markup = renderWithTooltip(
+      createElement(MessageContent, {
+        message: assistantMessage,
+        ...callbacks,
+        isSpeaking: false,
+        speechState: "idle",
+        feedback: "up",
+      })
+    );
+
+    expect(markup).not.toContain('aria-label="Good response"');
+    expect(markup).not.toContain('aria-label="Bad response"');
+  });
+});
