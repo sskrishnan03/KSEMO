@@ -30,7 +30,6 @@ import {
   ChevronDown,
   Camera,
   FilePlus2,
-  Library,
   Loader2,
   MessageCircle,
   Mic,
@@ -41,6 +40,7 @@ import {
   VolumeX,
   X,
 } from "lucide-react";
+import { Library } from "reicon-react/icons/Library";
 import React, {
   memo,
   useEffect,
@@ -979,7 +979,7 @@ export const ChatComposer = memo(function ChatComposer({
                         setToolsOpen(false);
                       }}
                     >
-                      <Library className="mr-2 size-4" />
+                      <Library aria-hidden="true" className="mr-2 size-4" />
                       Browse Library
                     </DropdownMenuItem>
                     {!voiceChatActive && (
@@ -1533,7 +1533,7 @@ export function LibraryPickerContent({
   return (
     <div className="space-y-2 p-2">
       <div className="flex items-center gap-2 px-1">
-        <Library className="size-4 text-muted-foreground" />
+        <Library aria-hidden="true" className="size-4 text-muted-foreground" />
         <p className="flex-1 text-sm font-medium">Browse Library</p>
         {onCancel && (
           <Button
