@@ -37,6 +37,8 @@ import {
   ShieldCheck,
   SquarePen,
   Trash2,
+  X,
+  LockKeyhole,
 } from "lucide-react";
 import { Library } from "reicon-react/icons/Library";
 import { ChatLine } from "reicon-react/icons/ChatLine";
@@ -46,6 +48,27 @@ import { PdfFileIcon, WordFileIcon } from "./FileBrandIcons";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { startLogin } from "@/const";
 import React, { memo, useMemo, useRef, useState } from "react";
+
+/** The locked sidebar actions that answer with the in-sidebar sign-in card. */
+type LockedIntent = "new" | "search" | "library";
+
+const LOCKED_INTENT_COPY: Record<
+  LockedIntent,
+  { title: string; body: string }
+> = {
+  new: {
+    title: "Sign in to start a chat",
+    body: "Chats, files, and creations stay in sync once you sign in.",
+  },
+  search: {
+    title: "Sign in to search",
+    body: "Search across every conversation and file in your account.",
+  },
+  library: {
+    title: "Sign in to open your library",
+    body: "Your uploads and saved files live in your library.",
+  },
+};
 
 type Conversation = {
   id: string;
@@ -81,7 +104,6 @@ export const ConversationSidebar = memo(function ConversationSidebar({
   user,
   previewSupportOpen = false,
   locked = false,
-  onLoginPrompt,
 }: {
   conversations: Conversation[];
   activeConversationId: string | null;
@@ -109,7 +131,6 @@ export const ConversationSidebar = memo(function ConversationSidebar({
   previewSupportOpen?: boolean;
   /** Signed-out guest mode: nothing in the sidebar is usable until sign-in. */
   locked?: boolean;
-  onLoginPrompt?: () => void;
 }) {
   const pinned = useMemo(
     () => conversations.filter(item => item.isPinned),
@@ -125,6 +146,9 @@ export const ConversationSidebar = memo(function ConversationSidebar({
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  // Which locked action a guest last tapped, so the in-sidebar sign-in
+  // container can name it. Null means the standing guest card is showing.
+  const [lockedIntent, setLockedIntent] = useState<LockedIntent | null>(null);
 
   const startRename = (conversation: Conversation) => {
     setRenamingId(conversation.id);
@@ -305,21 +329,21 @@ export const ConversationSidebar = memo(function ConversationSidebar({
         <div className="space-y-1">
           {utility("New chat", <SquarePen className="size-4" />, () => {
             if (locked) {
-              onLoginPrompt?.();
+              setLockedIntent("new");
               return;
             }
             onNew();
           })}
           {utility("Search", <Search className="size-4" />, () => {
             if (locked) {
-              onLoginPrompt?.();
+              setLockedIntent("search");
               return;
             }
             onSearch();
           })}
           {utility("Library", <Library size={16} />, () => {
             if (locked) {
-              onLoginPrompt?.();
+              setLockedIntent("library");
               return;
             }
             onWorkspace("files");
@@ -405,30 +429,71 @@ export const ConversationSidebar = memo(function ConversationSidebar({
           }
         </nav>
         {locked && !compact && (
-          <div className="mt-3 rounded-xl bg-gradient-to-b from-sidebar-accent/40 to-transparent p-4 text-center">
-            <div className="mx-auto size-10 overflow-hidden rounded-xl transition-transform duration-150 hover:scale-105">
-              <img
-                src="/KSEMOlogo.png"
-                alt="KSEMO logo"
-                className="size-full object-cover"
-              />
-            </div>
-            <p className="mt-2.5 text-sm font-semibold tracking-[-0.01em]">
-              Sign in to KSEMO
-            </p>
-            <p className="mt-1 text-xs leading-5 text-muted-foreground">
-              Your conversations, files, and creations — all in one place.
-            </p>
-            <Button
-              onClick={() => startLogin()}
-              className="mt-3 h-9 w-full rounded-lg bg-[oklch(0.95_0.003_80)] text-[oklch(0.21_0.008_80)] shadow-sm transition-[background-color,transform] duration-150 hover:bg-[oklch(0.93_0.003_80)] active:scale-[0.98]"
+          lockedIntent ? (
+            /* In-sidebar sign-in container. Opening a locked action sets
+               `lockedIntent`, which swaps this block in place of the standing
+               guest sign-in card, so the answer appears where the click
+               happened instead of in a dialog over the chat. Cancelling clears
+               the intent and restores the guest card. */
+            <div
+              role="alertdialog"
+              aria-label="Sign in required"
+              className="relative mt-3 rounded-xl bg-gradient-to-b from-sidebar-accent/40 to-transparent p-4 text-center"
             >
-              <span className="inline-flex items-center gap-2 text-sm font-medium">
-                <LogIn className="size-4" />
-                Sign in
-              </span>
-            </Button>
-          </div>
+              <button
+                type="button"
+                onClick={() => setLockedIntent(null)}
+                className="absolute right-1.5 top-1.5 flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                aria-label="Cancel"
+              >
+                <X className="size-3.5" />
+              </button>
+
+              <div className="mx-auto flex size-9 items-center justify-center rounded-lg bg-sidebar-accent text-sidebar-accent-foreground">
+                <LockKeyhole className="size-4" />
+              </div>
+              <p className="mt-2.5 text-sm font-semibold tracking-[-0.01em]">
+                {LOCKED_INTENT_COPY[lockedIntent].title}
+              </p>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                {LOCKED_INTENT_COPY[lockedIntent].body}
+              </p>
+              <Button
+                onClick={() => startLogin()}
+                className="mt-3 h-9 w-full rounded-lg bg-[oklch(0.95_0.003_80)] text-[oklch(0.21_0.008_80)] shadow-sm transition-[background-color,transform] duration-150 hover:bg-[oklch(0.93_0.003_80)] active:scale-[0.98]"
+              >
+                <span className="inline-flex items-center gap-2 text-sm font-medium">
+                  <LogIn className="size-4" />
+                  Sign in
+                </span>
+              </Button>
+            </div>
+          ) : (
+            <div className="mt-3 rounded-xl bg-gradient-to-b from-sidebar-accent/40 to-transparent p-4 text-center">
+              <div className="mx-auto size-10 overflow-hidden rounded-xl transition-transform duration-150 hover:scale-105">
+                <img
+                  src="/KSEMOlogo.png"
+                  alt="KSEMO logo"
+                  className="size-full object-cover"
+                />
+              </div>
+              <p className="mt-2.5 text-sm font-semibold tracking-[-0.01em]">
+                Sign in to KSEMO
+              </p>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                Your conversations, files, and creations — all in one place.
+              </p>
+              <Button
+                onClick={() => startLogin()}
+                className="mt-3 h-9 w-full rounded-lg bg-[oklch(0.95_0.003_80)] text-[oklch(0.21_0.008_80)] shadow-sm transition-[background-color,transform] duration-150 hover:bg-[oklch(0.93_0.003_80)] active:scale-[0.98]"
+              >
+                <span className="inline-flex items-center gap-2 text-sm font-medium">
+                  <LogIn className="size-4" />
+                  Sign in
+                </span>
+              </Button>
+            </div>
+          )
         )}
         {!locked && (
           <div className="mt-3 border-t border-border pt-3">

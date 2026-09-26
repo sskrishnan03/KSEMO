@@ -1,6 +1,8 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import {
   ConversationSidebar,
@@ -53,6 +55,13 @@ function renderLockedSidebar() {
       onLogout: () => undefined,
       user: { name: "KSEMO user", email: "user@example.com" },
     })
+  );
+}
+
+function readSidebarSource() {
+  return readFileSync(
+    fileURLToPath(new URL("./ConversationSidebar.tsx", import.meta.url)),
+    "utf8"
   );
 }
 
@@ -281,5 +290,85 @@ describe("KSEMO conversation sidebar disclosure", () => {
     // No room for the block in the rail, so only the icon remains.
     expect(markup).toContain('aria-label="Sign in"');
     expect(markup).not.toContain("Sign in to KSEMO");
+  });
+});
+
+describe("KSEMO signed-out sidebar sign-in container", () => {
+  function renderLocked() {
+    return renderWithTooltip(
+      createElement(ConversationSidebar, {
+        conversations: [],
+        activeConversationId: null,
+        open: true,
+        collapsed: false,
+        locked: true,
+        onClose: () => undefined,
+        onToggleCollapsed: () => undefined,
+        onNew: () => undefined,
+        onSelect: () => undefined,
+        onRename: () => undefined,
+        onRenameSubmit: () => undefined,
+        onPin: () => undefined,
+        onArchive: () => undefined,
+        onShare: () => undefined,
+        onExport: () => undefined,
+        onDelete: () => undefined,
+        onSearch: () => undefined,
+        onWorkspace: () => undefined,
+        onSettings: () => undefined,
+        onSupport: () => undefined,
+        onLogout: () => undefined,
+        user: { name: "KSEMO user", email: "user@example.com" },
+      })
+    );
+  }
+
+  it("leaves the standing guest card alone until a locked action is tapped", () => {
+    const markup = renderLocked();
+    // Static markup only ever shows the pre-click state, which is the guest
+    // card. The intent container is click-driven and covered below.
+    expect(markup).not.toContain('role="alertdialog"');
+    expect(markup).toContain("Sign in to KSEMO");
+  });
+
+  it("keeps one intent per action so the copy can name what was tapped", () => {
+    const source = readSidebarSource();
+    expect(source).toContain('setLockedIntent("new")');
+    expect(source).toContain('setLockedIntent("search")');
+    expect(source).toContain('setLockedIntent("library")');
+    // Each one short-circuits instead of running the real action.
+    expect(source).toMatch(
+      /if \(locked\) \{\s*setLockedIntent\("new"\);\s*return;/
+    );
+    expect(source).toMatch(
+      /if \(locked\) \{\s*setLockedIntent\("search"\);\s*return;/
+    );
+    expect(source).toMatch(
+      /if \(locked\) \{\s*setLockedIntent\("library"\);\s*return;/
+    );
+  });
+
+  it("answers inside the sidebar instead of raising a dialog over the chat", () => {
+    const source = readSidebarSource();
+    // The container lives in the sidebar and is announced as a dialog for the
+    // sign-in requirement, with its own copy per action and a cancel.
+    expect(source).toContain('role="alertdialog"');
+    expect(source).toContain('aria-label="Sign in required"');
+    expect(source).toContain("LOCKED_INTENT_COPY[lockedIntent].title");
+    expect(source).toContain("LOCKED_INTENT_COPY[lockedIntent].body");
+    expect(source).toContain('aria-label="Cancel"');
+    expect(source).toContain("setLockedIntent(null)");
+    // And it no longer defers to a parent-owned prompt for these three actions.
+    expect(source).not.toContain("onLoginPrompt");
+  });
+
+  it("leaves the composer's sign-in prompt alone", () => {
+    // Sending a message while signed out still routes through the bottom-right
+    // prompt; only the sidebar's own utility row moved in-sidebar.
+    const home = readFileSync(
+      fileURLToPath(new URL("../../pages/Home.tsx", import.meta.url)),
+      "utf8"
+    );
+    expect(home).toContain("setGuestPromptOpen(true)");
   });
 });

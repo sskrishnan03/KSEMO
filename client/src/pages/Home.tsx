@@ -3247,7 +3247,6 @@ export default function Home() {
         title: conversation.title,
       })
   );
-  const stableOnLoginPrompt = usePersistFn(() => setGuestPromptOpen(true));
   const stableOnSearch = usePersistFn(() => {
     if (guestMode) {
       setGuestPromptOpen(true);
@@ -3524,7 +3523,6 @@ export default function Home() {
         onLogout={stableHandleSignOut}
         user={user ?? {}}
         locked={guestMode}
-        onLoginPrompt={stableOnLoginPrompt}
       />
 
       <main
