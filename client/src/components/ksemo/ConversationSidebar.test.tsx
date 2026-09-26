@@ -70,7 +70,9 @@ describe("KSEMO conversation sidebar disclosure", () => {
     expect(markup).toContain('data-disclosure-group="conversations"');
     expect(markup).toContain("w-full");
     expect(markup).toContain("cursor-pointer");
-    expect(markup).toContain("lucide-message-circle");
+    // Conversation rows use reicon's ChatLine (asserted via its outline path).
+    expect(markup).toContain("M10.4606 1.25H13.5394");
+    expect(markup).not.toContain("lucide-message-circle");
     expect(markup).not.toContain("bg-muted-foreground/10");
     expect(markup).toContain("lucide-square-pen");
     expect(markup).not.toContain(">Tasks<");

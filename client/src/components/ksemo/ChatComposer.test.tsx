@@ -1,8 +1,10 @@
+import { readFileSync } from "node:fs";
 import { createElement, type ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import {
+  BOT_TRACE_CLASS,
   ChatComposer,
   getLibrarySubmenuClass,
   LibraryPickerContent,
@@ -184,5 +186,45 @@ describe("ChatComposer", () => {
     expect(excelMarkup).toContain("#ffffff");
     expect(pptMarkup).toContain("#ffffff");
     expect(textMarkup).toContain("#ffffff");
+  });
+
+  it("leaves the composer outline still in chat mode and hands the edge to temporary chat", () => {
+    const chatMarkup = renderWithTooltip(
+      createElement(ChatComposer, { ...baseProps })
+    );
+    expect(chatMarkup).not.toContain(BOT_TRACE_CLASS);
+    // The resting border line is still there, waiting for Bot to light it up.
+    expect(chatMarkup).toContain("border-border");
+
+    const temporaryMarkup = renderWithTooltip(
+      createElement(ChatComposer, { ...baseProps, temporary: true })
+    );
+    expect(temporaryMarkup).not.toContain(BOT_TRACE_CLASS);
+    expect(temporaryMarkup).toContain("border-transparent");
+  });
+
+  it("loops a white segment round the whole border line — from the left, endlessly", () => {
+    const css = readFileSync(new URL("../../index.css", import.meta.url), "utf8");
+    const rule = css.slice(
+      css.indexOf(".ksemo-composer-trace::after"),
+      css.indexOf("MESSAGE FEEDBACK TOGGLE")
+    );
+
+    // White, and riding the border itself: the band is the 2px the padding leaves
+    // inside the box's own 20px radius, so the resting outline never moves.
+    expect(rule).toContain("border-radius: inherit");
+    expect(rule).toContain("padding: 2px");
+    expect(rule).toContain("#fff 25deg");
+    // Starts at the left edge (270deg from the top) and sweeps clockwise: left,
+    // top, right, bottom, left.
+    expect(rule).toContain("from calc(var(--ksemo-trace-angle) + 270deg)");
+    // One full turn per cycle, forever, at an even speed.
+    expect(rule).toContain("@keyframes ksemo-composer-trace");
+    expect(rule).toContain("--ksemo-trace-angle: 360deg");
+    expect(rule).toContain("2.8s linear infinite");
+    // The angle has to be a registered typed property or the browser cannot
+    // animate it and the highlight would sit still on the left edge.
+    expect(css).toContain("@property --ksemo-trace-angle");
+    expect(css).toContain('syntax: "<angle>"');
   });
 });

@@ -55,6 +55,9 @@ import { FileResultCard } from "./FileResultCard";
 export const getLibrarySubmenuClass = (isCentered: boolean) =>
   `absolute left-1/2 -translate-x-1/2 z-50 max-h-[calc(100dvh-${isCentered ? "12rem" : "6rem"})] w-full max-w-3xl rounded-xl border border-border bg-popover p-0 text-popover-foreground shadow-xl`;
 
+/** Class that runs a white light around the composer's own border line in Bot mode. */
+export const BOT_TRACE_CLASS = "ksemo-composer-trace";
+
 const CHAT_PLACEHOLDER = "Ask KSEMO anything...";
 const BOT_PLACEHOLDER = "Tell the bot what to build...";
 const TEMP_PLACEHOLDER = "Start a temporary conversation...";
@@ -669,6 +672,11 @@ export const ChatComposer = memo(function ChatComposer({
       <div
         className={cn(
           "relative rounded-[20px] border border-border bg-popover p-1.5 shadow-sm text-popover-foreground",
+          // Bot mode: a short white segment of the box's own border line keeps
+          // running around all four sides — left, top, right, bottom — for as
+          // long as Bot is selected. It is painted on the border itself, so the
+          // resting outline never moves and only the highlight travels.
+          activeTag === "bot" && !temporary && BOT_TRACE_CLASS,
           // Temporary "incognito" mode: no hard border line at all; only a
           // soft glow hugs the edge of the box. The glow adapts to the theme —
           // dark in light mode so it stays visible, white in dark mode.

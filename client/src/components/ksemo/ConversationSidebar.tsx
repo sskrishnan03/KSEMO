@@ -30,7 +30,6 @@ import {
   HelpCircle,
   LogIn,
   LogOut,
-  MessageCircle,
   Pencil,
   Pin,
   Search,
@@ -40,6 +39,8 @@ import {
   Trash2,
 } from "lucide-react";
 import { Library } from "reicon-react/icons/Library";
+import { ChatLine } from "reicon-react/icons/ChatLine";
+import { ChatSquareCall } from "reicon-react/icons/ChatSquareCall";
 import { ShareIcon } from "./icons";
 import { PdfFileIcon, WordFileIcon } from "./FileBrandIcons";
 import { useIsMobile } from "@/hooks/useIsMobile";
@@ -730,7 +731,7 @@ const ConversationInlineRename = memo(function ConversationInlineRename({
   };
   return (
     <div className="flex min-w-0 flex-1 items-center gap-2 self-stretch py-2 pl-1 pr-0">
-      <MessageCircle className="size-[20px] shrink-0 text-foreground/70" />
+      <ChatLine aria-hidden="true" className="size-[20px] shrink-0 text-foreground/70" />
       <input
         autoFocus
         value={value}
@@ -1054,7 +1055,17 @@ const ConversationTitleButton = memo(function ConversationTitleButton({
       aria-label={conversation.title}
       className="flex min-w-0 flex-1 items-center gap-2 self-stretch py-2 pl-1 pr-0 text-left text-sm leading-5"
     >
-      <MessageCircle className="size-[20px] shrink-0 text-foreground/70 transition-colors group-hover:text-foreground" />
+      {conversation.isPinned ? (
+        <ChatSquareCall
+          aria-hidden="true"
+          className="size-[20px] shrink-0 text-foreground/70 transition-colors group-hover:text-foreground"
+        />
+      ) : (
+        <ChatLine
+          aria-hidden="true"
+          className="size-[20px] shrink-0 text-foreground/70 transition-colors group-hover:text-foreground"
+        />
+      )}
       <Tooltip open={showTooltip}>
         <TooltipTrigger asChild>
           <span
