@@ -1,6 +1,7 @@
 import { trpc } from "@/lib/trpc";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getAuthHeaders } from "@/lib/authHeaders";
+import { currentTimeZone } from "@/lib/timeZone";
 
 export type VoiceSessionState =
   | "idle"
@@ -858,6 +859,7 @@ export function useVoiceSession(options: {
         conversationId: activeConversationId,
         content: userText,
         mode: "voice",
+        timeZone: currentTimeZone(),
       };
       
       // Add attachments if provided

@@ -73,6 +73,7 @@ import {
   type KsemoMessage,
 } from "../components/ksemo/MessageContent";
 import { getAuthHeaders } from "@/lib/authHeaders";
+import { currentTimeZone } from "@/lib/timeZone";
 import { toast } from "sonner";
 import { detectFileRequest } from "@shared/docDetect";
 
@@ -1517,6 +1518,7 @@ export default function Home() {
         body: JSON.stringify({
           conversationId: conversationId ?? undefined,
           content,
+          timeZone: currentTimeZone(),
           regenerateAssistantMessageId: options.regenerateAssistantMessageId,
           attachmentFileIds: selectedAttachments.length
             ? selectedAttachments.map(file => file.fileId)

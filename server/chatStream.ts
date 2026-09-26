@@ -43,7 +43,25 @@ import {
 import { UNIVERSAL_RESPONSE_INSTRUCTION } from "./universalResponsePrompt";
 
 const BASE_SYSTEM_INSTRUCTION =
-  "You are KSEMO, a thoughtful and reliable assistant. Be clear, accurate, respectful, and practical. Use Markdown when it improves readability. Never claim to have completed work you cannot verify. You can perform math, logic, code analysis, and general reasoning directly — do not refuse calculation or analysis questions. When asked about the current time or date, state that you do not have access to a real-time clock but you can help with time-zone conversions, date math, and scheduling if the user provides a reference time or zone. Never introduce yourself, never state your name, and never refer to yourself as an AI assistant unless the user explicitly asks about you — always reply directly and naturally to whatever the user says.";
+  "You are KSEMO, a thoughtful and reliable assistant. Be clear, accurate, respectful, and practical. Use Markdown when it improves readability. Never claim to have completed work you cannot verify. You can perform math, logic, code analysis, and general reasoning directly — do not refuse calculation or analysis questions. You are given the user's current local date and time at the start of every turn, so answer questions about the current time, date, or time of day straight from that value; never claim you lack a real-time clock or ask the user to supply the time. Also help with time-zone conversions, date math, and scheduling. Never introduce yourself, never state your name, and never refer to yourself as an AI assistant unless the user explicitly asks about you — always reply directly and naturally to whatever the user says.";
+
+/**
+ * Validates the IANA zone the client reports, so the injected clock reflects the
+ * user's own wall time instead of the server's (a hosted server is usually UTC).
+ * Returns "" for anything unusable, which makes the caller fall back to the
+ * server's zone rather than throwing inside `Intl`.
+ */
+export function resolveUserTimeZone(value: unknown): string {
+  if (typeof value !== "string") return "";
+  const candidate = value.trim();
+  if (!/^[A-Za-z0-9_+\-/]{1,64}$/.test(candidate)) return "";
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: candidate });
+    return candidate;
+  } catch {
+    return "";
+  }
+}
 
 // Per-file cap on extracted document text injected into the model context.
 const FILE_TEXT_PER_FILE_CHARS = 150_000;
@@ -254,6 +272,8 @@ export function registerChatStream(app: Express) {
       pptStyle?: string;
       /** Temporary ("incognito") chat: hidden from all listings and not memorized. */
       temporary?: boolean;
+      /** The viewer's IANA zone, so time answers use their clock, not ours. */
+      timeZone?: string;
     };
     const temporary = body.temporary === true;
     let content = body.content?.trim();
@@ -573,6 +593,7 @@ export function registerChatStream(app: Express) {
             "Reason carefully, state assumptions, and organize analysis clearly.",
         }[preferences?.persona ?? "balanced"];
         const now = new Date();
+        const userTimeZone = resolveUserTimeZone(body.timeZone);
         const currentTimeString = now.toLocaleString("en-US", {
           weekday: "long",
           year: "numeric",
@@ -582,12 +603,18 @@ export function registerChatStream(app: Express) {
           minute: "2-digit",
           second: "2-digit",
           hour12: true,
+          timeZone: userTimeZone || undefined,
           timeZoneName: "short",
         });
+        // Be explicit about whose clock this is, so a "what time is it?" answer
+        // is unqualified when we know the zone and honest when we do not.
+        const timeZoneNote = userTimeZone
+          ? ` This is the user's own local time in ${userTimeZone}, the zone their device reports. State the time directly and mention the zone when it is useful; do not add a disclaimer about not having a clock.`
+          : " The user's time zone was not reported, so this is the server's local time; if the user appears to be in a different zone, ask which one before converting.";
         const systemInstruction = [
           BASE_SYSTEM_INSTRUCTION,
           UNIVERSAL_RESPONSE_INSTRUCTION,
-          `The current date and time is: ${currentTimeString}. Use this to answer questions about time, dates, and scheduling. You may be asked about mathematical equations, code analysis, general reasoning, and anything else — always attempt to answer helpfully.`,
+          `The current date and time is: ${currentTimeString}.${timeZoneNote} Use this to answer questions about time, dates, and scheduling. You may be asked about mathematical equations, code analysis, general reasoning, and anything else — always attempt to answer helpfully.`,
           personaInstruction,
           preferences?.customInstructions?.trim(),
           body.mode === "voice" ? VOICE_STYLE_INSTRUCTION : null,
