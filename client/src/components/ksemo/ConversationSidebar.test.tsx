@@ -26,6 +26,36 @@ function renderInMenu(element: React.ReactElement) {
   );
 }
 
+/** Signed-out sidebar: `locked` is what swaps in the guest sign-in block. */
+function renderLockedSidebar() {
+  return renderWithTooltip(
+    createElement(ConversationSidebar, {
+      conversations: [],
+      activeConversationId: null,
+      open: true,
+      collapsed: false,
+      locked: true,
+      onClose: () => undefined,
+      onToggleCollapsed: () => undefined,
+      onNew: () => undefined,
+      onSelect: () => undefined,
+      onRename: () => undefined,
+      onRenameSubmit: () => undefined,
+      onPin: () => undefined,
+      onArchive: () => undefined,
+      onShare: () => undefined,
+      onExport: () => undefined,
+      onDelete: () => undefined,
+      onSearch: () => undefined,
+      onWorkspace: () => undefined,
+      onSettings: () => undefined,
+      onSupport: () => undefined,
+      onLogout: () => undefined,
+      user: { name: "KSEMO user", email: "user@example.com" },
+    })
+  );
+}
+
 describe("KSEMO conversation sidebar disclosure", () => {
   it("renders label-adjacent Pinned and Conversations disclosure controls without conversation counts", () => {
     const markup = renderWithTooltip(
@@ -194,5 +224,62 @@ describe("KSEMO conversation sidebar disclosure", () => {
     expect(markup).toContain('role="img"');
     expect(markup).toContain(">PDF<");
     expect(markup).toContain(">WORD<");
+  });
+
+  it("keeps the scan-to-open code out of the sidebar entirely", () => {
+    const markup = renderLockedSidebar();
+    // The code lives outside the sidebar now, as a viewport-anchored sibling.
+    expect(markup).not.toContain("Scan to open");
+    expect(markup).not.toContain('alt="Dismiss scanner"');
+  });
+
+  it("restores the guest sign-in block the sidebar had before the scanner existed", () => {
+    const markup = renderLockedSidebar();
+    expect(markup).toContain('alt="KSEMO logo"');
+    expect(markup).toContain("Sign in to KSEMO");
+    expect(markup).toContain(
+      "Your conversations, files, and creations"
+    );
+    expect(markup).toContain("bg-[oklch(0.95_0.003_80)]");
+  });
+
+  it("keeps the rest of the signed-out sidebar intact alongside the sign-in block", () => {
+    const markup = renderLockedSidebar();
+    expect(markup).toContain('aria-label="Conversations"');
+    expect(markup).toContain("New chat");
+    expect(markup).toContain("Search");
+    expect(markup).toContain("Library");
+  });
+
+  it("shows the compact signed-out rail its icon-only sign-in affordance", () => {
+    const markup = renderWithTooltip(
+      createElement(ConversationSidebar, {
+        conversations: [],
+        activeConversationId: null,
+        open: true,
+        collapsed: true,
+        locked: true,
+        onClose: () => undefined,
+        onToggleCollapsed: () => undefined,
+        onNew: () => undefined,
+        onSelect: () => undefined,
+        onRename: () => undefined,
+        onRenameSubmit: () => undefined,
+        onPin: () => undefined,
+        onArchive: () => undefined,
+        onShare: () => undefined,
+        onExport: () => undefined,
+        onDelete: () => undefined,
+        onSearch: () => undefined,
+        onWorkspace: () => undefined,
+        onSettings: () => undefined,
+        onSupport: () => undefined,
+        onLogout: () => undefined,
+        user: { name: "KSEMO user", email: "user@example.com" },
+      })
+    );
+    // No room for the block in the rail, so only the icon remains.
+    expect(markup).toContain('aria-label="Sign in"');
+    expect(markup).not.toContain("Sign in to KSEMO");
   });
 });
