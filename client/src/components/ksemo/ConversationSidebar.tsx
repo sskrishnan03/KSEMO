@@ -28,7 +28,6 @@ import {
   FileText,
   Headset,
   HelpCircle,
-  Library,
   LogIn,
   LogOut,
   MessageCircle,
@@ -40,6 +39,7 @@ import {
   SquarePen,
   Trash2,
 } from "lucide-react";
+import { Library } from "reicon-react/icons/Library";
 import { ShareIcon } from "./icons";
 import { PdfFileIcon, WordFileIcon } from "./FileBrandIcons";
 import { useIsMobile } from "@/hooks/useIsMobile";
@@ -147,12 +147,12 @@ export const ConversationSidebar = memo(function ConversationSidebar({
   const iconMotion = (label: string) =>
     ({
       "New chat":
-        "group-hover:rotate-6 group-hover:scale-110 group-active:rotate-0",
+        "group-hover:-rotate-12 group-hover:scale-125 group-active:rotate-0 group-active:scale-95",
       Search:
-        "group-hover:translate-x-0.5 group-hover:scale-105 group-active:translate-x-0",
+        "group-hover:translate-x-1 group-hover:-translate-y-0.5 group-hover:scale-125 group-active:translate-x-0 group-active:translate-y-0 group-active:scale-95",
       Library:
-        "group-hover:-translate-y-0.5 group-hover:rotate-3 group-active:translate-y-0",
-    })[label] ?? "group-hover:scale-105";
+        "group-hover:-translate-y-1 group-hover:rotate-6 group-hover:scale-125 group-active:translate-y-0 group-active:rotate-0 group-active:scale-95",
+    })[label] ?? "group-hover:scale-125 group-active:scale-95";
   const utility = (
     label: string,
     icon: React.ReactNode,
@@ -169,7 +169,7 @@ export const ConversationSidebar = memo(function ConversationSidebar({
       >
         <span
           className={cn(
-            "transition-transform duration-150 ease-out motion-reduce:transform-none",
+            "transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] motion-reduce:transform-none",
             iconMotion(label)
           )}
         >
@@ -316,7 +316,7 @@ export const ConversationSidebar = memo(function ConversationSidebar({
             }
             onSearch();
           })}
-          {utility("Library", <Library className="size-4" />, () => {
+          {utility("Library", <Library size={16} />, () => {
             if (locked) {
               onLoginPrompt?.();
               return;

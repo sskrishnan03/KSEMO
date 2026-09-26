@@ -48,6 +48,7 @@
     "pptxgenjs": "^4.0.1",
     "react": "^19.2.1",
     "react-dom": "^19.2.1",
+    "reicon-react": "^1.2.5",
     "shiki": "^4.4.3",
     "sonner": "^2.0.7",
     "streamdown": "^1.4.0",
