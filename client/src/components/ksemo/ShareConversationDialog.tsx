@@ -63,7 +63,7 @@ export const ShareConversationDialog = memo(function ShareConversationDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[calc(100vw-2rem)] sm:w-full sm:max-w-md gap-3.5 rounded-2xl p-5 overflow-hidden border border-border bg-card text-card-foreground shadow-2xl box-border">
+      <DialogContent className="w-[calc(100vw-2rem)] sm:w-full sm:max-w-[420px] gap-3.5 rounded-2xl p-5 overflow-hidden border border-border bg-card text-card-foreground shadow-2xl box-border">
         <DialogTitle className="sr-only">Share conversation</DialogTitle>
         <DialogDescription className="sr-only">
           Share “{title}” via link or email.
@@ -155,7 +155,7 @@ export function ShareConversationPanel({
   }, [isPublic, onEmail, onSetPublic]);
 
   return (
-    <div className="w-full max-w-full min-w-0 space-y-3.5 box-border">
+    <div className="w-full max-w-full min-w-0 space-y-3 box-border">
       {/* ── Header: Clean title and description (no icon) ── */}
       <div className="text-left space-y-0.5">
         <h2 className="text-base font-semibold tracking-[-0.01em] text-foreground">
@@ -166,73 +166,84 @@ export function ShareConversationPanel({
         </p>
       </div>
 
-      {/* ── Chat Workspace Live Preview with White Inner Glow & No Borderline ── */}
-      <div
-        tabIndex={0}
-        role="region"
-        aria-label="Conversation workspace preview"
-        className="w-full max-w-full min-w-0 h-44 sm:h-48 overflow-y-auto overflow-x-hidden rounded-xl border-0 bg-background p-3 space-y-2.5 text-xs focus:outline-hidden shadow-[inset_0_0_20px_rgba(255,255,255,0.18),inset_0_0_8px_rgba(255,255,255,0.28)] box-border"
-      >
-        {displayMessages.length === 0 ? (
-          <div className="flex h-full items-center justify-center text-center text-muted-foreground">
-            <p className="text-xs">No messages in this conversation yet</p>
-          </div>
-        ) : (
-          displayMessages.map(msg => {
-            const isUser = msg.role === "user";
-            return (
-              <div
-                key={msg.id}
-                className={cn(
-                  "flex w-full max-w-full min-w-0",
-                  isUser ? "justify-end" : "justify-start"
-                )}
-              >
-                {isUser ? (
-                  /* User message: exact workspace bubble */
-                  <div className="flex flex-col items-end max-w-[85%] min-w-0">
-                    <div className="rounded-2xl rounded-tr-md border-0 bg-muted px-3 py-1.5 text-xs leading-relaxed text-foreground shadow-xs max-w-full break-words [overflow-wrap:anywhere]">
-                      <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere] max-w-full">
-                        {msg.content}
-                      </p>
-                      {msg.attachments && msg.attachments.length > 0 && (
-                        <div className="mt-1 flex flex-wrap gap-1 pt-1 border-t border-border/30">
-                          {msg.attachments.map(att => (
-                            <span
-                              key={att.id}
-                              className="inline-flex items-center gap-1 rounded bg-background px-1.5 py-0.5 text-[10px] text-foreground border-0 max-w-full truncate"
-                            >
-                              <Paperclip className="size-2.5 shrink-0" />
-                              <span className="truncate max-w-[120px]">{att.filename}</span>
-                            </span>
-                          ))}
+      {/* ── Chat Workspace Live Preview with Undisturbed Ambient Glow & Side Gaps ── */}
+      <div className="relative w-full max-w-full min-w-0 h-44 sm:h-48 rounded-xl bg-background overflow-hidden box-border">
+        {/* Scrollable Message List */}
+        <div
+          tabIndex={0}
+          role="region"
+          aria-label="Conversation workspace preview"
+          className="h-full w-full overflow-y-auto overflow-x-hidden px-3.5 py-3.5 space-y-3 text-xs focus:outline-hidden box-border"
+        >
+          <div className="w-[90%] mx-auto space-y-3 min-w-0">
+            {displayMessages.length === 0 ? (
+              <div className="flex h-full items-center justify-center text-center text-muted-foreground py-8">
+                <p className="text-xs">No messages in this conversation yet</p>
+              </div>
+            ) : (
+              displayMessages.map(msg => {
+                const isUser = msg.role === "user";
+                return (
+                  <div
+                    key={msg.id}
+                    className={cn(
+                      "flex w-full min-w-0",
+                      isUser ? "justify-end" : "justify-start"
+                    )}
+                  >
+                    {isUser ? (
+                      /* User message: compact bubble */
+                      <div className="flex flex-col items-end max-w-[85%] min-w-0">
+                        <div className="rounded-2xl rounded-tr-md border-0 bg-muted px-3.5 py-1.5 text-xs leading-relaxed text-foreground shadow-xs max-w-full break-words [overflow-wrap:anywhere]">
+                          <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere] max-w-full">
+                            {msg.content}
+                          </p>
+                          {msg.attachments && msg.attachments.length > 0 && (
+                            <div className="mt-1 flex flex-wrap gap-1 pt-1 border-t border-border/30">
+                              {msg.attachments.map(att => (
+                                <span
+                                  key={att.id}
+                                  className="inline-flex items-center gap-1 rounded bg-background px-1.5 py-0.5 text-[10px] text-foreground border-0 max-w-full truncate"
+                                >
+                                  <Paperclip className="size-2.5 shrink-0" />
+                                  <span className="truncate max-w-[120px]">{att.filename}</span>
+                                </span>
+                              ))}
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
-                  </div>
-                ) : (
-                  /* Assistant message: exact workspace text (no artificial prefixes) */
-                  <div className="w-full max-w-[95%] min-w-0 text-left text-xs leading-relaxed text-foreground py-0.5 whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
-                    {msg.content}
-                    {msg.attachments && msg.attachments.length > 0 && (
-                      <div className="mt-1 flex flex-wrap gap-1">
-                        {msg.attachments.map(att => (
-                          <span
-                            key={att.id}
-                            className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-[10px] text-foreground border-0 max-w-full truncate"
-                          >
-                            <Paperclip className="size-2.5 shrink-0 text-muted-foreground" />
-                            <span className="truncate max-w-[120px]">{att.filename}</span>
-                          </span>
-                        ))}
+                      </div>
+                    ) : (
+                      /* Assistant message: compact text */
+                      <div className="w-full max-w-[90%] min-w-0 text-left text-xs leading-relaxed text-foreground py-0.5 whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
+                        {msg.content}
+                        {msg.attachments && msg.attachments.length > 0 && (
+                          <div className="mt-1 flex flex-wrap gap-1">
+                            {msg.attachments.map(att => (
+                              <span
+                                key={att.id}
+                                className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-[10px] text-foreground border-0 max-w-full truncate"
+                              >
+                                <Paperclip className="size-2.5 shrink-0 text-muted-foreground" />
+                                <span className="truncate max-w-[120px]">{att.filename}</span>
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
-                )}
-              </div>
-            );
-          })
-        )}
+                );
+              })
+            )}
+          </div>
+        </div>
+
+        {/* Ambient white inner glow layer: stays completely undisturbed while scrolling */}
+        <div
+          className="pointer-events-none absolute inset-0 rounded-xl shadow-[inset_0_0_20px_rgba(255,255,255,0.18),inset_0_0_8px_rgba(255,255,255,0.28)]"
+          aria-hidden="true"
+        />
       </div>
 
       {/* ── Side-by-side Primary Action Buttons (With hover & active transitions) ── */}
