@@ -1,12 +1,12 @@
 import React, { memo, useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { ArrowUp, Check, Copy, Mail, Paperclip } from "lucide-react";
+  Popover,
+  PopoverAnchor,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { ArrowUp, Check, Copy, Mail, Paperclip, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface SharePreviewMessage {
@@ -47,6 +47,10 @@ export const ShareConversationDialog = memo(function ShareConversationDialog({
   enabled,
   isPublic,
   messages,
+  anchor,
+  trigger,
+  sideOffset = 6,
+  className,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -60,14 +64,29 @@ export const ShareConversationDialog = memo(function ShareConversationDialog({
   enabled: boolean;
   isPublic: boolean;
   messages?: SharePreviewMessage[];
+  anchor?: React.ReactNode;
+  trigger?: React.ReactNode;
+  sideOffset?: number;
+  className?: string;
 }) {
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[calc(100vw-2rem)] sm:w-full sm:max-w-[420px] gap-3.5 rounded-2xl p-5 overflow-hidden border border-border bg-card text-card-foreground shadow-2xl box-border">
-        <DialogTitle className="sr-only">Share conversation</DialogTitle>
-        <DialogDescription className="sr-only">
-          Share “{title}” via link or email.
-        </DialogDescription>
+    <Popover open={open} onOpenChange={onOpenChange}>
+      {anchor ? (
+        <PopoverAnchor asChild>{anchor}</PopoverAnchor>
+      ) : trigger ? (
+        <PopoverTrigger asChild>{trigger}</PopoverTrigger>
+      ) : null}
+      <PopoverContent
+        showOverlay
+        onOverlayClick={() => onOpenChange(false)}
+        align="end"
+        side="bottom"
+        sideOffset={sideOffset}
+        className={cn(
+          "w-[calc(100vw-2rem)] sm:w-[370px] gap-3 rounded-2xl p-4 sm:p-4.5 overflow-hidden border border-border bg-card text-card-foreground shadow-2xl box-border relative",
+          className
+        )}
+      >
         <ShareConversationPanel
           title={title}
           shareUrl={shareUrl}
@@ -76,12 +95,13 @@ export const ShareConversationDialog = memo(function ShareConversationDialog({
           onCopy={onCopy}
           onEmail={onEmail}
           onSetPublic={onSetPublic}
+          onCancel={() => onOpenChange(false)}
           enabled={enabled}
           isPublic={isPublic}
           messages={messages}
         />
-      </DialogContent>
-    </Dialog>
+      </PopoverContent>
+    </Popover>
   );
 });
 
@@ -92,6 +112,7 @@ export function ShareConversationPanel({
   onCopy,
   onEmail,
   onSetPublic,
+  onCancel,
   enabled,
   isPublic,
   messages,
@@ -156,14 +177,28 @@ export function ShareConversationPanel({
 
   return (
     <div className="w-full max-w-full min-w-0 space-y-3 box-border">
-      {/* ── Header: Clean title and description (no icon) ── */}
-      <div className="text-left space-y-0.5">
-        <h2 className="text-base font-semibold tracking-[-0.01em] text-foreground">
-          Share conversation
-        </h2>
-        <p className="text-xs text-muted-foreground leading-normal truncate">
-          Share “{title}” via link or email.
-        </p>
+      {/* ── Header: Clean title, description, and top-right close ("X") button ── */}
+      <div className="flex items-start justify-between gap-2">
+        <div className="text-left space-y-0.5 min-w-0 flex-1">
+          <h2 className="text-base font-semibold tracking-[-0.01em] text-foreground">
+            Share conversation
+          </h2>
+          <p className="text-xs text-muted-foreground leading-normal truncate">
+            Share “{title}” via link or email.
+          </p>
+        </div>
+        {onCancel && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={onCancel}
+            aria-label="Close share dialog"
+            className="size-7 -mt-0.5 -mr-1 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors shrink-0 cursor-pointer"
+          >
+            <X className="size-4" />
+          </Button>
+        )}
       </div>
 
       {/* ── Chat Workspace Live Preview with Undisturbed Ambient Glow & Side Gaps ── */}

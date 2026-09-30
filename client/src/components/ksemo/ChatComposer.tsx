@@ -1352,20 +1352,20 @@ export const ChatComposer = memo(function ChatComposer({
                       </>
                     )}
                     {/* Send / Stop Button */}
-                    {isGenerating ? (
+                    {isGenerating || isBotSpeaking ? (
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button
                             onClick={onCancel}
                             size="icon"
                             className="size-10 rounded-full bg-foreground text-background hover:bg-foreground/90 transition-colors"
-                            aria-label="Stop generating"
+                            aria-label={isBotSpeaking ? "Stop speaking" : "Stop generating"}
                           >
                             <Square className="size-4 fill-current" />
                           </Button>
                         </TooltipTrigger>
                         <TooltipContent side="bottom">
-                          Stop generating
+                          {isBotSpeaking ? "Stop speaking" : "Stop generating"}
                         </TooltipContent>
                       </Tooltip>
                     ) : botVoiceState === "transcribing" ? (

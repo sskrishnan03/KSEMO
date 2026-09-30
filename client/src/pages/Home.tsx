@@ -559,6 +559,7 @@ export default function Home() {
   const [speechState, setSpeechState] = useState<"idle" | "playing" | "paused">(
     "idle"
   );
+  const [isBotSpeakingAloud, setIsBotSpeakingAloud] = useState(false);
   const [primaryWorkspace, setPrimaryWorkspace] = useState<
     "library" | "search" | null
   >(() => inlineWorkspaceSection);
@@ -1006,25 +1007,62 @@ export default function Home() {
   }, [botReplyVoice.voiceName]);
 
   // Streaming TTS state and queue for real-time speech as responses stream
+  type StreamingTtsChunk = {
+    rawText: string;
+    cleanText: string;
+    messageId: string;
+    isFinalChunk?: boolean;
+  };
+
   const currentUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
-  const streamingTtsQueueRef = useRef<string[]>([]);
+  const streamingTtsQueueRef = useRef<StreamingTtsChunk[]>([]);
   const isTtsSpeakingRef = useRef(false);
   const streamTtsFinishedRef = useRef(false);
   const spokenCharsIndexRef = useRef(0);
+  const activeVoiceMessageIdRef = useRef<string | null>(null);
+  const activeVoiceFullTextRef = useRef<string>("");
+  const baseSpokenTextRef = useRef<string>("");
+  const wordTickerRef = useRef<number | null>(null);
+  const ttsSafetyTimerRef = useRef<number | null>(null);
   const speechRateRef = useRef(preferencesQuery.data?.speechRate ?? 100);
   useEffect(() => {
     speechRateRef.current = preferencesQuery.data?.speechRate ?? 100;
   }, [preferencesQuery.data?.speechRate]);
 
   const resetStreamingTts = useCallback(() => {
+    if (wordTickerRef.current !== null) {
+      window.clearInterval(wordTickerRef.current);
+      wordTickerRef.current = null;
+    }
+    if (ttsSafetyTimerRef.current !== null) {
+      window.clearTimeout(ttsSafetyTimerRef.current);
+      ttsSafetyTimerRef.current = null;
+    }
     streamingTtsQueueRef.current = [];
     isTtsSpeakingRef.current = false;
     streamTtsFinishedRef.current = false;
     spokenCharsIndexRef.current = 0;
+
+    const activeMsgId = activeVoiceMessageIdRef.current;
+    const fullText = activeVoiceFullTextRef.current;
+    if (activeMsgId && fullText) {
+      setChatMessages(current =>
+        current.map(msg =>
+          msg.id === activeMsgId && msg.status === "streaming"
+            ? { ...msg, content: fullText, status: "completed" }
+            : msg
+        )
+      );
+    }
+    activeVoiceMessageIdRef.current = null;
+    activeVoiceFullTextRef.current = "";
+    baseSpokenTextRef.current = "";
+
     if (currentUtteranceRef.current) {
       currentUtteranceRef.current.onstart = null;
       currentUtteranceRef.current.onend = null;
       currentUtteranceRef.current.onerror = null;
+      currentUtteranceRef.current.onboundary = null;
       currentUtteranceRef.current = null;
     }
     try {
@@ -1034,15 +1072,51 @@ export default function Home() {
     } catch {}
     setSpeakingMessageId(null);
     setSpeechState("idle");
+    setIsBotSpeakingAloud(false);
   }, []);
 
   const drainStreamingTtsQueue = useCallback(() => {
-    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) {
+      const fullText = activeVoiceFullTextRef.current;
+      const msgId = activeVoiceMessageIdRef.current;
+      if (msgId && fullText) {
+        setChatMessages(current =>
+          current.map(msg =>
+            msg.id === msgId || (msg.role === "assistant" && msg.status === "streaming")
+              ? { ...msg, content: fullText, status: "completed" }
+              : msg
+          )
+        );
+      }
+      setSpeakingMessageId(null);
+      setSpeechState("idle");
+      isTtsSpeakingRef.current = false;
+      setIsBotSpeakingAloud(false);
+      if (botVoiceOpenRef.current) {
+        botVoice.resumeListening();
+      }
+      return;
+    }
+
     if (isTtsSpeakingRef.current) return;
+
     if (streamingTtsQueueRef.current.length === 0) {
       if (streamTtsFinishedRef.current) {
+        const fullText = activeVoiceFullTextRef.current || baseSpokenTextRef.current;
+        const msgId = activeVoiceMessageIdRef.current;
+        if (msgId && fullText) {
+          setChatMessages(current =>
+            current.map(msg =>
+              msg.id === msgId || (msg.role === "assistant" && msg.status === "streaming")
+                ? { ...msg, content: fullText, status: "completed" }
+                : msg
+            )
+          );
+        }
         setSpeakingMessageId(null);
         setSpeechState("idle");
+        isTtsSpeakingRef.current = false;
+        setIsBotSpeakingAloud(false);
         if (botVoiceOpenRef.current) {
           botVoice.resumeListening();
         }
@@ -1055,17 +1129,71 @@ export default function Home() {
 
     isTtsSpeakingRef.current = true;
     setSpeechState("playing");
+    setSpeakingMessageId(nextChunk.messageId);
+    setIsBotSpeakingAloud(true);
     botVoice.pauseListening();
 
-    const utterance = new SpeechSynthesisUtterance(nextChunk);
+    const { rawText, cleanText, messageId, isFinalChunk } = nextChunk;
+
+    // Tokenize rawText into word tokens preserving exact whitespace and markdown
+    const rawTokens = rawText.match(/\S+\s*/g) || (rawText ? [rawText] : []);
+
+    // Split cleanText into words with character offsets in cleanText
+    const cleanWords: { word: string; start: number }[] = [];
+    const wordRegex = /\S+/g;
+    let match: RegExpExecArray | null;
+    while ((match = wordRegex.exec(cleanText)) !== null) {
+      cleanWords.push({ word: match[0], start: match.index });
+    }
+
+    // If cleanText is empty (e.g. pure code block or stripped symbols), reveal rawText immediately
+    if (!cleanText.trim() || cleanWords.length === 0) {
+      baseSpokenTextRef.current += rawText;
+      const currentFull = baseSpokenTextRef.current;
+      setChatMessages(current =>
+        current.map(msg =>
+          msg.id === messageId || (msg.role === "assistant" && msg.status === "streaming")
+            ? {
+                ...msg,
+                content: currentFull,
+                status: isFinalChunk && streamingTtsQueueRef.current.length === 0 ? "completed" : msg.status,
+              }
+            : msg
+        )
+      );
+      isTtsSpeakingRef.current = false;
+      drainStreamingTtsQueue();
+      return;
+    }
+
+    let currentRevealedCount = 0;
+    const baseTextBeforeChunk = baseSpokenTextRef.current;
+
+    const revealTokensUpTo = (count: number) => {
+      const targetCount = Math.max(1, Math.min(rawTokens.length, count));
+      if (targetCount <= currentRevealedCount) return;
+      currentRevealedCount = targetCount;
+      const chunkRevealed = rawTokens.slice(0, currentRevealedCount).join("");
+      const fullTextSoFar = baseTextBeforeChunk + chunkRevealed;
+
+      setChatMessages(current =>
+        current.map(msg =>
+          msg.id === messageId || (msg.role === "assistant" && msg.status === "streaming")
+            ? { ...msg, content: fullTextSoFar }
+            : msg
+        )
+      );
+    };
+
+    const utterance = new SpeechSynthesisUtterance(cleanText);
     currentUtteranceRef.current = utterance;
     const voices = window.speechSynthesis.getVoices();
     const preferredVoiceName = botReplyVoiceNameRef.current;
     if (preferredVoiceName) {
-      const match = voices.find(v => v.name === preferredVoiceName);
-      if (match) {
-        utterance.voice = match;
-        utterance.lang = match.lang;
+      const matched = voices.find(v => v.name === preferredVoiceName);
+      if (matched) {
+        utterance.voice = matched;
+        utterance.lang = matched.lang;
       }
     }
     if (!utterance.voice && voices.length > 0) {
@@ -1089,33 +1217,87 @@ export default function Home() {
     }
     utterance.rate = speechRateRef.current / 100;
 
-    const ttsSafetyTimer = window.setTimeout(() => {
+    let wordTicker: number | null = null;
+    const clearChunkTimers = () => {
+      if (wordTicker !== null) {
+        window.clearInterval(wordTicker);
+        wordTicker = null;
+      }
+      if (wordTickerRef.current !== null) {
+        window.clearInterval(wordTickerRef.current);
+        wordTickerRef.current = null;
+      }
+      if (ttsSafetyTimerRef.current !== null) {
+        window.clearTimeout(ttsSafetyTimerRef.current);
+        ttsSafetyTimerRef.current = null;
+      }
+    };
+
+    // Word boundary event from Web Speech API: fires as each word is spoken!
+    utterance.onboundary = event => {
+      if (event.name === "word" || !event.name) {
+        const charIdx = event.charIndex;
+        let wordIdx = 0;
+        for (let i = 0; i < cleanWords.length; i++) {
+          if (cleanWords[i].start <= charIdx) {
+            wordIdx = i;
+          } else {
+            break;
+          }
+        }
+        const ratio = cleanWords.length > 0 ? (wordIdx + 1) / cleanWords.length : 1;
+        const targetTokens = Math.round(ratio * rawTokens.length);
+        revealTokensUpTo(targetTokens);
+      }
+    };
+
+    // Smooth cadence timer: steps word-by-word in sync with speech rate if boundary events lag or miss
+    const msPerWord = Math.max(160, Math.round(300 / (utterance.rate || 1)));
+    let tickerWordIdx = 0;
+    wordTicker = window.setInterval(() => {
+      tickerWordIdx++;
+      const ratio = cleanWords.length > 0 ? (tickerWordIdx + 1) / cleanWords.length : 1;
+      const targetTokens = Math.round(ratio * rawTokens.length);
+      revealTokensUpTo(targetTokens);
+      if (tickerWordIdx >= cleanWords.length) {
+        if (wordTicker !== null) {
+          window.clearInterval(wordTicker);
+          wordTicker = null;
+        }
+      }
+    }, msPerWord);
+    wordTickerRef.current = wordTicker;
+
+    // Safety timeout in case speech engine gets stuck
+    const safetyMs = Math.max(8000, cleanText.length * 130);
+    ttsSafetyTimerRef.current = window.setTimeout(() => {
+      clearChunkTimers();
       if (currentUtteranceRef.current === utterance) {
         currentUtteranceRef.current = null;
+        revealTokensUpTo(rawTokens.length);
+        baseSpokenTextRef.current += rawText;
         isTtsSpeakingRef.current = false;
         drainStreamingTtsQueue();
       }
-    }, Math.max(8000, nextChunk.length * 120));
+    }, safetyMs);
 
     utterance.onstart = () => {
       setSpeechState("playing");
+      revealTokensUpTo(1);
     };
 
-    utterance.onend = () => {
-      window.clearTimeout(ttsSafetyTimer);
+    const handleChunkFinish = () => {
+      clearChunkTimers();
       if (currentUtteranceRef.current !== utterance) return;
       currentUtteranceRef.current = null;
+      revealTokensUpTo(rawTokens.length);
+      baseSpokenTextRef.current += rawText;
       isTtsSpeakingRef.current = false;
       drainStreamingTtsQueue();
     };
 
-    utterance.onerror = () => {
-      window.clearTimeout(ttsSafetyTimer);
-      if (currentUtteranceRef.current !== utterance) return;
-      currentUtteranceRef.current = null;
-      isTtsSpeakingRef.current = false;
-      drainStreamingTtsQueue();
-    };
+    utterance.onend = handleChunkFinish;
+    utterance.onerror = handleChunkFinish;
 
     try {
       if (window.speechSynthesis.paused) {
@@ -1123,10 +1305,12 @@ export default function Home() {
       }
       window.speechSynthesis.speak(utterance);
     } catch {
-      window.clearTimeout(ttsSafetyTimer);
+      clearChunkTimers();
       if (currentUtteranceRef.current === utterance) {
         currentUtteranceRef.current = null;
       }
+      revealTokensUpTo(rawTokens.length);
+      baseSpokenTextRef.current += rawText;
       isTtsSpeakingRef.current = false;
       drainStreamingTtsQueue();
     }
@@ -1134,6 +1318,8 @@ export default function Home() {
 
   const feedStreamingTts = useCallback(
     (accumulatedText: string, messageId: string) => {
+      activeVoiceMessageIdRef.current = messageId;
+      activeVoiceFullTextRef.current = accumulatedText;
       setSpeakingMessageId(messageId);
       while (true) {
         const match = extractNextSpeechSentence(
@@ -1141,11 +1327,14 @@ export default function Home() {
           spokenCharsIndexRef.current
         );
         if (!match) break;
+        const rawChunk = match.sentence;
         spokenCharsIndexRef.current = match.nextIndex;
-        const clean = prepareTextForSpeech(match.sentence);
-        if (clean) {
-          streamingTtsQueueRef.current.push(clean);
-        }
+        const clean = prepareTextForSpeech(rawChunk);
+        streamingTtsQueueRef.current.push({
+          rawText: rawChunk,
+          cleanText: clean,
+          messageId,
+        });
       }
       drainStreamingTtsQueue();
     },
@@ -1154,14 +1343,36 @@ export default function Home() {
 
   const finalizeStreamingTts = useCallback(
     (fullText: string, messageId: string) => {
+      activeVoiceMessageIdRef.current = messageId;
+      activeVoiceFullTextRef.current = fullText;
       setSpeakingMessageId(messageId);
       const tail = fullText.slice(spokenCharsIndexRef.current);
       if (tail.trim()) {
         const clean = prepareTextForSpeech(tail);
-        if (clean) {
-          streamingTtsQueueRef.current.push(clean);
-        }
+        streamingTtsQueueRef.current.push({
+          rawText: tail,
+          cleanText: clean,
+          messageId,
+          isFinalChunk: true,
+        });
         spokenCharsIndexRef.current = fullText.length;
+      } else if (streamingTtsQueueRef.current.length > 0) {
+        streamingTtsQueueRef.current[streamingTtsQueueRef.current.length - 1].isFinalChunk = true;
+      } else if (!isTtsSpeakingRef.current) {
+        setChatMessages(current =>
+          current.map(msg =>
+            msg.id === messageId || (msg.role === "assistant" && msg.status === "streaming")
+              ? { ...msg, content: fullText, status: "completed" }
+              : msg
+          )
+        );
+        setSpeakingMessageId(null);
+        setSpeechState("idle");
+        setIsBotSpeakingAloud(false);
+        if (botVoiceOpenRef.current) {
+          botVoice.resumeListening();
+        }
+        return;
       }
       streamTtsFinishedRef.current = true;
       drainStreamingTtsQueue();
@@ -1991,24 +2202,27 @@ export default function Home() {
             // responseText and are written by the seed/sync path when the user
             // returns to (or already has open) that conversation.
             if (isViewingThisStream()) {
-              const pending = pendingDeltasRef.current;
-              pending.set(messageId, (pending.get(messageId) ?? "") + delta);
-              if (!deltaFlushRafRef.current) {
-                deltaFlushRafRef.current = requestAnimationFrame(() => {
-                  deltaFlushRafRef.current = 0;
-                  flushPendingDeltas();
-                });
-              }
               // Stream words aloud in real-time as sentences arrive (Bot voice turns only)
               const isBotVoiceMode =
-                isVoiceTurn &&
-                botVoiceOpenRef.current &&
-                typeof window !== "undefined" &&
-                (window.sessionStorage?.getItem("ksemo:composer-tag") ??
-                  window.localStorage?.getItem("ksemo:composer-tag")) ===
-                  "bot";
+                isVoiceTurn ||
+                botVoiceOpenRef.current ||
+                (typeof window !== "undefined" &&
+                  (window.sessionStorage?.getItem("ksemo:composer-tag") ??
+                    window.localStorage?.getItem("ksemo:composer-tag")) ===
+                    "bot");
+
               if (isBotVoiceMode) {
+                // In bot voice mode, words are displayed word-by-word synchronously as the bot speaks!
                 feedStreamingTts(responseText, messageId);
+              } else {
+                const pending = pendingDeltasRef.current;
+                pending.set(messageId, (pending.get(messageId) ?? "") + delta);
+                if (!deltaFlushRafRef.current) {
+                  deltaFlushRafRef.current = requestAnimationFrame(() => {
+                    deltaFlushRafRef.current = 0;
+                    flushPendingDeltas();
+                  });
+                }
               }
             }
           } else if (eventName === "assistant.completed") {
@@ -2387,17 +2601,26 @@ export default function Home() {
         return;
       }
 
-      setChatMessages(current =>
-        current.map(message =>
-          message.role === "assistant" && message.status === "streaming"
-            ? {
-                ...message,
-                content: responseText || message.content,
-                status: finalStatus,
-              }
-            : message
-        )
-      );
+      const isBotVoiceMode =
+        isVoiceTurn ||
+        botVoiceOpenRef.current ||
+        (typeof window !== "undefined" &&
+          (window.sessionStorage?.getItem("ksemo:composer-tag") ??
+            window.localStorage?.getItem("ksemo:composer-tag")) === "bot");
+
+      if (!isBotVoiceMode) {
+        setChatMessages(current =>
+          current.map(message =>
+            message.role === "assistant" && message.status === "streaming"
+              ? {
+                  ...message,
+                  content: responseText || message.content,
+                  status: finalStatus,
+                }
+              : message
+          )
+        );
+      }
     }
 
     if (completedConversation) {
@@ -2432,16 +2655,19 @@ export default function Home() {
         );
       }
 
+      const isBotVoiceMode =
+        isVoiceTurn ||
+        botVoiceOpenRef.current ||
+        (typeof window !== "undefined" &&
+          (window.sessionStorage?.getItem("ksemo:composer-tag") ??
+            window.localStorage?.getItem("ksemo:composer-tag")) === "bot");
+
       if (
-        isVoiceTurn &&
+        isBotVoiceMode &&
         isViewingThisStream() &&
         !failureMessage &&
         !userStopped &&
-        responseText &&
-        botVoiceOpenRef.current &&
-        typeof window !== "undefined" &&
-        (window.sessionStorage?.getItem("ksemo:composer-tag") ??
-          window.localStorage?.getItem("ksemo:composer-tag")) === "bot"
+        responseText
       ) {
         finalizeStreamingTts(
           responseText,
@@ -3045,6 +3271,7 @@ export default function Home() {
     window.speechSynthesis?.cancel();
     setSpeakingMessageId(null);
     setSpeechState("idle");
+    setIsBotSpeakingAloud(false);
     setSidebarOpen(false);
     requestComposerFocus();
   }
@@ -3445,6 +3672,7 @@ export default function Home() {
   }
 
   function selectConversation(id: string) {
+    resetStreamingTts();
     closePdf();
     setChatFilesOpen(false);
     setPrimaryWorkspace(null);
@@ -4054,7 +4282,7 @@ export default function Home() {
       replyVoices={botReplyVoice.voices}
       replyVoiceName={botReplyVoice.voiceName}
       onReplyVoiceChange={botReplyVoice.setVoiceName}
-      isBotSpeaking={speechState === "playing"}
+      isBotSpeaking={isBotSpeakingAloud}
       isGenerating={isGenerating}
       isRecording={voice.state === "recording"}
       isTranscribing={voice.state === "transcribing"}
@@ -4313,63 +4541,85 @@ export default function Home() {
             {/* Chat action menu has no place in a temporary chat, so the
                 three-dots button is hidden there entirely. */}
             {!guestMode &&
-              visibleMessages.length > 0 &&
+              (visibleMessages.length > 0 || Boolean(shareTarget)) &&
               !isTemporaryChat &&
               !chatFilesOpen && (
-                <div className="absolute right-2 top-2 z-20 inline-flex items-center rounded-lg border border-border/40 bg-card shadow-xs">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-9 rounded-none rounded-l-lg border-0 bg-transparent px-3 text-foreground/80 hover:bg-accent hover:text-foreground transition-colors shadow-none"
-                      aria-label="Share chat"
-                      disabled={!activeConversationId}
-                      onClick={() => {
-                        if (activeConversationId) {
-                          stableOnShareConversation(
-                            activeConversation
-                              ? {
-                                  id: activeConversationId,
-                                  title: activeConversation.title,
-                                  isPublic: activeConversation.isPublic,
-                                  shareToken: activeConversation.shareToken,
-                                }
-                              : {
-                                  id: activeConversationId,
-                                  title: "this conversation",
-                                }
-                          );
-                        }
-                      }}
-                    >
-                      <span className="inline-flex items-center gap-1.5 text-sm font-medium">
-                        <ShareIcon className="size-4" />
-                        Share
-                      </span>
-                    </Button>
-                    <div
-                      className="h-4.5 w-px bg-border/40 shrink-0"
-                      aria-hidden="true"
-                    />
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
+                <div className="absolute right-2 top-2 z-20">
+                  <ShareConversationDialog
+                    open={Boolean(shareTarget) || isSharePreview}
+                    onOpenChange={stableShareOnOpenChange}
+                    title={shareTarget?.title ?? (activeConversation?.title || "your conversation")}
+                    shareUrl={
+                      shareTarget?.shareToken
+                        ? conversationShareUrl(shareTarget.shareToken)
+                        : activeConversation?.shareToken
+                          ? conversationShareUrl(activeConversation.shareToken)
+                          : ""
+                    }
+                    email={shareEmail}
+                    onEmailChange={setShareEmail}
+                    onCopy={stableShareOnCopy}
+                    onEmail={stableShareOnEmail}
+                    onSetPublic={stableShareOnSetPublic}
+                    enabled={Boolean(shareTarget || activeConversation) && !publicShareMutation.isPending}
+                    isPublic={Boolean(shareTarget?.isPublic ?? activeConversation?.isPublic)}
+                    messages={shareDialogMessages}
+                    sideOffset={6}
+                    anchor={
+                      <div className="inline-flex items-center rounded-lg border border-border/40 bg-card shadow-xs">
                         <Button
                           variant="ghost"
-                          size="icon"
-                          className="size-9 rounded-none rounded-r-lg border-0 bg-transparent text-foreground/80 hover:bg-accent hover:text-foreground transition-colors shadow-none"
-                          aria-label="Chat actions"
+                          size="sm"
+                          className="h-9 rounded-none rounded-l-lg border-0 bg-transparent px-3 text-foreground/80 hover:bg-accent hover:text-foreground transition-colors shadow-none"
+                          aria-label="Share chat"
+                          disabled={!activeConversationId}
+                          onClick={() => {
+                            if (activeConversationId) {
+                              stableOnShareConversation(
+                                activeConversation
+                                  ? {
+                                      id: activeConversationId,
+                                      title: activeConversation.title,
+                                      isPublic: activeConversation.isPublic,
+                                      shareToken: activeConversation.shareToken,
+                                    }
+                                  : {
+                                      id: activeConversationId,
+                                      title: "this conversation",
+                                    }
+                              );
+                            }
+                          }}
                         >
-                          <MoreHorizontal
-                            className="size-4.5"
-                            strokeWidth={2.75}
-                            fill="currentColor"
-                          />
+                          <span className="inline-flex items-center gap-1.5 text-sm font-medium">
+                            <ShareIcon className="size-4" />
+                            Share
+                          </span>
                         </Button>
-                      </DropdownMenuTrigger>
-                    <DropdownMenuContent
-                      align="end"
-                      sideOffset={6}
-                      className="w-44 rounded-xl"
-                    >
+                        <div
+                          className="h-4.5 w-px bg-border/40 shrink-0"
+                          aria-hidden="true"
+                        />
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="size-9 rounded-none rounded-r-lg border-0 bg-transparent text-foreground/80 hover:bg-accent hover:text-foreground transition-colors shadow-none"
+                              aria-label="Chat actions"
+                            >
+                              <MoreHorizontal
+                                className="size-4.5"
+                                strokeWidth={2.75}
+                                fill="currentColor"
+                              />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent
+                            align="end"
+                            sideOffset={6}
+                            className="w-44 rounded-xl"
+                          >
                       {/* Conversation title and date/month */}
                       <div className="px-2.5 pt-1.5 pb-1 select-none">
                         <p className="text-[12.5px] font-semibold text-foreground break-words leading-tight">
@@ -4478,7 +4728,10 @@ export default function Home() {
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
-              )}
+              }
+            />
+          </div>
+        )}
             <ChatFilesDialog
               open={chatFilesOpen}
               onOpenChange={setChatFilesOpen}
@@ -4687,24 +4940,6 @@ export default function Home() {
         initialSection="files"
         activeConversationId={activeConversationId}
         initialDeletePreview={isWorkspaceDeletePreview}
-      />
-      <ShareConversationDialog
-        open={Boolean(shareTarget) || isSharePreview}
-        onOpenChange={stableShareOnOpenChange}
-        title={shareTarget?.title ?? "your conversation"}
-        shareUrl={
-          shareTarget?.shareToken
-            ? conversationShareUrl(shareTarget.shareToken)
-            : ""
-        }
-        email={shareEmail}
-        onEmailChange={setShareEmail}
-        onCopy={stableShareOnCopy}
-        onEmail={stableShareOnEmail}
-        onSetPublic={stableShareOnSetPublic}
-        enabled={Boolean(shareTarget) && !publicShareMutation.isPending}
-        isPublic={Boolean(shareTarget?.isPublic)}
-        messages={shareDialogMessages}
       />
       <KsemoTextDialog
         open={Boolean(renameTarget) || isRenamePreview}

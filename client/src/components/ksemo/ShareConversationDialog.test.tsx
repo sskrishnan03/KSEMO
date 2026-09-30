@@ -81,4 +81,24 @@ describe("ShareConversationDialog", () => {
     expect(markup).toContain("1. Ship the real-time collaboration engine.");
     expect(markup).toContain("quarterly_goals.pdf");
   });
+
+  it("renders the top-right close button when onCancel is provided", () => {
+    const markup = renderToStaticMarkup(
+      createElement(ShareConversationPanel, {
+        title: "Team Sync",
+        shareUrl: "https://ksemo.ai/share/team-sync",
+        email: "",
+        onEmailChange: () => undefined,
+        onCopy: () => undefined,
+        onEmail: () => undefined,
+        onSetPublic: () => undefined,
+        onCancel: () => undefined,
+        isPublic: false,
+        enabled: true,
+      })
+    );
+
+    expect(markup).toContain('aria-label="Close share dialog"');
+  });
 });
+
