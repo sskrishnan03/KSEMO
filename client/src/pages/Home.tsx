@@ -4298,7 +4298,7 @@ export default function Home() {
                         <p className="text-[12.5px] font-semibold text-foreground break-words leading-tight">
                           {activeConversation?.title || "New Chat"}
                         </p>
-                        <div className="mt-1 flex items-center justify-between text-[11px] font-medium text-muted-foreground/80 leading-none">
+                        <div className="mt-1 flex items-center justify-between text-[11.5px] font-medium text-muted-foreground/80 leading-none">
                           <span className="whitespace-nowrap">Latest activity</span>
                           <span className="whitespace-nowrap">{conversationFormattedDate}</span>
                         </div>
