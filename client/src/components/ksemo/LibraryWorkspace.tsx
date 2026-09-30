@@ -37,7 +37,6 @@ import {
   Pencil,
   Search,
   Star,
-  Trash2,
   Upload,
   X,
 } from "lucide-react";
@@ -53,7 +52,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { ShareIcon } from "./icons";
+import { ShareIcon, Trash6Icon } from "./icons";
 import { downloadFile } from "@/lib/downloadFile";
 import React, {
   memo,
@@ -558,7 +557,7 @@ export function LibraryWorkspace({
                       className="flex h-11 w-11 items-center justify-center rounded-xl bg-neutral-900 text-destructive transition-colors hover:bg-neutral-800"
                       aria-label={removeActionLabel}
                     >
-                      <Trash2 className="size-4.5" strokeWidth={2.5} />
+                      <Trash6Icon className="size-4.5" />
                     </button>
                   </TooltipTrigger>
                   <TooltipContent side="top">
@@ -647,7 +646,7 @@ export function LibraryWorkspace({
                       className="flex h-11 w-11 items-center justify-center rounded-xl bg-neutral-900 text-destructive transition-colors hover:bg-neutral-800"
                       aria-label={removeActionLabel}
                     >
-                      <Trash2 className="size-4.5" strokeWidth={2.5} />
+                      <Trash6Icon className="size-4.5" />
                     </button>
                   </TooltipTrigger>
                   <TooltipContent side="left">
@@ -1117,7 +1116,7 @@ const LibraryGridCard = memo(function LibraryGridCard({
                 }}
                 variant="destructive"
               >
-                <Trash2 className="mr-2 size-4" />
+                <Trash6Icon className="mr-2 size-4" />
                 Delete
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -1367,7 +1366,7 @@ const LibraryListRow = memo(function LibraryListRow({
                 }}
                 variant="destructive"
               >
-                <Trash2 className="mr-2 size-4" />
+                <Trash6Icon className="mr-2 size-4" />
                 Delete
               </DropdownMenuItem>
             </DropdownMenuContent>

@@ -207,7 +207,7 @@ describe("KSEMO conversation sidebar disclosure", () => {
     expect(markup).toContain("lucide-ellipsis");
   });
 
-  it("renders mobile ConversationActionsMenu with aligned Download PDF and Download Word matching other options", () => {
+  it("renders ConversationActionsMenuItems with only Rename, Pin, and Delete options", () => {
     const markup = renderInMenu(
       createElement(ConversationActionsMenuItems, {
         conversation: {
@@ -218,21 +218,17 @@ describe("KSEMO conversation sidebar disclosure", () => {
         },
         onRename: () => undefined,
         onPin: () => undefined,
-        onArchive: () => undefined,
-        onShare: () => undefined,
-        onExport: () => undefined,
         onDelete: () => undefined,
-        isMobile: true,
       })
     );
-    expect(markup).toContain("Download PDF");
-    expect(markup).toContain("Download Word");
     expect(markup).toContain("Rename");
     expect(markup).toContain("lucide-pencil");
-    // PDF and Word get distinct branded marks (not the same generic icon).
-    expect(markup).toContain('role="img"');
-    expect(markup).toContain(">PDF<");
-    expect(markup).toContain(">WORD<");
+    expect(markup).toContain("Pin");
+    expect(markup).toContain("Delete");
+    expect(markup).not.toContain("Download PDF");
+    expect(markup).not.toContain("Download Word");
+    expect(markup).not.toContain("Share");
+    expect(markup).not.toContain("Archive");
   });
 
   it("keeps the scan-to-open code out of the sidebar entirely", () => {

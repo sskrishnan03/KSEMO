@@ -1,5 +1,27 @@
 import React, { useId } from "react";
 import { cn } from "@/lib/utils";
+import { Pin, PinOff, Trash2 } from "lucide-react";
+import { Winrar } from "reicon-react/icons/Winrar";
+
+export function PinTackIcon({ className }: { className?: string }) {
+  return <Pin className={cn("size-4", className)} />;
+}
+
+export function WinrarIcon({ className }: { className?: string }) {
+  return <Winrar className={cn("size-4", className)} />;
+}
+
+export function Trash6Icon({ className }: { className?: string }) {
+  return <Trash2 className={cn("size-4", className)} />;
+}
+
+export function TrashIcon({ className }: { className?: string }) {
+  return <Trash2 className={cn("size-4", className)} />;
+}
+
+export function UnpinTackIcon({ className }: { className?: string }) {
+  return <PinOff className={cn("size-4", className)} />;
+}
 
 // Stroke-based share icon drawn on the same 24-unit grid as the lucide icons
 // used across the app (strokeWidth 2, currentColor, round caps/joins) so it

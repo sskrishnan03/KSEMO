@@ -19,22 +19,33 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { startLogin } from "@/const";
 import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
 import {
+  Archive,
   ArrowDown,
   ChevronsRight,
-  FolderOpen,
+  Download,
   LogIn,
   MoreHorizontal,
-  Pin,
-  Trash2,
+  Pencil,
   UserPlus,
 } from "lucide-react";
-import { ShareIcon, TemporaryChatIcon } from "../components/ksemo/icons";
+import {
+  ShareIcon,
+  TemporaryChatIcon,
+  PinTackIcon,
+  UnpinTackIcon,
+  WinrarIcon,
+  Trash6Icon,
+} from "../components/ksemo/icons";
+import { PdfFileIcon, WordFileIcon } from "../components/ksemo/FileBrandIcons";
 
 import {
   Tooltip,
@@ -93,6 +104,10 @@ import { ConfirmDeleteDialog } from "../components/ksemo/ConfirmDeleteDialog";
 import { useVoiceInput } from "../hooks/useVoiceInput";
 import { useBotVoice } from "../hooks/useBotVoice";
 import { useBotReplyVoice } from "../lib/speechVoices";
+import { routeBotCommand } from "../lib/bot/commandRouter";
+import { openExternalUrl } from "../lib/bot/urlSafety";
+import type { ComposerTag } from "../components/ksemo/ChatComposer";
+import type { BotActionData } from "../components/voice/BotActionStatus";
 import { usePersistFn } from "../hooks/usePersistFn";
 import { WorkspacePanel } from "../components/ksemo/WorkspacePanel";
 import { LibraryWorkspace } from "../components/ksemo/LibraryWorkspace";
@@ -458,9 +473,19 @@ export default function Home() {
   }, [sidebarOpen, isMobile]);
   const [guestPromptOpen, setGuestPromptOpen] = useState(false);
   const [composerValue, setComposerValue] = useState("");
+  const [composerTag, setComposerTag] = useState<ComposerTag>(() => {
+    if (typeof window === "undefined") return "chat";
+    try {
+      const storage = window.sessionStorage ?? window.localStorage;
+      return storage.getItem("ksemo:composer-tag") === "bot" ? "bot" : "chat";
+    } catch {
+      return "chat";
+    }
+  });
   // Bot's auto-send has to reach the send pipeline, but useBotVoice is created
   // long before sendMessage's stable wrapper exists. This bridges the two.
   const botSendRef = useRef<((text: string) => void) | null>(null);
+  const botVoiceTurnRef = useRef<((text: string) => Promise<void>) | null>(null);
   // Mirrors whether the bot voice session is open, for stable callbacks that
   // must decide on the fly whether a finished reply should be spoken aloud.
   const botVoiceOpenRef = useRef(
@@ -468,6 +493,9 @@ export default function Home() {
       (window.sessionStorage?.getItem("ksemo:composer-tag") ??
         window.localStorage?.getItem("ksemo:composer-tag")) === "bot"
   );
+  useEffect(() => {
+    botVoiceOpenRef.current = composerTag === "bot";
+  }, [composerTag]);
   // The bot's answer voice, picked in the composer while the voice chat runs.
   const botReplyVoiceNameRef = useRef<string | null>(null);
   const [composerFocusToken, setComposerFocusToken] = useState(0);
@@ -731,6 +759,17 @@ export default function Home() {
     activeQuery.data?.conversation,
     conversationQuery.data,
   ]);
+  const conversationFormattedDate = useMemo(() => {
+    const raw =
+      (activeConversation as { updatedAt?: string | Date; createdAt?: string | Date } | null)?.updatedAt ||
+      (activeConversation as { updatedAt?: string | Date; createdAt?: string | Date } | null)?.createdAt ||
+      (chatMessages.length > 0 ? (chatMessages[0] as unknown as { createdAt?: string | Date }).createdAt : null);
+    const d = raw ? new Date(raw) : new Date();
+    if (isNaN(d.getTime())) {
+      return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(new Date());
+    }
+    return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(d);
+  }, [activeConversation, chatMessages]);
   const preferencesQuery = trpc.preferences.get.useQuery(undefined, {
     enabled: Boolean(user),
   });
@@ -916,7 +955,11 @@ export default function Home() {
     getCurrentText: () => composerValue,
     onSend: text => {
       setComposerValue("");
-      void sendMessage(text, { isVoiceTurn: true });
+      if (botVoiceTurnRef.current) {
+        void botVoiceTurnRef.current(text);
+      } else {
+        void sendMessage(text, { isVoiceTurn: true });
+      }
     },
   });
   const botReplyVoice = useBotReplyVoice();
@@ -1645,6 +1688,8 @@ export default function Home() {
       regenerateAssistantMessageId?: string;
       replaceUserMessageId?: string;
       isVoiceTurn?: boolean;
+      webSearch?: boolean;
+      initialBotAction?: BotActionData;
     } = {}
   ) {
     if (!user) {
@@ -1683,6 +1728,13 @@ export default function Home() {
         : undefined,
       now: draftNow,
     }) as KsemoMessage[];
+    if (options.initialBotAction) {
+      for (const message of drafts) {
+        if (message.role === "assistant" && message.status === "streaming") {
+          message.botAction = options.initialBotAction;
+        }
+      }
+    }
     // Resolve mode: either explicit activeMode from UI or auto-detected from natural language query
     const detected = detectFileRequest(content);
     const resolvedMode =
@@ -1769,6 +1821,7 @@ export default function Home() {
             : undefined,
           mode: resolvedMode ?? "chat",
           activeMode: resolvedMode ?? "chat",
+          ...(options.webSearch ? { webSearch: true } : {}),
           ...(temporary ? { temporary: true } : {}),
           ...(resolvedMode === "pptx"
             ? {
@@ -1901,6 +1954,50 @@ export default function Home() {
             }
           } else if (eventName === "assistant.completed") {
             lastProgressAt = Date.now();
+          } else if (eventName === "search.progress") {
+            lastProgressAt = Date.now();
+            const searchMsgId = str(data.messageId);
+            if (isViewingThisStream()) {
+              setChatMessages(current =>
+                current.map(message =>
+                  message.id === searchMsgId ||
+                  (message.role === "assistant" &&
+                    message.status === "streaming" &&
+                    message.botAction?.intent === "web_search")
+                    ? {
+                        ...message,
+                        botAction: {
+                          intent: "web_search",
+                          status: "searching",
+                          statusText: "Searching the web...",
+                        },
+                      }
+                    : message
+                )
+              );
+            }
+          } else if (eventName === "search.completed") {
+            lastProgressAt = Date.now();
+            const searchMsgId = str(data.messageId);
+            if (isViewingThisStream()) {
+              setChatMessages(current =>
+                current.map(message =>
+                  message.id === searchMsgId ||
+                  (message.role === "assistant" &&
+                    message.status === "streaming" &&
+                    message.botAction?.intent === "web_search")
+                    ? {
+                        ...message,
+                        botAction: {
+                          intent: "web_search",
+                          status: "completed",
+                          statusText: "Search completed",
+                        },
+                      }
+                    : message
+                )
+              );
+            }
           } else if (eventName === "conversation.titleUpdated") {
             // Invalidate the conversation list and active conversation to refresh with the new title
             utils.conversation.list.invalidate();
@@ -3436,10 +3533,156 @@ export default function Home() {
   // Stable wrappers for every callback handed to memoized children. Without
   // these, useMemo/React.memo boundaries would be defeated because Home
   // recreates plain function declarations on each render.
-  const stableSendMessage = usePersistFn(sendMessage);
-  const stableComposerSend = usePersistFn(
-    (content: string) => void sendMessage(content)
+  const handleBotVoiceTurn = useCallback(
+    async (rawTranscript: string) => {
+      const text = rawTranscript.trim();
+      if (!text) return;
+
+      const decision = routeBotCommand(text);
+
+      // 1. Direct website navigation or YouTube search or Site search
+      if (
+        decision.intent === "navigate" ||
+        decision.intent === "youtube_search" ||
+        decision.intent === "site_search"
+      ) {
+        if (decision.url) {
+          const isYouTubeSearch = decision.intent === "youtube_search";
+          const siteLabel = decision.target || "website";
+          const initialMessage = decision.statusText;
+
+          const userMessageId = `user-${Date.now()}`;
+          const assistantMessageId = `asst-${Date.now()}`;
+
+          const initialAction: BotActionData = {
+            intent: decision.intent,
+            target: decision.target,
+            url: decision.url,
+            query: decision.query,
+            status: isYouTubeSearch ? "searching" : "opening",
+            statusText: initialMessage,
+          };
+
+          const userMsg: KsemoMessage = {
+            id: userMessageId,
+            role: "user",
+            content: text,
+            status: "completed",
+          };
+
+          const asstMsg: KsemoMessage = {
+            id: assistantMessageId,
+            role: "assistant",
+            content: "",
+            status: "streaming",
+            botAction: initialAction,
+          };
+
+          setChatMessages(prev => [...prev, userMsg, asstMsg]);
+          window.requestAnimationFrame(() => scrollChatToEnd("smooth"));
+
+          // Open in a new tab immediately
+          const openResult = openExternalUrl(decision.url);
+
+          // Brief delay to let the animated indicator render cleanly
+          await new Promise(r => setTimeout(r, 600));
+
+          const finalAction: BotActionData = {
+            ...initialAction,
+            status: openResult.success ? "completed" : "blocked",
+            statusText: openResult.success
+              ? isYouTubeSearch
+                ? `Opened YouTube search results`
+                : `Opened ${siteLabel}`
+              : `Popup blocked by browser. Click to open ${siteLabel}`,
+            errorMessage: openResult.blocked
+              ? "Popup blocked by browser"
+              : undefined,
+          };
+
+          setChatMessages(prev =>
+            prev.map(m =>
+              m.id === assistantMessageId
+                ? { ...m, status: "completed", botAction: finalAction }
+                : m
+            )
+          );
+
+          // Resume listening after completing the navigation
+          if (botVoiceOpenRef.current) {
+            window.setTimeout(() => {
+              if (botVoiceOpenRef.current) {
+                botVoice.resumeListening();
+              }
+            }, 1000);
+          }
+          return;
+        }
+      }
+
+      // 2. Web search
+      if (decision.intent === "web_search") {
+        const query = decision.query || text;
+        const initialAction: BotActionData = {
+          intent: "web_search",
+          query,
+          status: "searching",
+          statusText: `Searching the web for "${query}"...`,
+        };
+        await sendMessage(text, {
+          isVoiceTurn: true,
+          webSearch: true,
+          initialBotAction: initialAction,
+        });
+        return;
+      }
+
+      // 3. Destructive commands (safety block)
+      if (decision.intent === "destructive") {
+        const userMessageId = `user-${Date.now()}`;
+        const assistantMessageId = `asst-${Date.now()}`;
+        const userMsg: KsemoMessage = {
+          id: userMessageId,
+          role: "user",
+          content: text,
+          status: "completed",
+        };
+        const asstMsg: KsemoMessage = {
+          id: assistantMessageId,
+          role: "assistant",
+          content:
+            decision.feedbackText ||
+            "That action cannot be executed automatically for safety reasons.",
+          status: "completed",
+        };
+        setChatMessages(prev => [...prev, userMsg, asstMsg]);
+        window.requestAnimationFrame(() => scrollChatToEnd("smooth"));
+        if (botVoiceOpenRef.current) {
+          botVoice.resumeListening();
+        }
+        return;
+      }
+
+      // 4. Normal AI chat question / general voice turn
+      await sendMessage(text, { isVoiceTurn: true });
+    },
+    [botVoice, sendMessage]
   );
+
+  const stableBotVoiceTurn = usePersistFn(handleBotVoiceTurn);
+  botVoiceTurnRef.current = stableBotVoiceTurn;
+
+  // Stable wrappers for every callback handed to memoized children. Without
+  // these, useMemo/React.memo boundaries would be defeated because Home
+  // recreates plain function declarations on each render.
+  const stableSendMessage = usePersistFn(sendMessage);
+  const stableComposerSend = usePersistFn((content: string) => {
+    if (composerTag === "bot") {
+      void handleBotVoiceTurn(content);
+    } else {
+      void sendMessage(content);
+    }
+  });
   botSendRef.current = stableComposerSend;
   const stableStopGeneration = usePersistFn(stopGeneration);
   const stableNewChat = usePersistFn(newChat);
@@ -3483,6 +3726,11 @@ export default function Home() {
   const stableBotVoiceStart = usePersistFn(() => {
     resetStreamingTts();
     botVoiceOpenRef.current = true;
+    setComposerTag("bot");
+    try {
+      window.sessionStorage?.setItem("ksemo:composer-tag", "bot");
+      window.localStorage?.setItem("ksemo:composer-tag", "bot");
+    } catch {}
     void botVoice.start();
   });
   const stableBotVoiceStop = usePersistFn(() => {
@@ -3490,6 +3738,23 @@ export default function Home() {
     resetStreamingTts();
     stopGeneration();
     botVoice.cancel();
+  });
+  const stableOnTagChange = usePersistFn((tag: ComposerTag) => {
+    setComposerTag(tag);
+    try {
+      window.sessionStorage?.setItem("ksemo:composer-tag", tag);
+      window.localStorage?.setItem("ksemo:composer-tag", tag);
+    } catch {}
+    if (tag === "bot") {
+      botVoiceOpenRef.current = true;
+      resetStreamingTts();
+      void botVoice.start();
+    } else {
+      botVoiceOpenRef.current = false;
+      resetStreamingTts();
+      stopGeneration();
+      botVoice.cancel();
+    }
   });
   // Good/bad response is an exclusive pair: pressing the other thumb switches
   // the rating, and pressing the active thumb again clears it.
@@ -3712,6 +3977,8 @@ export default function Home() {
       onCancel={stableStopGeneration}
       onVoice={stableVoiceAction}
       onCancelRecording={stableVoiceCancel}
+      activeTag={composerTag}
+      onTagChange={stableOnTagChange}
       onBotVoice={stableBotVoiceStart}
       onBotVoiceStop={stableBotVoiceStop}
       botVoiceState={botVoice.state}
@@ -3976,13 +4243,42 @@ export default function Home() {
               visibleMessages.length > 0 &&
               !isTemporaryChat &&
               !chatFilesOpen && (
-                <div className="absolute right-2 top-2 z-10">
+                <div className="absolute right-2 top-2 z-10 flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-9 rounded-lg border border-border/40 bg-card px-3 text-foreground/80 hover:bg-accent hover:text-foreground transition-colors shadow-xs"
+                    aria-label="Share chat"
+                    disabled={!activeConversationId}
+                    onClick={() => {
+                      if (activeConversationId) {
+                        stableOnShareConversation(
+                          activeConversation
+                            ? {
+                                id: activeConversationId,
+                                title: activeConversation.title,
+                                isPublic: activeConversation.isPublic,
+                                shareToken: activeConversation.shareToken,
+                              }
+                            : {
+                                id: activeConversationId,
+                                title: "this conversation",
+                              }
+                        );
+                      }
+                    }}
+                  >
+                    <span className="inline-flex items-center gap-1.5 text-sm font-medium">
+                      <ShareIcon className="size-4" />
+                      Share
+                    </span>
+                  </Button>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="size-9 rounded-lg bg-neutral-900 text-neutral-50 hover:bg-neutral-800"
+                        className="size-9 rounded-lg border border-border/40 bg-card text-foreground/80 hover:bg-accent hover:text-foreground transition-colors shadow-xs"
                         aria-label="Chat actions"
                       >
                         <MoreHorizontal
@@ -3994,8 +4290,22 @@ export default function Home() {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent
                       align="end"
+                      sideOffset={6}
                       className="w-44 rounded-xl"
                     >
+                      {/* Conversation title and date/month */}
+                      <div className="px-2.5 pt-1.5 pb-1 select-none">
+                        <p className="text-[12.5px] font-semibold text-foreground break-words leading-tight">
+                          {activeConversation?.title || "New Chat"}
+                        </p>
+                        <div className="mt-1 flex items-center justify-between text-[11px] font-medium text-muted-foreground/80 leading-none">
+                          <span className="whitespace-nowrap">Latest activity</span>
+                          <span className="whitespace-nowrap">{conversationFormattedDate}</span>
+                        </div>
+                      </div>
+                      <DropdownMenuSeparator className="my-1" />
+
+                      {/* Best order: Pin, Rename, Archive, View files, Export, Delete */}
                       <DropdownMenuItem
                         disabled={!activeConversationId}
                         onSelect={() => {
@@ -4009,36 +4319,80 @@ export default function Home() {
                           }
                         }}
                       >
-                        <Pin className="mr-2 size-4" />
+                        {activeConversation?.isPinned ? (
+                          <UnpinTackIcon className="mr-2 size-4" />
+                        ) : (
+                          <PinTackIcon className="mr-2 size-4" />
+                        )}
                         {activeConversation?.isPinned ? "Unpin" : "Pin"}
                       </DropdownMenuItem>
+
+                      <DropdownMenuItem
+                        disabled={!activeConversationId}
+                        onSelect={() => {
+                          if (activeConversationId && activeConversation) {
+                            stableOnRename(activeConversation);
+                          }
+                        }}
+                      >
+                        <Pencil className="mr-2 size-4" />
+                        Rename
+                      </DropdownMenuItem>
+
                       <DropdownMenuItem
                         disabled={!activeConversationId}
                         onSelect={() => {
                           if (activeConversationId) {
-                            stableOnShareConversation(
-                              activeConversation
-                                ? {
-                                    id: activeConversationId,
-                                    title: activeConversation.title,
-                                    isPublic: activeConversation.isPublic,
-                                    shareToken: activeConversation.shareToken,
-                                  }
-                                : {
-                                    id: activeConversationId,
-                                    title: "this conversation",
-                                  }
-                            );
+                            stableOnArchive({ id: activeConversationId });
+                            newChat();
+                            toast.success("Chat archived");
                           }
                         }}
                       >
-                        <ShareIcon className="mr-2 size-4" />
-                        Share
+                        <Archive className="mr-2 size-4" />
+                        Archive
                       </DropdownMenuItem>
+
                       <DropdownMenuItem onSelect={() => setChatFilesOpen(true)}>
-                        <FolderOpen className="mr-2 size-4" />
+                        <WinrarIcon className="mr-2 size-4" />
                         View files
                       </DropdownMenuItem>
+
+                      <DropdownMenuSub>
+                        <DropdownMenuSubTrigger
+                          disabled={!activeConversationId}
+                        >
+                          <Download className="mr-2 size-4" />
+                          Export
+                        </DropdownMenuSubTrigger>
+                        <DropdownMenuSubContent
+                          sideOffset={6}
+                          collisionPadding={12}
+                          className="w-28 min-w-0 rounded-xl p-1"
+                        >
+                          <DropdownMenuItem
+                            onSelect={() => {
+                              if (activeConversationId) {
+                                void exportConversation(activeConversationId, "pdf");
+                              }
+                            }}
+                          >
+                            <PdfFileIcon className="mr-2 size-5 shrink-0" />
+                            <span>PDF</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onSelect={() => {
+                              if (activeConversationId) {
+                                void exportConversation(activeConversationId, "word");
+                              }
+                            }}
+                          >
+                            <WordFileIcon className="mr-2 size-5 shrink-0" />
+                            <span>Word</span>
+                          </DropdownMenuItem>
+                        </DropdownMenuSubContent>
+                      </DropdownMenuSub>
+
                       <DropdownMenuSeparator />
                       <DropdownMenuItem
                         disabled={!activeConversationId}
@@ -4053,7 +4407,7 @@ export default function Home() {
                             });
                         }}
                       >
-                        <Trash2 className="mr-2 size-4" />
+                        <Trash6Icon className="mr-2 size-4" />
                         Delete
                       </DropdownMenuItem>
                     </DropdownMenuContent>

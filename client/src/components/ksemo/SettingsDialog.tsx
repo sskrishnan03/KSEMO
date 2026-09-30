@@ -45,13 +45,13 @@ import {
   ShieldCheck,
   Settings2,
   Star,
-  Trash2,
   Unlink,
   User,
   X,
   Zap,
 } from "lucide-react";
 import React, { memo, useEffect, useMemo, useRef, useState } from "react";
+import { Trash6Icon } from "./icons";
 import { MemorySection } from "./MemorySection";
 
 type Preferences =
@@ -94,12 +94,12 @@ export const settingsSections: Array<{
 const settingsNavItems: Array<{
   id: SettingsTab;
   label: string;
-  icon: typeof MessageSquare;
+  icon: React.ComponentType<{ className?: string }>;
 }> = [
   { id: "account", label: "Account", icon: User },
   { id: "security", label: "Security", icon: ShieldCheck },
   { id: "appearance", label: "Appearance", icon: Palette },
-  { id: "data", label: "Data Control", icon: Trash2 },
+  { id: "data", label: "Data Control", icon: Trash6Icon },
   { id: "memory", label: "Memory", icon: Brain },
   { id: "feedback", label: "Feedback", icon: MessageSquare },
 ];
@@ -1711,7 +1711,7 @@ function ArchivedChatsWorkspace({
                           setDeleteTarget({ id: c.id, title: c.title })
                         }
                       >
-                        <Trash2 className="size-4" />
+                        <Trash6Icon className="size-4" />
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent side="bottom">Delete</TooltipContent>
@@ -1886,7 +1886,7 @@ function SharedChatsWorkspace({
                             setDeleteTarget({ id: c.id, title: c.title })
                           }
                         >
-                          <Trash2 className="size-4" />
+                          <Trash6Icon className="size-4" />
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent side="bottom">Delete</TooltipContent>

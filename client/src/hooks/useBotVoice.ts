@@ -21,8 +21,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 export type BotVoiceState = "idle" | "listening" | "transcribing";
 
 /** How long a pause counts as "I've finished talking". */
-const SILENCE_MS = 750;
-const FINAL_SILENCE_MS = 500;
+const SILENCE_MS = 600;
+const FINAL_SILENCE_MS = 350;
 
 /** Above this the mic is considered open, which drives the wave. */
 const LISTENING_LEVEL_THRESHOLD = 0.02;

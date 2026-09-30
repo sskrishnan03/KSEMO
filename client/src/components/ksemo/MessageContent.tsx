@@ -28,11 +28,10 @@ import {
   Square,
   ThumbsDown,
   ThumbsUp,
-  Trash2,
   Volume2,
   X,
 } from "lucide-react";
-import { ShareIcon } from "./icons";
+import { ShareIcon, Trash6Icon } from "./icons";
 import {
   MessageFeedback,
   type MessageFeedbackValue,
@@ -44,6 +43,7 @@ import { KsemoMarkdownCode } from "./code-block";
 import { sanitizeAssistantText } from "@/lib/sanitizeAssistant";
 import { usePdfViewer, isViewableDocument } from "@/contexts/PdfViewerContext";
 import type { PptOutlinePlan } from "@shared/presentationOutline";
+import { BotActionStatus, type BotActionData } from "@/components/voice/BotActionStatus";
 
 type KsemoMessage = {
   id: string;
@@ -57,6 +57,7 @@ type KsemoMessage = {
     url: string;
     sizeBytes?: number;
   }>;
+  botAction?: BotActionData;
   fileGeneration?: {
     stage: string;
     format: string;
@@ -486,12 +487,24 @@ export const MessageContent = memo(function MessageContent({
                       })()}
                     </>
                   ) : (
-                    <div className="ksemo-markdown prose prose-neutral max-w-none text-[15px] leading-6 dark:prose-invert">
-                      <Streamdown components={KSEMO_MARKDOWN_COMPONENTS}>
-                        {cleanContent}
-                      </Streamdown>
-                    </div>
+                    <>
+                      {message.botAction && (
+                        <BotActionStatus action={message.botAction} />
+                      )}
+                      {cleanContent && (
+                        <div className="ksemo-markdown prose prose-neutral max-w-none text-[15px] leading-6 dark:prose-invert">
+                          <Streamdown components={KSEMO_MARKDOWN_COMPONENTS}>
+                            {cleanContent}
+                          </Streamdown>
+                        </div>
+                      )}
+                    </>
                   )}
+                  {isCancelled && renderStoppedNotice()}
+                </>
+              ) : message.botAction ? (
+                <>
+                  <BotActionStatus action={message.botAction} />
                   {isCancelled && renderStoppedNotice()}
                 </>
               ) : fileCreationNode ? (
@@ -504,6 +517,7 @@ export const MessageContent = memo(function MessageContent({
               ) : message.status === "streaming" &&
                 isCurrentGeneration &&
                 !hideTypingIndicator &&
+                !message.botAction &&
                 !message.fileGeneration &&
                 !fileCreationNode &&
                 !(message.attachments?.length && !isUser) ? (
@@ -854,7 +868,7 @@ function MessageOverflow({
             onClick={() => onDelete(message)}
             variant="destructive"
           >
-            <Trash2 className="mr-2 size-4" />
+            <Trash6Icon className="mr-2 size-4" />
             Delete message
           </DropdownMenuItem>
         )}

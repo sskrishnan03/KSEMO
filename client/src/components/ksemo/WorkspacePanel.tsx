@@ -14,7 +14,8 @@ import {
   guessMimeType,
   isSupportedUpload,
 } from "@/lib/fileIcons";
-import { Link2, Trash2, Upload } from "lucide-react";
+import { Link2, Upload } from "lucide-react";
+import { Trash6Icon } from "./icons";
 import React, {
   memo,
   type ChangeEvent,
@@ -261,7 +262,7 @@ export const WorkspacePanel = memo(function WorkspacePanel({
                         }
                         aria-label={`Remove ${file.filename}`}
                       >
-                        <Trash2 className="size-4" />
+                        <Trash6Icon className="size-4" />
                       </Button>
                     </div>
                   ))

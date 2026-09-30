@@ -18,9 +18,9 @@ import {
   ChevronsRight,
   MessageCircle,
   Search,
-  Pin,
   X,
 } from "lucide-react";
+import { PinTackIcon } from "./icons";
 import { memo, useEffect, useMemo, useState } from "react";
 import {
   format,
@@ -621,7 +621,7 @@ export function SearchWorkspace({
                           {result.title}
                         </span>
                         {result.isPinned && (
-                          <Pin className="size-3.5 shrink-0 text-primary" />
+                          <PinTackIcon className="size-3.5 shrink-0 text-primary" />
                         )}
                       </div>
                       {result.snippet && (
@@ -683,7 +683,7 @@ export function SearchWorkspace({
                                       {result.title}
                                     </span>
                                     {result.isPinned && (
-                                      <Pin className="size-3.5 shrink-0 text-primary" />
+                                      <PinTackIcon className="size-3.5 shrink-0 text-primary" />
                                     )}
                                   </div>
                                   {result.snippet && (
@@ -724,7 +724,7 @@ export function SearchWorkspace({
                                       {result.title}
                                     </span>
                                     {result.isPinned && (
-                                      <Pin className="size-3.5 shrink-0 text-primary" />
+                                      <PinTackIcon className="size-3.5 shrink-0 text-primary" />
                                     )}
                                   </div>
                                   {result.snippet && (
@@ -765,7 +765,7 @@ export function SearchWorkspace({
                                       {result.title}
                                     </span>
                                     {result.isPinned && (
-                                      <Pin className="size-3.5 shrink-0 text-primary" />
+                                      <PinTackIcon className="size-3.5 shrink-0 text-primary" />
                                     )}
                                   </div>
                                   {result.snippet && (

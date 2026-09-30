@@ -12,9 +12,9 @@ import {
   Quote,
   RotateCw,
   Sparkles,
-  Trash2,
   Type,
 } from "lucide-react";
+import { Trash6Icon } from "./icons";
 import React, { memo, useState } from "react";
 import {
   PPT_SLIDE_TYPE_LABELS,
@@ -450,7 +450,7 @@ export const PresentationOutlineCard = memo(function PresentationOutlineCard({
                     disabled={busy || draft.slides.length <= 1}
                     className="grid size-6 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-30"
                   >
-                    <Trash2 className="size-3.5" />
+                    <Trash6Icon className="size-3.5" />
                   </button>
                 </div>
               </div>
@@ -511,7 +511,7 @@ export const PresentationOutlineCard = memo(function PresentationOutlineCard({
                           disabled={busy}
                           className="grid size-6 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-30"
                         >
-                          <Trash2 className="size-3.5" />
+                          <Trash6Icon className="size-3.5" />
                         </button>
                       </div>
                     ))}

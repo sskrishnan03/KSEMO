@@ -1,5 +1,6 @@
 import { getFileKind, isImageFile } from "@/lib/fileKinds";
-import { Eye, ExternalLink, FolderOpen, X } from "lucide-react";
+import { Eye, ExternalLink, X } from "lucide-react";
+import { WinrarIcon } from "./icons";
 import React, { memo, useEffect, useMemo, useState } from "react";
 import { usePdfViewer, isViewableDocument } from "@/contexts/PdfViewerContext";
 import { ImageLightbox } from "@/components/ui/image-lightbox";
@@ -60,7 +61,7 @@ export const ChatFilesDialog = memo(function ChatFilesDialog({
       <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border/80 px-3.5 py-2.5 bg-muted/20">
         <div className="flex items-center gap-2.5 min-w-0">
           <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-foreground">
-            <FolderOpen className="size-4" />
+            <WinrarIcon className="size-4" />
           </span>
           <p className="text-[15px] font-semibold leading-tight text-foreground truncate">
             Files in this chat

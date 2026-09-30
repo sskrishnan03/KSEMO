@@ -7,7 +7,7 @@ import {
   AlertDialogDescription,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Trash2 } from "lucide-react";
+import { Trash6Icon } from "./icons";
 import React, { useEffect, useState } from "react";
 
 type Props = {
@@ -46,7 +46,7 @@ export function ConfirmDeleteDialog({
       <AlertDialogContent className="max-w-sm gap-3 rounded-2xl p-4 sm:max-w-sm">
         <div className="flex items-start gap-3">
           <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-destructive/10 text-destructive">
-            <Trash2 className="size-4" />
+            <Trash6Icon className="size-4" />
           </span>
           <div className="min-w-0 flex-1">
             <AlertDialogTitle className="text-[15px] leading-6 font-semibold tracking-[-0.01em]">

@@ -53,7 +53,7 @@ const MAX_EXTRACT_CHARS = 3_000;
  * Performs a web search using DuckDuckGo HTML endpoint and extracts
  * result links, titles, and snippets from the response.
  */
-async function searchWeb(
+export async function searchWeb(
   query: string,
   signal?: AbortSignal
 ): Promise<Array<{ title: string; url: string; snippet: string }>> {

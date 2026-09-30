@@ -31,19 +31,17 @@ import {
   LogIn,
   LogOut,
   Pencil,
-  Pin,
   Search,
   Settings2,
   ShieldCheck,
   SquarePen,
-  Trash2,
   X,
   LockKeyhole,
 } from "lucide-react";
 import { Library } from "reicon-react/icons/Library";
 import { ChatLine } from "reicon-react/icons/ChatLine";
 import { ChatSquareCall } from "reicon-react/icons/ChatSquareCall";
-import { ShareIcon } from "./icons";
+import { ShareIcon, PinTackIcon, UnpinTackIcon, Trash6Icon } from "./icons";
 import { PdfFileIcon, WordFileIcon } from "./FileBrandIcons";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { startLogin } from "@/const";
@@ -891,78 +889,41 @@ export const ConversationActionsMenuItems = memo(
     conversation,
     onRename,
     onPin,
-    onArchive,
-    onShare,
-    onExport,
+    onArchive: _onArchive,
+    onShare: _onShare,
+    onExport: _onExport,
     onDelete,
-    isMobile,
+    isMobile: _isMobile,
   }: {
     conversation: Conversation;
     onRename: (conversation: Conversation) => void;
     onPin: (conversation: Conversation) => void;
-    onArchive: (conversation: Conversation) => void;
-    onShare: (conversation: Conversation) => void;
-    onExport: (conversation: Conversation, format: "pdf" | "word") => void;
+    onArchive?: (conversation: Conversation) => void;
+    onShare?: (conversation: Conversation) => void;
+    onExport?: (conversation: Conversation, format: "pdf" | "word") => void;
     onDelete: (conversation: Conversation) => void;
-    isMobile: boolean;
+    isMobile?: boolean;
   }) {
     return (
       <>
+        <DropdownMenuItem onClick={() => onPin(conversation)}>
+          {conversation.isPinned ? (
+            <UnpinTackIcon className="mr-2 size-4" />
+          ) : (
+            <PinTackIcon className="mr-2 size-4" />
+          )}
+          {conversation.isPinned ? "Unpin" : "Pin"}
+        </DropdownMenuItem>
         <DropdownMenuItem onClick={() => onRename(conversation)}>
           <Pencil className="mr-2 size-4" />
           Rename
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => onPin(conversation)}>
-          <Pin className="mr-2 size-4" />
-          {conversation.isPinned ? "Unpin" : "Pin"}
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => onShare(conversation)}>
-          <ShareIcon className="mr-2 size-4" />
-          Share
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => onArchive(conversation)}>
-          <Archive className="mr-2 size-4" />
-          Archive
-        </DropdownMenuItem>
-        {isMobile ? (
-          <>
-            <DropdownMenuItem onClick={() => onExport(conversation, "pdf")}>
-              <PdfFileIcon className="mr-2 size-4 shrink-0" />
-              Download PDF
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => onExport(conversation, "word")}>
-              <WordFileIcon className="mr-2 size-4 shrink-0" />
-              Download Word
-            </DropdownMenuItem>
-          </>
-        ) : (
-          <DropdownMenuSub>
-            <DropdownMenuSubTrigger>
-              <Download className="mr-2 size-4" />
-              Export
-            </DropdownMenuSubTrigger>
-            <DropdownMenuSubContent
-              sideOffset={6}
-              collisionPadding={12}
-              className="w-auto min-w-[8rem] rounded-xl"
-            >
-              <DropdownMenuItem onClick={() => onExport(conversation, "pdf")}>
-                <PdfFileIcon className="mr-2 size-5" />
-                Download PDF
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onExport(conversation, "word")}>
-                <WordFileIcon className="mr-2 size-5" />
-                Download Word
-              </DropdownMenuItem>
-            </DropdownMenuSubContent>
-          </DropdownMenuSub>
-        )}
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onClick={() => onDelete(conversation)}
           variant="destructive"
         >
-          <Trash2 className="mr-2 size-4" />
+          <Trash6Icon className="mr-2 size-4" />
           Delete
         </DropdownMenuItem>
       </>

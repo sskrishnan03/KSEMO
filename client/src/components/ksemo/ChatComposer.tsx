@@ -290,11 +290,16 @@ export const ChatComposer = memo(function ChatComposer({
   focusToken = 0,
   temporary = false,
   guestMode = false,
+  activeTag: propActiveTag,
+  onTagChange,
 }: {
   onSend: (content: string) => void;
   onCancel: () => void;
   onVoice: () => void;
   onCancelRecording: () => void;
+  /** Active tag (chat vs bot). */
+  activeTag?: ComposerTag;
+  onTagChange?: (tag: ComposerTag) => void;
   /** Starts Bot's live voice. Never toggles — Bot mode is the only way in. */
   onBotVoice?: () => void;
   /** Stops Bot's live voice (used when leaving Bot mode or pressing stop). */
@@ -377,7 +382,15 @@ export const ChatComposer = memo(function ChatComposer({
   const [isDragActive, setIsDragActive] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [canExpand, setCanExpand] = useState(false);
-  const [activeTag, setActiveTag] = useState<ComposerTag>(readStoredTag);
+  const [activeTag, setActiveTag] = useState<ComposerTag>(
+    () => propActiveTag ?? readStoredTag()
+  );
+
+  useEffect(() => {
+    if (propActiveTag && propActiveTag !== activeTag) {
+      setActiveTag(propActiveTag);
+    }
+  }, [propActiveTag, activeTag]);
 
   const dragCounterRef = useRef(0);
   const editorModeRef = useRef<CapabilityMode>("chat");
@@ -407,6 +420,7 @@ export const ChatComposer = memo(function ChatComposer({
     (tag: ComposerTag) => {
       storeTag(tag);
       setActiveTag(tag);
+      onTagChange?.(tag);
       onValueChange("");
       if (tag === "bot") {
         onBotVoice?.();
@@ -415,7 +429,7 @@ export const ChatComposer = memo(function ChatComposer({
         (onBotVoiceStop ?? onBotVoice)?.();
       }
     },
-    [onBotVoice, onBotVoiceStop, onCancelRecording, onValueChange]
+    [onBotVoice, onBotVoiceStop, onCancelRecording, onTagChange, onValueChange]
   );
 
   const isEditorDisabled = isGenerating || isRecording || isTranscribing;
@@ -1110,36 +1124,7 @@ export const ChatComposer = memo(function ChatComposer({
                   </DropdownMenu>
                 )}
 
-                {/* In Bot mode: purely voice mode - pure black orb + dynamic status label */}
-                {botActive && (
-                  <div className="flex items-center gap-3 pl-2 py-0.5 animate-in fade-in zoom-in-95 duration-200">
-                    <BotVoiceOrb
-                      active={orbListening}
-                      isSpeaking={isBotSpeaking}
-                      isThinking={isGenerating && botActive}
-                      levelRef={botOrbLevel}
-                      className="size-8.5 shrink-0"
-                    />
-                    <span
-                      className={cn(
-                        "text-[15px] font-medium leading-none select-none tracking-tight transition-colors duration-150",
-                        isBotSpeaking
-                          ? "text-foreground font-semibold animate-pulse"
-                          : isGenerating
-                            ? "text-muted-foreground animate-pulse"
-                            : "text-muted-foreground"
-                      )}
-                    >
-                      {isBotSpeaking
-                        ? "Speaking..."
-                        : isGenerating
-                          ? "Thinking..."
-                          : "Listening..."}
-                    </span>
-                  </div>
-                )}
-
-                {!isEditingMessage && !guestMode && !temporary && !botActive && (
+                {!isEditingMessage && !guestMode && !temporary && (
                   <div
                     className="animate-[ksemo-tag-pop_400ms_ease-out_both] relative flex h-8 w-20 shrink-0 items-center rounded-full border border-border bg-popover p-0.5 shadow-sm sm:w-[10.5rem]"
                     role="group"
@@ -1154,20 +1139,14 @@ export const ChatComposer = memo(function ChatComposer({
                     />
                     <button
                       type="button"
-                      onClick={() => {
-                        if (activeTag === "bot") return;
-                        changeTag("chat");
-                      }}
+                      onClick={() => changeTag("chat")}
                       aria-pressed={activeTag === "chat"}
                       aria-label="Chat mode"
-                      disabled={activeTag === "bot"}
                       className={cn(
                         "relative z-10 flex h-full flex-1 items-center justify-center gap-1.5 rounded-full text-[13px] font-medium outline-none transition-colors duration-200",
                         activeTag === "chat"
                           ? "text-background"
-                          : activeTag === "bot"
-                            ? "text-muted-foreground/50 cursor-default"
-                            : "text-foreground hover:bg-accent/60 hover:text-foreground"
+                          : "text-foreground hover:bg-accent/60 hover:text-foreground"
                       )}
                     >
                       <MessageCircle className="size-4" />
@@ -1188,6 +1167,35 @@ export const ChatComposer = memo(function ChatComposer({
                       <KseBotModeIcon className="size-[18px]" />
                       <span className="hidden sm:inline">Bot</span>
                     </button>
+                  </div>
+                )}
+
+                {/* In Bot mode: purely voice mode - pure black orb + dynamic status label */}
+                {botActive && (
+                  <div className="flex items-center gap-2.5 pl-1.5 py-0.5 animate-in fade-in zoom-in-95 duration-200">
+                    <BotVoiceOrb
+                      active={orbListening}
+                      isSpeaking={isBotSpeaking}
+                      isThinking={isGenerating && botActive}
+                      levelRef={botOrbLevel}
+                      className="size-7.5 shrink-0"
+                    />
+                    <span
+                      className={cn(
+                        "text-[14px] font-medium leading-none select-none tracking-tight transition-colors duration-150",
+                        isBotSpeaking
+                          ? "text-foreground font-semibold animate-pulse"
+                          : isGenerating
+                            ? "text-muted-foreground animate-pulse"
+                            : "text-muted-foreground"
+                      )}
+                    >
+                      {isBotSpeaking
+                        ? "Speaking..."
+                        : isGenerating
+                          ? "Thinking..."
+                          : "Listening..."}
+                    </span>
                   </div>
                 )}
               </div>
@@ -1391,8 +1399,7 @@ export const ChatComposer = memo(function ChatComposer({
                               onCancelRecording?.();
                               onBotVoiceStop?.();
                               onValueChange("");
-                              storeTag("chat");
-                              setActiveTag("chat");
+                              changeTag("chat");
                             }}
                             size="icon"
                             className="size-10 rounded-full bg-foreground text-background hover:bg-foreground/90 transition-colors"

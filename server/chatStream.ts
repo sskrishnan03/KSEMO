@@ -40,6 +40,7 @@ import {
   createInitialTitle,
   resolveConversationTitle,
 } from "./conversationTitler";
+import { searchWeb } from "./docgen/research";
 import { UNIVERSAL_RESPONSE_INSTRUCTION } from "./universalResponsePrompt";
 
 const BASE_SYSTEM_INSTRUCTION =
@@ -267,6 +268,8 @@ export function registerChatStream(app: Express) {
       mode?: string;
       /** Backward-compatible alias sent by older clients (`activeMode`). */
       activeMode?: string;
+      /** Enable web search grounding for Bot/search queries. */
+      webSearch?: boolean;
       /** User-selected PowerPoint options (per shared/presentation.ts). */
       pptConfig?: Record<string, unknown>;
       pptStyle?: string;
@@ -629,6 +632,56 @@ export function registerChatStream(app: Express) {
           { role: "system", content: systemInstruction },
           ...filteredAssistantContext,
         ];
+
+        // ------------------------------------------------------------------
+        // Web Search Execution (Bot / Search commands)
+        // ------------------------------------------------------------------
+        const isWebSearchRequest = Boolean(
+          body.webSearch || body.mode === "search"
+        );
+        if (isWebSearchRequest && content?.trim()) {
+          writeEvent(res, "search.progress", {
+            messageId: assistantMessageId,
+            stage: "searching",
+            query: content.trim(),
+          });
+
+          try {
+            const searchResults = await searchWeb(
+              content.trim(),
+              generationSignal
+            );
+            writeEvent(res, "search.completed", {
+              messageId: assistantMessageId,
+              query: content.trim(),
+              sourceCount: searchResults.length,
+              sources: searchResults.slice(0, 5).map(r => ({
+                title: r.title,
+                url: r.url,
+              })),
+            });
+
+            if (searchResults.length > 0) {
+              const searchContext = searchResults
+                .slice(0, 6)
+                .map(
+                  (r, idx) =>
+                    `[${idx + 1}] "${r.title}" (${r.url})\n${r.snippet}`
+                )
+                .join("\n\n");
+
+              chatMessages.push({
+                role: "system",
+                content: `WEB SEARCH RESULTS FOR: "${content.trim()}"\n\n${searchContext}\n\nGround your response in these verified search results. Provide an informative, direct, and accurate answer. If in voice mode, speak your findings naturally without markdown or bullet points.`,
+              });
+            }
+          } catch (searchErr) {
+            console.warn(
+              "[ChatStream] web search failed, falling back to direct answering",
+              searchErr
+            );
+          }
+        }
 
         // ------------------------------------------------------------------
         // AI File Creation & Document Generation
