@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { BotVoiceOrb } from "@/components/voice/BotVoiceOrb";
 import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
@@ -25,10 +26,9 @@ import { useIsMobile } from "@/hooks/useIsMobile";
 import { PptConfigStrip } from "./PptConfigStrip";
 import {
   ArrowUp,
-  AudioLines,
   Check,
-  ChevronDown,
   Camera,
+  ChevronDown,
   FilePlus2,
   Loader2,
   MessageCircle,
@@ -37,12 +37,13 @@ import {
   Plus,
   Square,
   Volume2,
-  VolumeX,
   X,
 } from "lucide-react";
+
 import { Library } from "reicon-react/icons/Library";
 import React, {
   memo,
+  useCallback,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -55,14 +56,14 @@ import { FileResultCard } from "./FileResultCard";
 export const getLibrarySubmenuClass = (isCentered: boolean) =>
   `absolute left-1/2 -translate-x-1/2 z-50 max-h-[calc(100dvh-${isCentered ? "12rem" : "6rem"})] w-full max-w-3xl rounded-xl border border-border bg-popover p-0 text-popover-foreground shadow-xl`;
 
-/** Class that runs a white light around the composer's own border line in Bot mode. */
-export const BOT_TRACE_CLASS = "ksemo-composer-trace";
+/** Bot mode: a black circle floats just above the chat box's top-left corner.
+    The box is pushed down by that same room so the circle always has space and
+    never crowds whatever sits above. The circle is the voice-chat button. */
+const BOT_ORB_HEADROOM = "pt-12";
 
 const CHAT_PLACEHOLDER = "Ask KSEMO anything...";
-const BOT_PLACEHOLDER = "Tell the bot what to build...";
+const BOT_PLACEHOLDER = "Speak or type whatever you want...";
 const TEMP_PLACEHOLDER = "Start a temporary conversation...";
-
-const VOICE_PLACEHOLDER = "Ask me out loud or type your question here...";
 
 const COMPACT_INPUT_MAX_HEIGHT = 192;
 const EXPANDED_INPUT_MAX_HEIGHT = 320;
@@ -122,6 +123,44 @@ function getModeToken(mode: CapabilityMode): string {
   return MODE_TOKEN_LABELS[mode] ?? getCapabilityOption(mode).title;
 }
 
+function formatVoiceName(name: string): string {
+  return name.replace(/^(Microsoft|Google|Apple)\s+/i, "").trim() || name;
+}
+
+/*
+ * Which mode the composer is in has to outlive the component itself.
+ *
+ * Stored in sessionStorage so a page refresh preserves the session/mode in the
+ * current tab, while opening a new tab or closing the browser starts with a fresh
+ * new chat.
+ */
+const COMPOSER_TAG_KEY = "ksemo:composer-tag";
+
+export type ComposerTag = "chat" | "bot";
+
+function readStoredTag(): ComposerTag {
+  if (typeof window === "undefined") return "chat";
+  try {
+    const storage = window.sessionStorage ?? window.localStorage;
+    return storage.getItem(COMPOSER_TAG_KEY) === "bot"
+      ? "bot"
+      : "chat";
+  } catch {
+    // Private mode / blocked storage — a session-only default is fine.
+    return "chat";
+  }
+}
+
+function storeTag(tag: ComposerTag) {
+  if (typeof window === "undefined") return;
+  try {
+    const storage = window.sessionStorage ?? window.localStorage;
+    storage.setItem(COMPOSER_TAG_KEY, tag);
+  } catch {
+    // Nothing to do; the tag simply won't survive the next remount.
+  }
+}
+
 export const DictateRecordingPill = memo(function DictateRecordingPill({
   recordingSeconds,
   audioBars,
@@ -149,7 +188,10 @@ export const DictateRecordingPill = memo(function DictateRecordingPill({
       role="region"
       aria-label="Dictation recording controls"
     >
-      <div className="flex h-6 items-center gap-0.5 sm:gap-1" aria-hidden="true">
+      <div
+        className="flex h-6 items-center gap-0.5 sm:gap-1"
+        aria-hidden="true"
+      >
         {bars.map((val, index) => {
           const height = Math.max(4, Math.min(22, Math.round(4 + val * 18)));
           return (
@@ -207,8 +249,16 @@ export const ChatComposer = memo(function ChatComposer({
   onSend,
   onCancel,
   onVoice,
-  onVoiceChat,
   onCancelRecording,
+  onBotVoice,
+  onBotVoiceStop,
+  botVoiceState = "idle",
+  botVoiceActive = false,
+  botOrbLevel,
+  replyVoices,
+  replyVoiceName,
+  onReplyVoiceChange,
+  isBotSpeaking = false,
   isGenerating,
   isRecording,
   isTranscribing,
@@ -232,13 +282,6 @@ export const ChatComposer = memo(function ChatComposer({
   pptConfig,
   onPptConfigChange,
   hideVoiceInput = false,
-  voiceChatActive = false,
-  voiceChatMuted = false,
-  onVoiceChatMicToggle,
-  onVoiceChatEnd,
-  voices,
-  selectedVoiceName,
-  onVoiceChatVoiceSelect,
   isEditingMessage = false,
   onSaveEdit,
   onCancelEdit,
@@ -251,8 +294,20 @@ export const ChatComposer = memo(function ChatComposer({
   onSend: (content: string) => void;
   onCancel: () => void;
   onVoice: () => void;
-  onVoiceChat?: () => void;
   onCancelRecording: () => void;
+  /** Starts Bot's live voice. Never toggles — Bot mode is the only way in. */
+  onBotVoice?: () => void;
+  /** Stops Bot's live voice (used when leaving Bot mode or pressing stop). */
+  onBotVoiceStop?: () => void;
+  botVoiceState?: "idle" | "listening" | "transcribing";
+  botVoiceActive?: boolean;
+  /** Live voice level for the Bot orb, mutated in place each frame. */
+  botOrbLevel?: React.RefObject<number>;
+  /** Speech voices the bot can answer in; where absent the picker hides. */
+  replyVoices?: Array<{ name: string; lang: string; default: boolean }>;
+  replyVoiceName?: string | null;
+  onReplyVoiceChange?: (name: string | null) => void;
+  isBotSpeaking?: boolean;
   isGenerating: boolean;
   isRecording: boolean;
   isTranscribing: boolean;
@@ -303,13 +358,6 @@ export const ChatComposer = memo(function ChatComposer({
   pptConfig?: PresentationConfig;
   onPptConfigChange?: (config: PresentationConfig) => void;
   hideVoiceInput?: boolean;
-  voiceChatActive?: boolean;
-  voiceChatMuted?: boolean;
-  onVoiceChatMicToggle?: () => void;
-  onVoiceChatEnd?: () => void;
-  voices?: Array<{ name: string; lang: string; default: boolean }>;
-  selectedVoiceName?: string | null;
-  onVoiceChatVoiceSelect?: (name: string) => void;
   isEditingMessage?: boolean;
   onSaveEdit?: () => void;
   onCancelEdit?: () => void;
@@ -329,7 +377,8 @@ export const ChatComposer = memo(function ChatComposer({
   const [isDragActive, setIsDragActive] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [canExpand, setCanExpand] = useState(false);
-  const [activeTag, setActiveTag] = useState<"chat" | "bot">("chat");
+  const [activeTag, setActiveTag] = useState<ComposerTag>(readStoredTag);
+
   const dragCounterRef = useRef(0);
   const editorModeRef = useRef<CapabilityMode>("chat");
   const lastSyncedValueRef = useRef<string | null>(null);
@@ -337,6 +386,38 @@ export const ChatComposer = memo(function ChatComposer({
     activeMode && activeMode !== "chat"
       ? getCapabilityOption(activeMode)
       : null;
+  // Bot mode puts the orb outside the chat box. It stands down for the states
+  // that own the box outright — temporary chat has its own edge treatment, and
+  // edit mode has no mode toggle at all.
+  const botActive =
+    activeTag === "bot" && !temporary && !guestMode && !isEditingMessage;
+
+  // The orb swells only while Bot is actually listening, so it stays a calm
+  // resting black circle the rest of the time.
+  const orbListening = botActive && (botVoiceActive || isRecording);
+  const micBusy = botActive ? botVoiceState !== "idle" : isRecording;
+  // Mirrored for the tag switcher so it acts on the live call state, never a
+  // stale render's copy.
+  const micBusyRef = useRef(false);
+  useEffect(() => {
+    micBusyRef.current = micBusy;
+  }, [micBusy]);
+
+  const changeTag = useCallback(
+    (tag: ComposerTag) => {
+      storeTag(tag);
+      setActiveTag(tag);
+      onValueChange("");
+      if (tag === "bot") {
+        onBotVoice?.();
+      } else {
+        onCancelRecording?.();
+        (onBotVoiceStop ?? onBotVoice)?.();
+      }
+    },
+    [onBotVoice, onBotVoiceStop, onCancelRecording, onValueChange]
+  );
+
   const isEditorDisabled = isGenerating || isRecording || isTranscribing;
   const displayedLibraryFiles = useMemo(
     () => filterLibraryItems(libraryFiles, libraryQuery),
@@ -371,7 +452,6 @@ export const ChatComposer = memo(function ChatComposer({
   const isSlashActive =
     !isEditingMessage &&
     !guestMode &&
-    !voiceChatActive &&
     activeMode === "chat" &&
     value.startsWith("/") &&
     !value.startsWith("//") &&
@@ -569,7 +649,8 @@ export const ChatComposer = memo(function ChatComposer({
       (!content &&
         !visibleAttachmentNotices.length &&
         (!activeMode || activeMode === "chat")) ||
-      isGenerating
+      isGenerating ||
+      micBusy
     )
       return;
     const finalContent =
@@ -669,321 +750,320 @@ export const ChatComposer = memo(function ChatComposer({
           isCentered={isCentered}
         />
       )}
-      <div
-        className={cn(
-          "relative rounded-[20px] border border-border bg-popover p-1.5 shadow-sm text-popover-foreground",
-          // Bot mode: a short white segment of the box's own border line keeps
-          // running around all four sides — left, top, right, bottom — for as
-          // long as Bot is selected. It is painted on the border itself, so the
-          // resting outline never moves and only the highlight travels.
-          activeTag === "bot" && !temporary && BOT_TRACE_CLASS,
-          // Temporary "incognito" mode: no hard border line at all; only a
-          // soft glow hugs the edge of the box. The glow adapts to the theme —
-          // dark in light mode so it stays visible, white in dark mode.
-          temporary &&
-            "border-transparent shadow-[0_0_12px_3px_rgba(0,0,0,0.16)] dark:shadow-[0_0_12px_3px_rgba(255,255,255,0.14)]"
-        )}
-      >
-        {isDragActive && (
-          <div className="pointer-events-none fixed inset-0 z-[100] flex items-center justify-center bg-card/80 backdrop-blur-sm">
-            <div className="rounded-2xl border-2 border-dashed border-primary/60 bg-card px-10 py-8 shadow-xl">
-              <p className="text-sm font-medium text-foreground">
-                Drop to attach files or images
-              </p>
+      <div className="relative">
+        <div
+          className={cn(
+            "relative rounded-[20px] border border-border bg-popover p-1.5 shadow-sm text-popover-foreground",
+            // Temporary "incognito" mode: no hard border line at all; only a
+            // soft glow hugs the edge of the box. The glow adapts to the theme —
+            // dark in light mode so it stays visible, white in dark mode.
+            temporary &&
+              "border-transparent shadow-[0_0_12px_3px_rgba(0,0,0,0.16)] dark:shadow-[0_0_12px_3px_rgba(255,255,255,0.14)]"
+          )}
+        >
+          {isDragActive && (
+            <div className="pointer-events-none fixed inset-0 z-[100] flex items-center justify-center bg-card/80 backdrop-blur-sm">
+              <div className="rounded-2xl border-2 border-dashed border-primary/60 bg-card px-10 py-8 shadow-xl">
+                <p className="text-sm font-medium text-foreground">
+                  Drop to attach files or images
+                </p>
+              </div>
             </div>
-          </div>
-        )}
-        {libraryOpen && (
-          <div
-            ref={libraryPanelRef}
-            className={cn(
-              getLibrarySubmenuClass(isCentered),
-              isMobile || menuPlacement !== "below"
-                ? "bottom-[calc(100%+0.5rem)]"
-                : "top-[calc(100%+0.5rem)]"
-            )}
-          >
-            <LibraryPickerContent
-              files={displayedLibraryFiles}
-              query={libraryQuery}
-              onQueryChange={setLibraryQuery}
-              onCancel={() => setLibraryOpen(false)}
-              onSelect={files => {
-                onLibraryFile?.(files);
-                setLibraryOpen(false);
-                setLibraryQuery("");
-              }}
-              visibleCount={isCentered ? 2 : 4}
-            />
-          </div>
-        )}
-        <input
-          ref={fileInputRef}
-          type="file"
-          multiple
-          onChange={selectFile}
-          accept="image/*,audio/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.tsv,.md,.markdown,.json,.xml,.yml,.yaml,.ts,.tsx,.js,.jsx,.py,.c,.cpp,.h,.hpp,.cs,.rb,.go,.rs,.php,.sql,.sh,.bat,.ps1,.zip,.tar,.gz"
-          className="sr-only"
-        />
-        {visibleAttachmentNotices.length > 0 && (
-          <div className="mx-1 mb-0.5 flex items-center gap-2 overflow-x-auto px-2 pt-2 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {visibleAttachmentNotices.map(item => {
-              const isImage =
-                (item.url || item.mimeType) &&
-                (IMAGE_EXT.test(item.name) ||
-                  (item.mimeType ?? "").startsWith("image/"));
-              const kind = getFileKind(item.name, item.mimeType);
-              return isImage && item.url ? (
-                <div
-                  key={item.fileId}
-                  className="group relative size-16 shrink-0"
-                >
-                  <img
-                    src={item.url}
-                    alt={item.name}
-                    className="h-full w-full rounded-xl border border-border object-cover shadow-sm"
-                  />
-                  {onClearAttachment && (
-                    <button
-                      type="button"
-                      onClick={() => onClearAttachment(item.fileId)}
-                      className="absolute -right-1.5 -top-1.5 z-10 flex size-5 items-center justify-center rounded-full bg-white text-black shadow-md border border-neutral-300/80 outline-none max-md:opacity-100 max-md:scale-100 md:opacity-0 md:scale-90 transition-all duration-150 group-hover:opacity-100 group-hover:scale-100 group-focus-within:opacity-100 group-focus-within:scale-100 focus-visible:opacity-100 focus-visible:scale-100 hover:scale-110 hover:bg-neutral-100 focus-visible:ring-2 focus-visible:ring-primary"
-                      aria-label="Remove screenshot"
-                    >
-                      <X className="size-3 stroke-[2.5]" />
-                    </button>
-                  )}
-                </div>
-              ) : (
-                <div
-                  key={item.fileId}
-                  className="group flex h-16 shrink-0 items-center gap-3 rounded-xl border border-border bg-muted py-2 pl-2 pr-3 shadow-sm transition-colors hover:bg-accent"
-                >
-                  <span
-                    className={`flex size-11 shrink-0 items-center justify-center rounded-lg ${kind.colorClass}`}
-                  >
-                    <kind.icon className="size-10 shrink-0" />
-                  </span>
-                  <span className="flex min-w-0 flex-col">
-                    <span className="max-w-[150px] truncate text-[13px] font-semibold text-foreground">
-                      {item.name}
-                    </span>
-                    <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                      {kind.label}
-                      {item.linked ? " · linked" : " · library"}
-                    </span>
-                  </span>
-                  {onClearAttachment && (
-                    <button
-                      type="button"
-                      onClick={() => onClearAttachment(item.fileId)}
-                      className="ml-auto flex size-5 shrink-0 items-center justify-center rounded-full bg-white text-black shadow-md border border-neutral-300/80 outline-none max-md:opacity-100 max-md:scale-100 md:opacity-0 md:scale-90 transition-all duration-150 group-hover:opacity-100 group-hover:scale-100 group-focus-within:opacity-100 group-focus-within:scale-100 focus-visible:opacity-100 focus-visible:scale-100 hover:scale-110 hover:bg-neutral-100 focus-visible:ring-2 focus-visible:ring-primary"
-                      aria-label="Remove screenshot"
-                    >
-                      <X className="size-3 stroke-[2.5]" />
-                    </button>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Main Composer Content */}
-        <div className="flex flex-col">
-          {/* Text Input Area */}
-          <div className="relative flex flex-1 items-start">
+          )}
+          {libraryOpen && (
             <div
-              id="ksemo-composer-textarea"
-              ref={editorRef}
-              contentEditable={isEditorDisabled ? "false" : "true"}
-              suppressContentEditableWarning
-              spellCheck={false}
-              autoCorrect="off"
-              autoCapitalize="off"
-              role="textbox"
-              aria-multiline="true"
-              aria-label={
-                isEditingMessage ? "Edit your message" : "Message KSEMO"
-              }
-              onInput={handleEditorInput}
-              onPaste={handlePaste}
-              onKeyDown={event => {
-                if (isEditingMessage && event.key === "Escape") {
-                  event.preventDefault();
-                  onCancelEdit?.();
-                  return;
-                }
-                if (isSlashActive) {
-                  if (event.key === "Escape") {
-                    event.preventDefault();
-                    onValueChange("");
-                    return;
-                  }
-                  if (event.key === "ArrowDown") {
-                    event.preventDefault();
-                    setSlashHighlight(current => {
-                      const max = Math.max(0, slashFiltered.length - 1);
-                      return Math.min(max, current + 1);
-                    });
-                    return;
-                  }
-                  if (event.key === "ArrowUp") {
-                    event.preventDefault();
-                    setSlashHighlight(current => Math.max(0, current - 1));
-                    return;
-                  }
-                  if (
-                    event.key === "Tab" ||
-                    (event.key === "Enter" && !event.shiftKey)
-                  ) {
-                    event.preventDefault();
-                    const option =
-                      slashFiltered[slashHighlight] ?? slashFiltered[0];
-                    if (option) selectSlashOption(option.mode);
-                    return;
-                  }
-                }
-                if (event.key === "Enter" && !event.shiftKey) {
-                  event.preventDefault();
-                  submit();
-                }
-                if (
-                  event.key === "Backspace" &&
-                  activeMode &&
-                  activeMode !== "chat" &&
-                  editorRef.current &&
-                  isBackspaceTargetingModeToken(editorRef.current, value)
-                ) {
-                  event.preventDefault();
-                  onModeChange?.(null);
-                }
-              }}
+              ref={libraryPanelRef}
               className={cn(
-                "min-h-10 min-w-0 flex-1 overflow-y-auto whitespace-pre-wrap border-0 !bg-transparent pl-2.5 py-1 text-[15px] leading-6 md:text-[15px] shadow-none focus-visible:ring-0 outline-none dark:!bg-transparent",
-                expanded ? "max-h-80" : "max-h-48",
-                canExpand ? "pr-10" : "pr-1"
+                getLibrarySubmenuClass(isCentered),
+                isMobile || menuPlacement !== "below"
+                  ? "bottom-[calc(100%+0.5rem)]"
+                  : "top-[calc(100%+0.5rem)]"
               )}
-              style={{ height: "40px" }}
-            />
-            {canExpand && (
-              <div
-                className="pointer-events-none absolute inset-x-0 -bottom-1 h-9 bg-gradient-to-t from-popover to-transparent"
-                aria-hidden="true"
+            >
+              <LibraryPickerContent
+                files={displayedLibraryFiles}
+                query={libraryQuery}
+                onQueryChange={setLibraryQuery}
+                onCancel={() => setLibraryOpen(false)}
+                onSelect={files => {
+                  onLibraryFile?.(files);
+                  setLibraryOpen(false);
+                  setLibraryQuery("");
+                }}
+                visibleCount={isCentered ? 2 : 4}
               />
-            )}
-            {canExpand && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    type="button"
-                    tabIndex={-1}
-                    onClick={() => setExpanded(current => !current)}
-                    className="absolute right-1.5 top-1.5 z-10 flex size-8 items-center justify-center rounded-full bg-transparent text-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-0 focus-visible:outline-none"
-                    aria-label={expanded ? "Collapse" : "Expand"}
-                    aria-pressed={expanded}
+            </div>
+          )}
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            onChange={selectFile}
+            accept="image/*,audio/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.tsv,.md,.markdown,.json,.xml,.yml,.yaml,.ts,.tsx,.js,.jsx,.py,.c,.cpp,.h,.hpp,.cs,.rb,.go,.rs,.php,.sql,.sh,.bat,.ps1,.zip,.tar,.gz"
+            className="sr-only"
+          />
+          {visibleAttachmentNotices.length > 0 && (
+            <div className="mx-1 mb-0.5 flex items-center gap-2 overflow-x-auto px-2 pt-2 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {visibleAttachmentNotices.map(item => {
+                const isImage =
+                  (item.url || item.mimeType) &&
+                  (IMAGE_EXT.test(item.name) ||
+                    (item.mimeType ?? "").startsWith("image/"));
+                const kind = getFileKind(item.name, item.mimeType);
+                return isImage && item.url ? (
+                  <div
+                    key={item.fileId}
+                    className="group relative size-16 shrink-0"
                   >
-                    <ChevronDown
-                      className={cn(
-                        "size-5 transition-transform duration-200",
-                        expanded ? "rotate-180" : ""
-                      )}
+                    <img
+                      src={item.url}
+                      alt={item.name}
+                      className="h-full w-full rounded-xl border border-border object-cover shadow-sm"
                     />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom">
-                  {expanded ? "Collapse" : "Expand"}
-                </TooltipContent>
-              </Tooltip>
-            )}
-            {value.length === 0 && !activeModeOption && (
-              <span
-                key={
-                  isEditingMessage
-                    ? "edit"
-                    : voiceChatActive
-                      ? "voice"
-                      : temporary
-                        ? "temporary"
-                        : activeMode && activeMode !== "chat"
-                          ? activeMode
-                          : "chat"
-                }
-                className="pointer-events-none absolute left-2.5 top-[7px] text-[15px] leading-6 text-muted-foreground animate-[ksemo-placeholder-rise_800ms_ease-out]"
-                aria-hidden="true"
-              >
-                {isEditingMessage
-                  ? "Edit your message…"
-                  : voiceChatActive
-                    ? VOICE_PLACEHOLDER
-                    : temporary
-                      ? TEMP_PLACEHOLDER
-                      : activeTag === "bot"
-                        ? BOT_PLACEHOLDER
-                        : CHAT_PLACEHOLDER}
-              </span>
-            )}
-          </div>
+                    {onClearAttachment && (
+                      <button
+                        type="button"
+                        onClick={() => onClearAttachment(item.fileId)}
+                        className="absolute -right-1.5 -top-1.5 z-10 flex size-5 items-center justify-center rounded-full bg-white text-black shadow-md border border-neutral-300/80 outline-none max-md:opacity-100 max-md:scale-100 md:opacity-0 md:scale-90 transition-all duration-150 group-hover:opacity-100 group-hover:scale-100 group-focus-within:opacity-100 group-focus-within:scale-100 focus-visible:opacity-100 focus-visible:scale-100 hover:scale-110 hover:bg-neutral-100 focus-visible:ring-2 focus-visible:ring-primary"
+                        aria-label="Remove screenshot"
+                      >
+                        <X className="size-3 stroke-[2.5]" />
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div
+                    key={item.fileId}
+                    className="group flex h-16 shrink-0 items-center gap-3 rounded-xl border border-border bg-muted py-2 pl-2 pr-3 shadow-sm transition-colors hover:bg-accent"
+                  >
+                    <span
+                      className={`flex size-11 shrink-0 items-center justify-center rounded-lg ${kind.colorClass}`}
+                    >
+                      <kind.icon className="size-10 shrink-0" />
+                    </span>
+                    <span className="flex min-w-0 flex-col">
+                      <span className="max-w-[150px] truncate text-[13px] font-semibold text-foreground">
+                        {item.name}
+                      </span>
+                      <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                        {kind.label}
+                        {item.linked ? " · linked" : " · library"}
+                      </span>
+                    </span>
+                    {onClearAttachment && (
+                      <button
+                        type="button"
+                        onClick={() => onClearAttachment(item.fileId)}
+                        className="ml-auto flex size-5 shrink-0 items-center justify-center rounded-full bg-white text-black shadow-md border border-neutral-300/80 outline-none max-md:opacity-100 max-md:scale-100 md:opacity-0 md:scale-90 transition-all duration-150 group-hover:opacity-100 group-hover:scale-100 group-focus-within:opacity-100 group-focus-within:scale-100 focus-visible:opacity-100 focus-visible:scale-100 hover:scale-110 hover:bg-neutral-100 focus-visible:ring-2 focus-visible:ring-primary"
+                        aria-label="Remove screenshot"
+                      >
+                        <X className="size-3 stroke-[2.5]" />
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
 
-          {/* Bottom Control Row */}
-          <div className="flex flex-wrap items-center justify-between gap-x-1.5 gap-y-1.5 pt-1">
-            {/* Left Side Controls */}
-            <div className="flex items-center gap-1.5">
-              {!isEditingMessage && !guestMode && (
-                <DropdownMenu
-                  open={toolsOpen && !libraryOpen}
-                  onOpenChange={setToolsOpen}
-                >
+          {/* Main Composer Content */}
+          <div className={cn(botActive ? "flex items-center justify-between w-full min-h-[44px]" : "flex flex-col")}>
+            {/* Text Input Area (hidden in Bot mode where you speak directly) */}
+            {!botActive && (
+              <div className="relative flex flex-1 items-start">
+                <div
+                  id="ksemo-composer-textarea"
+                  ref={editorRef}
+                  contentEditable={isEditorDisabled ? "false" : "true"}
+                  suppressContentEditableWarning
+                  spellCheck={false}
+                  autoCorrect="off"
+                  autoCapitalize="off"
+                  role="textbox"
+                  aria-multiline="true"
+                  aria-label={
+                    isEditingMessage ? "Edit your message" : "Message KSEMO"
+                  }
+                  onInput={handleEditorInput}
+                  onPaste={handlePaste}
+                  onKeyDown={event => {
+                    if (isEditingMessage && event.key === "Escape") {
+                      event.preventDefault();
+                      onCancelEdit?.();
+                      return;
+                    }
+                    if (isSlashActive) {
+                      if (event.key === "Escape") {
+                        event.preventDefault();
+                        onValueChange("");
+                        return;
+                      }
+                      if (event.key === "ArrowDown") {
+                        event.preventDefault();
+                        setSlashHighlight(current => {
+                          const max = Math.max(0, slashFiltered.length - 1);
+                          return Math.min(max, current + 1);
+                        });
+                        return;
+                      }
+                      if (event.key === "ArrowUp") {
+                        event.preventDefault();
+                        setSlashHighlight(current => Math.max(0, current - 1));
+                        return;
+                      }
+                      if (
+                        event.key === "Tab" ||
+                        (event.key === "Enter" && !event.shiftKey)
+                      ) {
+                        event.preventDefault();
+                        const option =
+                          slashFiltered[slashHighlight] ?? slashFiltered[0];
+                        if (option) selectSlashOption(option.mode);
+                        return;
+                      }
+                    }
+                    if (event.key === "Enter" && !event.shiftKey) {
+                      event.preventDefault();
+                      submit();
+                    }
+                    if (
+                      event.key === "Backspace" &&
+                      activeMode &&
+                      activeMode !== "chat" &&
+                      editorRef.current &&
+                      isBackspaceTargetingModeToken(editorRef.current, value)
+                    ) {
+                      event.preventDefault();
+                      onModeChange?.(null);
+                    }
+                  }}
+                  className={cn(
+                    "min-h-10 min-w-0 flex-1 overflow-y-auto whitespace-pre-wrap border-0 !bg-transparent pl-2.5 py-1 text-[15px] leading-6 md:text-[15px] shadow-none focus-visible:ring-0 outline-none dark:!bg-transparent",
+                    expanded ? "max-h-80" : "max-h-48",
+                    canExpand ? "pr-10" : "pr-1"
+                  )}
+                  style={{ height: "40px" }}
+                />
+                {canExpand && (
+                  <div
+                    className="pointer-events-none absolute inset-x-0 -bottom-1 h-9 bg-gradient-to-t from-popover to-transparent"
+                    aria-hidden="true"
+                  />
+                )}
+                {canExpand && (
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="size-10 rounded-full bg-transparent text-foreground hover:bg-accent hover:text-foreground transition-colors"
-                          aria-label="Attach"
-                        >
-                          <Plus className="size-5" />
-                        </Button>
-                      </DropdownMenuTrigger>
+                      <button
+                        type="button"
+                        tabIndex={-1}
+                        onClick={() => setExpanded(current => !current)}
+                        className="absolute right-1.5 top-1.5 z-10 flex size-8 items-center justify-center rounded-full bg-transparent text-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-0 focus-visible:outline-none"
+                        aria-label={expanded ? "Collapse" : "Expand"}
+                        aria-pressed={expanded}
+                      >
+                        <ChevronDown
+                          className={cn(
+                            "size-5 transition-transform duration-200",
+                            expanded ? "rotate-180" : ""
+                          )}
+                        />
+                      </button>
                     </TooltipTrigger>
-                    <TooltipContent side="bottom">{MENU_TITLE}</TooltipContent>
+                    <TooltipContent side="bottom">
+                      {expanded ? "Collapse" : "Expand"}
+                    </TooltipContent>
                   </Tooltip>
-                  <DropdownMenuContent
-                    align="start"
-                    side={isMobile ? "top" : (menuPlacement === "below" ? "bottom" : "top")}
-                    sideOffset={8}
-                    alignOffset={-8}
-                    collisionPadding={12}
-                    className="ksemo-thin-scroll w-48 rounded-xl max-h-[16rem] overflow-y-auto"
+                )}
+                {value.length === 0 && !activeModeOption && (
+                  <span
+                    key={
+                      isEditingMessage
+                        ? "edit"
+                        : temporary
+                          ? "temporary"
+                          : activeMode && activeMode !== "chat"
+                            ? activeMode
+                            : "chat"
+                    }
+                    className="pointer-events-none absolute left-2.5 top-[7px] text-[15px] leading-6 text-muted-foreground animate-[ksemo-placeholder-rise_800ms_ease-out]"
+                    aria-hidden="true"
                   >
-                    <DropdownMenuItem
-                      onClick={() => fileInputRef.current?.click()}
+                    {isEditingMessage
+                      ? "Edit your message…"
+                      : temporary
+                        ? TEMP_PLACEHOLDER
+                        : CHAT_PLACEHOLDER}
+                  </span>
+                )}
+              </div>
+            )}
+
+            {/* Bottom Control Row */}
+            <div className={cn("flex items-center justify-between w-full", !botActive && "flex-wrap gap-x-1.5 gap-y-1.5 pt-1")}>
+              {/* Left Side Controls */}
+              <div className="flex items-center gap-2">
+                {!isEditingMessage && !guestMode && !botActive && (
+                  <DropdownMenu
+                    open={toolsOpen && !libraryOpen}
+                    onOpenChange={setToolsOpen}
+                  >
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-10 shrink-0 rounded-full bg-transparent text-foreground hover:bg-accent hover:text-foreground transition-colors"
+                            aria-label="Attach"
+                          >
+                            <Plus className="size-5" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom">
+                        {MENU_TITLE}
+                      </TooltipContent>
+                    </Tooltip>
+                    <DropdownMenuContent
+                      align="start"
+                      side={
+                        isMobile
+                          ? "top"
+                          : menuPlacement === "below"
+                            ? "bottom"
+                            : "top"
+                      }
+                      sideOffset={8}
+                      alignOffset={-8}
+                      collisionPadding={12}
+                      className="ksemo-thin-scroll w-48 rounded-xl max-h-[16rem] overflow-y-auto"
                     >
-                      <Paperclip className="mr-2 size-4" /> Upload files
-                    </DropdownMenuItem>
-                    {onTakeScreenshot && (
+                      <DropdownMenuItem
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        <Paperclip className="mr-2 size-4" /> Upload files
+                      </DropdownMenuItem>
+                      {onTakeScreenshot && (
+                        <DropdownMenuItem
+                          onSelect={() => {
+                            setToolsOpen(false);
+                            onTakeScreenshot();
+                          }}
+                        >
+                          <Camera className="mr-2 size-4" />
+                          Take Screenshot
+                        </DropdownMenuItem>
+                      )}
                       <DropdownMenuItem
                         onSelect={() => {
+                          setLibraryOpen(true);
                           setToolsOpen(false);
-                          onTakeScreenshot();
                         }}
                       >
-                        <Camera className="mr-2 size-4" />
-                        Take Screenshot
+                        <Library aria-hidden="true" className="mr-2 size-4" />
+                        Browse Library
                       </DropdownMenuItem>
-                    )}
-                    <DropdownMenuItem
-                      onSelect={() => {
-                        setLibraryOpen(true);
-                        setToolsOpen(false);
-                      }}
-                    >
-                      <Library aria-hidden="true" className="mr-2 size-4" />
-                      Browse Library
-                    </DropdownMenuItem>
-                    {!voiceChatActive && (
-                      <>
+                      {!botActive && (
                         <DropdownMenuSub>
                           <DropdownMenuSubTrigger>
                             <FilePlus2 className="mr-2 size-4" />
@@ -1025,455 +1105,388 @@ export const ChatComposer = memo(function ChatComposer({
                             })}
                           </DropdownMenuSubContent>
                         </DropdownMenuSub>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
+
+                {/* In Bot mode: purely voice mode - pure black orb + dynamic status label */}
+                {botActive && (
+                  <div className="flex items-center gap-3 pl-2 py-0.5 animate-in fade-in zoom-in-95 duration-200">
+                    <BotVoiceOrb
+                      active={orbListening}
+                      isSpeaking={isBotSpeaking}
+                      isThinking={isGenerating && botActive}
+                      levelRef={botOrbLevel}
+                      className="size-8.5 shrink-0"
+                    />
+                    <span
+                      className={cn(
+                        "text-[15px] font-medium leading-none select-none tracking-tight transition-colors duration-150",
+                        isBotSpeaking
+                          ? "text-foreground font-semibold animate-pulse"
+                          : isGenerating
+                            ? "text-muted-foreground animate-pulse"
+                            : "text-muted-foreground"
+                      )}
+                    >
+                      {isBotSpeaking
+                        ? "Speaking..."
+                        : isGenerating
+                          ? "Thinking..."
+                          : "Listening..."}
+                    </span>
+                  </div>
+                )}
+
+                {!isEditingMessage && !guestMode && !temporary && !botActive && (
+                  <div
+                    className="animate-[ksemo-tag-pop_400ms_ease-out_both] relative flex h-8 w-20 shrink-0 items-center rounded-full border border-border bg-popover p-0.5 shadow-sm sm:w-[10.5rem]"
+                    role="group"
+                    aria-label="Composer mode"
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={cn(
+                        "absolute top-0.5 bottom-0.5 w-[calc(50%-2px)] rounded-full bg-foreground text-background shadow-sm transition-[left] duration-300 ease-out",
+                        activeTag === "bot" ? "left-1/2" : "left-0.5"
+                      )}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (activeTag === "bot") return;
+                        changeTag("chat");
+                      }}
+                      aria-pressed={activeTag === "chat"}
+                      aria-label="Chat mode"
+                      disabled={activeTag === "bot"}
+                      className={cn(
+                        "relative z-10 flex h-full flex-1 items-center justify-center gap-1.5 rounded-full text-[13px] font-medium outline-none transition-colors duration-200",
+                        activeTag === "chat"
+                          ? "text-background"
+                          : activeTag === "bot"
+                            ? "text-muted-foreground/50 cursor-default"
+                            : "text-foreground hover:bg-accent/60 hover:text-foreground"
+                      )}
+                    >
+                      <MessageCircle className="size-4" />
+                      <span className="hidden sm:inline">Chat</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => changeTag("bot")}
+                      aria-pressed={activeTag === "bot"}
+                      aria-label="Bot mode"
+                      className={cn(
+                        "relative z-10 flex h-full flex-1 items-center justify-center gap-1.5 rounded-full text-[13px] font-medium outline-none transition-colors duration-200",
+                        activeTag === "bot"
+                          ? "text-background"
+                          : "text-foreground hover:bg-accent/60 hover:text-foreground"
+                      )}
+                    >
+                      <KseBotModeIcon className="size-[18px]" />
+                      <span className="hidden sm:inline">Bot</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Right Side Controls */}
+              <div className="ml-auto flex items-center gap-1.5">
+                {isEditingMessage ? (
+                  <>
+                    {/* Recorded audio / Mic button */}
+                    {!hideVoiceInput && (
+                      <>
+                        {isRecording ? (
+                          <DictateRecordingPill
+                            recordingSeconds={recordingSeconds}
+                            audioBars={audioBars}
+                            audioLevel={audioLevel}
+                            onStop={onCancelRecording}
+                            onTranscribe={onVoice}
+                          />
+                        ) : isTranscribing ? (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                disabled
+                                className="size-10 rounded-full bg-transparent text-muted-foreground transition-colors"
+                                aria-label="Converting speech to text"
+                              >
+                                <div
+                                  className="loader"
+                                  style={{ width: 18 }}
+                                  aria-hidden
+                                />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom">
+                              Transcribing…
+                            </TooltipContent>
+                          </Tooltip>
+                        ) : (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={onVoice}
+                                disabled={isTranscribing}
+                                className="size-10 rounded-full bg-transparent text-foreground hover:bg-accent hover:text-foreground transition-colors"
+                                aria-label="Dictate"
+                              >
+                                <Mic className="size-4.5" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom">
+                              Dictate
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
                       </>
                     )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
 
-              {!isEditingMessage && !guestMode && (
-                <div
-                  className="animate-[ksemo-tag-pop_400ms_ease-out_both] relative flex h-8 w-20 shrink-0 items-center rounded-full border border-border bg-popover p-0.5 shadow-sm sm:w-[10.5rem]"
-                  role="group"
-                  aria-label="Composer mode"
-                >
-                  <span
-                    aria-hidden="true"
-                    className={cn(
-                      "absolute top-0.5 bottom-0.5 w-[calc(50%-2px)] rounded-full bg-foreground text-background shadow-sm transition-[left] duration-300 ease-out",
-                      activeTag === "bot" ? "left-1/2" : "left-0.5"
-                    )}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setActiveTag("chat")}
-                    aria-pressed={activeTag === "chat"}
-                    aria-label="Chat mode"
-                    className={cn(
-                      "relative z-10 flex h-full flex-1 items-center justify-center gap-1.5 rounded-full text-[13px] font-medium outline-none transition-colors duration-200",
-                      activeTag === "chat"
-                        ? "text-background"
-                        : "text-foreground hover:bg-accent/60 hover:text-foreground"
-                    )}
-                  >
-                    <MessageCircle className="size-4" />
-                    <span className="hidden sm:inline">Chat</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setActiveTag("bot")}
-                    aria-pressed={activeTag === "bot"}
-                    aria-label="Bot mode"
-                    className={cn(
-                      "relative z-10 flex h-full flex-1 items-center justify-center gap-1.5 rounded-full text-[13px] font-medium outline-none transition-colors duration-200",
-                      activeTag === "bot"
-                        ? "text-background"
-                        : "text-foreground hover:bg-accent/60 hover:text-foreground"
-                    )}
-                  >
-                    <KseBotModeIcon className="size-[18px]" />
-                    <span className="hidden sm:inline">Bot</span>
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Right Side Controls */}
-            <div className="ml-auto flex items-center gap-1.5">
-              {isEditingMessage ? (
-                <>
-                  {/* Recorded audio / Mic button */}
-                  {!hideVoiceInput && (
-                    <>
-                      {isRecording ? (
-                        <DictateRecordingPill
-                          recordingSeconds={recordingSeconds}
-                          audioBars={audioBars}
-                          audioLevel={audioLevel}
-                          onStop={onCancelRecording}
-                          onTranscribe={onVoice}
-                        />
-                      ) : isTranscribing ? (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              disabled
-                              className="size-10 rounded-full bg-transparent text-muted-foreground transition-colors"
-                              aria-label="Converting speech to text"
-                            >
-                              <div className="loader" style={{ width: 18 }} aria-hidden />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent side="bottom">
-                            Transcribing…
-                          </TooltipContent>
-                        </Tooltip>
-                      ) : (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={onVoice}
-                              disabled={isTranscribing}
-                              className="size-10 rounded-full bg-transparent text-foreground hover:bg-accent hover:text-foreground transition-colors"
-                              aria-label="Dictate"
-                            >
-                              <Mic className="size-4.5" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent side="bottom">Dictate</TooltipContent>
-                        </Tooltip>
-                      )}
-                    </>
-                  )}
-
-                  {/* Cancel Button */}
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={onCancelEdit}
-                        disabled={isRecording || isTranscribing}
-                        className="size-10 rounded-full bg-transparent text-foreground hover:bg-accent hover:text-foreground transition-colors"
-                        aria-label="Cancel edit"
-                      >
-                        <X className="size-4.5" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom">Cancel edit</TooltipContent>
-                  </Tooltip>
-
-                  {/* Save Button (Tick mark) */}
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        type="button"
-                        size="icon"
-                        onClick={onSaveEdit}
-                        disabled={
-                          !value.trim() || isRecording || isTranscribing
-                        }
-                        className="size-10 rounded-full bg-foreground text-background hover:bg-foreground/90 disabled:bg-muted disabled:text-muted-foreground transition-colors"
-                        aria-label="Save edit"
-                      >
-                        <Check className="size-4.5" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom">Save edit</TooltipContent>
-                  </Tooltip>
-                </>
-              ) : voiceChatActive ? (
-                <VoiceChatInlineControls
-                  muted={voiceChatMuted ?? false}
-                  onMicToggle={onVoiceChatMicToggle ?? (() => undefined)}
-                  onEnd={onVoiceChatEnd ?? (() => undefined)}
-                  voices={voices}
-                  selectedVoiceName={selectedVoiceName}
-                  onVoiceSelect={onVoiceChatVoiceSelect}
-                />
-              ) : (
-                <>
-                  {/* Recording / Transcribing / Mic — opens in place of the mic when clicked */}
-                  {!hideVoiceInput && (
-                    <>
-                      {isRecording ? (
-                        <DictateRecordingPill
-                          recordingSeconds={recordingSeconds}
-                          audioBars={audioBars}
-                          audioLevel={audioLevel}
-                          onStop={onCancelRecording}
-                          onTranscribe={onVoice}
-                        />
-                      ) : isTranscribing ? (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              disabled
-                              className="size-10 rounded-full bg-transparent text-muted-foreground transition-colors"
-                              aria-label="Converting speech to text"
-                            >
-                              <div className="loader" style={{ width: 18 }} aria-hidden />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent side="bottom">
-                            Transcribing…
-                          </TooltipContent>
-                        </Tooltip>
-                      ) : (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={onVoice}
-                              disabled={isTranscribing}
-                              className="size-10 rounded-full bg-transparent text-foreground hover:bg-accent hover:text-foreground transition-colors"
-                              aria-label="Dictate"
-                            >
-                              <Mic className="size-4.5" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent side="bottom">Dictate</TooltipContent>
-                        </Tooltip>
-                      )}
-                    </>
-                  )}
-                  {/* Send / Voice / Stop Button */}
-                  {isGenerating ? (
+                    {/* Cancel Button */}
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Button
-                          onClick={onCancel}
+                          type="button"
+                          variant="ghost"
                           size="icon"
-                          className="size-10 rounded-full bg-foreground text-background hover:bg-foreground/90 transition-colors"
-                          aria-label="Stop generating"
-                        >
-                          <Square className="size-4 fill-current" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent side="bottom">
-                        Stop generating
-                      </TooltipContent>
-                    </Tooltip>
-                  ) : !temporary &&
-                    !guestMode &&
-                    !value.trim() &&
-                    !visibleAttachmentNotices.length &&
-                    (!activeMode || activeMode === "chat") &&
-                    !isRecording &&
-                    !isTranscribing ? (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          onClick={onVoiceChat}
+                          onClick={onCancelEdit}
                           disabled={isRecording || isTranscribing}
-                          size="icon"
-                          className="size-10 rounded-full bg-muted text-foreground hover:bg-accent transition-colors"
-                          aria-label="Start voice chat"
+                          className="size-10 rounded-full bg-transparent text-foreground hover:bg-accent hover:text-foreground transition-colors"
+                          aria-label="Cancel edit"
                         >
-                          <span className="flex items-center justify-center gap-[3px]">
-                            {[0, 1, 2, 3].map(i => (
-                              <span
-                                key={i}
-                                className="ksemo-voice-bar w-[3px] rounded-full bg-foreground/70"
-                                style={{
-                                  height: 4,
-                                  animation: `ksemo-voice-bar 1s ease-in-out ${i * 0.15}s infinite`,
-                                }}
-                              />
-                            ))}
-                          </span>
+                          <X className="size-4.5" />
                         </Button>
                       </TooltipTrigger>
-                      <TooltipContent side="bottom">
-                        Start voice chat
-                      </TooltipContent>
+                      <TooltipContent side="bottom">Cancel edit</TooltipContent>
                     </Tooltip>
-                  ) : !isRecording && !isTranscribing ? (
+
+                    {/* Save Button (Tick mark) */}
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Button
-                          onClick={submit}
-                          disabled={isRecording || isTranscribing}
+                          type="button"
                           size="icon"
-                          className={cn(
-                            "size-10 rounded-full transition-colors",
-                            canSend
-                              ? "bg-foreground text-background hover:bg-foreground/90"
-                              : "bg-muted text-muted-foreground hover:bg-accent"
-                          )}
-                          aria-label="Send message"
+                          onClick={onSaveEdit}
+                          disabled={
+                            !value.trim() || isRecording || isTranscribing
+                          }
+                          className="size-10 rounded-full bg-foreground text-background hover:bg-foreground/90 disabled:bg-muted disabled:text-muted-foreground transition-colors"
+                          aria-label="Save edit"
                         >
-                          <ArrowUp className="size-4.5" />
+                          <Check className="size-4.5" />
                         </Button>
                       </TooltipTrigger>
-                      <TooltipContent side="bottom">
-                        Send message
-                      </TooltipContent>
+                      <TooltipContent side="bottom">Save edit</TooltipContent>
                     </Tooltip>
-                  ) : null}
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Slash command ("/") menu — matches the Create Files submenu exactly */}
-        {isSlashActive && (
-          <div
-            ref={slashPanelRef}
-            className={cn(
-              "ksemo-thin-scroll absolute left-0 z-50 w-44 max-h-[min(16rem,40vh)] overflow-y-auto rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-md",
-              isMobile || menuPlacement === "above"
-                ? "bottom-[calc(100%+2px)]"
-                : "top-[calc(100%+2px)]"
-            )}
-          >
-            {slashFiltered.length === 0 ? (
-              <div className="px-2 py-1.5 text-sm text-muted-foreground">
-                No matches
+                  </>
+                ) : (
+                  <>
+                    {/* Chat: the press-to-record pill. Bot mode owns its voice
+                        through the black circle above the box instead. */}
+                    {!hideVoiceInput && !botActive && (
+                      <>
+                        {isRecording ? (
+                          <DictateRecordingPill
+                            recordingSeconds={recordingSeconds}
+                            audioBars={audioBars}
+                            audioLevel={audioLevel}
+                            onStop={onCancelRecording}
+                            onTranscribe={onVoice}
+                          />
+                        ) : isTranscribing ? (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                disabled
+                                className="size-10 rounded-full bg-transparent text-muted-foreground transition-colors"
+                                aria-label="Converting speech to text"
+                              >
+                                <div
+                                  className="loader"
+                                  style={{ width: 18 }}
+                                  aria-hidden
+                                />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom">
+                              Transcribing…
+                            </TooltipContent>
+                          </Tooltip>
+                        ) : (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={onVoice}
+                                disabled={isTranscribing}
+                                className="size-10 rounded-full bg-transparent text-foreground hover:bg-accent hover:text-foreground transition-colors"
+                                aria-label="Dictate"
+                              >
+                                <Mic className="size-4.5" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom">
+                              Dictate
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                      </>
+                    )}
+                    {/* Send / Stop Button */}
+                    {isGenerating ? (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            onClick={onCancel}
+                            size="icon"
+                            className="size-10 rounded-full bg-foreground text-background hover:bg-foreground/90 transition-colors"
+                            aria-label="Stop generating"
+                          >
+                            <Square className="size-4 fill-current" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom">
+                          Stop generating
+                        </TooltipContent>
+                      </Tooltip>
+                    ) : botVoiceState === "transcribing" ? (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            disabled
+                            size="icon"
+                            className="size-10 rounded-full bg-transparent text-muted-foreground"
+                            aria-label="Converting speech to text"
+                          >
+                            <div
+                              className="loader"
+                              style={{ width: 18 }}
+                              aria-hidden
+                            />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom">
+                          Transcribing…
+                        </TooltipContent>
+                      </Tooltip>
+                    ) : botActive ? (
+                      // In Bot mode, clicking the Stop button halts all speech/generation and cleanly returns to Chat
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            type="button"
+                            onClick={() => {
+                              onCancel();
+                              onCancelRecording?.();
+                              onBotVoiceStop?.();
+                              onValueChange("");
+                              storeTag("chat");
+                              setActiveTag("chat");
+                            }}
+                            size="icon"
+                            className="size-10 rounded-full bg-foreground text-background hover:bg-foreground/90 transition-colors"
+                            aria-label="Stop"
+                          >
+                            <Square className="size-4 fill-current" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom">
+                          Stop
+                        </TooltipContent>
+                      </Tooltip>
+                    ) : !isRecording && !isTranscribing ? (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            onClick={submit}
+                            disabled={isRecording || isTranscribing}
+                            size="icon"
+                            className={cn(
+                              "size-10 rounded-full transition-colors",
+                              canSend
+                                ? "bg-foreground text-background hover:bg-foreground/90"
+                                : "bg-muted text-muted-foreground hover:bg-accent"
+                            )}
+                            aria-label="Send message"
+                          >
+                            <ArrowUp className="size-4.5" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom">
+                          Send message
+                        </TooltipContent>
+                      </Tooltip>
+                    ) : null}
+                  </>
+                )}
               </div>
-            ) : (
-              slashFiltered.map((option, index) => {
-                const Icon = option.icon;
-                const isActive = activeMode === option.mode;
-                return (
-                  <div
-                    key={option.mode}
-                    role="menuitem"
-                    tabIndex={-1}
-                    onMouseEnter={() => setSlashHighlight(index)}
-                    onPointerDown={event => {
-                      event.preventDefault();
-                      selectSlashOption(option.mode);
-                    }}
-                    onClick={() => selectSlashOption(option.mode)}
-                    className={cn(
-                      "flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-hidden transition-colors",
-                      index === slashHighlight
-                        ? "bg-accent text-accent-foreground"
-                        : "hover:bg-accent hover:text-accent-foreground"
-                    )}
-                  >
-                    <Icon className="mr-2 size-5 text-muted-foreground" />
-                    {option.title}
-                    {isActive && (
-                      <Check className="ml-auto size-4 text-foreground" />
-                    )}
-                  </div>
-                );
-              })
-            )}
+            </div>
           </div>
-        )}
+
+          {/* Slash command ("/") menu — matches the Create Files submenu exactly */}
+          {isSlashActive && (
+            <div
+              ref={slashPanelRef}
+              className={cn(
+                "ksemo-thin-scroll absolute left-0 z-50 w-44 max-h-[min(16rem,40vh)] overflow-y-auto rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-md",
+                isMobile || menuPlacement === "above"
+                  ? "bottom-[calc(100%+2px)]"
+                  : "top-[calc(100%+2px)]"
+              )}
+            >
+              {slashFiltered.length === 0 ? (
+                <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                  No matches
+                </div>
+              ) : (
+                slashFiltered.map((option, index) => {
+                  const Icon = option.icon;
+                  const isActive = activeMode === option.mode;
+                  return (
+                    <div
+                      key={option.mode}
+                      role="menuitem"
+                      tabIndex={-1}
+                      onMouseEnter={() => setSlashHighlight(index)}
+                      onPointerDown={event => {
+                        event.preventDefault();
+                        selectSlashOption(option.mode);
+                      }}
+                      onClick={() => selectSlashOption(option.mode)}
+                      className={cn(
+                        "flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-hidden transition-colors",
+                        index === slashHighlight
+                          ? "bg-accent text-accent-foreground"
+                          : "hover:bg-accent hover:text-accent-foreground"
+                      )}
+                    >
+                      <Icon className="mr-2 size-5 text-muted-foreground" />
+                      {option.title}
+                      {isActive && (
+                        <Check className="ml-auto size-4 text-foreground" />
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
 });
-
-function VoiceChatInlineControls({
-  muted,
-  onMicToggle,
-  onEnd,
-  voices,
-  selectedVoiceName,
-  onVoiceSelect,
-}: {
-  muted: boolean;
-  onMicToggle: () => void;
-  onEnd: () => void;
-  voices?: Array<{ name: string; lang: string; default: boolean }>;
-  selectedVoiceName?: string | null;
-  onVoiceSelect?: (name: string) => void;
-}) {
-  const [voiceMenuOpen, setVoiceMenuOpen] = useState(false);
-  const englishVoices = voices?.filter(voice =>
-    voice.lang.toLowerCase().startsWith("en")
-  );
-  const displayVoices =
-    englishVoices && englishVoices.length > 0 ? englishVoices : (voices ?? []);
-
-  return (
-    <div
-      className="flex items-center gap-1.5"
-      role="group"
-      aria-label="Voice chat controls"
-    >
-      <DropdownMenu open={voiceMenuOpen} onOpenChange={setVoiceMenuOpen}>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            className="h-10 gap-1.5 rounded-full px-3.5 text-foreground transition-colors hover:bg-accent hover:text-foreground"
-            aria-label="Choose KSEMO's voice"
-          >
-            <AudioLines className="size-4" />
-            <span className="text-sm font-medium leading-none">Voice</span>
-            <ChevronDown
-              className={cn(
-                "size-4 text-muted-foreground transition-transform duration-200",
-                voiceMenuOpen ? "rotate-180" : ""
-              )}
-            />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent
-          align="end"
-          side="top"
-          sideOffset={10}
-          collisionPadding={12}
-          className="ksemo-thin-scroll w-60 max-h-72 overflow-y-auto"
-        >
-          {displayVoices.length > 0 ? (
-            displayVoices.map(voice => (
-              <DropdownMenuItem
-                key={voice.name}
-                onSelect={() => {
-                  onVoiceSelect?.(voice.name);
-                  setVoiceMenuOpen(false);
-                }}
-              >
-                <span className="min-w-0 flex-1 truncate">{voice.name}</span>
-                <span className="shrink-0 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                  {voice.lang}
-                </span>
-                {selectedVoiceName === voice.name && (
-                  <Check className="ml-2 size-4 shrink-0 text-foreground" />
-                )}
-              </DropdownMenuItem>
-            ))
-          ) : (
-            <p className="px-3 py-2 text-xs text-muted-foreground">
-              No voices available on this device.
-            </p>
-          )}
-        </DropdownMenuContent>
-      </DropdownMenu>
-
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onMicToggle}
-            aria-pressed={!muted}
-            className="size-10 rounded-full bg-transparent text-foreground transition-colors hover:bg-accent hover:text-foreground"
-            aria-label={muted ? "Unmute microphone" : "Mute microphone"}
-          >
-            {muted ? (
-              <VolumeX className="size-5" />
-            ) : (
-              <Volume2 className="size-5" />
-            )}
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent side="bottom">
-          {muted ? "Unmute microphone" : "Mute microphone"}
-        </TooltipContent>
-      </Tooltip>
-
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            onClick={onEnd}
-            size="icon"
-            className="size-10 rounded-full bg-foreground text-background hover:bg-foreground/90 transition-colors"
-            aria-label="End voice chat"
-          >
-            <Square className="size-4 fill-current" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent side="bottom">End voice chat</TooltipContent>
-      </Tooltip>
-    </div>
-  );
-}
 
 export function LibraryPickerContent({
   files,

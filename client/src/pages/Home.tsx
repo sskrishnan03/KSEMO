@@ -91,10 +91,11 @@ import { useVisualViewportHeight } from "../hooks/useVisualViewportHeight";
 import { ShareConversationDialog } from "../components/ksemo/ShareConversationDialog";
 import { ConfirmDeleteDialog } from "../components/ksemo/ConfirmDeleteDialog";
 import { useVoiceInput } from "../hooks/useVoiceInput";
+import { useBotVoice } from "../hooks/useBotVoice";
+import { useBotReplyVoice } from "../lib/speechVoices";
 import { usePersistFn } from "../hooks/usePersistFn";
 import { WorkspacePanel } from "../components/ksemo/WorkspacePanel";
 import { LibraryWorkspace } from "../components/ksemo/LibraryWorkspace";
-import { VoiceChat } from "../components/voice/VoiceChat";
 import { SearchWorkspace } from "../components/ksemo/PremiumSearch";
 import {
   createConversationPdfFile,
@@ -177,10 +178,76 @@ function appendUniqueAttachments(
   return result;
 }
 
-// The active conversation is remembered per user so a refresh restores the
-// same chat (never a random/new one). An explicit "New Chat" is recorded as a
-// sentinel so a refresh after New Chat stays on a fresh chat instead of
-// silently reopening the previous conversation.
+function prepareTextForSpeech(rawText: string): string {
+  if (!rawText) return "";
+  return rawText
+    // Remove code blocks
+    .replace(/```[\s\S]*?```/g, " ")
+    // Remove inline code
+    .replace(/`([^`]+)`/g, "$1")
+    // Remove image tags
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, " ")
+    // Remove links but keep link text
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+    // Remove HTML tags
+    .replace(/<[^>]+>/g, " ")
+    // Remove headers
+    .replace(/^#{1,6}\s+/gm, "")
+    // Remove bold, italics, strikethrough
+    .replace(/(\*\*|__)(.*?)\1/g, "$2")
+    .replace(/(\*|_)(.*?)\1/g, "$2")
+    .replace(/~~(.*?)~~/g, "$1")
+    // Remove bullet points and list markers
+    .replace(/^[\s*+-]+(?=\S)/gm, "")
+    .replace(/^\d+\.\s+/gm, "")
+    // Remove blockquote markers
+    .replace(/^>\s+/gm, "")
+    // Remove divider lines
+    .replace(/^[-*_]{3,}\s*$/gm, "")
+    // Remove raw URLs
+    .replace(/https?:\/\/\S+/g, "")
+    // Clean up punctuation and spacing
+    .replace(/\n+/g, ". ")
+    .replace(/\s+/g, " ")
+    .replace(/\.{2,}/g, ".")
+    .trim();
+}
+
+function extractNextSpeechSentence(
+  text: string,
+  startIndex: number
+): { sentence: string; nextIndex: number } | null {
+  const pending = text.slice(startIndex);
+  if (!pending) return null;
+
+  // Split on standard punctuation (. ? ! or newline followed by whitespace or end)
+  const match = /([.?!](\s+|$)|[\n\r]+)/.exec(pending);
+  if (match && match.index !== undefined) {
+    const endIndex = match.index + match[0].length;
+    return {
+      sentence: pending.slice(0, endIndex),
+      nextIndex: startIndex + endIndex,
+    };
+  }
+
+  // If text has accumulated without ending punctuation (>= 28 chars), break at commas, semicolons, colons
+  if (pending.length >= 28) {
+    const clauseMatch = /([,;:—–](\s+|$))/.exec(pending);
+    if (clauseMatch && clauseMatch.index !== undefined) {
+      const endIndex = clauseMatch.index + clauseMatch[0].length;
+      return {
+        sentence: pending.slice(0, endIndex),
+        nextIndex: startIndex + endIndex,
+      };
+    }
+  }
+
+  return null;
+}
+
+// The active conversation is remembered in sessionStorage per user so a same-tab
+// refresh restores the exact chat, while opening a new tab or closing the browser
+// starts with a fresh New Chat. An explicit "New Chat" is recorded as a sentinel.
 const ACTIVE_CONVERSATION_NEW_CHAT = "__new__";
 
 function activeConversationStorageKey(userId: number): string {
@@ -192,7 +259,8 @@ function getStoredActiveConversationState(userId: number): {
   newChatIntent: boolean;
 } {
   try {
-    const value = localStorage.getItem(activeConversationStorageKey(userId));
+    const storage = window.sessionStorage ?? window.localStorage;
+    const value = storage.getItem(activeConversationStorageKey(userId));
     if (value === null) return { conversationId: null, newChatIntent: false };
     if (value === ACTIVE_CONVERSATION_NEW_CHAT)
       return { conversationId: null, newChatIntent: true };
@@ -204,13 +272,15 @@ function getStoredActiveConversationState(userId: number): {
 
 function storeActiveConversationId(userId: number, id: string): void {
   try {
-    localStorage.setItem(activeConversationStorageKey(userId), id);
+    const storage = window.sessionStorage ?? window.localStorage;
+    storage.setItem(activeConversationStorageKey(userId), id);
   } catch {}
 }
 
 function rememberNewChatIntent(userId: number): void {
   try {
-    localStorage.setItem(
+    const storage = window.sessionStorage ?? window.localStorage;
+    storage.setItem(
       activeConversationStorageKey(userId),
       ACTIVE_CONVERSATION_NEW_CHAT
     );
@@ -388,6 +458,18 @@ export default function Home() {
   }, [sidebarOpen, isMobile]);
   const [guestPromptOpen, setGuestPromptOpen] = useState(false);
   const [composerValue, setComposerValue] = useState("");
+  // Bot's auto-send has to reach the send pipeline, but useBotVoice is created
+  // long before sendMessage's stable wrapper exists. This bridges the two.
+  const botSendRef = useRef<((text: string) => void) | null>(null);
+  // Mirrors whether the bot voice session is open, for stable callbacks that
+  // must decide on the fly whether a finished reply should be spoken aloud.
+  const botVoiceOpenRef = useRef(
+    typeof window !== "undefined" &&
+      (window.sessionStorage?.getItem("ksemo:composer-tag") ??
+        window.localStorage?.getItem("ksemo:composer-tag")) === "bot"
+  );
+  // The bot's answer voice, picked in the composer while the voice chat runs.
+  const botReplyVoiceNameRef = useRef<string | null>(null);
   const [composerFocusToken, setComposerFocusToken] = useState(0);
   const requestComposerFocus = useCallback(() => {
     setComposerFocusToken(t => t + 1);
@@ -458,7 +540,6 @@ export default function Home() {
     code: string;
     filename?: string;
   } | null>(null);
-  const [voiceChatOpen, setVoiceChatOpen] = useState(false);
   const activePrimaryWorkspace = primaryWorkspace;
   const [shareTarget, setShareTarget] = useState<{
     id: string;
@@ -663,11 +744,6 @@ export default function Home() {
     },
     onError: () => {},
   });
-  const voicePreferencesMutation = trpc.preferences.update.useMutation({
-    onSuccess: () => {
-      utils.preferences.get.invalidate();
-    },
-  });
 
   // Keep a ref mirror of the viewed conversation so streaming callbacks can
   // tell whether the user has switched away mid-stream (see sendMessage).
@@ -832,6 +908,171 @@ export default function Home() {
       setComposerValue(current => (current ? `${current} ${text}` : text)),
     onError: () => {},
   });
+  // Bot's own voice. Unlike the dictate pill this writes into the composer
+  // continuously while you speak, then sends on its own once you go quiet — so
+  // Bot can be driven hands-free without ever leaving the chat box.
+  const botVoice = useBotVoice({
+    onDraft: setComposerValue,
+    getCurrentText: () => composerValue,
+    onSend: text => {
+      setComposerValue("");
+      void sendMessage(text, { isVoiceTurn: true });
+    },
+  });
+  const botReplyVoice = useBotReplyVoice();
+  useEffect(() => {
+    if (botVoice.state !== "idle") {
+      botVoiceOpenRef.current = true;
+    }
+  }, [botVoice.state]);
+  useEffect(() => {
+    botReplyVoiceNameRef.current = botReplyVoice.voiceName;
+  }, [botReplyVoice.voiceName]);
+
+  // Streaming TTS state and queue for real-time speech as responses stream
+  const currentUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const streamingTtsQueueRef = useRef<string[]>([]);
+  const isTtsSpeakingRef = useRef(false);
+  const streamTtsFinishedRef = useRef(false);
+  const spokenCharsIndexRef = useRef(0);
+  const speechRateRef = useRef(preferencesQuery.data?.speechRate ?? 100);
+  useEffect(() => {
+    speechRateRef.current = preferencesQuery.data?.speechRate ?? 100;
+  }, [preferencesQuery.data?.speechRate]);
+
+  const resetStreamingTts = useCallback(() => {
+    streamingTtsQueueRef.current = [];
+    isTtsSpeakingRef.current = false;
+    streamTtsFinishedRef.current = false;
+    spokenCharsIndexRef.current = 0;
+    if (currentUtteranceRef.current) {
+      currentUtteranceRef.current.onstart = null;
+      currentUtteranceRef.current.onend = null;
+      currentUtteranceRef.current.onerror = null;
+      currentUtteranceRef.current = null;
+    }
+    try {
+      if (typeof window !== "undefined" && "speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+      }
+    } catch {}
+    setSpeakingMessageId(null);
+    setSpeechState("idle");
+  }, []);
+
+  const drainStreamingTtsQueue = useCallback(() => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    if (isTtsSpeakingRef.current) return;
+    if (streamingTtsQueueRef.current.length === 0) {
+      if (streamTtsFinishedRef.current) {
+        setSpeakingMessageId(null);
+        setSpeechState("idle");
+        if (botVoiceOpenRef.current) {
+          botVoice.resumeListening();
+        }
+      }
+      return;
+    }
+
+    const nextChunk = streamingTtsQueueRef.current.shift();
+    if (!nextChunk) return;
+
+    isTtsSpeakingRef.current = true;
+    setSpeechState("playing");
+    botVoice.pauseListening();
+
+    const utterance = new SpeechSynthesisUtterance(nextChunk);
+    currentUtteranceRef.current = utterance;
+    const voices = window.speechSynthesis.getVoices();
+    if (voices.length > 0) {
+      const preferred =
+        voices.find(
+          v =>
+            v.lang.startsWith("en") &&
+            (v.name.includes("Natural") ||
+              v.name.includes("Google") ||
+              v.name.includes("Online") ||
+              v.name.includes("Samantha") ||
+              v.name.includes("Jenny"))
+        ) ||
+        voices.find(v => v.lang.startsWith("en")) ||
+        voices.find(v => v.default) ||
+        voices[0];
+      if (preferred) {
+        utterance.voice = preferred;
+        utterance.lang = preferred.lang;
+      }
+    }
+    utterance.rate = speechRateRef.current / 100;
+
+    utterance.onstart = () => {
+      setSpeechState("playing");
+    };
+
+    utterance.onend = () => {
+      if (currentUtteranceRef.current !== utterance) return;
+      currentUtteranceRef.current = null;
+      isTtsSpeakingRef.current = false;
+      drainStreamingTtsQueue();
+    };
+
+    utterance.onerror = () => {
+      if (currentUtteranceRef.current !== utterance) return;
+      currentUtteranceRef.current = null;
+      isTtsSpeakingRef.current = false;
+      drainStreamingTtsQueue();
+    };
+
+    try {
+      if (window.speechSynthesis.paused) {
+        window.speechSynthesis.resume();
+      }
+      window.speechSynthesis.speak(utterance);
+    } catch {
+      if (currentUtteranceRef.current === utterance) {
+        currentUtteranceRef.current = null;
+      }
+      isTtsSpeakingRef.current = false;
+      drainStreamingTtsQueue();
+    }
+  }, [botVoice]);
+
+  const feedStreamingTts = useCallback(
+    (accumulatedText: string, messageId: string) => {
+      setSpeakingMessageId(messageId);
+      while (true) {
+        const match = extractNextSpeechSentence(
+          accumulatedText,
+          spokenCharsIndexRef.current
+        );
+        if (!match) break;
+        spokenCharsIndexRef.current = match.nextIndex;
+        const clean = prepareTextForSpeech(match.sentence);
+        if (clean) {
+          streamingTtsQueueRef.current.push(clean);
+        }
+      }
+      drainStreamingTtsQueue();
+    },
+    [drainStreamingTtsQueue]
+  );
+
+  const finalizeStreamingTts = useCallback(
+    (fullText: string, messageId: string) => {
+      setSpeakingMessageId(messageId);
+      const tail = fullText.slice(spokenCharsIndexRef.current);
+      if (tail.trim()) {
+        const clean = prepareTextForSpeech(tail);
+        if (clean) {
+          streamingTtsQueueRef.current.push(clean);
+        }
+        spokenCharsIndexRef.current = fullText.length;
+      }
+      streamTtsFinishedRef.current = true;
+      drainStreamingTtsQueue();
+    },
+    [drainStreamingTtsQueue]
+  );
   // chatMessages is the single source of truth for the open conversation's
   // messages. The server query seeds it once per conversation, and a
   // conversation that is still streaming re-seeds from every fresh snapshot so
@@ -1403,12 +1644,14 @@ export default function Home() {
     options: {
       regenerateAssistantMessageId?: string;
       replaceUserMessageId?: string;
+      isVoiceTurn?: boolean;
     } = {}
   ) {
     if (!user) {
       setGuestPromptOpen(true);
       return;
     }
+    const isVoiceTurn = Boolean(options.isVoiceTurn);
     const conversationId = activeConversationId;
     // Snapshot the temporary flag at send time: the toggle may change while the
     // stream is in flight.
@@ -1421,6 +1664,7 @@ export default function Home() {
       )
     )
       return;
+    resetStreamingTts();
     const knownMessages = chatMessages;
     const isRegeneration = Boolean(options.regenerateAssistantMessageId);
     const draftNow = Date.now();
@@ -1642,6 +1886,17 @@ export default function Home() {
                   deltaFlushRafRef.current = 0;
                   flushPendingDeltas();
                 });
+              }
+              // Stream words aloud in real-time as sentences arrive (Bot voice turns only)
+              const isBotVoiceMode =
+                isVoiceTurn &&
+                botVoiceOpenRef.current &&
+                typeof window !== "undefined" &&
+                (window.sessionStorage?.getItem("ksemo:composer-tag") ??
+                  window.localStorage?.getItem("ksemo:composer-tag")) ===
+                  "bot";
+              if (isBotVoiceMode) {
+                feedStreamingTts(responseText, messageId);
               }
             }
           } else if (eventName === "assistant.completed") {
@@ -2016,13 +2271,21 @@ export default function Home() {
       }
 
       if (
+        isVoiceTurn &&
         isViewingThisStream() &&
-        preferencesQuery.data?.autoPlayResponses &&
-        responseText &&
         !failureMessage &&
-        !userStopped
-      )
-        speak(responseText, completedConversation.assistantMessageId);
+        !userStopped &&
+        responseText &&
+        botVoiceOpenRef.current &&
+        typeof window !== "undefined" &&
+        (window.sessionStorage?.getItem("ksemo:composer-tag") ??
+          window.localStorage?.getItem("ksemo:composer-tag")) === "bot"
+      ) {
+        finalizeStreamingTts(
+          responseText,
+          completedConversation.assistantMessageId
+        );
+      }
     }
   }
 
@@ -2529,6 +2792,7 @@ export default function Home() {
     // Stop only the stream for the currently-viewed conversation; any other
     // conversations generating in the background are left untouched.
     // This cancels file generation operations.
+    resetStreamingTts();
     const target = activeConversationId;
     for (const stream of streamsRef.current) {
       if (stream.active && stream.conversationId === target) {
@@ -3080,25 +3344,76 @@ export default function Home() {
     requestComposerFocus();
   }
 
-  function speak(text: string, messageId: string) {
+
+
+  function speak(text: string, messageId: string, voiceName?: string | null) {
     if (!("speechSynthesis" in window)) {
       return;
     }
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
+    try {
+      window.speechSynthesis.cancel();
+    } catch {}
+    const cleanText = prepareTextForSpeech(text);
+    if (!cleanText) return;
+
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    const voices = window.speechSynthesis.getVoices();
+    if (voiceName) {
+      const voice = voices.find(candidate => candidate.name === voiceName);
+      if (voice) {
+        utterance.voice = voice;
+        utterance.lang = voice.lang;
+      }
+    } else if (voices.length > 0) {
+      const preferred =
+        voices.find(
+          v =>
+            v.lang.startsWith("en") &&
+            (v.name.includes("Natural") ||
+              v.name.includes("Google") ||
+              v.name.includes("Online") ||
+              v.name.includes("Samantha") ||
+              v.name.includes("Jenny"))
+        ) ||
+        voices.find(v => v.lang.startsWith("en")) ||
+        voices.find(v => v.default) ||
+        voices[0];
+      if (preferred) {
+        utterance.voice = preferred;
+        utterance.lang = preferred.lang;
+      }
+    }
     utterance.rate = (preferencesQuery.data?.speechRate ?? 100) / 100;
-    utterance.onstart = () => setSpeechState("playing");
+    
+    // Pause listening so the microphone doesn't pick up the bot's own voice
+    botVoice.pauseListening();
+
+    utterance.onstart = () => {
+      setSpeechState("playing");
+    };
     utterance.onend = () => {
       setSpeakingMessageId(null);
       setSpeechState("idle");
+      // Resume listening if still in Bot mode so the user can speak hands-free
+      if (botVoiceOpenRef.current) {
+        botVoice.resumeListening();
+      }
     };
     utterance.onerror = () => {
       setSpeakingMessageId(null);
       setSpeechState("idle");
+      if (botVoiceOpenRef.current) {
+        botVoice.resumeListening();
+      }
     };
     setSpeakingMessageId(messageId);
     setSpeechState("playing");
-    window.speechSynthesis.speak(utterance);
+    try {
+      if (window.speechSynthesis.paused) {
+        window.speechSynthesis.resume();
+      }
+      window.speechSynthesis.speak(utterance);
+    } catch {}
   }
 
   function pauseSpeech() {
@@ -3112,9 +3427,10 @@ export default function Home() {
   }
 
   function stopSpeech() {
-    window.speechSynthesis.cancel();
-    setSpeakingMessageId(null);
-    setSpeechState("idle");
+    resetStreamingTts();
+    if (botVoiceOpenRef.current) {
+      botVoice.resumeListening();
+    }
   }
 
   // Stable wrappers for every callback handed to memoized children. Without
@@ -3124,6 +3440,7 @@ export default function Home() {
   const stableComposerSend = usePersistFn(
     (content: string) => void sendMessage(content)
   );
+  botSendRef.current = stableComposerSend;
   const stableStopGeneration = usePersistFn(stopGeneration);
   const stableNewChat = usePersistFn(newChat);
   const stableSelectConversation = usePersistFn(selectConversation);
@@ -3161,20 +3478,18 @@ export default function Home() {
     voice.state === "recording" ? voice.stop : voice.start
   );
   const stableVoiceCancel = usePersistFn(voice.cancel);
-  const stableOpenVoiceChat = usePersistFn(() => {
-    if (isTemporaryChatRef.current) return;
-    setVoiceChatOpen(true);
+  // Bot's voice is never a toggle: start and stop are separate calls so nothing
+  // can ever turn the call on and off in one tap.
+  const stableBotVoiceStart = usePersistFn(() => {
+    resetStreamingTts();
+    botVoiceOpenRef.current = true;
+    void botVoice.start();
   });
-  const stableCloseVoiceChat = usePersistFn(() => {
-    setVoiceChatOpen(false);
-    if (activeConversationId) {
-      // Spoken turns stream straight to the server, so the open chat must
-      // re-seed from the database for the exchange to read as a normal chat.
-      seededConversationIdRef.current = null;
-      setSeededConversationId(null);
-      void utils.conversation.get.refetch({ id: activeConversationId });
-    }
-    utils.conversation.list.invalidate();
+  const stableBotVoiceStop = usePersistFn(() => {
+    botVoiceOpenRef.current = false;
+    resetStreamingTts();
+    stopGeneration();
+    botVoice.cancel();
   });
   // Good/bad response is an exclusive pair: pressing the other thumb switches
   // the rating, and pressing the active thumb again clears it.
@@ -3383,10 +3698,6 @@ export default function Home() {
 
   const greeting = useMemo(timeGreeting, []);
 
-  const stableVoiceSpeechRate = usePersistFn((rate: number) => {
-    voicePreferencesMutation.mutate({ speechRate: rate });
-  });
-
   const renderComposer = (
     options: {
       hideVoiceInput?: boolean;
@@ -3400,8 +3711,16 @@ export default function Home() {
       onSend={stableComposerSend}
       onCancel={stableStopGeneration}
       onVoice={stableVoiceAction}
-      onVoiceChat={guestMode ? undefined : stableOpenVoiceChat}
       onCancelRecording={stableVoiceCancel}
+      onBotVoice={stableBotVoiceStart}
+      onBotVoiceStop={stableBotVoiceStop}
+      botVoiceState={botVoice.state}
+      botVoiceActive={botVoice.state !== "idle"}
+      botOrbLevel={botVoice.levelRef}
+      replyVoices={botReplyVoice.voices}
+      replyVoiceName={botReplyVoice.voiceName}
+      onReplyVoiceChange={botReplyVoice.setVoiceName}
+      isBotSpeaking={speechState === "playing"}
       isGenerating={isGenerating}
       isRecording={voice.state === "recording"}
       isTranscribing={voice.state === "transcribing"}
@@ -3447,7 +3766,6 @@ export default function Home() {
     />
   );
   const composerElement = renderComposer();
-  const voiceComposerElement = renderComposer({ hideVoiceInput: true });
 
   if (loading || (pendingOAuthReturnRef.current && authReturnHolding)) {
     // Coming back from the Google account picker, hold the "Signing you in"
@@ -3920,16 +4238,6 @@ export default function Home() {
                 />
                 {composerElement}
               </div>
-            )}
-            {voiceChatOpen && !isTemporaryChat && (
-              <VoiceChat
-                conversationId={activeConversationId}
-                onConversation={stableSelectConversation}
-                onExit={stableCloseVoiceChat}
-                speechRatePreference={preferencesQuery.data?.speechRate ?? 100}
-                onSpeechRateChange={stableVoiceSpeechRate}
-                composer={voiceComposerElement}
-              />
             )}
           </>
         )}
