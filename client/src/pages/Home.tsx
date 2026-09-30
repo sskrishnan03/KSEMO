@@ -721,6 +721,34 @@ export default function Home() {
     { id: activeConversationId ?? "unselected" },
     { enabled: Boolean(activeConversationId) }
   );
+  const shareTargetMessagesQuery = trpc.conversation.get.useQuery(
+    { id: shareTarget?.id ?? "unselected" },
+    {
+      enabled: Boolean(
+        shareTarget?.id && shareTarget.id !== activeConversationId
+      ),
+      staleTime: 60_000,
+    }
+  );
+  const shareDialogMessages = useMemo(() => {
+    if (!shareTarget && isSharePreview) {
+      return chatMessages.length > 0 ? chatMessages : undefined;
+    }
+    if (!shareTarget) return [];
+    if (shareTarget.id === activeConversationId) {
+      return chatMessages;
+    }
+    if (shareTargetMessagesQuery.data?.messages) {
+      return shareTargetMessagesQuery.data.messages;
+    }
+    return [];
+  }, [
+    shareTarget,
+    isSharePreview,
+    activeConversationId,
+    chatMessages,
+    shareTargetMessagesQuery.data?.messages,
+  ]);
   // While the user is switching between saved conversations, the server data
   // loads instantly from the cache but the seed effect still needs one frame
   // to call setChatMessages. Show a small loader instead of the empty "new
@@ -4676,6 +4704,7 @@ export default function Home() {
         onSetPublic={stableShareOnSetPublic}
         enabled={Boolean(shareTarget) && !publicShareMutation.isPending}
         isPublic={Boolean(shareTarget?.isPublic)}
+        messages={shareDialogMessages}
       />
       <KsemoTextDialog
         open={Boolean(renameTarget) || isRenamePreview}
