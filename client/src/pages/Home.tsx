@@ -34,7 +34,6 @@ import {
   Download,
   LogIn,
   MoreHorizontal,
-  Pencil,
   UserPlus,
 } from "lucide-react";
 import {
@@ -4140,11 +4139,11 @@ export default function Home() {
               variant="ghost"
               size="icon"
               onClick={() => setSidebarOpen(true)}
-              className="absolute left-2 top-2 z-10 size-10 rounded-lg bg-neutral-900 text-neutral-50 hover:bg-neutral-800 lg:hidden"
+              className="absolute left-2 top-2 z-10 size-9 rounded-lg border border-border/40 bg-card text-foreground/80 hover:bg-accent hover:text-foreground transition-colors shadow-xs lg:hidden"
               aria-label="Open conversations"
               data-testid="mobile-sidebar-toggle"
             >
-              <ChevronsRight className="size-5" />
+              <ChevronsRight className="size-4.5" />
             </Button>
 
             {!guestMode &&
@@ -4327,17 +4326,6 @@ export default function Home() {
                         {activeConversation?.isPinned ? "Unpin" : "Pin"}
                       </DropdownMenuItem>
 
-                      <DropdownMenuItem
-                        disabled={!activeConversationId}
-                        onSelect={() => {
-                          if (activeConversationId && activeConversation) {
-                            stableOnRename(activeConversation);
-                          }
-                        }}
-                      >
-                        <Pencil className="mr-2 size-4" />
-                        Rename
-                      </DropdownMenuItem>
 
                       <DropdownMenuItem
                         disabled={!activeConversationId}

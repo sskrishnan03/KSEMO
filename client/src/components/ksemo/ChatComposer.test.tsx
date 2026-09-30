@@ -240,6 +240,7 @@ describe("ChatComposer", () => {
       expect(botMarkup).toContain("Listening...");
       expect(botMarkup).not.toContain('aria-label="Attach"');
       expect(botMarkup).toContain('aria-label="Stop"');
+      expect(botMarkup).not.toContain('aria-label="Composer mode"');
     } finally {
       if (originalWindow === undefined) {
         delete (globalThis as { window?: unknown }).window;

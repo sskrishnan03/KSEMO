@@ -274,7 +274,7 @@ export const ConversationSidebar = memo(function ConversationSidebar({
                     className="absolute inset-0 size-10 lg:size-[2.125rem] rounded-lg opacity-100 transition-all duration-150 group-hover/brand:scale-100 max-lg:opacity-100 lg:opacity-0 lg:group-hover/brand:opacity-100 lg:group-focus-within/brand:opacity-100 hover:bg-sidebar-accent active:scale-95"
                     aria-label="Expand sidebar"
                   >
-                    <ChevronsRight className="size-5 lg:size-[1.125rem]" />
+                    <ChevronsRight className="size-4.5 lg:size-[1.125rem]" />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent
@@ -314,10 +314,10 @@ export const ConversationSidebar = memo(function ConversationSidebar({
                   variant="ghost"
                   size="icon"
                   onClick={onClose}
-                  className="size-10 rounded-lg transition-transform duration-150 text-foreground outline-none hover:bg-sidebar-accent hover:text-foreground focus-visible:ring-0 focus-visible:border-transparent active:scale-95 lg:hidden"
+                  className="size-9 rounded-lg border border-border/40 bg-card text-foreground/80 hover:bg-accent hover:text-foreground transition-colors shadow-xs outline-none focus-visible:ring-0 focus-visible:border-transparent active:scale-95 lg:hidden"
                   aria-label="Close navigation"
                 >
-                  <ChevronsLeft className="size-5" />
+                  <ChevronsLeft className="size-4.5" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom">Close sidebar</TooltipContent>

@@ -1124,7 +1124,7 @@ export const ChatComposer = memo(function ChatComposer({
                   </DropdownMenu>
                 )}
 
-                {!isEditingMessage && !guestMode && !temporary && (
+                {!isEditingMessage && !guestMode && !temporary && !botActive && (
                   <div
                     className="animate-[ksemo-tag-pop_400ms_ease-out_both] relative flex h-8 w-20 shrink-0 items-center rounded-full border border-border bg-popover p-0.5 shadow-sm sm:w-[10.5rem]"
                     role="group"
@@ -1178,7 +1178,7 @@ export const ChatComposer = memo(function ChatComposer({
                       isSpeaking={isBotSpeaking}
                       isThinking={isGenerating && botActive}
                       levelRef={botOrbLevel}
-                      className="size-7.5 shrink-0"
+                      className="size-9 shrink-0"
                     />
                     <span
                       className={cn(
