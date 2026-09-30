@@ -4248,8 +4248,7 @@ export default function Home() {
               visibleMessages.length > 0 &&
               !isTemporaryChat &&
               !chatFilesOpen && (
-                <div className="absolute right-2 top-2 z-20 flex items-center">
-                  <div className="inline-flex items-center rounded-lg border border-border/40 bg-card shadow-xs">
+                <div className="absolute right-2 top-2 z-20 inline-flex items-center rounded-lg border border-border/40 bg-card shadow-xs">
                     <Button
                       variant="ghost"
                       size="sm"
