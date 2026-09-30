@@ -21,8 +21,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 export type BotVoiceState = "idle" | "listening" | "transcribing";
 
 /** How long a pause counts as "I've finished talking". */
-const SILENCE_MS = 600;
-const FINAL_SILENCE_MS = 350;
+const SILENCE_MS = 1400;
+const FINAL_SILENCE_MS = 900;
 
 /** Above this the mic is considered open, which drives the wave. */
 const LISTENING_LEVEL_THRESHOLD = 0.02;
@@ -198,19 +198,35 @@ export function useBotVoice({
   );
 
   // --- audio metering ----------------------------------------------------
+  const stopMetering = useCallback(() => {
+    if (rafRef.current !== null) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
+    streamRef.current?.getTracks().forEach(track => track.stop());
+    streamRef.current = null;
+    if (audioContextRef.current) {
+      void audioContextRef.current.close().catch(() => undefined);
+      audioContextRef.current = null;
+    }
+    analyserRef.current = null;
+    levelRef.current = 0;
+    barsRef.current.fill(0.06);
+  }, []);
+
   const startMetering = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       if (unmountedRef.current) {
         stream.getTracks().forEach(track => track.stop());
-        return;
+        return false;
       }
       streamRef.current = stream;
       const Ctor =
         window.AudioContext ??
         (window as unknown as { webkitAudioContext?: typeof AudioContext })
           .webkitAudioContext;
-      if (!Ctor) return;
+      if (!Ctor) return false;
       const ctx = new Ctor();
       audioContextRef.current = ctx;
       if (ctx.state === "suspended") void ctx.resume();
@@ -255,27 +271,15 @@ export function useBotVoice({
         rafRef.current = requestAnimationFrame(tick);
       };
       rafRef.current = requestAnimationFrame(tick);
+      return true;
     } catch {
       setMicDenied(true);
-      onError?.("Microphone unavailable.");
+      stopMetering();
+      setStateBoth("idle");
+      onError?.("Microphone permission was denied. Please allow microphone access in your browser.");
+      return false;
     }
-  }, [onError]);
-
-  const stopMetering = useCallback(() => {
-    if (rafRef.current !== null) {
-      cancelAnimationFrame(rafRef.current);
-      rafRef.current = null;
-    }
-    streamRef.current?.getTracks().forEach(track => track.stop());
-    streamRef.current = null;
-    if (audioContextRef.current) {
-      void audioContextRef.current.close().catch(() => undefined);
-      audioContextRef.current = null;
-    }
-    analyserRef.current = null;
-    levelRef.current = 0;
-    barsRef.current.fill(0.06);
-  }, []);
+  }, [onError, setStateBoth, stopMetering]);
 
   // --- recognition -------------------------------------------------------
   const startRecognition = useCallback(() => {
@@ -312,14 +316,18 @@ export function useBotVoice({
       armSilenceTimer(hasFinal ? FINAL_SILENCE_MS : SILENCE_MS);
     };
 
-    // Browsers stop recognition on their own every so often; restart it so a
-    // long answer doesn't get cut off mid-sentence.
+    // Browsers stop recognition on their own every so often; restart with a fresh instance
     recognition.onend = () => {
+      recognitionRef.current = null;
       if (wantListeningRef.current && !unmountedRef.current) {
         try {
-          recognition.start();
+          startRecognition();
         } catch {
-          wantListeningRef.current = false;
+          window.setTimeout(() => {
+            if (wantListeningRef.current && !unmountedRef.current) {
+              startRecognition();
+            }
+          }, 300);
         }
       }
     };
@@ -328,9 +336,13 @@ export function useBotVoice({
       if (event.error === "not-allowed" || event.error === "audio-capture") {
         wantListeningRef.current = false;
         setMicDenied(true);
-        onError?.("Microphone permission was denied.");
+        stopMetering();
+        setStateBoth("idle");
+        onError?.("Microphone permission was denied. Please allow microphone access.");
+      } else if (event.error === "network") {
+        // Speech recognition network error
+        onError?.("Speech recognition network connection interrupted.");
       }
-      // `no-speech` and `aborted` are routine; nothing to report.
     };
 
     try {
@@ -340,7 +352,7 @@ export function useBotVoice({
     }
     recognitionRef.current = recognition;
     return true;
-  }, [armSilenceTimer, onError, publishDraft]);
+  }, [armSilenceTimer, onError, publishDraft, setStateBoth, stopMetering]);
 
   const stopRecognition = useCallback(() => {
     wantListeningRef.current = false;
@@ -448,11 +460,12 @@ export function useBotVoice({
 
   const resumeListening = useCallback(() => {
     pausedRef.current = false;
+    wantListeningRef.current = true;
     committedRef.current = "";
     interimRef.current = "";
     baseRef.current = "";
     clearSilenceTimer();
-    if (wantListeningRef.current && !unmountedRef.current && !recognitionRef.current) {
+    if (!unmountedRef.current && !recognitionRef.current) {
       startRecognition();
     }
   }, [clearSilenceTimer, startRecognition]);
@@ -469,7 +482,10 @@ export function useBotVoice({
     setStateBoth("listening");
     playBotVoiceStart();
 
-    await startMetering();
+    const meteringOk = await startMetering();
+    if (meteringOk === false) {
+      return;
+    }
 
     if (startRecognition()) {
       wantListeningRef.current = true;
@@ -492,6 +508,7 @@ export function useBotVoice({
     startMetering,
     startRecordingFallback,
     startRecognition,
+    stopMetering,
   ]);
 
   const stop = useCallback(() => {

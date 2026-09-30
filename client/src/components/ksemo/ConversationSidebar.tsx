@@ -1013,7 +1013,6 @@ const ConversationTitleButton = memo(function ConversationTitleButton({
   const [displayTitle, setDisplayTitle] = useState(fullTitle);
   const [wasTruncated, setWasTruncated] = useState(false);
   const [isOverflowing, setIsOverflowing] = useState(false);
-  const [showTooltip, setShowTooltip] = useState(false);
 
   // Word-safe truncation: the title is shortened to COMPLETE words that fit the
   // available width, with "…" appended. A word is never visually cut in half.
@@ -1065,16 +1064,6 @@ const ConversationTitleButton = memo(function ConversationTitleButton({
     return () => resizeObserver.disconnect();
   }, [fullTitle]);
 
-  const handleMouseEnter = () => {
-    if (wasTruncated) {
-      setShowTooltip(true);
-    }
-  };
-
-  const handleMouseLeave = () => {
-    setShowTooltip(false);
-  };
-
   return (
     <button
       onClick={() => onSelect(conversation.id)}
@@ -1092,35 +1081,19 @@ const ConversationTitleButton = memo(function ConversationTitleButton({
           className="size-[20px] shrink-0 text-foreground/70 transition-colors group-hover:text-foreground"
         />
       )}
-      <Tooltip open={showTooltip}>
-        <TooltipTrigger asChild>
-          <span
-            ref={titleRef}
-            onMouseEnter={handleMouseEnter}
-            onMouseLeave={handleMouseLeave}
-            className={cn(
-              "min-w-0 flex-1 overflow-hidden whitespace-nowrap cursor-pointer transition-[mask-image] duration-150",
-              isRowHovered &&
-                wasTruncated && [
-                  "[-webkit-mask-image:linear-gradient(to_right,black_calc(100%_-_36px),transparent_100%)]",
-                  "[mask-image:linear-gradient(to_right,black_calc(100%_-_36px),transparent_100%)]",
-                ]
-            )}
-          >
-            {displayTitle}
-          </span>
-        </TooltipTrigger>
-        {wasTruncated && (
-          <TooltipContent
-            side="right"
-            sideOffset={35}
-            collisionPadding={40}
-            className="min-w-[80px] max-w-[150px] break-words whitespace-pre-wrap leading-tight px-2.5 py-1.5"
-          >
-            {fullTitle}
-          </TooltipContent>
+      <span
+        ref={titleRef}
+        className={cn(
+          "min-w-0 flex-1 overflow-hidden whitespace-nowrap cursor-pointer transition-[mask-image] duration-150",
+          isRowHovered &&
+            wasTruncated && [
+              "[-webkit-mask-image:linear-gradient(to_right,black_calc(100%_-_36px),transparent_100%)]",
+              "[mask-image:linear-gradient(to_right,black_calc(100%_-_36px),transparent_100%)]",
+            ]
         )}
-      </Tooltip>
+      >
+        {displayTitle}
+      </span>
     </button>
   );
 });

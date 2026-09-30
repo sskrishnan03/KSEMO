@@ -13,6 +13,7 @@ const GEMINI_BASE_URL =
 // user's message that they never said.
 const TRANSCRIBE_MODELS = [
   "gemini-3.5-transcribe",
+  "gemini-2.5-flash",
   "gemini-3.6-flash",
 ];
 

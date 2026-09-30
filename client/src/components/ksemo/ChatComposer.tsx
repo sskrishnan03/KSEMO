@@ -408,7 +408,7 @@ export const ChatComposer = memo(function ChatComposer({
   // The orb swells only while Bot is actually listening, so it stays a calm
   // resting black circle the rest of the time.
   const orbListening = botActive && (botVoiceActive || isRecording);
-  const micBusy = botActive ? botVoiceState !== "idle" : isRecording;
+  const micBusy = isRecording;
   // Mirrored for the tag switcher so it acts on the live call state, never a
   // stale render's copy.
   const micBusyRef = useRef(false);
@@ -1389,7 +1389,6 @@ export const ChatComposer = memo(function ChatComposer({
                         </TooltipContent>
                       </Tooltip>
                     ) : botActive ? (
-                      // In Bot mode, clicking the Stop button halts all speech/generation and cleanly returns to Chat
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button

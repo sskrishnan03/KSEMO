@@ -36,6 +36,7 @@ import {
   Bug,
   Check,
   Copy,
+  Database,
   HelpCircle,
   Lightbulb,
   LogOut,
@@ -99,7 +100,7 @@ const settingsNavItems: Array<{
   { id: "account", label: "Account", icon: User },
   { id: "security", label: "Security", icon: ShieldCheck },
   { id: "appearance", label: "Appearance", icon: Palette },
-  { id: "data", label: "Data Control", icon: Trash6Icon },
+  { id: "data", label: "Data Control", icon: Database },
   { id: "memory", label: "Memory", icon: Brain },
   { id: "feedback", label: "Feedback", icon: MessageSquare },
 ];

@@ -498,7 +498,7 @@ export const DEFAULT_LLM_MODEL = "models/gemini-2.5-flash";
 
 // Separate free-tier quota bucket on the primary provider; used automatically
 // when the requested model is unavailable or rate-limited.
-const PRIMARY_FREE_FALLBACK_MODEL = "models/gemini-2.5-flash";
+const PRIMARY_FREE_FALLBACK_MODEL = "models/gemini-3.5-flash";
 
 export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   assertApiKey();

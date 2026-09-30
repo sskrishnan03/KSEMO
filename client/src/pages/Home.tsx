@@ -960,6 +960,12 @@ export default function Home() {
         void sendMessage(text, { isVoiceTurn: true });
       }
     },
+    onError: message => {
+      toast.error(message);
+      if (botVoiceOpenRef.current) {
+        botVoice.resumeListening();
+      }
+    },
   });
   const botReplyVoice = useBotReplyVoice();
   useEffect(() => {
@@ -1026,7 +1032,15 @@ export default function Home() {
     const utterance = new SpeechSynthesisUtterance(nextChunk);
     currentUtteranceRef.current = utterance;
     const voices = window.speechSynthesis.getVoices();
-    if (voices.length > 0) {
+    const preferredVoiceName = botReplyVoiceNameRef.current;
+    if (preferredVoiceName) {
+      const match = voices.find(v => v.name === preferredVoiceName);
+      if (match) {
+        utterance.voice = match;
+        utterance.lang = match.lang;
+      }
+    }
+    if (!utterance.voice && voices.length > 0) {
       const preferred =
         voices.find(
           v =>
@@ -1047,11 +1061,20 @@ export default function Home() {
     }
     utterance.rate = speechRateRef.current / 100;
 
+    const ttsSafetyTimer = window.setTimeout(() => {
+      if (currentUtteranceRef.current === utterance) {
+        currentUtteranceRef.current = null;
+        isTtsSpeakingRef.current = false;
+        drainStreamingTtsQueue();
+      }
+    }, Math.max(8000, nextChunk.length * 120));
+
     utterance.onstart = () => {
       setSpeechState("playing");
     };
 
     utterance.onend = () => {
+      window.clearTimeout(ttsSafetyTimer);
       if (currentUtteranceRef.current !== utterance) return;
       currentUtteranceRef.current = null;
       isTtsSpeakingRef.current = false;
@@ -1059,6 +1082,7 @@ export default function Home() {
     };
 
     utterance.onerror = () => {
+      window.clearTimeout(ttsSafetyTimer);
       if (currentUtteranceRef.current !== utterance) return;
       currentUtteranceRef.current = null;
       isTtsSpeakingRef.current = false;
@@ -1071,6 +1095,7 @@ export default function Home() {
       }
       window.speechSynthesis.speak(utterance);
     } catch {
+      window.clearTimeout(ttsSafetyTimer);
       if (currentUtteranceRef.current === utterance) {
         currentUtteranceRef.current = null;
       }
@@ -1692,6 +1717,9 @@ export default function Home() {
     } = {}
   ) {
     if (!user) {
+      if (botVoiceOpenRef.current) {
+        botVoice.resumeListening();
+      }
       setGuestPromptOpen(true);
       return;
     }
@@ -1706,8 +1734,12 @@ export default function Home() {
       streamsRef.current.some(
         stream => stream.active && stream.conversationId === conversationId
       )
-    )
+    ) {
+      if (botVoiceOpenRef.current) {
+        botVoice.resumeListening();
+      }
       return;
+    }
     resetStreamingTts();
     const knownMessages = chatMessages;
     const isRegeneration = Boolean(options.regenerateAssistantMessageId);
@@ -2288,6 +2320,9 @@ export default function Home() {
                 : message
             )
           );
+          if (botVoiceOpenRef.current) {
+            botVoice.resumeListening();
+          }
           return;
         }
         setComposerValue(current => (current ? current : content));
@@ -2317,6 +2352,9 @@ export default function Home() {
           setChatMessages(current =>
             current.filter(message => !message.id.startsWith("local-"))
           );
+        }
+        if (botVoiceOpenRef.current) {
+          botVoice.resumeListening();
         }
         return;
       }
@@ -2381,6 +2419,8 @@ export default function Home() {
           responseText,
           completedConversation.assistantMessageId
         );
+      } else if (botVoiceOpenRef.current) {
+        botVoice.resumeListening();
       }
     }
   }

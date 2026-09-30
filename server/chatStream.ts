@@ -108,7 +108,7 @@ const MAX_ATTACHMENTS_PER_MESSAGE = 100;
 const MAX_IMAGES_IN_MODEL_CONTEXT = 20;
 
 // Separate free-tier quota bucket; used when the selected model's daily limit is hit.
-const QUOTA_FALLBACK_MODEL = "models/gemini-2.5-flash";
+const QUOTA_FALLBACK_MODEL = "models/gemini-3.5-flash";
 
 // Hard cap for a single response generation. Without it a stalled provider
 // (or its retry ladder) would hold the SSE connection open in silence while
