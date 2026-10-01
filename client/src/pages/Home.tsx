@@ -4549,6 +4549,7 @@ export default function Home() {
                     open={Boolean(shareTarget) || isSharePreview}
                     onOpenChange={stableShareOnOpenChange}
                     title={shareTarget?.title ?? (activeConversation?.title || "your conversation")}
+                    conversationId={shareTarget?.id ?? activeConversation?.id}
                     shareUrl={
                       shareTarget?.shareToken
                         ? conversationShareUrl(shareTarget.shareToken)

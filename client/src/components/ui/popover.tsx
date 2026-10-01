@@ -53,7 +53,7 @@ function PopoverContent({
           <div
             data-slot="popover-overlay"
             className={cn(
-              "fixed inset-0 z-[70] bg-black/20 dark:bg-black/40 backdrop-blur-[2.5px] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 duration-200",
+              "fixed inset-0 z-[70] bg-black/20 dark:bg-black/40 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 duration-200",
               overlayClassName
             )}
             onClick={onOverlayClick}
