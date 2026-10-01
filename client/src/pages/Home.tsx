@@ -499,8 +499,9 @@ export default function Home() {
   const botReplyVoiceNameRef = useRef<string | null>(null);
   const [composerFocusToken, setComposerFocusToken] = useState(0);
   const requestComposerFocus = useCallback(() => {
+    if (isMobile) return;
     setComposerFocusToken(t => t + 1);
-  }, []);
+  }, [isMobile]);
   const [attachmentNotices, setAttachmentNotices] = useState<
     SelectedAttachment[]
   >([]);
@@ -5084,6 +5085,7 @@ const KsemoTextDialog = memo(function KsemoTextDialog({
   secondaryActionLabel?: string;
   onSecondaryAction?: () => void;
 }) {
+  const isMobile = useIsMobile();
   const placeCaretAtEnd = (event: React.FocusEvent<HTMLInputElement>) => {
     const input = event.currentTarget;
     requestAnimationFrame(() => {
@@ -5112,7 +5114,7 @@ const KsemoTextDialog = memo(function KsemoTextDialog({
                 id="ksemo-dialog-value"
                 value={value}
                 onChange={event => onValueChange(event.target.value)}
-                autoFocus
+                autoFocus={!isMobile}
                 className="min-h-32 w-full resize-none rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none transition-colors"
               />
             ) : (
@@ -5121,7 +5123,7 @@ const KsemoTextDialog = memo(function KsemoTextDialog({
                 value={value}
                 onChange={event => onValueChange(event.target.value)}
                 maxLength={120}
-                autoFocus
+                autoFocus={!isMobile}
                 onFocus={placeCaretAtEnd}
                 onKeyDown={event => {
                   if (event.key === "Enter") {

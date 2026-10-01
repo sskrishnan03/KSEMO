@@ -450,11 +450,12 @@ export const ChatComposer = memo(function ChatComposer({
 
   useEffect(() => {
     if (isEditingMessage) {
+      if (isMobile) return;
       requestAnimationFrame(() => {
         placeCaretAtEnd();
       });
     }
-  }, [isEditingMessage]);
+  }, [isEditingMessage, isMobile]);
 
   // ---- Slash command ("/") menu state ----
   const slashPanelRef = useRef<HTMLDivElement>(null);
@@ -505,9 +506,11 @@ export const ChatComposer = memo(function ChatComposer({
   function selectSlashOption(mode: CapabilityMode) {
     onValueChange("");
     onModeChange?.(mode);
-    requestAnimationFrame(() => {
-      placeCaretAtEnd();
-    });
+    if (!isMobile) {
+      requestAnimationFrame(() => {
+        placeCaretAtEnd();
+      });
+    }
   }
 
   function renderEditorDom(nextMode: CapabilityMode, nextValue: string) {
@@ -593,10 +596,12 @@ export const ChatComposer = memo(function ChatComposer({
     if (changed) {
       renderEditorDom(mode, value);
       if (mode !== "chat" || value !== "") {
-        placeCaretAtEnd();
+        if (!isMobile || document.activeElement === editor) {
+          placeCaretAtEnd();
+        }
       }
     }
-  }, [activeMode, value]);
+  }, [activeMode, value, isMobile]);
 
   useEffect(() => {
     const editor = editorRef.current;
@@ -625,8 +630,10 @@ export const ChatComposer = memo(function ChatComposer({
   // When a chat is opened (new chat or an existing conversation), focus the
   // input so the user can start typing immediately. Runs on mount too, so the
   // composer that appears after messages finish loading also grabs focus.
+  // On mobile devices, we skip auto-focusing so the virtual keyboard does not
+  // abruptly pop up and displace the screen until the user taps the chat box.
   useEffect(() => {
-    if (!focusToken) return;
+    if (!focusToken || isMobile) return;
     const frame = requestAnimationFrame(() => {
       const editor = editorRef.current;
       if (!editor || isEditorDisabled) return;
@@ -639,7 +646,7 @@ export const ChatComposer = memo(function ChatComposer({
       selection?.addRange(range);
     });
     return () => cancelAnimationFrame(frame);
-  }, [focusToken]);
+  }, [focusToken, isMobile, isEditorDisabled]);
 
   useEffect(() => {
     if (!libraryOpen) return;
@@ -884,7 +891,16 @@ export const ChatComposer = memo(function ChatComposer({
           <div className={cn(botActive ? "flex items-center justify-between w-full min-h-[44px]" : "flex flex-col")}>
             {/* Text Input Area (hidden in Bot mode where you speak directly) */}
             {!botActive && (
-              <div className="relative flex flex-1 items-start">
+              <div
+                className="relative flex flex-1 items-start cursor-text"
+                onClick={event => {
+                  const editor = editorRef.current;
+                  if (!editor || isEditorDisabled) return;
+                  if (event.target !== editor) {
+                    placeCaretAtEnd();
+                  }
+                }}
+              >
                 <div
                   id="ksemo-composer-textarea"
                   ref={editorRef}
@@ -1102,9 +1118,11 @@ export const ChatComposer = memo(function ChatComposer({
                                       onModeChange?.(null);
                                     } else {
                                       onModeChange?.(option.mode);
-                                      requestAnimationFrame(() => {
-                                        placeCaretAtEnd();
-                                      });
+                                      if (!isMobile) {
+                                        requestAnimationFrame(() => {
+                                          placeCaretAtEnd();
+                                        });
+                                      }
                                     }
                                     setToolsOpen(false);
                                   }}
@@ -1522,6 +1540,7 @@ export function LibraryPickerContent({
   onCancel?: () => void;
   visibleCount?: number;
 }) {
+  const isMobile = useIsMobile();
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
 
   const toggleFileSelection = (fileId: string) => {
@@ -1567,7 +1586,7 @@ export function LibraryPickerContent({
       </div>
       <div className="flex items-center gap-2">
         <Input
-          autoFocus
+          autoFocus={!isMobile}
           value={query}
           onChange={event => onQueryChange(event.target.value)}
           placeholder="Search your files and images"

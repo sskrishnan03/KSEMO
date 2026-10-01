@@ -430,4 +430,12 @@ describe("ChatComposer", () => {
     expect(markup).not.toContain('aria-label="Composer mode"');
     expect(markup).toContain('aria-label="Message KSEMO"');
   });
+
+  it("renders composer with cursor-text container ready for mobile tap-to-focus", () => {
+    const markup = renderWithTooltip(
+      createElement(ChatComposer, { ...baseProps, focusToken: 1 })
+    );
+    expect(markup).toContain("cursor-text");
+    expect(markup).toContain('id="ksemo-composer-textarea"');
+  });
 });
