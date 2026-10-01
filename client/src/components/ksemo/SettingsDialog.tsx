@@ -23,6 +23,7 @@ import { Switch } from "@/components/ui/switch";
 import {
   Tooltip,
   TooltipContent,
+  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useTheme, type ThemeMode } from "@/contexts/ThemeContext";
@@ -473,6 +474,7 @@ export const SettingsDialog = memo(function SettingsDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent showCloseButton={false} className="flex h-[70dvh] w-[60vw] !max-w-none max-md:h-[min(85dvh,560px)] max-md:w-[calc(100%-1rem)] flex-col gap-0 overflow-hidden rounded-2xl p-0">
+        <TooltipProvider delayDuration={150}>
         <DialogHeader className="sr-only">
           <DialogTitle>Settings</DialogTitle>
           <DialogDescription>
@@ -596,6 +598,7 @@ export const SettingsDialog = memo(function SettingsDialog({
             </div>
           </div>
         </div>
+        </TooltipProvider>
       </DialogContent>
 
       <ConfirmDeleteDialog
@@ -1645,14 +1648,19 @@ function ArchivedChatsWorkspace({
     <>
       <div className="flex h-full flex-col">
         <div className="flex shrink-0 items-center gap-3 border-b border-border px-4 py-3">
-          <button
-            type="button"
-            onClick={onBack}
-            aria-label="Back to Data Control"
-            className="flex size-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors outline-none hover:bg-accent hover:text-foreground focus-visible:ring-0 focus-visible:outline-none"
-          >
-            <ArrowLeft className="size-4" />
-          </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={onBack}
+                aria-label="Back to Data Control"
+                className="flex size-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors outline-none hover:bg-accent hover:text-foreground focus-visible:ring-0 focus-visible:outline-none"
+              >
+                <ArrowLeft className="size-4" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">Back to Data Control</TooltipContent>
+          </Tooltip>
           <div className="min-w-0">
             <p className="text-base font-semibold">Archived chats</p>
             <p className="text-xs text-muted-foreground">
@@ -1796,14 +1804,19 @@ function SharedChatsWorkspace({
     <>
       <div className="flex h-full flex-col">
         <div className="flex shrink-0 items-center gap-3 border-b border-border px-4 py-3">
-          <button
-            type="button"
-            onClick={onBack}
-            aria-label="Back to Data Control"
-            className="flex size-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors outline-none hover:bg-accent hover:text-foreground focus-visible:ring-0 focus-visible:outline-none"
-          >
-            <ArrowLeft className="size-4" />
-          </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={onBack}
+                aria-label="Back to Data Control"
+                className="flex size-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors outline-none hover:bg-accent hover:text-foreground focus-visible:ring-0 focus-visible:outline-none"
+              >
+                <ArrowLeft className="size-4" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">Back to Data Control</TooltipContent>
+          </Tooltip>
           <div className="min-w-0">
             <p className="text-base font-semibold">Shared chats</p>
             <p className="text-xs text-muted-foreground">
