@@ -30,18 +30,6 @@ type Panel = "idle" | "signin" | "signup" | "forgot";
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const FADE = { duration: 0.22, ease: [0.32, 0.72, 0, 1] } as const;
 
-function BackButton({ onClick }: { onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="mb-4 flex size-10 items-center justify-center rounded-xl border border-border text-muted-foreground transition-all duration-150 hover:rounded-full hover:border-accent hover:bg-accent hover:text-foreground active:scale-90 focus-visible:ring-0 focus-visible:outline-none"
-      aria-label="Go back"
-    >
-      <ArrowLeft className="size-4" />
-    </button>
-  );
-}
 
 function AuthDivider() {
   return (
@@ -539,6 +527,36 @@ function ForgotForm({
 export default function AuthStage({ initial = "idle" }: { initial?: Panel }) {
   const [panel, setPanel] = useState<Panel>(initial);
   const [busy, setBusy] = useState<string | null>(null);
+  const [, navigate] = useLocation();
+
+  function handleBack() {
+    if (panel === "forgot") {
+      setPanel("signin");
+      return;
+    }
+    if (panel === "signin" || panel === "signup") {
+      if (initial === "idle") {
+        setPanel("idle");
+        return;
+      }
+      const redirectTarget =
+        new URLSearchParams(window.location.search).get("redirect") || "/";
+      if (window.history.length > 1) {
+        window.history.back();
+      } else {
+        navigate(redirectTarget);
+      }
+      return;
+    }
+    // panel === "idle"
+    const redirectTarget =
+      new URLSearchParams(window.location.search).get("redirect") || "/";
+    if (window.history.length > 1) {
+      window.history.back();
+    } else {
+      navigate(redirectTarget);
+    }
+  }
 
   function handleGoogleStart() {
     // No loading screen on the way out — that would show before the account
@@ -553,6 +571,19 @@ export default function AuthStage({ initial = "idle" }: { initial?: Panel }) {
   return (
     <MotionConfig reducedMotion="user">
       <main className="relative flex min-h-dvh items-center justify-center bg-background px-5 py-10">
+        {/* Back button in left top */}
+        <div className="absolute left-4 top-4 sm:left-6 sm:top-6 z-30">
+          <button
+            type="button"
+            onClick={handleBack}
+            className="flex size-10 items-center justify-center rounded-xl text-muted-foreground transition-all duration-150 hover:bg-accent hover:text-foreground active:scale-95 focus-visible:ring-0 focus-visible:outline-none cursor-pointer"
+            aria-label="Go back"
+            data-testid="auth-back-button"
+          >
+            <ArrowLeft className="size-5" />
+          </button>
+        </div>
+
         {busy && <CenteredLoading label={busy} />}
         <div className="pointer-events-none absolute inset-0 opacity-35 [background-image:radial-gradient(var(--border)_1px,transparent_1px)] [background-size:28px_28px]" />
 
@@ -628,7 +659,6 @@ export default function AuthStage({ initial = "idle" }: { initial?: Panel }) {
                 transition={FADE}
                 className="max-w-md mx-auto"
               >
-                <BackButton onClick={() => setPanel("idle")} />
                 <div className="flex flex-col items-center text-center">
                   <div className="flex items-center gap-2">
                     <LogIn className="size-5 text-muted-foreground" />
@@ -666,7 +696,6 @@ export default function AuthStage({ initial = "idle" }: { initial?: Panel }) {
                 transition={FADE}
                 className="max-w-md mx-auto"
               >
-                <BackButton onClick={() => setPanel("idle")} />
                 <div className="flex flex-col items-center text-center">
                   <div className="flex items-center gap-2">
                     <UserPlus className="size-5 text-muted-foreground" />
@@ -703,7 +732,6 @@ export default function AuthStage({ initial = "idle" }: { initial?: Panel }) {
                 transition={FADE}
                 className="max-w-md mx-auto"
               >
-                <BackButton onClick={() => setPanel("signin")} />
                 <div className="flex flex-col items-center text-center">
                   <div className="flex items-center gap-2">
                     <KeyRound className="size-5 text-muted-foreground" />

@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Eye, EyeOff } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff } from "lucide-react";
 import React, { useId, useState } from "react";
 
 export function GoogleIcon() {
@@ -175,6 +175,16 @@ export function AuthShell({
 }: AuthShellProps) {
   return (
     <main className="relative grid min-h-dvh place-items-center overflow-auto bg-background px-5 py-6 sm:h-dvh sm:overflow-hidden sm:px-6">
+      {/* Back button in left top */}
+      <div className="absolute left-4 top-4 sm:left-6 sm:top-6 z-30">
+        <a
+          href="/signin"
+          className="flex size-10 items-center justify-center rounded-xl text-muted-foreground transition-all duration-150 hover:bg-accent hover:text-foreground active:scale-95 focus-visible:ring-0 focus-visible:outline-none cursor-pointer"
+          aria-label="Go back"
+        >
+          <ArrowLeft className="size-5" />
+        </a>
+      </div>
       <div className="absolute inset-0 opacity-35 [background-image:radial-gradient(var(--border)_1px,transparent_1px)] [background-size:28px_28px]" />
       <section className="relative w-full max-w-sm text-center">
         <a
