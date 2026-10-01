@@ -109,4 +109,53 @@ describe("inMemoryStore durable persistence", () => {
     expect(trashList.map(c => c.id)).toEqual([trashed.id]);
     expect(archivedList.find(c => c.id === active.id)?.isPinned).toBe(false);
   });
+
+  it("retrieves public conversations by shareToken and conversations by ID or token", async () => {
+    const base = path
+      .resolve(process.cwd(), "server", "inMemoryStore.ts")
+      .split(path.sep)
+      .join("/");
+    const url = "file:///" + (base.startsWith("/") ? base : "/" + base);
+
+    const { inMemoryStore } = await import(`${url}?shareTest=1`);
+    const uid = Array.from(inMemoryStore.users.keys())[0];
+
+    const conv = await inMemoryStore.createConversationForUser({
+      id: crypto.randomUUID(),
+      userId: uid,
+      title: "Shared Discussion",
+      conversationType: "text",
+    });
+
+    await inMemoryStore.updateConversationForUser(conv.id, uid, {
+      isPublic: true,
+      shareToken: "token-abc-1234567890",
+    });
+
+    await inMemoryStore.createMessage({
+      id: crypto.randomUUID(),
+      conversationId: conv.id,
+      role: "user",
+      content: "Hello from shared test",
+      model: "gemini",
+      status: "completed",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const publicConv = await inMemoryStore.getPublicConversationByToken("token-abc-1234567890");
+    expect(publicConv).toBeDefined();
+    expect(publicConv.title).toBe("Shared Discussion");
+    expect(publicConv.userId).toBe(uid);
+    expect(publicConv.messages).toHaveLength(1);
+    expect(publicConv.messages[0].content).toBe("Hello from shared test");
+
+    const byId = await inMemoryStore.getConversationById(conv.id);
+    expect(byId).toBeDefined();
+    expect(byId?.title).toBe("Shared Discussion");
+
+    const byToken = await inMemoryStore.getConversationByShareToken("token-abc-1234567890");
+    expect(byToken).toBeDefined();
+    expect(byToken?.id).toBe(conv.id);
+  });
 });

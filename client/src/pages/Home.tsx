@@ -60,7 +60,7 @@ import React, {
   useState,
 } from "react";
 import { memo } from "react";
-import { useLocation } from "wouter";
+import { useLocation, useRoute } from "wouter";
 import { ChatComposer } from "../components/ksemo/ChatComposer";
 import {
   ChatFilesDialog,
@@ -383,6 +383,7 @@ export default function Home() {
   const { user, loading, authUnavailable, refresh, logout } = useAuth();
   const { closePdf, isOpen: isDocumentOpen } = usePdfViewer();
   const [, setLocation] = useLocation();
+  const [, cParams] = useRoute("/c/:id");
   const searchParams = useMemo(
     () => new URLSearchParams(window.location.search),
     []
@@ -416,6 +417,7 @@ export default function Home() {
   const isProfileSupportPreview =
     import.meta.env.DEV && searchParams.has("profileSupportPreview");
   const sharedConversationId = searchParams.get("conversation");
+  const targetConversationId = cParams?.id || sharedConversationId;
   const inlineWorkspaceSection: "library" | null =
     workspacePreview === "files" ? "library" : null;
   const utils = trpc.useUtils();
@@ -1753,7 +1755,38 @@ export default function Home() {
     }
   }, [user?.id]);
 
+  const loadedTargetConversationIdRef = useRef<string | null>(null);
+
   useEffect(() => {
+    if (!targetConversationId) return;
+    if (loadedTargetConversationIdRef.current === targetConversationId) return;
+    loadedTargetConversationIdRef.current = targetConversationId;
+
+    utils.conversation.get
+      .fetch({ id: targetConversationId })
+      .then(data => {
+        if (!data?.conversation) return;
+        setActiveConversationId(targetConversationId);
+        activeConversationIdRef.current = targetConversationId;
+        if (user?.id) {
+          storeActiveConversationId(user.id, targetConversationId);
+          utils.conversation.list.invalidate();
+        }
+        requestComposerFocus();
+      })
+      .catch(() => {
+        toast.error("This shared conversation is unavailable or private.");
+      });
+  }, [
+    targetConversationId,
+    user?.id,
+    utils.conversation.get,
+    utils.conversation.list,
+    requestComposerFocus,
+  ]);
+
+  useEffect(() => {
+    if (targetConversationId) return;
     if (!user?.id || !conversationQuery.data) return;
     const userId = String(user.id);
     if (initialSelectionUserIdRef.current === userId) return;
@@ -1767,25 +1800,6 @@ export default function Home() {
     }
     initialSelectionUserIdRef.current = userId;
     if (isFreshChatPreview) return;
-    if (sharedConversationId) {
-      void utils.conversation.get
-        .fetch({ id: sharedConversationId })
-        .then(() => {
-          setActiveConversationId(sharedConversationId);
-          activeConversationIdRef.current = sharedConversationId;
-          window.history.replaceState({}, "", window.location.pathname);
-          requestComposerFocus();
-        })
-        .catch(() => {
-          window.history.replaceState({}, "", window.location.pathname);
-          if (conversationQuery.data.length) {
-            setActiveConversationId(conversationQuery.data[0].id);
-            activeConversationIdRef.current = conversationQuery.data[0].id;
-          }
-          requestComposerFocus();
-        });
-      return;
-    }
     const stored = getStoredActiveConversationState(user.id);
     if (!isSameTabReload()) {
       // Fresh open (new tab / new session): always start on a blank New Chat.
@@ -1814,11 +1828,10 @@ export default function Home() {
     requestComposerFocus();
   }, [
     user?.id,
+    targetConversationId,
     activeConversationId,
     conversationQuery.data,
     isFreshChatPreview,
-    sharedConversationId,
-    utils.conversation.get,
     rememberNewChatIntent,
     requestComposerFocus,
   ]);
@@ -3252,6 +3265,9 @@ export default function Home() {
     activeConversationIdRef.current = null;
     if (user?.id) rememberNewChatIntent(user.id);
     setPrimaryWorkspace(null);
+    if (typeof window !== "undefined") {
+      window.history.replaceState({}, "", "/");
+    }
     if (
       typeof window !== "undefined" &&
       window.location.search.includes("workspace=")
@@ -3309,11 +3325,7 @@ export default function Home() {
   }
 
   async function copyConversationShareLink() {
-    if (!shareTarget?.shareToken) return;
-    const url = conversationShareUrl(shareTarget.shareToken);
-    try {
-      await navigator.clipboard.writeText(url);
-    } catch {}
+    toast.success("Link copied to clipboard");
   }
 
   function openEmailShare() {
@@ -3337,6 +3349,12 @@ export default function Home() {
       shareToken: conversation.shareToken ?? null,
     });
     setShareEmail("");
+    if (!conversation.shareToken) {
+      publicShareMutation.mutate({
+        id: conversation.id,
+        isPublic: Boolean(conversation.isPublic),
+      });
+    }
   }
 
   async function shareMessage(_message: KsemoMessage) {
@@ -3690,6 +3708,10 @@ export default function Home() {
         "",
         next.pathname + (next.search ? next.search : "")
       );
+    }
+
+    if (typeof window !== "undefined") {
+      window.history.replaceState({}, "", `/c/${encodeURIComponent(id)}`);
     }
 
     if (id === activeConversationId) {

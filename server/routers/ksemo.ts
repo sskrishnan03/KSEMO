@@ -11,6 +11,8 @@ import {
   deleteMessageForUser,
   editMessageForUser,
   getConversationForUser,
+  getConversationById,
+  getConversationByShareToken,
   getPublicConversationByToken,
   getMessageForUser,
   listMessageVersionsForUser,
@@ -87,17 +89,40 @@ export const conversationRouter = router({
         conversationType: input.conversationType,
       })
     ),
-  get: protectedProcedure
+  get: publicProcedure
     .input(z.object({ id: conversationId }))
     .query(async ({ ctx, input }) => {
-      const conversation = await requireConversation(input.id, ctx.user.id);
+      let conversation: any = undefined;
+      const user = ctx.user;
+      if (user) {
+        conversation = await getConversationForUser(input.id, user.id);
+      }
+      if (!conversation) {
+        const candidate = await getConversationById(input.id);
+        if (candidate && candidate.isPublic) {
+          conversation = candidate;
+        }
+      }
+      if (!conversation) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Conversation not found",
+        });
+      }
+      const isOwner = Boolean(user && conversation.userId === user.id);
       const items = await listMessagesForConversation(conversation.id);
       return {
-        conversation,
+        conversation: {
+          ...conversation,
+          isOwner,
+        },
         messages: await Promise.all(
           items.map(async message => ({
             ...message,
-            attachments: await listMessageFilesForUser(message.id, ctx.user.id),
+            attachments:
+              isOwner && user
+                ? await listMessageFilesForUser(message.id, user.id)
+                : [],
           }))
         ),
       };
@@ -199,37 +224,59 @@ export const conversationRouter = router({
     .input(z.object({ id: conversationId, isPublic: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
       const conversation = await requireConversation(input.id, ctx.user.id);
-      const shareToken = input.isPublic
-        ? conversation.shareToken ||
-          Array.from(crypto.getRandomValues(new Uint8Array(24)))
-            .map(b => b.toString(36).padStart(2, "0"))
-            .join("")
-            .slice(0, 24)
-        : null;
+      const shareToken =
+        conversation.shareToken ||
+        Array.from(crypto.getRandomValues(new Uint8Array(18)))
+          .map(b => b.toString(36).padStart(2, "0"))
+          .join("")
+          .slice(0, 24);
       const updated = await updateConversationForUser(input.id, ctx.user.id, {
         isPublic: input.isPublic,
         shareToken: shareToken,
       });
       return {
         isPublic: Boolean(updated?.isPublic),
-        shareToken: updated?.shareToken ?? null,
+        shareToken: updated?.shareToken ?? shareToken,
       };
     }),
   getPublic: publicProcedure
     .input(z.object({ token: z.string().min(16).max(64) }))
-    .query(async ({ input }) => {
-      const shared = await getPublicConversationByToken(input.token);
+    .query(async ({ ctx, input }) => {
+      let shared = await getPublicConversationByToken(input.token);
+      // If conversation is not public, but current user is authenticated owner, still allow them to access it
+      if (!shared && ctx.user) {
+        const candidate = await getConversationByShareToken(input.token);
+        if (candidate && candidate.userId === ctx.user.id) {
+          const items = await listMessagesForConversation(candidate.id);
+          shared = {
+            id: candidate.id,
+            userId: candidate.userId,
+            title: candidate.title,
+            conversation_type: candidate.conversationType,
+            created_at: candidate.createdAt,
+            messages: items,
+          };
+        }
+      }
       if (!shared)
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "Shared conversation not found",
         });
+
+      const userId = ctx.user?.id;
+      const convUserId = shared.userId ?? shared.user_id;
+      const isOwner = Boolean(userId && convUserId && userId === convUserId);
+
       return {
         conversation: {
-          title: shared.conversation.title,
-          createdAt: new Date(shared.conversation.created_at),
+          id: shared.id,
+          title: shared.title,
+          conversationType: shared.conversation_type,
+          createdAt: new Date(shared.created_at),
+          isOwner,
         },
-        messages: shared.messages
+        messages: (shared.messages || [])
           .filter(
             (message: any) =>
               message.role === "user" || message.role === "assistant"
@@ -241,6 +288,66 @@ export const conversationRouter = router({
             createdAt: new Date(message.created_at),
           })),
       };
+    }),
+  forkShared: protectedProcedure
+    .input(
+      z.object({
+        token: z.string().min(16).max(64).optional(),
+        id: conversationId.optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      let shared: any = null;
+      if (input.token) {
+        shared = await getPublicConversationByToken(input.token);
+      } else if (input.id) {
+        const candidate = await getConversationById(input.id);
+        if (
+          candidate &&
+          (candidate.isPublic || candidate.userId === ctx.user.id)
+        ) {
+          const msgs = await listMessagesForConversation(candidate.id);
+          shared = {
+            id: candidate.id,
+            title: candidate.title,
+            conversation_type: candidate.conversationType,
+            messages: msgs,
+          };
+        }
+      }
+      if (!shared) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Conversation not found or is not public",
+        });
+      }
+      const duplicate = await createConversationForUser({
+        id: crypto.randomUUID(),
+        userId: ctx.user.id,
+        title: shared.title || "Shared Chat",
+        conversationType: shared.conversation_type || "text",
+      });
+      if (!duplicate) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Could not continue conversation.",
+        });
+      }
+      for (const msg of shared.messages || []) {
+        if (msg.role === "user" || msg.role === "assistant") {
+          await createMessage({
+            id: crypto.randomUUID(),
+            conversationId: duplicate.id,
+            role: msg.role,
+            content: msg.content,
+            model: msg.model || null,
+            status: "completed",
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          });
+        }
+      }
+      return { conversationId: duplicate.id };
     }),
   search: protectedProcedure
     .input(z.object({ query: z.string().trim().min(1).max(120) }))

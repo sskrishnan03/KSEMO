@@ -487,6 +487,7 @@ class InMemoryStore {
         const msgs = await this.listMessagesForConversation(conv.id);
         return {
           id: conv.id,
+          userId: conv.userId,
           title: conv.title,
           conversation_type: conv.conversationType,
           created_at: conv.createdAt.toISOString(),
@@ -501,6 +502,20 @@ class InMemoryStore {
       }
     }
     return null;
+  }
+
+  async getConversationById(id: string): Promise<Conversation | undefined> {
+    const conv = this.conversations.get(id);
+    return conv ?? undefined;
+  }
+
+  async getConversationByShareToken(shareToken: string): Promise<Conversation | undefined> {
+    for (const conv of this.conversations.values()) {
+      if (conv.shareToken === shareToken) {
+        return conv;
+      }
+    }
+    return undefined;
   }
 
   async deleteConversationForUser(id: string, userId: number): Promise<void> {

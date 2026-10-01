@@ -176,7 +176,7 @@ export function ShareConversationPanel({
         setCopyState("idle");
       }, 2500);
       timersRef.current.push(resetTimer);
-    }, 1200);
+    }, 400);
 
     timersRef.current.push(loadTimer);
   }, [clearTimers, copyState, currentLink, onCopy]);

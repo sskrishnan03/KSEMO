@@ -446,6 +446,7 @@ export async function getPublicConversationByToken(
   if (msgError) throwDb("getPublicConversationByToken.messages", msgError);
   return {
     id: conv.id,
+    userId: conv.user_id,
     title: conv.title,
     conversation_type: conv.conversation_type,
     created_at: conv.created_at,
@@ -457,6 +458,38 @@ export async function getPublicConversationByToken(
       created_at: m.created_at,
     })),
   };
+}
+
+export async function getConversationById(
+  id: string
+): Promise<Conversation | undefined> {
+  if (useMemoryFallback()) {
+    return inMemoryStore.getConversationById(id);
+  }
+  const { data, error } = await supabase
+    .from("conversations")
+    .select("*")
+    .eq("id", id)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (error && !isNotFound(error)) throwDb("getConversationById", error);
+  return data ? dbToConversation(data) : undefined;
+}
+
+export async function getConversationByShareToken(
+  shareToken: string
+): Promise<Conversation | undefined> {
+  if (useMemoryFallback()) {
+    return inMemoryStore.getConversationByShareToken(shareToken);
+  }
+  const { data, error } = await supabase
+    .from("conversations")
+    .select("*")
+    .eq("share_token", shareToken)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (error && !isNotFound(error)) throwDb("getConversationByShareToken", error);
+  return data ? dbToConversation(data) : undefined;
 }
 
 export async function deleteConversationForUser(

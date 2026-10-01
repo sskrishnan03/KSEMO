@@ -16,6 +16,7 @@ function Router() {
   return (
     <Switch>
       <Route path={"/"} component={Home} />
+      <Route path={"/c/:id"} component={Home} />
       <Route path={"/share/:token"} component={SharedConversation} />
       <Route path={"/support/faq"} component={FaqPage} />
       <Route path={"/support/privacy"} component={PrivacyPage} />
