@@ -136,72 +136,71 @@ export default function SharedConversation() {
   const { conversation, messages } = shared.data;
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-background text-foreground">
-      {/* Top Header — Clean navbar with only project name on the left */}
-      <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center justify-between border-b border-border/80 bg-background/80 px-4 backdrop-blur-md sm:px-6">
-        <div className="flex min-w-0 items-center">
-          <button
-            type="button"
-            onClick={() => setLocation("/")}
-            className="flex items-center rounded-lg transition-opacity hover:opacity-85 focus-visible:outline-none"
-            aria-label="KSEMO Home"
-          >
-            <span className="text-base font-semibold tracking-[-0.02em] text-foreground">
-              KSEMO
-            </span>
-          </button>
-        </div>
+    <div className="relative flex h-screen flex-col overflow-hidden bg-background text-foreground">
+      {/* Project name — non-clickable static label on the top-left */}
+      <div className="pointer-events-none absolute left-4 top-3.5 z-20 select-none">
+        <span className="text-base font-semibold tracking-[-0.02em] text-foreground">
+          KSEMO
+        </span>
+      </div>
 
-        <div className="flex shrink-0 items-center gap-2">
-          {user ? (
-            <Button
-              size="sm"
-              onClick={handleContinueChat}
-              disabled={forkMutation.isPending}
-              className="h-8.5 gap-2 rounded-xl bg-foreground px-3.5 text-xs font-semibold text-background shadow-xs transition-all hover:bg-foreground/90 active:scale-[0.98]"
-            >
-              <Sparkles className="size-3.5" />
-              <span>Continue this chat</span>
-            </Button>
-          ) : (
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() =>
-                  setLocation(
-                    `/signup?redirect=${encodeURIComponent(
-                      window.location.pathname
-                    )}`
-                  )
-                }
-                className="h-8.5 rounded-xl border-border px-3 text-xs font-medium text-foreground transition-colors hover:bg-accent active:scale-[0.98]"
-              >
-                <UserPlus className="mr-1.5 size-3.5" />
-                Create account
-              </Button>
-              <Button
-                size="sm"
-                onClick={() =>
-                  setLocation(
-                    `/signin?redirect=${encodeURIComponent(
-                      window.location.pathname
-                    )}`
-                  )
-                }
-                className="h-8.5 rounded-xl bg-foreground px-3.5 text-xs font-medium text-background shadow-xs transition-colors hover:bg-foreground/90 active:scale-[0.98]"
-              >
-                <LogIn className="mr-1.5 size-3.5" />
-                Sign in
-              </Button>
-            </div>
-          )}
+      {/* Top-right action buttons matching the workspace after sign out */}
+      {user ? (
+        <div className="absolute right-3 top-2.5 z-20 flex items-center gap-2">
+          <Button
+            onClick={handleContinueChat}
+            disabled={forkMutation.isPending}
+            className="h-9 rounded-lg bg-[oklch(0.95_0.003_80)] text-[oklch(0.21_0.008_80)] shadow-sm transition-colors duration-150 hover:bg-[oklch(0.93_0.003_80)] active:scale-[0.98]"
+          >
+            <span className="inline-flex items-center gap-1.5 text-sm font-medium">
+              <Sparkles className="size-4" />
+              Continue this chat
+            </span>
+          </Button>
         </div>
-      </header>
+      ) : (
+        <div className="absolute right-3 top-2.5 z-20 flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() =>
+              setLocation(
+                `/signup?redirect=${encodeURIComponent(
+                  window.location.pathname
+                )}`
+              )
+            }
+            className="h-9 rounded-lg border-border text-foreground transition-colors duration-150 hover:border-transparent hover:bg-[oklch(0.21_0.008_80)] hover:text-[oklch(0.95_0.003_80)] active:scale-[0.98]"
+            aria-label="Create account"
+            data-testid="guest-create-account-button"
+          >
+            <span className="inline-flex items-center gap-1.5 text-sm font-medium">
+              <UserPlus className="size-4" />
+              Create account
+            </span>
+          </Button>
+          <Button
+            onClick={() =>
+              setLocation(
+                `/signin?redirect=${encodeURIComponent(
+                  window.location.pathname
+                )}`
+              )
+            }
+            className="h-9 rounded-lg bg-[oklch(0.95_0.003_80)] text-[oklch(0.21_0.008_80)] shadow-sm transition-colors duration-150 hover:bg-[oklch(0.93_0.003_80)] active:scale-[0.98]"
+            aria-label="Sign in"
+            data-testid="guest-sign-in-button"
+          >
+            <span className="inline-flex items-center gap-1.5 text-sm font-medium">
+              <LogIn className="size-4" />
+              Sign in
+            </span>
+          </Button>
+        </div>
+      )}
 
       {/* Main Conversation Thread — Authentic KSEMO Chat Workspace UI */}
       <section
-        className="min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-6"
+        className="min-h-0 flex-1 overflow-y-auto px-4 pb-4 pt-16 sm:px-6 sm:pt-16"
         aria-label="Shared conversation"
       >
         <div className="mx-auto max-w-3xl space-y-6">
