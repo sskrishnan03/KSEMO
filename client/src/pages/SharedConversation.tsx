@@ -1,25 +1,26 @@
-import { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Loading } from "@/components/ui/loading";
 import { Button } from "@/components/ui/button";
 import {
   MessageCircle,
-  Copy,
-  Check,
   Sparkles,
-  ArrowRight,
   LogIn,
+  UserPlus,
 } from "lucide-react";
 import { useLocation, useRoute } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { toast } from "sonner";
+import { MessageContent, type KsemoMessage } from "@/components/ksemo/MessageContent";
 
 export default function SharedConversation() {
   const [, params] = useRoute("/share/:token");
   const [, setLocation] = useLocation();
   const { user } = useAuth();
   const token = params?.token ?? "";
-  const [copied, setCopied] = useState(false);
+
+  const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
+  const [speechState, setSpeechState] = useState<"idle" | "playing" | "paused">("idle");
 
   const shared = trpc.conversation.getPublic.useQuery(
     { token },
@@ -43,17 +44,6 @@ export default function SharedConversation() {
     }
   }, [shared.data?.conversation.isOwner, shared.data?.conversation.id, setLocation]);
 
-  const handleCopyLink = async () => {
-    try {
-      await navigator.clipboard.writeText(window.location.href);
-      setCopied(true);
-      toast.success("Link copied to clipboard");
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      toast.error("Failed to copy link");
-    }
-  };
-
   const handleContinueChat = () => {
     if (user) {
       forkMutation.mutate({ token });
@@ -61,6 +51,45 @@ export default function SharedConversation() {
       setLocation(`/signin?redirect=${encodeURIComponent(window.location.pathname)}`);
     }
   };
+
+  const handleSpeak = useCallback((text: string, messageId: string) => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.onend = () => {
+      setSpeakingMessageId(null);
+      setSpeechState("idle");
+    };
+    utterance.onerror = () => {
+      setSpeakingMessageId(null);
+      setSpeechState("idle");
+    };
+    setSpeakingMessageId(messageId);
+    setSpeechState("playing");
+    window.speechSynthesis.speak(utterance);
+  }, []);
+
+  const handlePause = useCallback(() => {
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.pause();
+      setSpeechState("paused");
+    }
+  }, []);
+
+  const handleResume = useCallback(() => {
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.resume();
+      setSpeechState("playing");
+    }
+  }, []);
+
+  const handleStop = useCallback(() => {
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+      setSpeakingMessageId(null);
+      setSpeechState("idle");
+    }
+  }, []);
 
   if (shared.isLoading) {
     return <Loading fullScreen />;
@@ -83,7 +112,7 @@ export default function SharedConversation() {
       <main className="grid min-h-screen place-items-center bg-background px-5">
         <section className="w-full max-w-lg rounded-2xl border border-border bg-card p-8 text-center shadow-lg">
           <MessageCircle className="mx-auto size-8 text-muted-foreground/60" />
-          <h1 className="mt-4 font-serif text-2xl tracking-[-0.03em] text-foreground">
+          <h1 className="mt-4 text-2xl font-bold tracking-tight text-foreground">
             This shared chat is unavailable
           </h1>
           <p className="mt-3 text-sm leading-6 text-muted-foreground">
@@ -107,127 +136,204 @@ export default function SharedConversation() {
   const { conversation, messages } = shared.data;
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col">
-      {/* Top Navbar */}
-      <header className="sticky top-0 z-30 border-b border-border/80 bg-background/80 backdrop-blur-md px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3 min-w-0">
+    <div className="flex h-screen flex-col overflow-hidden bg-background text-foreground">
+      {/* Top Header — Clean navbar with only project name on the left */}
+      <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center justify-between border-b border-border/80 bg-background/80 px-4 backdrop-blur-md sm:px-6">
+        <div className="flex min-w-0 items-center">
           <button
+            type="button"
             onClick={() => setLocation("/")}
-            className="flex items-center gap-2 text-foreground font-semibold hover:opacity-80 transition-opacity cursor-pointer shrink-0"
+            className="flex items-center rounded-lg transition-opacity hover:opacity-85 focus-visible:outline-none"
+            aria-label="KSEMO Home"
           >
-            <span className="font-serif text-lg tracking-tight">KSEMO</span>
+            <span className="text-base font-semibold tracking-[-0.02em] text-foreground">
+              KSEMO
+            </span>
           </button>
-          <span className="text-xs rounded-full bg-muted px-2.5 py-0.5 font-medium text-muted-foreground shrink-0">
-            Shared Chat
-          </span>
-          <span className="text-sm font-medium text-muted-foreground truncate hidden md:inline-block">
-            {conversation.title}
-          </span>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleCopyLink}
-            className="h-8 gap-1.5 rounded-lg px-2.5 text-xs cursor-pointer text-muted-foreground hover:text-foreground"
-          >
-            {copied ? (
-              <Check className="size-3.5 text-green-500" />
-            ) : (
-              <Copy className="size-3.5" />
-            )}
-            <span className="hidden sm:inline">Copy link</span>
-          </Button>
-
-          <Button
-            size="sm"
-            onClick={handleContinueChat}
-            disabled={forkMutation.isPending}
-            className="h-8 gap-1.5 rounded-lg px-3 text-xs font-medium bg-foreground text-background hover:bg-foreground/90 transition-all cursor-pointer shadow-xs"
-          >
-            {user ? (
-              <>
-                <Sparkles className="size-3.5" />
-                <span>Continue this chat</span>
-              </>
-            ) : (
-              <>
-                <LogIn className="size-3.5" />
-                <span>Log in to continue</span>
-              </>
-            )}
-          </Button>
+        <div className="flex shrink-0 items-center gap-2">
+          {user ? (
+            <Button
+              size="sm"
+              onClick={handleContinueChat}
+              disabled={forkMutation.isPending}
+              className="h-8.5 gap-2 rounded-xl bg-foreground px-3.5 text-xs font-semibold text-background shadow-xs transition-all hover:bg-foreground/90 active:scale-[0.98]"
+            >
+              <Sparkles className="size-3.5" />
+              <span>Continue this chat</span>
+            </Button>
+          ) : (
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  setLocation(
+                    `/signup?redirect=${encodeURIComponent(
+                      window.location.pathname
+                    )}`
+                  )
+                }
+                className="h-8.5 rounded-xl border-border px-3 text-xs font-medium text-foreground transition-colors hover:bg-accent active:scale-[0.98]"
+              >
+                <UserPlus className="mr-1.5 size-3.5" />
+                Create account
+              </Button>
+              <Button
+                size="sm"
+                onClick={() =>
+                  setLocation(
+                    `/signin?redirect=${encodeURIComponent(
+                      window.location.pathname
+                    )}`
+                  )
+                }
+                className="h-8.5 rounded-xl bg-foreground px-3.5 text-xs font-medium text-background shadow-xs transition-colors hover:bg-foreground/90 active:scale-[0.98]"
+              >
+                <LogIn className="mr-1.5 size-3.5" />
+                Sign in
+              </Button>
+            </div>
+          )}
         </div>
       </header>
 
-      {/* Main Messages Thread */}
-      <main className="flex-1 max-w-3xl w-full mx-auto px-4 py-8 sm:px-6 sm:py-12 space-y-6">
-        <div className="border-b border-border pb-5 space-y-2">
-          <h1 className="font-serif text-2xl sm:text-3xl font-medium tracking-tight text-foreground">
-            {conversation.title}
-          </h1>
-          <p className="text-xs text-muted-foreground">
-            {messages.length} {messages.length === 1 ? "message" : "messages"} · Shared from KSEMO
-          </p>
-        </div>
-
-        <div className="space-y-6">
-          {messages.map((message: any) => {
-            const isUser = message.role === "user";
-            return (
-              <article
-                key={message.id}
-                className={
-                  isUser
-                    ? "ml-auto max-w-[85%] rounded-2xl bg-muted/80 px-4 py-3 border border-border/50 text-foreground"
-                    : "max-w-3xl rounded-2xl bg-card border border-border/60 p-4 sm:p-5 text-card-foreground shadow-xs"
-                }
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                    {isUser ? "You" : "KSEMO"}
-                  </span>
-                </div>
-                <div className="whitespace-pre-wrap text-sm leading-relaxed sm:text-[15px]">
-                  {message.content}
-                </div>
-              </article>
-            );
-          })}
-        </div>
-
-        {/* Bottom CTA Card */}
-        <section className="mt-12 rounded-2xl border border-border bg-muted/40 p-6 text-center space-y-3">
-          <h2 className="text-base font-medium text-foreground">
-            Continue this conversation
-          </h2>
-          <p className="text-xs sm:text-sm text-muted-foreground max-w-md mx-auto">
-            {user
-              ? "Pick up where this chat left off, ask follow-up questions, or edit any message in your own workspace."
-              : "Sign in to KSEMO to branch this conversation, edit responses, and explore further."}
-          </p>
-          <div className="pt-2 flex justify-center">
-            <Button
-              onClick={handleContinueChat}
-              disabled={forkMutation.isPending}
-              className="gap-2 rounded-xl text-sm font-medium bg-foreground text-background hover:bg-foreground/90 cursor-pointer shadow-sm"
-            >
-              {user ? (
-                <>
-                  <span>Continue this chat</span>
-                  <ArrowRight className="size-4" />
-                </>
-              ) : (
-                <>
-                  <LogIn className="size-4" />
-                  <span>Log in to continue</span>
-                </>
-              )}
-            </Button>
+      {/* Main Conversation Thread — Authentic KSEMO Chat Workspace UI */}
+      <section
+        className="min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-6"
+        aria-label="Shared conversation"
+      >
+        <div className="mx-auto max-w-3xl space-y-6">
+          <div className="border-b border-border/60 pb-4 space-y-1">
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
+              {conversation.title}
+            </h1>
+            <p className="text-xs text-muted-foreground">
+              {messages.length} {messages.length === 1 ? "message" : "messages"} · Shared from KSEMO
+            </p>
           </div>
-        </section>
-      </main>
+
+          <div className="space-y-5">
+            {messages.map((message: any) => {
+              const ksemoMessage: KsemoMessage = {
+                id: message.id,
+                role: message.role as "user" | "assistant",
+                content: message.content,
+                status: "completed",
+              };
+              return (
+                <MessageContent
+                  key={message.id}
+                  message={ksemoMessage}
+                  onSpeak={handleSpeak}
+                  onPause={handlePause}
+                  onResume={handleResume}
+                  onStop={handleStop}
+                  isSpeaking={speakingMessageId === message.id}
+                  speechState={speechState}
+                />
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* Bottom Composer Dock — Sign In / Continue prompt styled as Workspace Input */}
+      <div className="shrink-0 border-t border-border/50 bg-background/80 px-4 py-3 backdrop-blur-md sm:px-6">
+        <div className="mx-auto max-w-3xl">
+          {!user ? (
+            <div
+              onClick={() =>
+                setLocation(
+                  `/signin?redirect=${encodeURIComponent(
+                    window.location.pathname
+                  )}`
+                )
+              }
+              className="group flex cursor-pointer items-center justify-between gap-3 rounded-2xl border border-border bg-card/80 p-3 shadow-xs transition-all hover:border-foreground/30 hover:bg-card hover:shadow-md sm:p-3.5"
+              role="button"
+              tabIndex={0}
+              onKeyDown={e => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  setLocation(
+                    `/signin?redirect=${encodeURIComponent(
+                      window.location.pathname
+                    )}`
+                  );
+                }
+              }}
+            >
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground transition-colors group-hover:bg-foreground group-hover:text-background">
+                  <LogIn className="size-4" />
+                </div>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-foreground">
+                    Sign in to continue this chat
+                  </p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    After signing in, you can edit, branch, or ask follow-up questions.
+                  </p>
+                </div>
+              </div>
+              <Button
+                size="sm"
+                onClick={e => {
+                  e.stopPropagation();
+                  setLocation(
+                    `/signin?redirect=${encodeURIComponent(
+                      window.location.pathname
+                    )}`
+                  );
+                }}
+                className="h-8 shrink-0 rounded-xl bg-foreground px-3.5 text-xs font-semibold text-background shadow-xs transition-all hover:bg-foreground/90"
+              >
+                Sign in
+              </Button>
+            </div>
+          ) : (
+            <div
+              onClick={handleContinueChat}
+              className="group flex cursor-pointer items-center justify-between gap-3 rounded-2xl border border-border bg-card/80 p-3 shadow-xs transition-all hover:border-foreground/30 hover:bg-card hover:shadow-md sm:p-3.5"
+              role="button"
+              tabIndex={0}
+              onKeyDown={e => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  handleContinueChat();
+                }
+              }}
+            >
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary transition-colors group-hover:bg-foreground group-hover:text-background">
+                  <Sparkles className="size-4" />
+                </div>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-foreground">
+                    Continue this conversation in your workspace
+                  </p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    Pick up where this chat left off, edit messages, or ask follow-ups.
+                  </p>
+                </div>
+              </div>
+              <Button
+                size="sm"
+                onClick={e => {
+                  e.stopPropagation();
+                  handleContinueChat();
+                }}
+                disabled={forkMutation.isPending}
+                className="h-8 shrink-0 rounded-xl bg-foreground px-3.5 text-xs font-semibold text-background shadow-xs transition-all hover:bg-foreground/90"
+              >
+                {forkMutation.isPending ? "Opening…" : "Continue chat"}
+              </Button>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

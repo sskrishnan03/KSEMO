@@ -118,7 +118,9 @@ function SignInForm({
     await utils.auth.me.invalidate();
     await utils.auth.me.refetch();
     if (window.location.pathname !== "/") {
-      navigate("/");
+      const redirectTarget =
+        new URLSearchParams(window.location.search).get("redirect") || "/";
+      navigate(redirectTarget);
     }
   };
 
@@ -256,7 +258,9 @@ function SignUpForm({
         setBusy(null);
       }
       if (window.location.pathname !== "/") {
-        navigate("/");
+        const redirectTarget =
+          new URLSearchParams(window.location.search).get("redirect") || "/";
+        navigate(redirectTarget);
       }
     },
     onError: error => {
