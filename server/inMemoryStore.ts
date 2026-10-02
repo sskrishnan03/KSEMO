@@ -518,15 +518,53 @@ class InMemoryStore {
     return undefined;
   }
 
+  // Mirrors the ON DELETE CASCADE foreign keys on the Postgres side: a
+  // conversation never leaves its messages, revisions, feedback, attachments
+  // or voice sessions behind.
+  private purgeConversationRecords(id: string): void {
+    this.conversations.delete(id);
+    const messageIds = new Set<string>();
+    for (const [msgId, msg] of this.messages.entries()) {
+      if (msg.conversationId === id) {
+        messageIds.add(msgId);
+        this.messages.delete(msgId);
+      }
+    }
+    for (const messageId of messageIds) {
+      this.messageVersions.delete(messageId);
+      for (const [key, feedback] of this.messageFeedback.entries()) {
+        if (feedback.messageId === messageId) this.messageFeedback.delete(key);
+      }
+    }
+    for (const [attId, att] of this.attachments.entries()) {
+      if (
+        att.conversationId === id ||
+        (att.messageId !== null && messageIds.has(att.messageId))
+      ) {
+        this.attachments.delete(attId);
+      }
+    }
+    for (const [sessionId, session] of this.voiceSessions.entries()) {
+      if (session.conversationId === id) this.voiceSessions.delete(sessionId);
+    }
+    for (const [memoryId, memory] of this.memories.entries()) {
+      if (memory.sourceConversationId === id) {
+        memory.sourceConversationId = null;
+        this.memories.set(memoryId, memory);
+      }
+    }
+    for (const [taskId, task] of this.tasks.entries()) {
+      if (task.conversationId === id) {
+        task.conversationId = null;
+        this.tasks.set(taskId, task);
+      }
+    }
+  }
+
   async deleteConversationForUser(id: string, userId: number): Promise<void> {
     const conv = this.conversations.get(id);
     if (conv && conv.userId === userId) {
-      this.conversations.delete(id);
-      for (const [msgId, msg] of this.messages.entries()) {
-        if (msg.conversationId === id) {
-          this.messages.delete(msgId);
-        }
-      }
+      this.purgeConversationRecords(id);
       this.requestPersist();
     }
   }
@@ -535,7 +573,7 @@ class InMemoryStore {
     let count = 0;
     for (const [id, conv] of this.conversations.entries()) {
       if (conv.userId === userId) {
-        this.conversations.delete(id);
+        this.purgeConversationRecords(id);
         count++;
       }
     }

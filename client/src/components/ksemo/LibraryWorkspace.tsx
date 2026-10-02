@@ -141,6 +141,8 @@ export function LibraryWorkspace({
   const [deleteTarget, setDeleteTarget] = useState<
     LibraryWorkspaceFile[] | null
   >(null);
+  const [removing, setRemoving] = useState(false);
+  const [removeError, setRemoveError] = useState<string | null>(null);
   const [renameTarget, setRenameTarget] = useState<LibraryWorkspaceFile | null>(
     null
   );
@@ -343,20 +345,51 @@ export function LibraryWorkspace({
   }
 
   async function confirmRemoval() {
-    if (!deleteTarget?.length) return;
+    if (!deleteTarget?.length || removing) return;
+    const targets = deleteTarget;
+    setRemoveError(null);
+    setRemoving(true);
     try {
-      await Promise.all(
-        deleteTarget.map(file => removeMutation.mutateAsync({ id: file.id }))
+      // allSettled, not all: one rejected file used to discard the whole
+      // batch silently, leaving the dialog with no outcome at all. Now every
+      // file is attempted and the failures are reported by name.
+      const results = await Promise.allSettled(
+        targets.map(file => removeMutation.mutateAsync({ id: file.id }))
       );
-      setSelectedIds(current => {
-        const next = new Set(current);
-        for (const file of deleteTarget) next.delete(file.id);
-        return next;
+      const removedIds = new Set<string>();
+      const failures: string[] = [];
+      targets.forEach((file, index) => {
+        if (results[index].status === "fulfilled") {
+          removedIds.add(file.id);
+        } else {
+          failures.push(file.filename);
+        }
       });
-      setDeleteTarget(null);
-      await invalidateFiles();
-    } catch {
-      // The mutation-level message provides the actionable error state.
+
+      if (removedIds.size) {
+        setSelectedIds(current => {
+          const next = new Set(current);
+          for (const id of removedIds) next.delete(id);
+          return next;
+        });
+        await invalidateFiles();
+      }
+
+      if (!failures.length) {
+        setDeleteTarget(null);
+        return;
+      }
+
+      setRemoveError(
+        failures.length === targets.length
+          ? "None of the selected items could be removed. Please try again."
+          : `Removed ${removedIds.size} of ${targets.length} items. Could not remove: ${failures.join(", ")}.`
+      );
+      // Keep only the failures pending so a retry does not re-request the
+      // files that are already gone.
+      setDeleteTarget(targets.filter(file => !removedIds.has(file.id)));
+    } finally {
+      setRemoving(false);
     }
   }
 
@@ -759,7 +792,10 @@ export function LibraryWorkspace({
       <ConfirmDeleteDialog
         open={Boolean(deleteTarget)}
         onOpenChange={open => {
-          if (!open) setDeleteTarget(null);
+          if (!open) {
+            setDeleteTarget(null);
+            setRemoveError(null);
+          }
         }}
         title={
           deleteTarget?.length === 1
@@ -772,7 +808,8 @@ export function LibraryWorkspace({
             : `${deleteTarget?.length ?? 0} items will be permanently removed from your private Library.`
         }
         confirmLabel="Delete"
-        busy={removeMutation.isPending}
+        busy={removing}
+        error={removeError}
         onConfirm={confirmRemoval}
       />
       {openedFile && (

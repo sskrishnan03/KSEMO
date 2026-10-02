@@ -158,4 +158,66 @@ describe("inMemoryStore durable persistence", () => {
     expect(byToken).toBeDefined();
     expect(byToken?.id).toBe(conv.id);
   });
+
+  it("deletes every conversation for the user together with their messages", async () => {
+    const base = path
+      .resolve(process.cwd(), "server", "inMemoryStore.ts")
+      .split(path.sep)
+      .join("/");
+    const url = "file:///" + (base.startsWith("/") ? base : "/" + base);
+
+    const { inMemoryStore } = await import(`${url}?deleteAllTest=1`);
+    const uid = Array.from(inMemoryStore.users.keys())[0];
+
+    const ids: string[] = [];
+    for (const title of ["Alpha", "Beta", "Gamma"]) {
+      const conv = await inMemoryStore.createConversationForUser({
+        id: crypto.randomUUID(),
+        userId: uid,
+        title,
+        conversationType: "text",
+      });
+      ids.push(conv.id);
+      await inMemoryStore.createMessage({
+        id: crypto.randomUUID(),
+        conversationId: conv.id,
+        role: "user",
+        content: `message in ${title}`,
+        model: "gemini",
+        status: "completed",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+    }
+    // An archived conversation must go too - "delete all" is not limited to
+    // what the sidebar happens to show.
+    const archived = await inMemoryStore.createConversationForUser({
+      id: crypto.randomUUID(),
+      userId: uid,
+      title: "Archived one",
+      conversationType: "text",
+    });
+    await inMemoryStore.updateConversationForUser(archived.id, uid, {
+      isArchived: true,
+    });
+    ids.push(archived.id);
+
+    expect(inMemoryStore.messages.size).toBeGreaterThanOrEqual(ids.length);
+
+    const removed = await inMemoryStore.deleteAllConversationsForUser(uid);
+    expect(removed).toBeGreaterThanOrEqual(ids.length);
+
+    for (const id of ids) {
+      expect(inMemoryStore.conversations.has(id)).toBe(false);
+    }
+    // No orphaned messages survive, otherwise a later id reuse or a disk
+    // reload would resurrect deleted content.
+    for (const message of inMemoryStore.messages.values()) {
+      expect(ids).not.toContain(message.conversationId);
+    }
+
+    expect(await inMemoryStore.listConversationsForUser(uid, "active")).toHaveLength(0);
+    expect(await inMemoryStore.listConversationsForUser(uid, "archived")).toHaveLength(0);
+    expect(await inMemoryStore.listConversationsForUser(uid, "trash")).toHaveLength(0);
+  });
 });

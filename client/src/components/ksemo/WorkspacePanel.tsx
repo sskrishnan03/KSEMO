@@ -96,8 +96,21 @@ export const WorkspacePanel = memo(function WorkspacePanel({
     },
     onError: () => {},
   });
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const fileRemove = trpc.workspace.files.remove.useMutation({
-    onSuccess: () => utils.workspace.files.list.invalidate(),
+    onSuccess: () => {
+      setDeleteError(null);
+      setDeleteTarget(null);
+      utils.workspace.files.list.invalidate();
+    },
+    onError: error => {
+      // Keep the dialog open and explain the failure; closing silently made a
+      // failed removal look like it had worked and the item reappeared.
+      setDeleteError(
+        error.message ||
+          "This item could not be removed. Please try again in a moment."
+      );
+    },
   });
   const fileAttach = trpc.workspace.files.attachToConversation.useMutation({
     onSuccess: () => {},
@@ -127,8 +140,9 @@ export const WorkspacePanel = memo(function WorkspacePanel({
 
   function confirmDelete() {
     if (!deleteTarget) return;
+    // The dialog now closes from onSuccess only.
+    setDeleteError(null);
     fileRemove.mutate({ id: deleteTarget.id });
-    setDeleteTarget(null);
   }
 
   return (
@@ -281,11 +295,16 @@ export const WorkspacePanel = memo(function WorkspacePanel({
       <ConfirmDeleteDialog
         open={Boolean(deleteTarget)}
         onOpenChange={next => {
-          if (!next) setDeleteTarget(null);
+          if (!next) {
+            setDeleteTarget(null);
+            setDeleteError(null);
+          }
         }}
         title={`Remove ${deleteTarget?.kind ?? "item"}?`}
         description={`“${deleteTarget?.label}” will be permanently removed from your KSEMO workspace.`}
         confirmLabel="Delete"
+        busy={fileRemove.isPending}
+        error={deleteError}
         onConfirm={confirmDelete}
       />
       <ImageLightbox

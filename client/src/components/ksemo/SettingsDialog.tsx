@@ -43,6 +43,7 @@ import {
   Database,
   HelpCircle,
   Lightbulb,
+  Loader2,
   LogOut,
   MessageSquare,
   Palette,
@@ -426,33 +427,55 @@ export const SettingsDialog = memo(function SettingsDialog({
     }
   }, [initialTab, open]);
   const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
+  const [deleteAllError, setDeleteAllError] = useState<string | null>(null);
   const [confirmArchiveAll, setConfirmArchiveAll] = useState(false);
+  const [archiveAllError, setArchiveAllError] = useState<string | null>(null);
   const [confirmDeleteAccount, setConfirmDeleteAccount] = useState(false);
+  const [deleteAccountError, setDeleteAccountError] = useState<string | null>(
+    null
+  );
   const utils = trpc.useUtils();
   const removeAllMutation = trpc.conversation.removeAll.useMutation({
     onSuccess: () => {
+      setDeleteAllError(null);
       utils.conversation.list.invalidate();
       setConfirmDeleteAll(false);
       onOpenChange(false);
       onAllChatsDeleted();
     },
-    onError: () => {},
+    onError: error => {
+      // Keep the dialog open so the failure is visible instead of silently
+      // leaving the user staring at an unchanged sidebar.
+      setDeleteAllError(
+        error.message ||
+          "Chats could not be deleted. Please try again in a moment."
+      );
+    },
   });
   const archiveAllMutation = trpc.conversation.archiveAll.useMutation({
     onSuccess: () => {
       utils.conversation.list.invalidate();
       setConfirmArchiveAll(false);
     },
-    onError: () => {},
+    onError: error => {
+      setArchiveAllError(
+        error.message || "Chats could not be archived. Please try again."
+      );
+    },
   });
   const deleteAccountMutation = trpc.auth.deleteAccount.useMutation({
     onSuccess: () => {
+      setDeleteAccountError(null);
       setConfirmDeleteAccount(false);
       onOpenChange(false);
       onAccountDeleted?.();
     },
-    onError: () => {
-      setConfirmDeleteAccount(false);
+    onError: error => {
+      // Keep the dialog open with the reason visible. Closing it silently made
+      // a failed account deletion look exactly like a successful one.
+      setDeleteAccountError(
+        error.message || "Your account could not be deleted right now."
+      );
     },
   });
 
@@ -466,7 +489,10 @@ export const SettingsDialog = memo(function SettingsDialog({
         <AccountSection
           user={user}
           deleteBusy={deleteAccountMutation.isPending}
-          onDeleteAccount={() => setConfirmDeleteAccount(true)}
+          onDeleteAccount={() => {
+            setDeleteAccountError(null);
+            setConfirmDeleteAccount(true);
+          }}
         />
       )}
       {activeTab === "security" && <SecuritySection user={user} />}
@@ -477,7 +503,11 @@ export const SettingsDialog = memo(function SettingsDialog({
             onOpenArchived={() => setDataWorkspace("archived")}
             onOpenShared={() => setDataWorkspace("shared")}
             onArchiveAll={() => setConfirmArchiveAll(true)}
-            onDeleteAll={() => setConfirmDeleteAll(true)}
+            onDeleteAll={() => {
+              setDeleteAllError(null);
+              setConfirmDeleteAll(true);
+            }}
+            deletingAll={removeAllMutation.isPending}
           />
         ) : dataWorkspace === "archived" ? (
           <ArchivedChatsWorkspace
@@ -635,32 +665,54 @@ export const SettingsDialog = memo(function SettingsDialog({
 
       <ConfirmDeleteDialog
         open={confirmDeleteAll}
-        onOpenChange={setConfirmDeleteAll}
+        onOpenChange={next => {
+          if (!next) setDeleteAllError(null);
+          setConfirmDeleteAll(next);
+        }}
         title="Are you sure you want to delete all chats?"
         description="Every conversation, including archived ones, will be permanently removed. This cannot be undone."
         confirmLabel="Delete all"
+        busyLabel="Deleting all…"
         busy={removeAllMutation.isPending}
-        onConfirm={() => removeAllMutation.mutate()}
+        error={deleteAllError}
+        onConfirm={() => {
+          setDeleteAllError(null);
+          removeAllMutation.mutate();
+        }}
       />
       <ConfirmDeleteDialog
         open={confirmArchiveAll}
-        onOpenChange={setConfirmArchiveAll}
+        onOpenChange={next => {
+          if (!next) setArchiveAllError(null);
+          setConfirmArchiveAll(next);
+        }}
         title="Archive all chats?"
         description="Every active conversation will be archived and hidden from your sidebar. You can restore any of them later."
         confirmLabel="Archive all"
         busyLabel="Archiving…"
         busy={archiveAllMutation.isPending}
-        onConfirm={() => archiveAllMutation.mutate()}
+        error={archiveAllError}
+        onConfirm={() => {
+          setArchiveAllError(null);
+          archiveAllMutation.mutate();
+        }}
       />
       <ConfirmDeleteDialog
         open={confirmDeleteAccount}
-        onOpenChange={setConfirmDeleteAccount}
+        onOpenChange={next => {
+          if (!next) setDeleteAccountError(null);
+          setConfirmDeleteAccount(next);
+        }}
         title="Delete account?"
         description="Your account and all of your data — conversations, files, projects and settings — will be permanently removed. This cannot be undone."
         confirmLabel="Delete account"
         busyLabel="Deleting account…"
         busy={deleteAccountMutation.isPending}
-        onConfirm={() => deleteAccountMutation.mutate()}
+        error={deleteAccountError}
+        onConfirm={() => {
+          setDeleteAccountError(null);
+          deleteAccountMutation.mutate();
+        }}
       />
     </Dialog>
   );
@@ -855,9 +907,16 @@ function AccountSection({
             type="button"
             disabled={deleteBusy}
             onClick={onDeleteAccount}
-            className="shrink-0 rounded-lg bg-destructive px-3 py-1.5 text-[11px] font-semibold text-destructive-foreground transition-opacity hover:opacity-90 disabled:pointer-events-none disabled:opacity-60"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-destructive px-3 py-1.5 text-[11px] font-semibold text-destructive-foreground transition-opacity hover:opacity-90 disabled:pointer-events-none disabled:opacity-60"
           >
-            {deleteBusy ? "Deleting…" : "Delete Account"}
+            {deleteBusy ? (
+              <>
+                <Loader2 className="size-3 animate-spin" />
+                Deleting…
+              </>
+            ) : (
+              "Delete Account"
+            )}
           </button>
         </div>
       </div>
@@ -1514,11 +1573,13 @@ function DataSection({
   onOpenShared,
   onArchiveAll,
   onDeleteAll,
+  deletingAll,
 }: {
   onOpenArchived: () => void;
   onOpenShared: () => void;
   onArchiveAll: () => void;
   onDeleteAll: () => void;
+  deletingAll: boolean;
 }) {
   const exportQuery = trpc.workspace.data.exportAll.useQuery(undefined, {
     enabled: false,
@@ -1626,10 +1687,18 @@ function DataSection({
           </div>
           <button
             type="button"
+            disabled={deletingAll}
             onClick={onDeleteAll}
-            className="shrink-0 rounded-lg bg-destructive px-3 py-1.5 text-[11px] font-semibold text-destructive-foreground transition-opacity hover:opacity-90 focus-visible:outline-none"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-destructive px-3 py-1.5 text-[11px] font-semibold text-destructive-foreground transition-opacity hover:opacity-90 disabled:pointer-events-none disabled:opacity-60 focus-visible:outline-none"
           >
-            Delete all
+            {deletingAll ? (
+              <>
+                <Loader2 className="size-3 animate-spin" />
+                Deleting…
+              </>
+            ) : (
+              "Delete all"
+            )}
           </button>
         </div>
       </div>
@@ -1775,6 +1844,7 @@ function ArchivedChatsWorkspace({
     id: string;
     title: string;
   } | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const restoreMutation = trpc.conversation.setArchived.useMutation({
     onSuccess: () => {
       utils.conversation.list.invalidate();
@@ -1783,10 +1853,15 @@ function ArchivedChatsWorkspace({
   });
   const deleteMutation = trpc.conversation.remove.useMutation({
     onSuccess: () => {
+      setDeleteError(null);
       utils.conversation.list.invalidate();
       if (deleteTarget) setDeleteTarget(null);
     },
-    onError: () => {},
+    onError: error => {
+      setDeleteError(
+        error.message || "This chat could not be deleted. Please try again."
+      );
+    },
   });
   const conversations = (chatsQuery.data ?? []) as Array<{
     id: string;
@@ -1872,9 +1947,10 @@ function ArchivedChatsWorkspace({
                         aria-label="Delete chat"
                         className="size-8 shrink-0 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                         disabled={deleteMutation.isPending}
-                        onClick={() =>
-                          setDeleteTarget({ id: c.id, title: c.title })
-                        }
+                        onClick={() => {
+                          setDeleteError(null);
+                          setDeleteTarget({ id: c.id, title: c.title });
+                        }}
                       >
                         <Trash6Icon className="size-4" />
                       </Button>
@@ -1891,13 +1967,18 @@ function ArchivedChatsWorkspace({
       <ConfirmDeleteDialog
         open={Boolean(deleteTarget)}
         onOpenChange={openState => {
-          if (!openState) setDeleteTarget(null);
+          if (!openState) {
+            setDeleteTarget(null);
+            setDeleteError(null);
+          }
         }}
         title="Delete this chat?"
         description={`“${deleteTarget?.title ?? "This chat"}” will be permanently removed.`}
         confirmLabel="Delete"
         busy={deleteMutation.isPending}
+        error={deleteError}
         onConfirm={() => {
+          setDeleteError(null);
           if (deleteTarget) deleteMutation.mutate({ id: deleteTarget.id });
         }}
       />
@@ -1918,6 +1999,7 @@ function SharedChatsWorkspace({
     id: string;
     title: string;
   } | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [copyPending, setCopyPending] = useState(false);
   const unpublishMutation = trpc.conversation.configurePublicShare.useMutation({
     onSuccess: () => {
@@ -1927,10 +2009,15 @@ function SharedChatsWorkspace({
   });
   const deleteMutation = trpc.conversation.remove.useMutation({
     onSuccess: () => {
+      setDeleteError(null);
       utils.conversation.list.invalidate();
       if (deleteTarget) setDeleteTarget(null);
     },
-    onError: () => {},
+    onError: error => {
+      setDeleteError(
+        error.message || "This chat could not be deleted. Please try again."
+      );
+    },
   });
   const conversations = (chatsQuery.data ?? []) as Array<{
     id: string;
@@ -2071,13 +2158,18 @@ function SharedChatsWorkspace({
       <ConfirmDeleteDialog
         open={Boolean(deleteTarget)}
         onOpenChange={openState => {
-          if (!openState) setDeleteTarget(null);
+          if (!openState) {
+            setDeleteTarget(null);
+            setDeleteError(null);
+          }
         }}
         title="Delete this chat?"
         description={`“${deleteTarget?.title ?? "This chat"}” will be permanently removed.`}
         confirmLabel="Delete"
         busy={deleteMutation.isPending}
+        error={deleteError}
         onConfirm={() => {
+          setDeleteError(null);
           if (deleteTarget) deleteMutation.mutate({ id: deleteTarget.id });
         }}
       />

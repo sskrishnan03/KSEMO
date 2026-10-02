@@ -589,6 +589,7 @@ export default function Home() {
   );
   const savedComposerDraftRef = useRef("");
   const [editValue, setEditValue] = useState("");
+  const [deletePreviewDismissed, setDeletePreviewDismissed] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{
     kind: "conversation" | "message";
     id: string;
@@ -4263,7 +4264,17 @@ export default function Home() {
   const stableEditAction = usePersistFn(() => void saveEditedMessage());
   const stableCancelEdit = usePersistFn(cancelEdit);
   const stableDeleteDialogOpen = usePersistFn((open: boolean) => {
-    if (!open) setDeleteTarget(null);
+    if (open) return;
+    setDeleteTarget(null);
+    // The delete preview force-opens this dialog from the URL. Without
+    // clearing the flag and the local dismissal state, Escape appeared to do
+    // nothing and the dialog came straight back on the next render.
+    if (isDeletePreview) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("interactionPreview");
+      window.history.replaceState({}, "", url.pathname + url.search);
+      setDeletePreviewDismissed(true);
+    }
   });
   const stableDeleteAction = usePersistFn(() => {
     if (!deleteTarget) return;
@@ -4991,7 +5002,7 @@ export default function Home() {
         onAction={stableEditAction}
       />
       <ConfirmDeleteDialog
-        open={Boolean(deleteTarget) || isDeletePreview}
+        open={Boolean(deleteTarget) || (isDeletePreview && !deletePreviewDismissed)}
         onOpenChange={stableDeleteDialogOpen}
         title={
           deleteTarget?.kind === "conversation" || isDeletePreview
