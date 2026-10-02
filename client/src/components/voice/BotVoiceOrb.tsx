@@ -3,28 +3,22 @@ import React, { useEffect, useRef } from "react";
 import {
   BOT_ORB_THEMES,
   DEFAULT_BOT_ORB_THEME_ID,
-  getSphereStyle,
   useBotOrbTheme,
   type BotOrbThemeId,
 } from "@/lib/botOrbTheme";
+import { NebulaOrbCanvas } from "./NebulaOrbCanvas";
 
 /**
- * The 3D realistic circle / orb that floats above the top-left corner of the chat box
- * in Bot mode. Purely visual — it is deliberately not a control and cannot be
- * pressed. Voice chat turns on the moment Bot is selected, and the one and only
- * way to hang up is the stop button inside the box.
+ * The 3D realistic circle / orb that floats in the composer in Bot mode.
+ * Purely visual — strictly borderless, zero outer fade or drop-shadow.
+ * Looks completely identical to the settings orb design.
  *
- * Visual states:
- * 1. Bot speaking (`isSpeaking`): The circle blows up and organically pulses with
- *    simulated speech acoustics, glowing with the chosen combination's inner color.
- * 2. User speaking (`active`): Swells dynamically with the microphone live volume level.
- * 3. Bot thinking (`isThinking`): Smooth gentle breathing pulse while generating response.
- * 4. Idle: Calm resting 3D sphere with realistic specular highlight and deep black volume.
- *
- * All animation runs directly on the DOM node via requestAnimationFrame for 60fps
- * stutter-free performance without triggering React re-renders.
+ * Dynamic responsiveness:
+ * 1. Bot speaking (`isSpeaking`): Gentle rhythmic acoustic pulsing.
+ * 2. User speaking (`active`): Swells naturally with microphone audio level.
+ * 3. Bot thinking (`isThinking`): Smooth gentle breathing pulse.
+ * 4. Idle: Calm resting nebula sphere.
  */
-
 export function BotVoiceOrb({
   levelRef,
   active = false,
@@ -37,7 +31,7 @@ export function BotVoiceOrb({
   levelRef?: React.RefObject<number>;
   /** When true the circle is listening to the user and swells with the mic level. */
   active?: boolean;
-  /** When true the bot is answering aloud and the circle dynamically pulses/blows up. */
+  /** When true the bot is answering aloud and the circle dynamically pulses. */
   isSpeaking?: boolean;
   /** When true the bot is generating/thinking. */
   isThinking?: boolean;
@@ -68,7 +62,6 @@ export function BotVoiceOrb({
 
     const tick = () => {
       const node = nodeRef.current;
-      const currentTheme = themeRef.current;
       const now = performance.now();
       let target = 0;
 
@@ -94,32 +87,20 @@ export function BotVoiceOrb({
       const easeFactor = isSpeakingRef.current ? 0.28 : 0.22;
       smoothedRef.current += (target - smoothedRef.current) * easeFactor;
 
-      if (node && currentTheme) {
+      if (node) {
         let scale = 1.0;
-        const [r, g, b] = currentTheme.rgb;
-        const baseShadow = `inset 0 -2.5px 5px ${currentTheme.bounceColor}, 0 4px 10px -1px rgba(0, 0, 0, 0.65)`;
-        let shadow = `${baseShadow}, 0 0 6px rgba(${r}, ${g}, ${b}, 0.2)`;
 
         if (isSpeakingRef.current) {
-          // Dynamic blow-up effect with rich color glow while bot is speaking
-          scale = 1 + smoothedRef.current * 0.42;
-          const glowAlpha = Math.min(0.75, 0.22 + smoothedRef.current * 0.5);
-          const spread = Math.round(5 + smoothedRef.current * 18);
-          shadow = `${baseShadow}, 0 0 ${spread}px rgba(${r}, ${g}, ${b}, ${glowAlpha.toFixed(2)}), 0 0 ${Math.round(spread * 1.7)}px rgba(${r}, ${g}, ${b}, ${(glowAlpha * 0.4).toFixed(2)})`;
+          scale = 1 + smoothedRef.current * 0.16;
         } else if (isThinkingRef.current) {
-          scale = 1 + smoothedRef.current * 0.18;
-          const glowAlpha = (0.2 + smoothedRef.current * 0.45).toFixed(2);
-          const spread = Math.round(6 + smoothedRef.current * 10);
-          shadow = `${baseShadow}, 0 0 ${spread}px rgba(${r}, ${g}, ${b}, ${glowAlpha})`;
+          scale = 1 + smoothedRef.current * 0.08;
         } else if (activeRef.current) {
-          scale = 1 + smoothedRef.current * 0.32;
-          const glowAlpha = Math.min(0.65, 0.18 + smoothedRef.current * 0.4);
-          const spread = Math.round(4 + smoothedRef.current * 14);
-          shadow = `${baseShadow}, 0 0 ${spread}px rgba(${r}, ${g}, ${b}, ${glowAlpha.toFixed(2)})`;
+          scale = 1 + smoothedRef.current * 0.12;
         }
 
         node.style.transform = `scale(${scale.toFixed(3)})`;
-        node.style.boxShadow = shadow;
+        // Strictly zero fade or shadow outside the circle
+        node.style.boxShadow = "none";
       }
 
       frame = requestAnimationFrame(tick);
@@ -135,25 +116,16 @@ export function BotVoiceOrb({
     <span
       ref={nodeRef}
       aria-hidden="true"
-      style={getSphereStyle(theme)}
       className={cn(
-        "ksemo-bot-orb relative inline-flex items-center justify-center rounded-full bg-black overflow-hidden shadow-sm transition-[box-shadow] will-change-transform",
+        "ksemo-bot-orb relative inline-flex items-center justify-center rounded-full bg-black overflow-hidden will-change-transform shrink-0 select-none",
         className
       )}
     >
-      {/* The single rolling energy gradient inside */}
-      <span
-        className="absolute inset-[-15%] rounded-full animate-orb-roll pointer-events-none"
-        style={{
-          background: theme.rollingGradient,
-        }}
-      />
-      {/* Stationary dark perimeter rim so the outer circle boundary is 100% still and never appears to scroll */}
-      <span
-        className="absolute inset-0 rounded-full pointer-events-none"
-        style={{
-          background: `radial-gradient(circle at 50% 50%, transparent 58%, rgba(0, 0, 0, 0.85) 86%, #000000 100%)`,
-        }}
+      <NebulaOrbCanvas
+        theme={theme}
+        size={52}
+        active={active || isSpeaking || isThinking}
+        activity={isSpeaking ? 0.8 : isThinking ? 0.35 : active ? 0.5 : 0}
       />
     </span>
   );

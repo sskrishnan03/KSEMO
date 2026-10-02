@@ -20,6 +20,9 @@ export interface BotOrbTheme {
   description: string;
   accentHex: string;
   rgb: [number, number, number];
+  primaryGl: [number, number, number];
+  secondaryGl: [number, number, number];
+  accentGl: [number, number, number];
   coreColor: string;
   midColor: string;
   bounceColor: string;
@@ -35,6 +38,9 @@ const THEME_BLACK_WHITE: BotOrbTheme = {
   description: "Deep obsidian black infused with swirling luminous pearl white nebula clouds",
   accentHex: "#FFFFFF",
   rgb: [240, 245, 255],
+  primaryGl: [0.92, 0.95, 1.0],
+  secondaryGl: [0.18, 0.20, 0.25],
+  accentGl: [1.0, 1.0, 1.0],
   coreColor: "rgba(240, 245, 255, 0.95)",
   midColor: "rgba(200, 215, 235, 0.5)",
   bounceColor: "rgba(255, 255, 255, 0.35)",
@@ -53,6 +59,9 @@ const THEME_BLACK_CYAN: BotOrbTheme = {
   description: "Deep obsidian black infused with swirling electric cyan aurora clouds",
   accentHex: "#00E5FF",
   rgb: [0, 229, 255],
+  primaryGl: [0.0, 0.85, 1.0],
+  secondaryGl: [0.02, 0.26, 0.65],
+  accentGl: [0.45, 0.95, 1.0],
   coreColor: "rgba(0, 229, 255, 0.95)",
   midColor: "rgba(0, 140, 255, 0.55)",
   bounceColor: "rgba(0, 229, 255, 0.4)",
@@ -71,6 +80,9 @@ const THEME_BLACK_EMERALD: BotOrbTheme = {
   description: "Deep obsidian black infused with swirling radiant emerald clouds",
   accentHex: "#10E588",
   rgb: [16, 229, 136],
+  primaryGl: [0.06, 0.92, 0.54],
+  secondaryGl: [0.015, 0.42, 0.28],
+  accentGl: [0.38, 1.0, 0.78],
   coreColor: "rgba(16, 229, 136, 0.95)",
   midColor: "rgba(5, 175, 100, 0.55)",
   bounceColor: "rgba(16, 229, 136, 0.4)",
@@ -89,6 +101,9 @@ const THEME_BLACK_VIOLET: BotOrbTheme = {
   description: "Deep obsidian black infused with swirling cosmic violet nebula clouds",
   accentHex: "#A855F7",
   rgb: [168, 85, 247],
+  primaryGl: [0.66, 0.33, 0.97],
+  secondaryGl: [0.22, 0.08, 0.48],
+  accentGl: [0.88, 0.58, 1.0],
   coreColor: "rgba(168, 85, 247, 0.95)",
   midColor: "rgba(125, 45, 230, 0.55)",
   bounceColor: "rgba(168, 85, 247, 0.4)",
@@ -107,6 +122,9 @@ const THEME_BLACK_GOLD: BotOrbTheme = {
   description: "Deep obsidian black infused with swirling liquid solar gold stardust clouds",
   accentHex: "#F59E0B",
   rgb: [245, 158, 11],
+  primaryGl: [0.96, 0.62, 0.04],
+  secondaryGl: [0.55, 0.28, 0.02],
+  accentGl: [1.0, 0.88, 0.48],
   coreColor: "rgba(245, 158, 11, 0.95)",
   midColor: "rgba(217, 119, 6, 0.55)",
   bounceColor: "rgba(245, 158, 11, 0.4)",
@@ -126,7 +144,7 @@ export const BOT_ORB_THEMES: Record<BotOrbThemeId, BotOrbTheme> = {
   "black-gold": THEME_BLACK_GOLD,
 
   // Legacy mappings for backward compatibility
-  "midnight-black": THEME_BLACK_WHITE,
+  "midnight-black": THEME_BLACK_EMERALD,
   "eclipse-white": THEME_BLACK_WHITE,
   "electric-cyan": THEME_BLACK_CYAN,
   "cyber-emerald": THEME_BLACK_EMERALD,
@@ -142,7 +160,7 @@ export const BOT_ORB_THEME_LIST: BotOrbTheme[] = [
 ];
 
 export const STORAGE_KEY = "ksemo:bot-orb-theme";
-export const DEFAULT_BOT_ORB_THEME_ID: BotOrbThemeId = "black-cyan";
+export const DEFAULT_BOT_ORB_THEME_ID: BotOrbThemeId = "black-emerald";
 const EVENT_NAME = "ksemo:bot-orb-theme-change";
 
 export function getStoredBotOrbThemeId(): BotOrbThemeId {

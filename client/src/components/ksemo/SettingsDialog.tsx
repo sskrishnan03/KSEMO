@@ -621,7 +621,9 @@ export const SettingsDialog = memo(function SettingsDialog({
               className={
                 activeTab === "data" && dataWorkspace
                   ? "flex min-h-0 flex-1 flex-col overflow-hidden"
-                  : "min-h-0 flex-1 overflow-y-auto p-4 md:p-5"
+                  : activeTab === "appearance"
+                    ? "min-h-0 flex-1 overflow-hidden p-4 md:p-5"
+                    : "min-h-0 flex-1 overflow-y-auto p-4 md:p-5"
               }
             >
               {sectionContent}
@@ -950,8 +952,8 @@ const themeOptions: Array<{
   { value: "system", label: "System", ariaLabel: "System theme" },
 ];
 
-const THUMB_W = 112;
-const THUMB_H = 72;
+const THUMB_W = 92;
+const THUMB_H = 58;
 
 function MiniKsemoLight() {
   const s = {
@@ -1348,13 +1350,13 @@ function AppearanceSection() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <SectionHeading title="Appearance" />
 
       {/* 1. Theme Section: Theme label on top, the 3 options directly below it */}
-      <div className="space-y-3">
-        <p className="text-sm font-medium text-foreground">Theme</p>
-        <div className="flex flex-wrap items-start gap-4">
+      <div className="space-y-2">
+        <p className="text-sm font-medium text-muted-foreground">Theme</p>
+        <div className="flex flex-wrap items-start gap-3.5">
           {themeOptions.map(opt => {
             const active = mode === opt.value;
             return (
@@ -1371,7 +1373,7 @@ function AppearanceSection() {
                     setMode(opt.value);
                   }
                 }}
-                className="group flex flex-col items-center gap-2 outline-none"
+                className="group flex flex-col items-center gap-1.5 outline-none"
               >
                 <div
                   className="relative overflow-hidden rounded-xl transition-all duration-200 ease-out group-hover:-translate-y-0.5 group-hover:shadow-md group-focus-visible:shadow-md"
@@ -1385,9 +1387,9 @@ function AppearanceSection() {
                   {opt.value === "system" && <SystemPreviewThumb />}
                   {active && (
                     <span className="absolute inset-0 z-10 flex items-center justify-center bg-black/20">
-                      <span className="flex size-5 items-center justify-center rounded-full bg-foreground">
+                      <span className="flex size-4.5 items-center justify-center rounded-full bg-foreground">
                         <svg
-                          className="size-3 text-background"
+                          className="size-2.5 text-background"
                           viewBox="0 0 24 24"
                           fill="none"
                           stroke="currentColor"
@@ -1421,87 +1423,87 @@ function AppearanceSection() {
       <div className="h-px bg-border/60" />
 
       {/* 2. Bot Section: directly in the page below the Bot label, no container, no overflow clipping */}
-      <div className="space-y-3">
-        <p className="text-sm font-medium text-foreground">Bot</p>
-        <div className="flex items-center justify-center gap-3 sm:gap-6 w-full max-w-lg py-5 select-none">
-            {/* Left Chevron Button */}
-            <button
-              type="button"
-              onClick={handlePrev}
-              aria-label={`Previous: ${prevTheme.name}`}
-              className="flex size-10 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            >
-              <ChevronLeft className="size-6" />
-            </button>
+      <div className="space-y-2">
+        <p className="text-sm font-medium text-muted-foreground">Bot</p>
+        <div className="flex items-center justify-center gap-3 sm:gap-6 w-full max-w-lg py-2 select-none">
+          {/* Left Chevron Button */}
+          <button
+            type="button"
+            onClick={handlePrev}
+            aria-label={`Previous: ${prevTheme.name}`}
+            className="flex size-8 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          >
+            <ChevronLeft className="size-5 stroke-[1.75]" />
+          </button>
 
-            {/* Left Faded Preview Circle */}
+          {/* Left Faded Preview Circle */}
+          <button
+            type="button"
+            onClick={handlePrev}
+            aria-label={`Select ${prevTheme.name}`}
+            className="group flex flex-col items-center gap-1.5 opacity-65 hover:opacity-90 transition-all duration-300 cursor-pointer focus-visible:outline-none shrink-0"
+          >
+            <RealRollingOrb
+              theme={prevTheme}
+              size={66}
+            />
+            <span className="text-[11px] font-medium text-muted-foreground group-hover:text-foreground transition-colors max-w-[85px] truncate text-center">
+              {prevTheme.name}
+            </span>
+          </button>
+
+          {/* Center Active Big Circle */}
+          <div className="flex flex-col items-center gap-2 shrink-0">
             <button
               type="button"
-              onClick={handlePrev}
-              aria-label={`Select ${prevTheme.name}`}
-              className="group flex flex-col items-center gap-1.5 opacity-35 hover:opacity-75 transition-all duration-300 transform scale-75 cursor-pointer focus-visible:outline-none shrink-0"
+              role="radio"
+              aria-checked={true}
+              aria-label={`${currentTheme.name} (Click to speak)`}
+              onClick={() => handleCircleVoice(currentTheme)}
+              className="group relative flex items-center justify-center cursor-pointer focus-visible:outline-none hover:scale-105 active:scale-95 transition-transform duration-200"
             >
               <RealRollingOrb
-                theme={prevTheme}
-                size={68}
+                theme={currentTheme}
+                size={96}
+                active={true}
               />
-              <span className="text-[11px] font-medium text-muted-foreground group-hover:text-foreground transition-colors max-w-[90px] truncate text-center">
-                {prevTheme.name}
-              </span>
             </button>
-
-            {/* Center Active Big Circle */}
-            <div className="flex flex-col items-center gap-2.5 transform scale-100 transition-all duration-300 shrink-0">
-              <button
-                type="button"
-                role="radio"
-                aria-checked={true}
-                aria-label={`${currentTheme.name} (Click to speak)`}
-                onClick={() => handleCircleVoice(currentTheme)}
-                className="group relative flex items-center justify-center cursor-pointer focus-visible:outline-none hover:scale-105 active:scale-95 transition-transform duration-200"
-              >
-                <RealRollingOrb
-                  theme={currentTheme}
-                  size={104}
-                  active={true}
-                />
-              </button>
-              <div className="flex flex-col items-center text-center">
-                <span className="text-sm font-semibold text-foreground tracking-tight">
-                  {currentTheme.name}
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  {currentTheme.combinationLabel}
-                </span>
-              </div>
+            <div className="flex flex-col items-center text-center">
+              <span className="text-sm font-bold text-foreground tracking-tight">
+                {currentTheme.name}
+              </span>
+              <span className="text-xs text-muted-foreground mt-0.5">
+                {currentTheme.combinationLabel}
+              </span>
             </div>
-
-            {/* Right Faded Preview Circle */}
-            <button
-              type="button"
-              onClick={handleNext}
-              aria-label={`Select ${nextTheme.name}`}
-              className="group flex flex-col items-center gap-1.5 opacity-35 hover:opacity-75 transition-all duration-300 transform scale-75 cursor-pointer focus-visible:outline-none shrink-0"
-            >
-              <RealRollingOrb
-                theme={nextTheme}
-                size={68}
-              />
-              <span className="text-[11px] font-medium text-muted-foreground group-hover:text-foreground transition-colors max-w-[90px] truncate text-center">
-                {nextTheme.name}
-              </span>
-            </button>
-
-            {/* Right Chevron Button */}
-            <button
-              type="button"
-              onClick={handleNext}
-              aria-label={`Next: ${nextTheme.name}`}
-              className="flex size-10 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            >
-              <ChevronRight className="size-6" />
-            </button>
           </div>
+
+          {/* Right Faded Preview Circle */}
+          <button
+            type="button"
+            onClick={handleNext}
+            aria-label={`Select ${nextTheme.name}`}
+            className="group flex flex-col items-center gap-1.5 opacity-65 hover:opacity-90 transition-all duration-300 cursor-pointer focus-visible:outline-none shrink-0"
+          >
+            <RealRollingOrb
+              theme={nextTheme}
+              size={66}
+            />
+            <span className="text-[11px] font-medium text-muted-foreground group-hover:text-foreground transition-colors max-w-[85px] truncate text-center">
+              {nextTheme.name}
+            </span>
+          </button>
+
+          {/* Right Chevron Button */}
+          <button
+            type="button"
+            onClick={handleNext}
+            aria-label={`Next: ${nextTheme.name}`}
+            className="flex size-8 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          >
+            <ChevronRight className="size-5 stroke-[1.75]" />
+          </button>
+        </div>
       </div>
     </div>
   );
