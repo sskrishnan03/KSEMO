@@ -10,36 +10,55 @@ import {
 } from "./botOrbTheme";
 
 describe("botOrbTheme", () => {
-  it("contains exactly 5 distinct black and color combinations", () => {
-    expect(BOT_ORB_THEME_LIST).toHaveLength(5);
+  it("contains exactly 6 distinct black and color combinations", () => {
+    expect(BOT_ORB_THEME_LIST).toHaveLength(6);
     const ids = BOT_ORB_THEME_LIST.map(t => t.id);
     expect(ids).toEqual([
-      "black-white",
-      "black-cyan",
-      "black-emerald",
-      "black-violet",
-      "black-gold",
+      "arven",
+      "zeno",
+      "veya",
+      "koda",
+      "luma",
+      "orin",
     ]);
   });
 
-  it("gives each of the 5 options a distinct Black & Color name and combination label", () => {
+  it("gives each of the 6 options a distinct custom name and combination label", () => {
     const names = BOT_ORB_THEME_LIST.map(t => t.name);
     expect(names).toEqual([
-      "Black & White",
-      "Black & Cyan",
-      "Black & Emerald",
-      "Black & Violet",
-      "Black & Gold",
+      "Arven",
+      "Zeno",
+      "Veya",
+      "Koda",
+      "Luma",
+      "Orin",
     ]);
 
     const combinations = BOT_ORB_THEME_LIST.map(t => t.combinationLabel);
     expect(combinations).toEqual([
-      "Black & Pearl White",
-      "Black & Electric Cyan",
-      "Black & Emerald Green",
-      "Black & Cosmic Violet",
-      "Black & Solar Gold",
+      "Crimson Red",
+      "Electric Cyan",
+      "Emerald Green",
+      "Sapphire Blue",
+      "Cosmic Violet",
+      "Solar Gold",
     ]);
+  });
+
+  it("gives each of the 6 options a distinct custom previewPhrase without project name", () => {
+    const phrases = BOT_ORB_THEME_LIST.map(t => t.previewPhrase);
+    expect(phrases).toEqual([
+      "Hey there, I'm Arven! Great to meet you, tell me what's on your mind today.",
+      "Hi there, I'm Zeno! I'm super excited to chat, let's jump right in!",
+      "Hi, I'm Veya! It's so nice to meet you, what would you like to talk about?",
+      "Hey, I'm Koda! Always happy to hang out and help you with anything today.",
+      "Hi there, I'm Luma! I'm so excited to see what fun ideas we come up with.",
+      "Hello there, I'm Orin! Wishing you a wonderful day, what shall we chat about?",
+    ]);
+
+    for (const phrase of phrases) {
+      expect(phrase.toLowerCase()).not.toContain("ksemo");
+    }
   });
 
   it("defines continuous rolling conic-gradients with center point along with black", () => {

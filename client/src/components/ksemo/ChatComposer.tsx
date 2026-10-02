@@ -775,7 +775,7 @@ export const ChatComposer = memo(function ChatComposer({
         <div
           className={cn(
             "relative rounded-[20px] border border-border bg-popover p-1.5 shadow-sm text-popover-foreground transition-all duration-200",
-            botActive && "min-h-[66px] sm:min-h-[72px] px-3 py-2",
+            botActive && "h-auto py-1 px-2.5 sm:py-1.5 sm:px-3",
             // Temporary "incognito" mode: no hard border line at all; only a
             // soft glow hugs the edge of the box. The glow adapts to the theme —
             // dark in light mode so it stays visible, white in dark mode.
@@ -889,7 +889,7 @@ export const ChatComposer = memo(function ChatComposer({
           )}
 
           {/* Main Composer Content */}
-          <div className={cn(botActive ? "flex items-center justify-between w-full min-h-[54px] sm:min-h-[58px]" : "flex flex-col")}>
+          <div className={cn(botActive ? "flex items-center justify-between w-full" : "flex flex-col")}>
             {/* Text Input Area (hidden in Bot mode where you speak directly) */}
             {!botActive && (
               <div
@@ -1191,13 +1191,13 @@ export const ChatComposer = memo(function ChatComposer({
 
                 {/* In Bot mode: purely voice mode - pure black orb + dynamic status label */}
                 {botActive && (
-                  <div className="flex items-center gap-3 pl-1.5 py-0.5 animate-in fade-in zoom-in-95 duration-200">
+                  <div className="flex items-center gap-3 pl-1 sm:pl-1.5 animate-in fade-in zoom-in-95 duration-200">
                     <BotVoiceOrb
                       active={orbListening}
                       isSpeaking={isBotSpeaking}
                       isThinking={isGenerating && botActive}
                       levelRef={botOrbLevel}
-                      className="size-11 sm:size-12 shrink-0"
+                      className="size-10 sm:size-11 shrink-0"
                     />
                     <span
                       className={cn(

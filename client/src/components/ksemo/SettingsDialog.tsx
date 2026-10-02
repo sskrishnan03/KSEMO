@@ -1316,7 +1316,7 @@ function AppearanceSection() {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
     const synth = window.speechSynthesis;
     synth.cancel();
-    const text = `Hello! This is KSEMO with ${t.name}.`;
+    const text = t.previewPhrase || `${t.name} with you.`;
     const utterance = new SpeechSynthesisUtterance(text);
     if (voiceName) {
       const match = synth.getVoices().find(v => v.name === voiceName);

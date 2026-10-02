@@ -123,7 +123,7 @@ export function BotVoiceOrb({
     >
       <NebulaOrbCanvas
         theme={theme}
-        size={52}
+        size={44}
         active={active || isSpeaking || isThinking}
         activity={isSpeaking ? 0.8 : isThinking ? 0.35 : active ? 0.5 : 0}
       />
