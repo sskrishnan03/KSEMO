@@ -1420,12 +1420,10 @@ function AppearanceSection() {
 
       <div className="h-px bg-border/60" />
 
-      {/* 2. Bot Section: on the page itself, no container box, carousel with faded side previews */}
-      <div className="space-y-4">
+      {/* 2. Bot Section: directly in the page below the Bot label, no container, no overflow clipping */}
+      <div className="space-y-3">
         <p className="text-sm font-medium text-foreground">Bot</p>
-        <div className="flex flex-col items-center justify-center py-2 select-none overflow-hidden">
-          {/* Carousel row with Left arrow, Left faded preview, Center active orb, Right faded preview, Right arrow */}
-          <div className="flex items-center justify-center gap-3 sm:gap-6 w-full max-w-lg">
+        <div className="flex items-center justify-center gap-3 sm:gap-6 w-full max-w-lg py-5 select-none">
             {/* Left Chevron Button */}
             <button
               type="button"
@@ -1504,7 +1502,6 @@ function AppearanceSection() {
               <ChevronRight className="size-6" />
             </button>
           </div>
-        </div>
       </div>
     </div>
   );

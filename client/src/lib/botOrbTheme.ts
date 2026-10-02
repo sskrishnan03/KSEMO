@@ -231,7 +231,7 @@ export function getSphereStyle(theme: BotOrbTheme, customGlow?: { spread: number
 
   return {
     background: "#000000",
-    boxShadow: `inset 0 1.5px 2px rgba(255, 255, 255, 0.45), inset 0 -3px 6px ${theme.bounceColor}, 0 6px 14px -1px rgba(0, 0, 0, 0.75), 0 0 ${glowSpread}px rgba(${r}, ${g}, ${b}, ${glowAlpha.toFixed(2)})`,
+    boxShadow: `inset 0 -3px 6px ${theme.bounceColor}, 0 6px 14px -1px rgba(0, 0, 0, 0.75), 0 0 ${glowSpread}px rgba(${r}, ${g}, ${b}, ${glowAlpha.toFixed(2)})`,
   };
 }
 

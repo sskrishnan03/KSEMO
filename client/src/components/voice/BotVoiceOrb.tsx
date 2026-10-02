@@ -97,7 +97,7 @@ export function BotVoiceOrb({
       if (node && currentTheme) {
         let scale = 1.0;
         const [r, g, b] = currentTheme.rgb;
-        const baseShadow = `inset 0 1px 1.5px rgba(255, 255, 255, 0.5), inset 0 -2.5px 5px ${currentTheme.bounceColor}, 0 4px 10px -1px rgba(0, 0, 0, 0.65)`;
+        const baseShadow = `inset 0 -2.5px 5px ${currentTheme.bounceColor}, 0 4px 10px -1px rgba(0, 0, 0, 0.65)`;
         let shadow = `${baseShadow}, 0 0 6px rgba(${r}, ${g}, ${b}, 0.2)`;
 
         if (isSpeakingRef.current) {
@@ -141,18 +141,18 @@ export function BotVoiceOrb({
         className
       )}
     >
-      {/* The single rolling energy gradient looping continuously around the circle */}
+      {/* The single rolling energy gradient inside */}
       <span
-        className="absolute inset-0 rounded-full animate-orb-roll pointer-events-none"
+        className="absolute inset-[-15%] rounded-full animate-orb-roll pointer-events-none"
         style={{
           background: theme.rollingGradient,
         }}
       />
-      {/* Top 3D glossy specular glass gleam and edge curvature */}
+      {/* Stationary dark perimeter rim so the outer circle boundary is 100% still and never appears to scroll */}
       <span
         className="absolute inset-0 rounded-full pointer-events-none"
         style={{
-          background: `radial-gradient(circle at 30% 24%, rgba(255, 255, 255, 0.85) 0%, rgba(255, 255, 255, 0.22) 16%, transparent 34%), radial-gradient(circle at 50% 50%, transparent 40%, rgba(0, 0, 0, 0.35) 75%, rgba(0, 0, 0, 0.8) 100%)`,
+          background: `radial-gradient(circle at 50% 50%, transparent 58%, rgba(0, 0, 0, 0.85) 86%, #000000 100%)`,
         }}
       />
     </span>

@@ -50,12 +50,11 @@ describe("botOrbTheme", () => {
     }
   });
 
-  it("defines realistic 3D sphere gradient styling with specular glint and inner core glow", () => {
+  it("defines realistic 3D sphere gradient styling with inner bounce glow", () => {
     const cyanTheme = BOT_ORB_THEMES["black-cyan"];
     const style = getSphereStyle(cyanTheme);
 
     expect(style.background).toBe("#000000");
-    expect(style.boxShadow).toContain("inset 0 1.5px 2px rgba(255, 255, 255, 0.45)");
     expect(style.boxShadow).toContain(cyanTheme.bounceColor);
     expect(style.boxShadow).toContain("0 6px 14px -1px rgba(0, 0, 0, 0.75)");
   });
