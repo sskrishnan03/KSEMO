@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/tooltip";
 import { useTheme, type ThemeMode } from "@/contexts/ThemeContext";
 import { trpc } from "@/lib/trpc";
+import { cn } from "@/lib/utils";
 import { createPublicConversationUrl } from "@/lib/ksemoInteraction";
 import { ConfirmDeleteDialog } from "./ConfirmDeleteDialog";
 import {
@@ -36,6 +37,8 @@ import {
   Brain,
   Bug,
   Check,
+  ChevronLeft,
+  ChevronRight,
   Copy,
   Database,
   HelpCircle,
@@ -49,12 +52,24 @@ import {
   Star,
   Unlink,
   User,
+  Volume2,
   X,
   Zap,
 } from "lucide-react";
 import React, { memo, useEffect, useMemo, useRef, useState } from "react";
 import { Trash6Icon } from "./icons";
 import { MemorySection } from "./MemorySection";
+import {
+  BOT_ORB_THEME_LIST,
+  BOT_ORB_THEMES,
+  getSphereStyle,
+  RealRollingOrb,
+  useBotOrbTheme,
+  type BotOrbTheme,
+  type BotOrbThemeId,
+} from "@/lib/botOrbTheme";
+import { useBotReplyVoice } from "@/lib/speechVoices";
+import { BotVoiceOrb } from "@/components/voice/BotVoiceOrb";
 
 type Preferences =
   | {
@@ -165,6 +180,21 @@ const settingsSearchIndex: Array<{
   {
     tab: "appearance",
     label: "Theme",
+    hint: "Appearance",
+  },
+  {
+    tab: "appearance",
+    label: "Bot circle",
+    hint: "Appearance",
+  },
+  {
+    tab: "appearance",
+    label: "Bot circle colors",
+    hint: "Appearance",
+  },
+  {
+    tab: "appearance",
+    label: "Bot voice",
     hint: "Appearance",
   },
 
@@ -1277,15 +1307,53 @@ function SystemPreviewThumb() {
 
 function AppearanceSection() {
   const { mode, setMode } = useTheme();
+  const { themeId, setTheme, themes } = useBotOrbTheme();
+  const { voiceName } = useBotReplyVoice();
+
+  const handleCircleVoice = (t: BotOrbTheme) => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    const synth = window.speechSynthesis;
+    synth.cancel();
+    const text = `Hello! This is KSEMO with ${t.name}.`;
+    const utterance = new SpeechSynthesisUtterance(text);
+    if (voiceName) {
+      const match = synth.getVoices().find(v => v.name === voiceName);
+      if (match) utterance.voice = match;
+    }
+    utterance.rate = 1.0;
+    utterance.pitch = 1.0;
+    synth.speak(utterance);
+  };
+
+  const currentIndex = themes.findIndex(t => t.id === themeId);
+  const validCurrentIndex = currentIndex >= 0 ? currentIndex : 0;
+  const currentTheme = themes[validCurrentIndex];
+
+  const prevIndex = (validCurrentIndex - 1 + themes.length) % themes.length;
+  const nextIndex = (validCurrentIndex + 1) % themes.length;
+
+  const prevTheme = themes[prevIndex];
+  const nextTheme = themes[nextIndex];
+
+  const handlePrev = () => {
+    const t = themes[prevIndex];
+    setTheme(t.id);
+    handleCircleVoice(t);
+  };
+
+  const handleNext = () => {
+    const t = themes[nextIndex];
+    setTheme(t.id);
+    handleCircleVoice(t);
+  };
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <SectionHeading title="Appearance" />
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
-        <p className="w-20 shrink-0 pt-1 text-sm font-medium text-muted-foreground">
-          Theme
-        </p>
+      {/* 1. Theme Section: Theme label on top, the 3 options directly below it */}
+      <div className="space-y-3">
+        <p className="text-sm font-medium text-foreground">Theme</p>
         <div className="flex flex-wrap items-start gap-4">
           {themeOptions.map(opt => {
             const active = mode === opt.value;
@@ -1347,6 +1415,95 @@ function AppearanceSection() {
               </button>
             );
           })}
+        </div>
+      </div>
+
+      <div className="h-px bg-border/60" />
+
+      {/* 2. Bot Section: on the page itself, no container box, carousel with faded side previews */}
+      <div className="space-y-4">
+        <p className="text-sm font-medium text-foreground">Bot</p>
+        <div className="flex flex-col items-center justify-center py-2 select-none overflow-hidden">
+          {/* Carousel row with Left arrow, Left faded preview, Center active orb, Right faded preview, Right arrow */}
+          <div className="flex items-center justify-center gap-3 sm:gap-6 w-full max-w-lg">
+            {/* Left Chevron Button */}
+            <button
+              type="button"
+              onClick={handlePrev}
+              aria-label={`Previous: ${prevTheme.name}`}
+              className="flex size-10 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            >
+              <ChevronLeft className="size-6" />
+            </button>
+
+            {/* Left Faded Preview Circle */}
+            <button
+              type="button"
+              onClick={handlePrev}
+              aria-label={`Select ${prevTheme.name}`}
+              className="group flex flex-col items-center gap-1.5 opacity-35 hover:opacity-75 transition-all duration-300 transform scale-75 cursor-pointer focus-visible:outline-none shrink-0"
+            >
+              <RealRollingOrb
+                theme={prevTheme}
+                size={68}
+              />
+              <span className="text-[11px] font-medium text-muted-foreground group-hover:text-foreground transition-colors max-w-[90px] truncate text-center">
+                {prevTheme.name}
+              </span>
+            </button>
+
+            {/* Center Active Big Circle */}
+            <div className="flex flex-col items-center gap-2.5 transform scale-100 transition-all duration-300 shrink-0">
+              <button
+                type="button"
+                role="radio"
+                aria-checked={true}
+                aria-label={`${currentTheme.name} (Click to speak)`}
+                onClick={() => handleCircleVoice(currentTheme)}
+                className="group relative flex items-center justify-center cursor-pointer focus-visible:outline-none hover:scale-105 active:scale-95 transition-transform duration-200"
+              >
+                <RealRollingOrb
+                  theme={currentTheme}
+                  size={104}
+                  active={true}
+                />
+              </button>
+              <div className="flex flex-col items-center text-center">
+                <span className="text-sm font-semibold text-foreground tracking-tight">
+                  {currentTheme.name}
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  {currentTheme.combinationLabel}
+                </span>
+              </div>
+            </div>
+
+            {/* Right Faded Preview Circle */}
+            <button
+              type="button"
+              onClick={handleNext}
+              aria-label={`Select ${nextTheme.name}`}
+              className="group flex flex-col items-center gap-1.5 opacity-35 hover:opacity-75 transition-all duration-300 transform scale-75 cursor-pointer focus-visible:outline-none shrink-0"
+            >
+              <RealRollingOrb
+                theme={nextTheme}
+                size={68}
+              />
+              <span className="text-[11px] font-medium text-muted-foreground group-hover:text-foreground transition-colors max-w-[90px] truncate text-center">
+                {nextTheme.name}
+              </span>
+            </button>
+
+            {/* Right Chevron Button */}
+            <button
+              type="button"
+              onClick={handleNext}
+              aria-label={`Next: ${nextTheme.name}`}
+              className="flex size-10 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            >
+              <ChevronRight className="size-6" />
+            </button>
+          </div>
         </div>
       </div>
     </div>

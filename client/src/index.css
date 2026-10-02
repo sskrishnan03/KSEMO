@@ -570,5 +570,19 @@ html.ksemo-reduce-motion .ksemo-shimmer-text {
   color: currentColor;
 }
 
+/* Continuous inside rolling/swirling loop for Bot voice orbs */
+@keyframes ksemo-orb-roll {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-orb-roll {
+  animation: ksemo-orb-roll 3s linear infinite;
+}
+
 
 
