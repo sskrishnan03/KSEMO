@@ -147,118 +147,159 @@ export function NebulaOrbCanvas({
     if (!canvas) return;
 
     let gl: WebGLRenderingContext | null = null;
-    try {
-      gl = canvas.getContext("webgl", {
-        alpha: true,
-        antialias: true,
-        powerPreference: "low-power",
-      });
-    } catch {
-      // WebGL not available
-    }
-
-    if (!gl) return;
-
-    const vs = gl.createShader(gl.VERTEX_SHADER);
-    if (!vs) return;
-    gl.shaderSource(vs, VERTEX_SHADER_SRC);
-    gl.compileShader(vs);
-
-    const fs = gl.createShader(gl.FRAGMENT_SHADER);
-    if (!fs) return;
-    gl.shaderSource(fs, FRAGMENT_SHADER_SRC);
-    gl.compileShader(fs);
-
-    const program = gl.createProgram();
-    if (!program) return;
-    gl.attachShader(program, vs);
-    gl.attachShader(program, fs);
-    gl.linkProgram(program);
-
-    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-      gl.deleteProgram(program);
-      return;
-    }
-
-    gl.useProgram(program);
-
-    const positionBuffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-    gl.bufferData(
-      gl.ARRAY_BUFFER,
-      new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]),
-      gl.STATIC_DRAW
-    );
-
-    const aPosition = gl.getAttribLocation(program, "a_position");
-    gl.enableVertexAttribArray(aPosition);
-    gl.vertexAttribPointer(aPosition, 2, gl.FLOAT, false, 0, 0);
-
-    const uResolution = gl.getUniformLocation(program, "u_resolution");
-    const uTime = gl.getUniformLocation(program, "u_time");
-    const uColorPrimary = gl.getUniformLocation(program, "u_color_primary");
-    const uColorSecondary = gl.getUniformLocation(program, "u_color_secondary");
-    const uColorAccent = gl.getUniformLocation(program, "u_color_accent");
-    const uBrightness = gl.getUniformLocation(program, "u_brightness");
-    const uSpeed = gl.getUniformLocation(program, "u_speed");
-
-    gl.enable(gl.BLEND);
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-
+    let program: WebGLProgram | null = null;
+    let vs: WebGLShader | null = null;
+    let fs: WebGLShader | null = null;
+    let positionBuffer: WebGLBuffer | null = null;
     let animationFrameId: number;
-    const startTime = performance.now();
+    let isDisposed = false;
 
-    const render = () => {
-      if (!gl || !canvas) return;
+    const cleanupGL = () => {
+      if (animationFrameId) cancelAnimationFrame(animationFrameId);
+      if (gl) {
+        try {
+          if (positionBuffer) gl.deleteBuffer(positionBuffer);
+          if (program) gl.deleteProgram(program);
+          if (vs) gl.deleteShader(vs);
+          if (fs) gl.deleteShader(fs);
+          const loseExt = gl.getExtension("WEBGL_lose_context");
+          if (loseExt) {
+            loseExt.loseContext();
+          }
+        } catch {
+          // ignore
+        }
+      }
+    };
 
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      const width = Math.round(size * dpr);
-      const height = Math.round(size * dpr);
+    const initGL = () => {
+      if (isDisposed) return;
+      cleanupGL();
 
-      if (canvas.width !== width || canvas.height !== height) {
-        canvas.width = width;
-        canvas.height = height;
-        gl.viewport(0, 0, width, height);
+      try {
+        gl = canvas.getContext("webgl", {
+          alpha: true,
+          antialias: true,
+          powerPreference: "low-power",
+        });
+      } catch {
+        gl = null;
       }
 
-      gl.clearColor(0, 0, 0, 0);
-      gl.clear(gl.COLOR_BUFFER_BIT);
+      if (!gl) return;
+
+      vs = gl.createShader(gl.VERTEX_SHADER);
+      if (!vs) return;
+      gl.shaderSource(vs, VERTEX_SHADER_SRC);
+      gl.compileShader(vs);
+
+      fs = gl.createShader(gl.FRAGMENT_SHADER);
+      if (!fs) return;
+      gl.shaderSource(fs, FRAGMENT_SHADER_SRC);
+      gl.compileShader(fs);
+
+      program = gl.createProgram();
+      if (!program) return;
+      gl.attachShader(program, vs);
+      gl.attachShader(program, fs);
+      gl.linkProgram(program);
+
+      if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+        gl.deleteProgram(program);
+        program = null;
+        return;
+      }
 
       gl.useProgram(program);
 
-      const elapsed = (performance.now() - startTime) * 0.001;
-      const currentTheme = themeRef.current;
-      const isActive = activeRef.current;
-      const act = activityRef.current;
+      positionBuffer = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+      gl.bufferData(
+        gl.ARRAY_BUFFER,
+        new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]),
+        gl.STATIC_DRAW
+      );
 
-      gl.uniform2f(uResolution, width, height);
-      gl.uniform1f(uTime, elapsed);
+      const aPosition = gl.getAttribLocation(program, "a_position");
+      gl.enableVertexAttribArray(aPosition);
+      gl.vertexAttribPointer(aPosition, 2, gl.FLOAT, false, 0, 0);
 
-      gl.uniform3fv(uColorPrimary, currentTheme.primaryGl || [0.06, 0.92, 0.54]);
-      gl.uniform3fv(uColorSecondary, currentTheme.secondaryGl || [0.015, 0.42, 0.28]);
-      gl.uniform3fv(uColorAccent, currentTheme.accentGl || [0.38, 1.0, 0.78]);
+      const uResolution = gl.getUniformLocation(program, "u_resolution");
+      const uTime = gl.getUniformLocation(program, "u_time");
+      const uColorPrimary = gl.getUniformLocation(program, "u_color_primary");
+      const uColorSecondary = gl.getUniformLocation(program, "u_color_secondary");
+      const uColorAccent = gl.getUniformLocation(program, "u_color_accent");
+      const uBrightness = gl.getUniformLocation(program, "u_brightness");
+      const uSpeed = gl.getUniformLocation(program, "u_speed");
 
-      const baseBrightness = isActive ? 1.08 : 0.82;
-      gl.uniform1f(uBrightness, baseBrightness + act * 0.35);
+      gl.enable(gl.BLEND);
+      gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
-      const baseSpeed = isActive ? 0.95 : 0.65;
-      gl.uniform1f(uSpeed, baseSpeed + act * 0.65);
+      const startTime = performance.now();
 
-      gl.drawArrays(gl.TRIANGLES, 0, 6);
+      const render = () => {
+        if (isDisposed || !gl || !canvas || gl.isContextLost()) return;
+
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const width = Math.round(size * dpr);
+        const height = Math.round(size * dpr);
+
+        if (canvas.width !== width || canvas.height !== height) {
+          canvas.width = width;
+          canvas.height = height;
+          gl.viewport(0, 0, width, height);
+        }
+
+        gl.clearColor(0, 0, 0, 0);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+
+        gl.useProgram(program);
+
+        const elapsed = (performance.now() - startTime) * 0.001;
+        const currentTheme = themeRef.current;
+        const isActive = activeRef.current;
+        const act = activityRef.current;
+
+        gl.uniform2f(uResolution, width, height);
+        gl.uniform1f(uTime, elapsed);
+
+        gl.uniform3fv(uColorPrimary, currentTheme.primaryGl || [0.06, 0.92, 0.54]);
+        gl.uniform3fv(uColorSecondary, currentTheme.secondaryGl || [0.015, 0.42, 0.28]);
+        gl.uniform3fv(uColorAccent, currentTheme.accentGl || [0.38, 1.0, 0.78]);
+
+        const baseBrightness = isActive ? 1.08 : 0.82;
+        gl.uniform1f(uBrightness, baseBrightness + act * 0.35);
+
+        const baseSpeed = isActive ? 0.95 : 0.65;
+        gl.uniform1f(uSpeed, baseSpeed + act * 0.65);
+
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+        animationFrameId = requestAnimationFrame(render);
+      };
 
       animationFrameId = requestAnimationFrame(render);
     };
 
-    animationFrameId = requestAnimationFrame(render);
+    const handleContextLost = (e: Event) => {
+      e.preventDefault();
+      if (animationFrameId) cancelAnimationFrame(animationFrameId);
+    };
+
+    const handleContextRestored = () => {
+      initGL();
+    };
+
+    canvas.addEventListener("webglcontextlost", handleContextLost, false);
+    canvas.addEventListener("webglcontextrestored", handleContextRestored, false);
+
+    initGL();
 
     return () => {
-      cancelAnimationFrame(animationFrameId);
-      if (gl) {
-        gl.deleteBuffer(positionBuffer);
-        gl.deleteProgram(program);
-        gl.deleteShader(vs);
-        gl.deleteShader(fs);
-      }
+      isDisposed = true;
+      canvas.removeEventListener("webglcontextlost", handleContextLost);
+      canvas.removeEventListener("webglcontextrestored", handleContextRestored);
+      cleanupGL();
     };
   }, [size]);
 
@@ -273,9 +314,21 @@ export function NebulaOrbCanvas({
         justifyContent: "center",
         overflow: "hidden",
         borderRadius: "50%",
-        backgroundColor: "transparent",
+        backgroundColor: "#000000",
+        position: "relative",
       }}
     >
+      <div
+        aria-hidden="true"
+        style={{
+          position: "absolute",
+          inset: 0,
+          borderRadius: "50%",
+          backgroundColor: "#000000",
+          backgroundImage: `radial-gradient(circle at 35% 35%, ${theme.coreColor || "rgba(239,68,68,0.9)"} 0%, ${theme.midColor || "rgba(185,28,28,0.5)"} 50%, #000000 85%)`,
+          opacity: 0.9,
+        }}
+      />
       <canvas
         ref={canvasRef}
         style={{
@@ -283,6 +336,8 @@ export function NebulaOrbCanvas({
           height: size,
           display: "block",
           borderRadius: "50%",
+          position: "relative",
+          zIndex: 1,
         }}
       />
     </div>
