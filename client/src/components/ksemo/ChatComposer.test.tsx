@@ -447,4 +447,41 @@ describe("ChatComposer", () => {
     expect(markup).not.toContain("Change voice");
     expect(markup).toContain('aria-label="Stop"');
   });
+
+  it("renders composer safely on desktop and mobile with tools open", () => {
+    const desktopMarkup = renderWithTooltip(
+      createElement(ChatComposer, {
+        ...baseProps,
+        initialToolsOpen: true,
+        onTakeScreenshot: () => undefined,
+      })
+    );
+    expect(desktopMarkup).toContain('aria-label="Attach"');
+
+    const originalWindow = (globalThis as { window?: unknown }).window;
+    (globalThis as { window?: unknown }).window = {
+      innerWidth: 375,
+      matchMedia: () => ({
+        matches: false,
+        addEventListener: () => undefined,
+        removeEventListener: () => undefined,
+      }),
+    };
+    try {
+      const mobileMarkup = renderWithTooltip(
+        createElement(ChatComposer, {
+          ...baseProps,
+          initialToolsOpen: true,
+          onTakeScreenshot: () => undefined,
+        })
+      );
+      expect(mobileMarkup).toContain('aria-label="Attach"');
+    } finally {
+      if (originalWindow === undefined) {
+        delete (globalThis as { window?: unknown }).window;
+      } else {
+        (globalThis as { window?: unknown }).window = originalWindow;
+      }
+    }
+  });
 });

@@ -35,12 +35,14 @@ import {
   Loader2,
   MessageCircle,
   Mic,
+  Monitor,
   Paperclip,
   Plus,
   SlidersHorizontal,
   Square,
   X,
 } from "lucide-react";
+import { CameraCaptureDialog } from "./CameraCaptureDialog";
 
 import { Library } from "reicon-react/icons/Library";
 import React, {
@@ -380,6 +382,7 @@ export const ChatComposer = memo(function ChatComposer({
   const isMobile = useIsMobile();
   const [libraryOpen, setLibraryOpen] = useState(initialLibraryOpen);
   const [toolsOpen, setToolsOpen] = useState(initialToolsOpen);
+  const [cameraOpen, setCameraOpen] = useState(false);
   const [libraryQuery, setLibraryQuery] = useState("");
   const [isDragActive, setIsDragActive] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -719,6 +722,13 @@ export const ChatComposer = memo(function ChatComposer({
     event.target.value = "";
     for (const file of files) onAttachment?.(file);
   }
+
+  const handleCameraCapture = useCallback(
+    (file: File) => {
+      onAttachment?.(file);
+    },
+    [onAttachment]
+  );
 
   function handlePaste(event: React.ClipboardEvent<HTMLDivElement>) {
     const items = Array.from(event.clipboardData?.items ?? []);
@@ -1099,16 +1109,30 @@ export const ChatComposer = memo(function ChatComposer({
                       >
                         <Paperclip className="mr-2 size-4" /> Upload files
                       </DropdownMenuItem>
-                      {onTakeScreenshot && (
-                        <DropdownMenuItem
-                          onSelect={() => {
-                            setToolsOpen(false);
-                            onTakeScreenshot();
-                          }}
-                        >
-                          <Camera className="mr-2 size-4" />
-                          Take Screenshot
-                        </DropdownMenuItem>
+                      {isMobile ? (
+                        !guestMode && (
+                          <DropdownMenuItem
+                            onSelect={() => {
+                              setToolsOpen(false);
+                              setCameraOpen(true);
+                            }}
+                          >
+                            <Camera className="mr-2 size-4" />
+                            Camera
+                          </DropdownMenuItem>
+                        )
+                      ) : (
+                        onTakeScreenshot && (
+                          <DropdownMenuItem
+                            onSelect={() => {
+                              setToolsOpen(false);
+                              onTakeScreenshot();
+                            }}
+                          >
+                            <Monitor className="mr-2 size-4" />
+                            Take Screenshot
+                          </DropdownMenuItem>
+                        )
                       )}
                       <DropdownMenuItem
                         onSelect={() => {
@@ -1624,6 +1648,11 @@ export const ChatComposer = memo(function ChatComposer({
           )}
         </div>
       </div>
+      <CameraCaptureDialog
+        open={cameraOpen}
+        onOpenChange={setCameraOpen}
+        onCapture={handleCameraCapture}
+      />
     </div>
   );
 });

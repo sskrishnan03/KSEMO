@@ -301,7 +301,7 @@ export const FAQ_CATEGORIES: FaqCategory[] = [
         id: "cn-14",
         question: "Can I use a screenshot as context in a message?",
         answer:
-          "Yes. Open the plus menu in the message box and choose “Take screenshot”, then grant screen or window permissions when asked. The screenshot attaches to your message like an image for the current conversation.",
+          "Yes. On laptops and desktops, open the plus menu in the message box and choose “Take screenshot”, then grant screen or window permissions when asked. On mobile devices, choose “Camera” to take a photo with your front or back camera. The image attaches to your message for the current conversation.",
       },
       {
         id: "cn-15",
@@ -980,7 +980,7 @@ export const FAQ_CATEGORIES: FaqCategory[] = [
         id: "tr-8",
         question: "The screenshot capture is not working. What should I do?",
         answer:
-          "Screenshot capture requires a screen or window permission. Grant it in the browser prompt that appears when you choose “Take screenshot”. If nothing happens, reload the page and try again, or use your operating system's own screenshot tool and attach the image as a regular file.",
+          "Screenshot capture is designed for desktop and laptop browsers and requires a screen or window permission. On mobile devices, use the “Camera” option in the plus menu instead to take photos directly with your front or back camera. If nothing happens on desktop, check browser permissions or use your operating system's screenshot tool and attach the image as a file.",
       },
       {
         id: "tr-9",
