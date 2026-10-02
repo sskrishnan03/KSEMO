@@ -438,4 +438,13 @@ describe("ChatComposer", () => {
     expect(markup).toContain("cursor-text");
     expect(markup).toContain('id="ksemo-composer-textarea"');
   });
+
+  it("renders the Orb selector option before Stop button in Bot mode, without voice changer", () => {
+    const markup = renderWithTooltip(
+      createElement(ChatComposer, { ...baseProps, activeTag: "bot" })
+    );
+    expect(markup).toContain("Select bot");
+    expect(markup).not.toContain("Change voice");
+    expect(markup).toContain('aria-label="Stop"');
+  });
 });

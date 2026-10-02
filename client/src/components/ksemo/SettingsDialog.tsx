@@ -48,7 +48,7 @@ import {
   Palette,
   Search,
   ShieldCheck,
-  Settings2,
+  Settings,
   Star,
   Unlink,
   User,
@@ -103,7 +103,7 @@ export const settingsSections: Array<{
   {
     id: "general",
     label: "General",
-    icon: Settings2,
+    icon: Settings,
     keywords: "theme style preferences",
   },
 ];
@@ -357,7 +357,7 @@ export function SettingsSearch({
               {results.map(({ entry }, index) => {
                 const Icon =
                   settingsNavItems.find(item => item.id === entry.tab)?.icon ??
-                  Settings2;
+                  Settings;
                 return (
                   <li key={`${entry.tab}-${entry.label}`}>
                     <button
@@ -518,7 +518,7 @@ export const SettingsDialog = memo(function SettingsDialog({
         <div className="shrink-0 border-b border-border bg-sidebar md:hidden">
           <div className="flex h-11 items-center justify-between gap-2 px-3">
             <div className="flex min-w-0 items-center gap-2">
-              <Settings2 className="size-4 shrink-0 text-muted-foreground" />
+              <Settings className="size-4 shrink-0 text-muted-foreground" />
               <span className="truncate text-sm font-semibold tracking-[-0.02em]">
                 Settings
               </span>
@@ -566,7 +566,7 @@ export const SettingsDialog = memo(function SettingsDialog({
         <div className="flex min-h-0 flex-1 flex-col md:flex-row">
           <aside className="hidden md:flex w-56 shrink-0 flex-col border-r border-border bg-sidebar px-3 py-3">
             <div className="mb-3 flex items-center gap-2 px-2 pb-2">
-              <Settings2 className="size-4 text-muted-foreground" />
+              <Settings className="size-4 text-muted-foreground" />
               <span className="text-sm font-semibold tracking-[-0.02em]">
                 Settings
               </span>

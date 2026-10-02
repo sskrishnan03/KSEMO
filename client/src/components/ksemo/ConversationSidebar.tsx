@@ -32,7 +32,7 @@ import {
   LogOut,
   Pencil,
   Search,
-  Settings2,
+  Settings,
   ShieldCheck,
   SquarePen,
   X,
@@ -540,7 +540,7 @@ export const ConversationSidebar = memo(function ConversationSidebar({
                 onClick={onSettings}
                 className="focus-visible:ring-0 focus-visible:outline-none"
               >
-                <Settings2 className="mr-2 size-4" /> Settings
+                <Settings className="mr-2 size-4" /> Settings
               </DropdownMenuItem>
               {isMobile ? (
                 <>
