@@ -12,6 +12,7 @@ import { useLocation, useRoute } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { toast } from "sonner";
 import { MessageContent, type KsemoMessage } from "@/components/ksemo/MessageContent";
+import { speechReactiveService, type SpeechVisualizerState } from "@/lib/speechReactive";
 
 export default function SharedConversation() {
   const [, params] = useRoute("/share/:token");
@@ -20,7 +21,7 @@ export default function SharedConversation() {
   const token = params?.token ?? "";
 
   const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
-  const [speechState, setSpeechState] = useState<"idle" | "playing" | "paused">("idle");
+  const [speechState, setSpeechState] = useState<SpeechVisualizerState>("idle");
 
   const shared = trpc.conversation.getPublic.useQuery(
     { token },
@@ -54,19 +55,36 @@ export default function SharedConversation() {
 
   const handleSpeak = useCallback((text: string, messageId: string) => {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
-    window.speechSynthesis.cancel();
+    try {
+      window.speechSynthesis.cancel();
+      speechReactiveService.stop();
+    } catch {}
+
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.onend = () => {
-      setSpeakingMessageId(null);
-      setSpeechState("idle");
-    };
-    utterance.onerror = () => {
-      setSpeakingMessageId(null);
-      setSpeechState("idle");
-    };
     setSpeakingMessageId(messageId);
-    setSpeechState("playing");
-    window.speechSynthesis.speak(utterance);
+    setSpeechState("buffering");
+
+    speechReactiveService.bindUtterance(utterance, messageId, text, {
+      onStart: () => setSpeechState("playing"),
+      onEnd: () => {
+        setSpeakingMessageId(null);
+        setSpeechState("idle");
+      },
+      onError: () => {
+        setSpeakingMessageId(null);
+        setSpeechState("idle");
+      },
+      onPause: () => setSpeechState("paused"),
+      onResume: () => setSpeechState("playing"),
+    });
+
+    try {
+      window.speechSynthesis.speak(utterance);
+    } catch {
+      speechReactiveService.stop();
+      setSpeakingMessageId(null);
+      setSpeechState("idle");
+    }
   }, []);
 
   const handlePause = useCallback(() => {
@@ -84,6 +102,7 @@ export default function SharedConversation() {
   }, []);
 
   const handleStop = useCallback(() => {
+    speechReactiveService.stop();
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
       window.speechSynthesis.cancel();
       setSpeakingMessageId(null);

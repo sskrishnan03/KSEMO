@@ -42,12 +42,12 @@ const FeedbackToggle = memo(function FeedbackToggle({
           aria-pressed={active}
           onClick={() => onToggle(value)}
           className={cn(
-            "size-7 rounded-md text-muted-foreground transition-colors",
-            // Once chosen, the thumb keeps the same look under the pointer, so
-            // hovering can never leave a lingering highlight on it.
+            "size-7 rounded-md transition-colors",
             active
-              ? "bg-accent/70 text-foreground hover:bg-accent/70 hover:text-foreground"
-              : "hover:bg-accent hover:text-foreground"
+              ? value === "up"
+                ? "bg-emerald-500/15 text-emerald-600 hover:bg-emerald-500/15 hover:text-emerald-600 dark:text-emerald-400 dark:hover:text-emerald-400"
+                : "bg-rose-500/15 text-rose-600 hover:bg-rose-500/15 hover:text-rose-600 dark:text-rose-400 dark:hover:text-rose-400"
+              : "text-muted-foreground hover:bg-accent hover:text-foreground"
           )}
         >
           {/* Nothing wraps the thumb: the glyph is the only thing that changes. */}

@@ -108,6 +108,7 @@ import { openExternalUrl } from "../lib/bot/urlSafety";
 import type { ComposerTag } from "../components/ksemo/ChatComposer";
 import type { BotActionData } from "../components/voice/BotActionStatus";
 import { usePersistFn } from "../hooks/usePersistFn";
+import { speechReactiveService, type SpeechVisualizerState } from "@/lib/speechReactive";
 import { WorkspacePanel } from "../components/ksemo/WorkspacePanel";
 import { LibraryWorkspace } from "../components/ksemo/LibraryWorkspace";
 import { SearchWorkspace } from "../components/ksemo/PremiumSearch";
@@ -559,7 +560,7 @@ export default function Home() {
   const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(
     null
   );
-  const [speechState, setSpeechState] = useState<"idle" | "playing" | "paused">(
+  const [speechState, setSpeechState] = useState<SpeechVisualizerState>(
     "idle"
   );
   const [isBotSpeakingAloud, setIsBotSpeakingAloud] = useState(false);
@@ -1070,6 +1071,7 @@ export default function Home() {
       currentUtteranceRef.current = null;
     }
     try {
+      speechReactiveService.stop();
       if (typeof window !== "undefined" && "speechSynthesis" in window) {
         window.speechSynthesis.cancel();
       }
@@ -3804,32 +3806,45 @@ export default function Home() {
     // Pause listening so the microphone doesn't pick up the bot's own voice
     botVoice.pauseListening();
 
-    utterance.onstart = () => {
-      setSpeechState("playing");
-    };
-    utterance.onend = () => {
-      setSpeakingMessageId(null);
-      setSpeechState("idle");
-      // Resume listening if still in Bot mode so the user can speak hands-free
-      if (botVoiceOpenRef.current) {
-        botVoice.resumeListening();
-      }
-    };
-    utterance.onerror = () => {
-      setSpeakingMessageId(null);
-      setSpeechState("idle");
-      if (botVoiceOpenRef.current) {
-        botVoice.resumeListening();
-      }
-    };
     setSpeakingMessageId(messageId);
-    setSpeechState("playing");
+    setSpeechState("buffering");
+
+    speechReactiveService.bindUtterance(utterance, messageId, cleanText, {
+      onStart: () => {
+        setSpeechState("playing");
+      },
+      onEnd: () => {
+        setSpeakingMessageId(null);
+        setSpeechState("idle");
+        if (botVoiceOpenRef.current) {
+          botVoice.resumeListening();
+        }
+      },
+      onError: () => {
+        setSpeakingMessageId(null);
+        setSpeechState("idle");
+        if (botVoiceOpenRef.current) {
+          botVoice.resumeListening();
+        }
+      },
+      onPause: () => {
+        setSpeechState("paused");
+      },
+      onResume: () => {
+        setSpeechState("playing");
+      },
+    });
+
     try {
       if (window.speechSynthesis.paused) {
         window.speechSynthesis.resume();
       }
       window.speechSynthesis.speak(utterance);
-    } catch {}
+    } catch {
+      speechReactiveService.stop();
+      setSpeakingMessageId(null);
+      setSpeechState("idle");
+    }
   }
 
   function pauseSpeech() {

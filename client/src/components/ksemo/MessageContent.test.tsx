@@ -26,7 +26,7 @@ const callbacks = {
 };
 
 describe("MessageContent speech controls", () => {
-  it("renders a compact overflow entry for idle assistant read-aloud", () => {
+  it("renders a direct read-aloud button for idle assistant message", () => {
     const markup = renderWithTooltip(
       createElement(MessageContent, {
         message: assistantMessage,
@@ -35,10 +35,11 @@ describe("MessageContent speech controls", () => {
         speechState: "idle",
       })
     );
-    expect(markup).toContain('aria-label="More message actions"');
+    expect(markup).toContain('aria-label="Read aloud"');
+    expect(markup).not.toContain('aria-label="More message actions"');
   });
 
-  it("keeps active speech controls available through the assistant overflow", () => {
+  it("renders active animated equalizer icon with stop reading control when speech is playing", () => {
     const markup = renderWithTooltip(
       createElement(MessageContent, {
         message: assistantMessage,
@@ -47,10 +48,12 @@ describe("MessageContent speech controls", () => {
         speechState: "playing",
       })
     );
-    expect(markup).toContain('aria-label="More message actions"');
+    expect(markup).toContain('aria-label="Stop reading"');
+    expect(markup).toContain("ksemo-eq-bar-1");
+    expect(markup).not.toContain('aria-label="More message actions"');
   });
 
-  it("renders share, regenerate, and compact overflow entry points when those real handlers are available", () => {
+  it("renders copy, regenerate, and direct read-aloud entry points without share or overflow menu", () => {
     const markup = renderWithTooltip(
       createElement(MessageContent, {
         message: assistantMessage,
@@ -62,10 +65,11 @@ describe("MessageContent speech controls", () => {
         onDelete: () => undefined,
       })
     );
-    expect(markup).toContain('aria-label="Share response"');
+    expect(markup).toContain('aria-label="Copy response"');
+    expect(markup).toContain('aria-label="Read aloud"');
     expect(markup).toContain('aria-label="Regenerate response"');
-    expect(markup).toContain('aria-label="More message actions"');
-    expect(markup).toContain('data-has-delete="true"');
+    expect(markup).not.toContain('aria-label="Share response"');
+    expect(markup).not.toContain('aria-label="More message actions"');
   });
 
   it("keeps user actions hover-oriented with direct version history and without an avatar or delete control", () => {
@@ -114,7 +118,7 @@ describe("MessageContent speech controls", () => {
     expect(markup).toContain('data-testid="stopped-response-notice"');
     expect(markup).toContain('aria-label="Regenerate response"');
     expect(markup).toContain('aria-label="Copy response"');
-    expect(markup).toContain('aria-label="Share response"');
+    expect(markup).not.toContain('aria-label="Share response"');
   });
 
   it("renders centered interrupted divider line and action bar regenerate when assistant response is stopped with no content", () => {
@@ -263,6 +267,7 @@ describe("MessageContent speech controls", () => {
 
     // Assistant action bar must be completely hidden while generating
     expect(markup).not.toContain('aria-label="Copy response"');
+    expect(markup).not.toContain('aria-label="Read aloud"');
     expect(markup).not.toContain('aria-label="Share response"');
     expect(markup).not.toContain('aria-label="Regenerate response"');
     expect(markup).not.toContain('aria-label="Good response"');
@@ -294,8 +299,9 @@ describe("MessageContent speech controls", () => {
     // Both completed card and action buttons are present
     expect(markup).toContain('data-testid="completed-card"');
     expect(markup).toContain('aria-label="Copy response"');
-    expect(markup).toContain('aria-label="Share response"');
+    expect(markup).toContain('aria-label="Read aloud"');
     expect(markup).toContain('aria-label="Regenerate response"');
+    expect(markup).not.toContain('aria-label="Share response"');
   });
 });
 

@@ -1,11 +1,5 @@
 import { Button } from "@/components/ui/button";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
@@ -21,7 +15,6 @@ import {
   ChevronDown,
   Copy,
   Download,
-  Ellipsis,
   ExternalLink,
   Pencil,
   RotateCcw,
@@ -31,7 +24,6 @@ import {
   Volume2,
   X,
 } from "lucide-react";
-import { ShareIcon, Trash6Icon } from "./icons";
 import {
   MessageFeedback,
   type MessageFeedbackValue,
@@ -44,6 +36,7 @@ import { sanitizeAssistantText } from "@/lib/sanitizeAssistant";
 import { usePdfViewer, isViewableDocument } from "@/contexts/PdfViewerContext";
 import type { PptOutlinePlan } from "@shared/presentationOutline";
 import { BotActionStatus, type BotActionData } from "@/components/voice/BotActionStatus";
+import { useSpeechWaveBars } from "@/lib/speechReactive";
 
 type KsemoMessage = {
   id: string;
@@ -156,6 +149,48 @@ export function splitFirstSentence(content: string): {
   };
 }
 
+function RealtimeSpeechEqualizer({
+  isSpeaking,
+  speechState,
+  messageId,
+}: {
+  isSpeaking: boolean;
+  speechState?: "idle" | "buffering" | "playing" | "paused";
+  messageId: string;
+}) {
+  const { heights, isBuffering } = useSpeechWaveBars(
+    isSpeaking,
+    speechState ?? "playing",
+    messageId
+  );
+
+  return (
+    <span
+      className={cn(
+        "group-hover/readaloud:hidden flex size-4 items-center justify-center gap-[2px]",
+        isBuffering && "opacity-60 animate-pulse"
+      )}
+    >
+      <span
+        className="ksemo-eq-bar-1 w-[2px] rounded-full bg-current transition-all duration-75 ease-out"
+        style={{ height: `${heights[0]}px` }}
+      />
+      <span
+        className="ksemo-eq-bar-2 w-[2px] rounded-full bg-current transition-all duration-75 ease-out"
+        style={{ height: `${heights[1]}px` }}
+      />
+      <span
+        className="ksemo-eq-bar-3 w-[2px] rounded-full bg-current transition-all duration-75 ease-out"
+        style={{ height: `${heights[2]}px` }}
+      />
+      <span
+        className="ksemo-eq-bar-4 w-[2px] rounded-full bg-current transition-all duration-75 ease-out"
+        style={{ height: `${heights[3]}px` }}
+      />
+    </span>
+  );
+}
+
 export const MessageContent = memo(function MessageContent({
   message,
   onSpeak,
@@ -188,7 +223,7 @@ export const MessageContent = memo(function MessageContent({
   onResume: () => void;
   onStop: () => void;
   isSpeaking: boolean;
-  speechState: "idle" | "playing" | "paused";
+  speechState?: "idle" | "buffering" | "playing" | "paused";
   isCurrentGeneration?: boolean;
   isFileGenerating?: boolean;
   hideTypingIndicator?: boolean;
@@ -260,13 +295,22 @@ export const MessageContent = memo(function MessageContent({
 
   const actionClass =
     "size-7 rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground";
-  const action = (label: string, icon: React.ReactNode, click: () => void) => (
+  const action = (
+    label: string,
+    icon: React.ReactNode,
+    click: () => void,
+    active?: boolean
+  ) => (
     <Tooltip>
       <TooltipTrigger asChild>
         <Button
           variant="ghost"
           size="icon"
-          className={actionClass}
+          className={cn(
+            actionClass,
+            active &&
+              "bg-accent/70 text-foreground hover:bg-accent/70 hover:text-foreground"
+          )}
           onClick={click}
           aria-label={label}
         >
@@ -676,12 +720,38 @@ export const MessageContent = memo(function MessageContent({
                     copyMessage
                   )}
                 {message.content &&
-                  onShare &&
-                  action(
-                    "Share response",
-                    <ShareIcon className="size-4" />,
-                    () => onShare(message)
-                  )}
+                  onSpeak &&
+                  (isSpeaking ? (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className={cn(
+                            actionClass,
+                            "bg-accent/70 text-foreground hover:bg-destructive/15 hover:text-destructive group/readaloud"
+                          )}
+                          onClick={onStop}
+                          aria-label="Stop reading"
+                        >
+                          <RealtimeSpeechEqualizer
+                            isSpeaking={isSpeaking}
+                            speechState={speechState}
+                            messageId={message.id}
+                          />
+                          <Square className="size-3.5 fill-current hidden group-hover/readaloud:block" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom">Stop reading</TooltipContent>
+                    </Tooltip>
+                  ) : (
+                    action(
+                      "Read aloud",
+                      <Volume2 className="size-4" />,
+                      () =>
+                        onSpeak(cleanContent || message.content, message.id)
+                    )
+                  ))}
                 {(onRegenerate || onRetry) &&
                   action(
                     message.status === "failed"
@@ -697,16 +767,6 @@ export const MessageContent = memo(function MessageContent({
                     onToggle={handleFeedbackToggle}
                   />
                 )}
-                <MessageOverflow
-                  message={message}
-                  onReadAloud={
-                    message.content
-                      ? () => onSpeak(message.content, message.id)
-                      : undefined
-                  }
-                  onStopReading={isSpeaking ? onStop : undefined}
-                  onDelete={onDelete}
-                />
               </div>
             )}
         </div>
@@ -822,67 +882,6 @@ export const MessageContent = memo(function MessageContent({
     </>
   );
 });
-function MessageOverflow({
-  message,
-  onReadAloud,
-  onStopReading,
-  onDelete,
-}: {
-  message: KsemoMessage;
-  onReadAloud?: () => void;
-  onStopReading?: () => void;
-  onDelete?: (message: KsemoMessage) => void;
-}) {
-  if (!onReadAloud && !onStopReading && !onDelete) return null;
-  return (
-    <DropdownMenu>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-7 rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
-              aria-label="More message actions"
-              data-has-delete={onDelete ? "true" : "false"}
-            >
-              <Ellipsis className="size-4" />
-            </Button>
-          </DropdownMenuTrigger>
-        </TooltipTrigger>
-        <TooltipContent side="bottom">More actions</TooltipContent>
-      </Tooltip>
-      <DropdownMenuContent
-        side="top"
-        sideOffset={8}
-        align="end"
-        className="w-44 rounded-xl"
-      >
-        {onStopReading ? (
-          <DropdownMenuItem onClick={onStopReading}>
-            <Square className="mr-2 size-4 fill-current" />
-            Stop reading
-          </DropdownMenuItem>
-        ) : (
-          onReadAloud && (
-            <DropdownMenuItem onClick={onReadAloud}>
-              <Volume2 className="mr-2 size-4" />
-              Read aloud
-            </DropdownMenuItem>
-          )
-        )}
-        {onDelete && (
-          <DropdownMenuItem
-            onClick={() => onDelete(message)}
-            variant="destructive"
-          >
-            <Trash6Icon className="mr-2 size-4" />
-            Delete message
-          </DropdownMenuItem>
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
 
 export type { KsemoMessage };
+

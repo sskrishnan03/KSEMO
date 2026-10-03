@@ -109,14 +109,15 @@ describe("MessageFeedback good/bad response toggle", () => {
 
     // The chosen thumb hovers to exactly the colour it already sits at, so
     // moving the pointer over it produces no change.
-    expect(good).toContain("bg-accent/70");
-    expect(good).toContain("hover:bg-accent/70");
-    expect(good).toContain("hover:text-foreground");
+    expect(good).toContain("text-emerald-600");
+    expect(good).toContain("hover:text-emerald-600");
+    expect(good).toContain("bg-emerald-500/15");
+    expect(good).toContain("hover:bg-emerald-500/15");
     expect(good).not.toMatch(/(^|\s)hover:bg-accent(\s|$)/);
 
     // The unrated thumb still lights up normally on hover.
     expect(bad).toContain("hover:bg-accent");
-    expect(bad).not.toContain("hover:bg-accent/70");
+    expect(bad).not.toContain("hover:bg-emerald-500/15");
   });
 
   it("renders the thumbs in reading order", () => {

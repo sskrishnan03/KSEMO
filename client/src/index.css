@@ -585,5 +585,26 @@ html.ksemo-reduce-motion .ksemo-shimmer-text {
   animation: ksemo-orb-roll 3s linear infinite;
 }
 
+/* Audio equalizer bars for active Read Aloud icon:
+   Heights are dynamically driven in real time by speech synthesis
+   word boundaries, syllables, and acoustic volume rather than a canned loop. */
+.ksemo-eq-bar-1,
+.ksemo-eq-bar-2,
+.ksemo-eq-bar-3,
+.ksemo-eq-bar-4 {
+  transform-origin: bottom;
+  will-change: height;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ksemo-eq-bar-1,
+  .ksemo-eq-bar-2,
+  .ksemo-eq-bar-3,
+  .ksemo-eq-bar-4 {
+    transition: none !important;
+  }
+}
+
+
 
 
