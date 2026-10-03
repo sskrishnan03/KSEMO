@@ -47,6 +47,7 @@ import { BotActionStatus, type BotActionData } from "@/components/voice/BotActio
 
 type KsemoMessage = {
   id: string;
+  clientId?: string;
   role: "user" | "assistant" | "system" | "tool";
   content: string;
   status?: "sending" | "streaming" | "completed" | "failed" | "cancelled";
@@ -514,17 +515,24 @@ export const MessageContent = memo(function MessageContent({
                 </>
               ) : isCancelled ? (
                 renderStoppedNotice()
-              ) : message.status === "streaming" &&
-                isCurrentGeneration &&
-                !hideTypingIndicator &&
-                !message.botAction &&
-                !message.fileGeneration &&
-                !fileCreationNode &&
-                !(message.attachments?.length && !isUser) ? (
-                <div aria-label="KSEMO is responding">
-                  <ThinkingIndicator />
-                </div>
-              ) : null}
+              ) : (
+                <>
+                  {message.status === "streaming" &&
+                    isCurrentGeneration &&
+                    !hideTypingIndicator &&
+                    !message.botAction &&
+                    !message.fileGeneration &&
+                    !fileCreationNode &&
+                    !(message.attachments?.length && !isUser) && (
+                      <div
+                        aria-label="KSEMO is responding"
+                        className="inline-flex items-center"
+                      >
+                        <ThinkingIndicator />
+                      </div>
+                    )}
+                </>
+              )}
             </div>
           )}
 

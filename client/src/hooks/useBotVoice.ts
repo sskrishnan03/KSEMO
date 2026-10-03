@@ -292,6 +292,9 @@ export function useBotVoice({
 
     recognition.onresult = event => {
       if (pausedRef.current) return;
+      if (!committedRef.current && !interimRef.current) {
+        baseRef.current = getCurrentText?.() ?? "";
+      }
       let interim = "";
       let hasFinal = false;
       for (
@@ -456,6 +459,7 @@ export function useBotVoice({
     clearSilenceTimer();
     interimRef.current = "";
     committedRef.current = "";
+    baseRef.current = "";
   }, [clearSilenceTimer]);
 
   const resumeListening = useCallback(() => {

@@ -415,6 +415,7 @@ html.ksemo-reduce-motion *::after {
   --b: 4px;
 }
 
+
 @keyframes ksemoloader {
   to {
     transform: rotate(1turn);

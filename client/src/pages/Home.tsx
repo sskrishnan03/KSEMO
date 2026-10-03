@@ -2198,9 +2198,9 @@ export default function Home() {
               setChatMessages(current =>
                 current.map(message =>
                   message.id.startsWith("local-user")
-                    ? { ...message, id: conv.userMessageId }
+                    ? { ...message, id: conv.userMessageId, clientId: message.clientId ?? message.id }
                     : message.id.startsWith("local-assistant")
-                      ? { ...message, id: conv.assistantMessageId }
+                      ? { ...message, id: conv.assistantMessageId, clientId: message.clientId ?? message.id }
                       : message
                 )
               );
@@ -3857,6 +3857,8 @@ export default function Home() {
       const text = rawTranscript.trim();
       if (!text) return;
 
+      botVoice.pauseListening();
+
       const decision = routeBotCommand(text);
 
       // 1. Direct website navigation or YouTube search or Site search
@@ -4841,7 +4843,7 @@ export default function Home() {
 
                     return (
                       <MessageContent
-                        key={message.id}
+                        key={message.clientId ?? message.id}
                         message={message}
                         fileCreationNode={fileCreationNode}
                         isFileGenerating={Boolean(

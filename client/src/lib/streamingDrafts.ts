@@ -1,5 +1,6 @@
 export type StreamDraftMessage = {
   id: string;
+  clientId?: string;
   role: "user" | "assistant" | "system" | "tool";
   content: string;
   status?: string;
@@ -31,6 +32,7 @@ export function buildStreamingDrafts(
   );
   const assistant: StreamDraftMessage = {
     id: `local-assistant-${now}`,
+    clientId: `local-assistant-${now}`,
     role: "assistant",
     content: "",
     status: "streaming",
@@ -46,6 +48,7 @@ export function buildStreamingDrafts(
     ...messages,
     {
       id: `local-user-${now}`,
+      clientId: `local-user-${now}`,
       role: "user",
       content,
       status: "completed",

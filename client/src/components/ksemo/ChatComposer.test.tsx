@@ -237,10 +237,19 @@ describe("ChatComposer", () => {
         })
       );
       expect(botMarkup).toContain("ksemo-bot-orb");
-      expect(botMarkup).toContain("Listening...");
+      expect(botMarkup).not.toContain("Listening...");
       expect(botMarkup).not.toContain('aria-label="Attach"');
       expect(botMarkup).toContain('aria-label="Stop"');
       expect(botMarkup).not.toContain('aria-label="Composer mode"');
+
+      const speakingBot = renderWithTooltip(
+        createElement(ChatComposer, {
+          ...baseProps,
+          botVoiceActive: true,
+          isBotSpeaking: true,
+        })
+      );
+      expect(speakingBot).toContain("Speaking...");
     } finally {
       if (originalWindow === undefined) {
         delete (globalThis as { window?: unknown }).window;
@@ -304,7 +313,7 @@ describe("ChatComposer", () => {
     }
   });
 
-  it("hides the text area in Bot mode and shows the voice orb and controls", () => {
+  it("keeps the text area in Bot mode so user can type or speak, and shows the voice orb and controls", () => {
     const store = new Map<string, string>();
     store.set("ksemo:composer-tag", "bot");
     const originalWindow = (globalThis as { window?: unknown }).window;
@@ -325,7 +334,8 @@ describe("ChatComposer", () => {
           botVoiceState: "listening",
         })
       );
-      expect(idleBot).not.toContain("ksemo-composer-textarea");
+      expect(idleBot).toContain("ksemo-composer-textarea");
+      expect(idleBot).toContain("Speak or type whatever you want...");
       expect(idleBot).toContain("ksemo-bot-orb");
       expect(idleBot).not.toContain('aria-label="Attach"');
       expect(idleBot).toContain('aria-label="Stop"');
