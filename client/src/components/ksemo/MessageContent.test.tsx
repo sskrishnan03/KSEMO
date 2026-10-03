@@ -53,6 +53,24 @@ describe("MessageContent speech controls", () => {
     expect(markup).not.toContain('aria-label="More message actions"');
   });
 
+  it("shows the same segmented ring used by Dictate transcribing while audio is preparing", () => {
+    const markup = renderWithTooltip(
+      createElement(MessageContent, {
+        message: assistantMessage,
+        ...callbacks,
+        isSpeaking: true,
+        speechState: "buffering",
+        isPreparingSpeech: true,
+      })
+    );
+    expect(markup).toContain('aria-label="Preparing audio"');
+    // Identical loader markup to the Dictate/Transcribe control
+    expect(markup).toContain('class="loader text-foreground"');
+    expect(markup).toContain("width:18px");
+    expect(markup).not.toContain('aria-label="Read aloud"');
+    expect(markup).not.toContain('aria-label="Stop reading"');
+  });
+
   it("renders copy, regenerate, and direct read-aloud entry points without share or overflow menu", () => {
     const markup = renderWithTooltip(
       createElement(MessageContent, {

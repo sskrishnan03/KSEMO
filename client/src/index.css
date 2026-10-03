@@ -382,14 +382,14 @@ html.ksemo-reduce-motion *::after {
   transition-duration: 0.01ms !important;
 }
 
-/* KSEMO loader — segmented white ring */
+/* KSEMO loader — segmented ring */
 .loader {
   width: 25px;
   --b: 7px;
   aspect-ratio: 1;
   border-radius: 50%;
   padding: 1px;
-  background: conic-gradient(#0000 10%, #fff) content-box;
+  background: conic-gradient(#0000 10%, currentColor) content-box;
   -webkit-mask:
     repeating-conic-gradient(#0000 0deg, #000 1deg 20deg, #0000 21deg 36deg),
     radial-gradient(
@@ -415,6 +415,12 @@ html.ksemo-reduce-motion *::after {
   --b: 4px;
 }
 
+/* KSEMO loader — micro ring for inline action buttons (e.g. Read Aloud analyzing) */
+.loader-xs {
+  width: 14px;
+  --b: 2.5px;
+}
+
 
 @keyframes ksemoloader {
   to {
@@ -423,6 +429,14 @@ html.ksemo-reduce-motion *::after {
 }
 
 html.ksemo-reduce-motion .loader {
+  animation: none;
+}
+
+html.ksemo-reduce-motion .loader-sm {
+  animation: none;
+}
+
+html.ksemo-reduce-motion .loader-xs {
   animation: none;
 }
 

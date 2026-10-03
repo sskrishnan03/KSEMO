@@ -199,6 +199,7 @@ export const MessageContent = memo(function MessageContent({
   onStop,
   isSpeaking,
   speechState,
+  isPreparingSpeech = false,
   isCurrentGeneration = false,
   isFileGenerating = false,
   hideTypingIndicator = false,
@@ -224,6 +225,7 @@ export const MessageContent = memo(function MessageContent({
   onStop: () => void;
   isSpeaking: boolean;
   speechState?: "idle" | "buffering" | "playing" | "paused";
+  isPreparingSpeech?: boolean;
   isCurrentGeneration?: boolean;
   isFileGenerating?: boolean;
   hideTypingIndicator?: boolean;
@@ -721,7 +723,32 @@ export const MessageContent = memo(function MessageContent({
                   )}
                 {message.content &&
                   onSpeak &&
-                  (isSpeaking ? (
+                  (isPreparingSpeech ? (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          disabled
+                          className={cn(
+                            actionClass,
+                            "cursor-default bg-accent/70 text-foreground disabled:opacity-100"
+                          )}
+                          aria-label="Preparing audio"
+                          aria-live="polite"
+                        >
+                          <div
+                            className="loader text-foreground"
+                            style={{ width: 18 }}
+                            aria-hidden
+                          />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom">
+                        Preparing audio…
+                      </TooltipContent>
+                    </Tooltip>
+                  ) : isSpeaking ? (
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Button

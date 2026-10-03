@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Loading } from "@/components/ui/loading";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,7 @@ import { useLocation, useRoute } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { toast } from "sonner";
 import { MessageContent, type KsemoMessage } from "@/components/ksemo/MessageContent";
-import { speechReactiveService, type SpeechVisualizerState } from "@/lib/speechReactive";
+import { speechReactiveService, speakWithPrepareDelay, type SpeechVisualizerState } from "@/lib/speechReactive";
 
 export default function SharedConversation() {
   const [, params] = useRoute("/share/:token");
@@ -22,6 +22,7 @@ export default function SharedConversation() {
 
   const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
   const [speechState, setSpeechState] = useState<SpeechVisualizerState>("idle");
+  const cancelPrepareRef = useRef<(() => void) | null>(null);
 
   const shared = trpc.conversation.getPublic.useQuery(
     { token },
@@ -59,32 +60,30 @@ export default function SharedConversation() {
       window.speechSynthesis.cancel();
       speechReactiveService.stop();
     } catch {}
+    cancelPrepareRef.current?.();
+    cancelPrepareRef.current = null;
 
     const utterance = new SpeechSynthesisUtterance(text);
     setSpeakingMessageId(messageId);
     setSpeechState("buffering");
 
-    speechReactiveService.bindUtterance(utterance, messageId, text, {
+    // Deferred playback: the control shows its loading ring for the
+    // "preparing audio" beat, then speech begins and the equalizer takes over.
+    cancelPrepareRef.current = speakWithPrepareDelay(utterance, messageId, text, {
       onStart: () => setSpeechState("playing"),
       onEnd: () => {
+        cancelPrepareRef.current = null;
         setSpeakingMessageId(null);
         setSpeechState("idle");
       },
       onError: () => {
+        cancelPrepareRef.current = null;
         setSpeakingMessageId(null);
         setSpeechState("idle");
       },
       onPause: () => setSpeechState("paused"),
       onResume: () => setSpeechState("playing"),
     });
-
-    try {
-      window.speechSynthesis.speak(utterance);
-    } catch {
-      speechReactiveService.stop();
-      setSpeakingMessageId(null);
-      setSpeechState("idle");
-    }
   }, []);
 
   const handlePause = useCallback(() => {
@@ -102,12 +101,21 @@ export default function SharedConversation() {
   }, []);
 
   const handleStop = useCallback(() => {
+    cancelPrepareRef.current?.();
+    cancelPrepareRef.current = null;
     speechReactiveService.stop();
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
       window.speechSynthesis.cancel();
       setSpeakingMessageId(null);
       setSpeechState("idle");
     }
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      cancelPrepareRef.current?.();
+      cancelPrepareRef.current = null;
+    };
   }, []);
 
   if (shared.isLoading) {
@@ -250,6 +258,9 @@ export default function SharedConversation() {
                   onStop={handleStop}
                   isSpeaking={speakingMessageId === message.id}
                   speechState={speechState}
+                  isPreparingSpeech={
+                    speakingMessageId === message.id && speechState === "buffering"
+                  }
                 />
               );
             })}

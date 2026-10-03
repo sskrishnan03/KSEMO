@@ -108,7 +108,7 @@ import { openExternalUrl } from "../lib/bot/urlSafety";
 import type { ComposerTag } from "../components/ksemo/ChatComposer";
 import type { BotActionData } from "../components/voice/BotActionStatus";
 import { usePersistFn } from "../hooks/usePersistFn";
-import { speechReactiveService, type SpeechVisualizerState } from "@/lib/speechReactive";
+import { speechReactiveService, speakWithPrepareDelay, type SpeechVisualizerState } from "@/lib/speechReactive";
 import { WorkspacePanel } from "../components/ksemo/WorkspacePanel";
 import { LibraryWorkspace } from "../components/ksemo/LibraryWorkspace";
 import { SearchWorkspace } from "../components/ksemo/PremiumSearch";
@@ -1029,6 +1029,9 @@ export default function Home() {
   const baseSpokenTextRef = useRef<string>("");
   const wordTickerRef = useRef<number | null>(null);
   const ttsSafetyTimerRef = useRef<number | null>(null);
+  // Disarms a Read Aloud utterance that is still waiting out its "preparing
+  // audio" beat, so cancelled speech can never begin a moment later.
+  const readAloudPrepareCancelRef = useRef<(() => void) | null>(null);
   const speechRateRef = useRef(preferencesQuery.data?.speechRate ?? 100);
   useEffect(() => {
     speechRateRef.current = preferencesQuery.data?.speechRate ?? 100;
@@ -1069,6 +1072,10 @@ export default function Home() {
       currentUtteranceRef.current.onerror = null;
       currentUtteranceRef.current.onboundary = null;
       currentUtteranceRef.current = null;
+    }
+    if (readAloudPrepareCancelRef.current) {
+      readAloudPrepareCancelRef.current();
+      readAloudPrepareCancelRef.current = null;
     }
     try {
       speechReactiveService.stop();
@@ -3771,6 +3778,8 @@ export default function Home() {
     try {
       window.speechSynthesis.cancel();
     } catch {}
+    readAloudPrepareCancelRef.current?.();
+    readAloudPrepareCancelRef.current = null;
     const cleanText = prepareTextForSpeech(text);
     if (!cleanText) return;
 
@@ -3809,42 +3818,39 @@ export default function Home() {
     setSpeakingMessageId(messageId);
     setSpeechState("buffering");
 
-    speechReactiveService.bindUtterance(utterance, messageId, cleanText, {
-      onStart: () => {
-        setSpeechState("playing");
-      },
-      onEnd: () => {
-        setSpeakingMessageId(null);
-        setSpeechState("idle");
-        if (botVoiceOpenRef.current) {
-          botVoice.resumeListening();
-        }
-      },
-      onError: () => {
-        setSpeakingMessageId(null);
-        setSpeechState("idle");
-        if (botVoiceOpenRef.current) {
-          botVoice.resumeListening();
-        }
-      },
-      onPause: () => {
-        setSpeechState("paused");
-      },
-      onResume: () => {
-        setSpeechState("playing");
-      },
-    });
-
-    try {
-      if (window.speechSynthesis.paused) {
-        window.speechSynthesis.resume();
+    // Playback is deferred behind the "preparing audio" beat so the Read Aloud
+    // button shows its loading ring first and the equalizer only starts moving
+    // once audio is actually playing.
+    readAloudPrepareCancelRef.current = speakWithPrepareDelay(
+      utterance,
+      messageId,
+      cleanText,
+      {
+        onStart: () => {
+          setSpeechState("playing");
+        },
+        onEnd: () => {
+          setSpeakingMessageId(null);
+          setSpeechState("idle");
+          if (botVoiceOpenRef.current) {
+            botVoice.resumeListening();
+          }
+        },
+        onError: () => {
+          setSpeakingMessageId(null);
+          setSpeechState("idle");
+          if (botVoiceOpenRef.current) {
+            botVoice.resumeListening();
+          }
+        },
+        onPause: () => {
+          setSpeechState("paused");
+        },
+        onResume: () => {
+          setSpeechState("playing");
+        },
       }
-      window.speechSynthesis.speak(utterance);
-    } catch {
-      speechReactiveService.stop();
-      setSpeakingMessageId(null);
-      setSpeechState("idle");
-    }
+    );
   }
 
   function pauseSpeech() {
@@ -4870,6 +4876,9 @@ export default function Home() {
                         onStop={stableStopSpeech}
                         isSpeaking={speakingMessageId === message.id}
                         speechState={speechState}
+                        isPreparingSpeech={
+                          speakingMessageId === message.id && speechState === "buffering"
+                        }
                         isCurrentGeneration={
                           isGenerating && generatingMessageId === message.id
                         }

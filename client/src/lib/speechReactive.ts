@@ -305,6 +305,113 @@ class SpeechReactiveService {
 
 export const speechReactiveService = new SpeechReactiveService();
 
+/**
+ * How long the Read Aloud control stays in its "preparing audio" state before
+ * playback begins. This is a deliberate beat, not a network wait: the segmented
+ * ring holds for long enough that it reads as the app analysing the reply and
+ * choosing a voice, instead of an unexplained instant jump into speech. Speech
+ * itself is deferred by the same amount so the equalizer never runs ahead of
+ * the voice.
+ */
+export const SPEECH_PREPARE_MIN_MS = 2000;
+
+/**
+ * Safety net for engines that load voices lazily and therefore never fire
+ * `onstart`. Without it the control could be stranded in the preparing state.
+ */
+export const SPEECH_START_WATCHDOG_MS = 8000;
+
+export interface SpeakLifecycleCallbacks {
+  onStart?: () => void;
+  onEnd?: () => void;
+  onError?: () => void;
+  onPause?: () => void;
+  onResume?: () => void;
+}
+
+/**
+ * Binds an utterance to the visualizer and holds playback back for
+ * `SPEECH_PREPARE_MIN_MS`, so callers can render a loading state first and let
+ * audio begin only afterwards. Playback is deliberately deferred rather than
+ * muted-then-unmuted so the visualizer stays perfectly in sync with the voice.
+ *
+ * Returns a cancel function that disarms the pending timers — call it whenever
+ * speech is cancelled elsewhere so a queued utterance can never start late.
+ */
+export function speakWithPrepareDelay(
+  utterance: SpeechSynthesisUtterance,
+  messageId: string,
+  cleanText: string,
+  callbacks?: SpeakLifecycleCallbacks
+): () => void {
+  let cancelled = false;
+  let prepareTimerId: number | null = null;
+  let watchdogTimerId: number | null = null;
+
+  const clearTimers = () => {
+    if (prepareTimerId !== null) {
+      window.clearTimeout(prepareTimerId);
+      prepareTimerId = null;
+    }
+    if (watchdogTimerId !== null) {
+      window.clearTimeout(watchdogTimerId);
+      watchdogTimerId = null;
+    }
+  };
+
+  const clearWatchdog = () => {
+    if (watchdogTimerId !== null) {
+      window.clearTimeout(watchdogTimerId);
+      watchdogTimerId = null;
+    }
+  };
+
+  speechReactiveService.bindUtterance(utterance, messageId, cleanText, {
+    onStart: () => {
+      clearWatchdog();
+      callbacks?.onStart?.();
+    },
+    onEnd: () => {
+      clearTimers();
+      callbacks?.onEnd?.();
+    },
+    onError: () => {
+      clearTimers();
+      callbacks?.onError?.();
+    },
+    onPause: () => callbacks?.onPause?.(),
+    onResume: () => callbacks?.onResume?.(),
+  });
+
+  const synth = window.speechSynthesis;
+  if (synth.paused) synth.resume();
+
+  prepareTimerId = window.setTimeout(() => {
+    prepareTimerId = null;
+    if (cancelled) return;
+    try {
+      synth.speak(utterance);
+    } catch {
+      clearTimers();
+      callbacks?.onError?.();
+    }
+  }, SPEECH_PREPARE_MIN_MS);
+
+  watchdogTimerId = window.setTimeout(() => {
+    watchdogTimerId = null;
+    if (cancelled) return;
+    if (speechReactiveService.getState() === "buffering") {
+      clearTimers();
+      callbacks?.onError?.();
+    }
+  }, SPEECH_START_WATCHDOG_MS);
+
+  return () => {
+    cancelled = true;
+    clearTimers();
+  };
+}
+
 export function useSpeechWaveBars(
   isSpeaking: boolean,
   speechState: SpeechVisualizerState,
