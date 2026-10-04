@@ -258,7 +258,7 @@ export const ConversationSidebar = memo(function ConversationSidebar({
         >
           {compact ? (
             <div className="group/brand relative size-10 lg:size-[2.125rem]">
-              <div className="size-10 lg:size-[2.125rem] overflow-hidden rounded-lg border border-border bg-card shadow-sm transition-all duration-150 group-hover/brand:scale-90 group-hover/brand:opacity-0 group-focus-within/brand:scale-90 group-focus-within/brand:opacity-0 max-lg:bg-transparent max-lg:border-0 max-lg:shadow-none">
+              <div className="size-10 lg:size-[2.125rem] overflow-hidden rounded-lg border border-border bg-card shadow-sm transition-all duration-150 group-hover/brand:scale-90 group-hover/brand:opacity-0 group-focus-within/brand:scale-90 group-focus-within/brand:opacity-0 max-lg:!bg-transparent max-lg:!border-0 max-lg:!shadow-none max-lg:!shadow-sm-none">
                 <img
                   src="/KSEMOlogo.png"
                   alt="KSEMO logo"
@@ -271,7 +271,7 @@ export const ConversationSidebar = memo(function ConversationSidebar({
                     variant="ghost"
                     size="icon"
                     onClick={onToggleCollapsed}
-          className="absolute inset-0 size-10 lg:size-[2.125rem] rounded-lg opacity-100 transition-all duration-150 group-hover/brand:scale-100 max-lg:opacity-100 max-lg:bg-transparent max-lg:hover:bg-transparent max-lg:border-0 max-lg:shadow-none max-lg:outline-none max-lg:focus-visible:ring-0 lg:opacity-0 lg:group-hover/brand:opacity-100 lg:group-focus-within/brand:opacity-100 lg:hover:bg-sidebar-accent active:scale-95"
+          className="absolute inset-0 size-10 lg:size-[2.125rem] rounded-lg opacity-100 transition-all duration-150 group-hover/brand:scale-100 max-lg:opacity-100 max-lg:!bg-transparent max-lg:!hover:bg-transparent max-lg:!border-0 max-lg:!shadow-none max-lg:!shadow-sm-none max-lg:!outline-none max-lg:!focus-visible:ring-0 lg:opacity-0 lg:group-hover/brand:opacity-100 lg:group-focus-within/brand:opacity-100 lg:hover:bg-sidebar-accent active:scale-95"
           aria-label="Expand sidebar"
         >
           <ChevronsRight className="size-4.5 lg:size-[1.125rem]" />
