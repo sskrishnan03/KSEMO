@@ -271,11 +271,11 @@ export const ConversationSidebar = memo(function ConversationSidebar({
                     variant="ghost"
                     size="icon"
                     onClick={onToggleCollapsed}
-                    className="absolute inset-0 size-10 lg:size-[2.125rem] rounded-lg opacity-100 transition-all duration-150 group-hover/brand:scale-100 max-lg:opacity-100 lg:opacity-0 lg:group-hover/brand:opacity-100 lg:group-focus-within/brand:opacity-100 hover:bg-sidebar-accent active:scale-95"
-                    aria-label="Expand sidebar"
-                  >
-                    <ChevronsRight className="size-4.5 lg:size-[1.125rem]" />
-                  </Button>
+          className="absolute inset-0 size-10 lg:size-[2.125rem] rounded-lg opacity-100 transition-all duration-150 group-hover/brand:scale-100 max-lg:opacity-100 lg:opacity-0 lg:group-hover/brand:opacity-100 lg:group-focus-within/brand:opacity-100 lg:hover:bg-sidebar-accent active:scale-95"
+          aria-label="Expand sidebar"
+        >
+          <ChevronsRight className="size-4.5 lg:size-[1.125rem]" />
+        </Button>
                 </TooltipTrigger>
                 <TooltipContent
                   side="right"
