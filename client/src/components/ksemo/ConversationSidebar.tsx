@@ -314,7 +314,7 @@ export const ConversationSidebar = memo(function ConversationSidebar({
                   variant="ghost"
                   size="icon"
                   onClick={onClose}
-                  className="size-9 rounded-lg border border-border/40 bg-card text-foreground/80 hover:bg-accent hover:text-foreground transition-colors shadow-xs outline-none focus-visible:ring-0 focus-visible:border-transparent active:scale-95 lg:hidden"
+                  className="size-9 rounded-lg border border-border/40 text-foreground/80 hover:bg-accent hover:text-foreground transition-colors shadow-xs outline-none focus-visible:ring-0 focus-visible:border-transparent active:scale-95 lg:hidden"
                   aria-label="Close navigation"
                 >
                   <ChevronsLeft className="size-4.5" />
