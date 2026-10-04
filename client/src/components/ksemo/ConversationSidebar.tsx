@@ -271,7 +271,7 @@ export const ConversationSidebar = memo(function ConversationSidebar({
                     variant="ghost"
                     size="icon"
                     onClick={onToggleCollapsed}
-          className="absolute inset-0 size-10 lg:size-[2.125rem] rounded-lg opacity-100 transition-all duration-150 group-hover/brand:scale-100 max-lg:opacity-100 lg:opacity-0 lg:group-hover/brand:opacity-100 lg:group-focus-within/brand:opacity-100 lg:hover:bg-sidebar-accent active:scale-95"
+          className="absolute inset-0 size-10 lg:size-[2.125rem] rounded-lg opacity-100 transition-all duration-150 group-hover/brand:scale-100 max-lg:opacity-100 max-lg:bg-transparent max-lg:hover:bg-transparent lg:opacity-0 lg:group-hover/brand:opacity-100 lg:group-focus-within/brand:opacity-100 lg:hover:bg-sidebar-accent active:scale-95"
           aria-label="Expand sidebar"
         >
           <ChevronsRight className="size-4.5 lg:size-[1.125rem]" />
@@ -314,7 +314,7 @@ export const ConversationSidebar = memo(function ConversationSidebar({
                   variant="ghost"
                   size="icon"
                   onClick={onClose}
-                  className="size-9 rounded-lg border border-border/40 text-foreground/80 hover:bg-accent hover:text-foreground transition-colors shadow-xs outline-none focus-visible:ring-0 focus-visible:border-transparent active:scale-95 lg:hidden"
+                  className="size-9 rounded-lg border-0 text-foreground/80 hover:bg-accent hover:text-foreground transition-colors outline-none focus-visible:ring-0 focus-visible:border-transparent active:scale-95 lg:hidden"
                   aria-label="Close navigation"
                 >
                   <ChevronsLeft className="size-4.5" />
