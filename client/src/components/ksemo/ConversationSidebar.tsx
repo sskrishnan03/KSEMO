@@ -186,7 +186,7 @@ export const ConversationSidebar = memo(function ConversationSidebar({
         onClick={action}
         variant="ghost"
         className={cn(
-          "group relative h-9 rounded-lg text-foreground/90 transition-[color,background-color,transform] duration-150 hover:bg-sidebar-accent hover:text-foreground active:scale-[0.97]",
+          "group relative h-9 rounded-lg text-foreground/90 transition-[color,background-color,transform] duration-150 hover:bg-sidebar-accent hover:text-foreground active:scale-[0.97] max-lg:bg-transparent max-lg:hover:bg-transparent",
           compact ? "w-10 px-0" : "w-full justify-start gap-2 px-2"
         )}
       >
@@ -364,7 +364,7 @@ export const ConversationSidebar = memo(function ConversationSidebar({
                       variant="ghost"
                       size="icon"
                       onClick={() => startLogin()}
-                      className="size-9 rounded-lg text-foreground/90 transition-colors hover:bg-sidebar-accent hover:text-foreground"
+                      className="size-9 rounded-lg text-foreground/90 transition-colors hover:bg-sidebar-accent hover:text-foreground max-lg:bg-transparent max-lg:hover:bg-transparent"
                       aria-label="Sign in"
                     >
                       <LogIn className="size-4" />
@@ -707,7 +707,7 @@ const ConversationGroup = memo(function ConversationGroup({
                   "group flex items-center rounded-lg pr-0",
                   (isRowActive || isHovered || isMenuOpen) &&
                     !isRenaming &&
-                    "bg-sidebar-accent"
+                    "bg-sidebar-accent max-lg:bg-transparent"
                 )}
               >
                 {isRenaming ? (
