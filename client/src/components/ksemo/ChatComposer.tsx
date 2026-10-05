@@ -397,21 +397,8 @@ export const ChatComposer = memo(function ChatComposer({
   const handleSelectOrb = useCallback(
     (t: (typeof orbThemes)[0]) => {
       setOrbTheme(t.id);
-      if (typeof window !== "undefined" && "speechSynthesis" in window) {
-        const synth = window.speechSynthesis;
-        synth.cancel();
-        const text = t.previewPhrase || `${t.name} with you.`;
-        const utterance = new SpeechSynthesisUtterance(text);
-        if (replyVoiceName) {
-          const match = synth.getVoices().find(v => v.name === replyVoiceName);
-          if (match) utterance.voice = match;
-        }
-        utterance.rate = 1.0;
-        utterance.pitch = 1.0;
-        synth.speak(utterance);
-      }
     },
-    [setOrbTheme, replyVoiceName]
+    [setOrbTheme]
   );
 
   useEffect(() => {
@@ -1509,25 +1496,7 @@ export const ChatComposer = memo(function ChatComposer({
                           </DropdownMenuContent>
                         </DropdownMenu>
 
-                        {/* 2. Send Button (when text is typed in Bot mode) */}
-                        {canSend && !isGenerating && !isBotSpeaking && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                type="button"
-                                onClick={submit}
-                                size="icon"
-                                className="size-10 rounded-full bg-foreground text-background hover:bg-foreground/90 transition-colors animate-in fade-in zoom-in-95 duration-150"
-                                aria-label="Send message"
-                              >
-                                <ArrowUp className="size-5" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent side="top">Send</TooltipContent>
-                          </Tooltip>
-                        )}
-
-                        {/* 3. Stop Button */}
+                        {/* 2. Stop Button */}
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Button

@@ -119,7 +119,7 @@ const getContinuousTime = () => {
 
 export function CosmicLoader({
   className,
-  size = 42,
+  size = 32,
 }: CosmicLoaderProps) {
   const filterId = "cosmic-glow-filter";
 
