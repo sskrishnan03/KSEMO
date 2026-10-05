@@ -31,6 +31,8 @@ import {
   Check,
   Camera,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   FilePlus2,
   Loader2,
   MessageCircle,
@@ -1440,59 +1442,76 @@ export const ChatComposer = memo(function ChatComposer({
                           <DropdownMenuContent
                             align="end"
                             side="top"
-                            sideOffset={12}
+                            sideOffset={54}
                             collisionPadding={12}
-                            className="relative w-[280px] p-2 rounded-2xl border border-border bg-popover text-popover-foreground shadow-2xl animate-in fade-in zoom-in-95 duration-150 z-50 select-none overflow-hidden"
+                            alignOffset={-50}
+                            className="relative w-auto p-3 rounded-2xl border border-border bg-popover text-popover-foreground shadow-2xl animate-in fade-in zoom-in-95 duration-150 z-50 select-none overflow-hidden"
                           >
-                            {/* Left Edge Fade */}
-                            <div className="pointer-events-none absolute left-0 top-0 bottom-0 z-10 w-6 bg-gradient-to-r from-popover to-transparent" />
+                            <div className="flex flex-col items-center gap-2">
+                              {/* Orb in the center */}
+                              <div className="flex flex-col items-center gap-1">
+                                <div className="flex items-center justify-center">
+                                  <RealRollingOrb
+                                    theme={currentOrbTheme}
+                                    size={72}
+                                    active={true}
+                                  />
+                                </div>
+                                <div className="text-center">
+                                  <h3 className="text-xs font-semibold text-foreground">{currentOrbTheme.name}</h3>
+                                  <p className="text-[10px] text-muted-foreground">{currentOrbTheme.combinationLabel}</p>
+                                </div>
+                              </div>
 
-                            {/* Scrollable Track */}
-                            <div className="flex items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden py-0.5 px-1 scroll-smooth snap-x snap-mandatory">
-                              {orbThemes.map(t => {
-                                const isSelected = t.id === currentOrbTheme.id;
-                                return (
-                                  <button
-                                    key={t.id}
-                                    type="button"
-                                    onClick={() => {
-                                      handleSelectOrb(t);
-                                      setOrbMenuOpen(false);
-                                    }}
-                                    className={cn(
-                                      "group flex flex-col items-center gap-1.5 py-1 px-1 rounded-xl shrink-0 w-[68px] snap-start transition-all cursor-pointer outline-none",
-                                      isSelected
-                                        ? "opacity-100 scale-105"
-                                        : "opacity-75 hover:opacity-100 hover:scale-105"
-                                    )}
-                                    aria-label={`Select ${t.name}`}
-                                  >
-                                    {/* Circle on top */}
-                                    <div className="flex items-center justify-center transition-transform duration-200">
-                                      <RealRollingOrb
-                                        theme={t}
-                                        size={42}
-                                        active={isSelected}
+                              {/* Left button, dots, right button at the bottom */}
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const currentIndex = orbThemes.findIndex(t => t.id === currentOrbTheme.id);
+                                    const prevIndex = currentIndex > 0 ? currentIndex - 1 : orbThemes.length - 1;
+                                    handleSelectOrb(orbThemes[prevIndex]);
+                                  }}
+                                  className="flex size-6 items-center justify-center rounded-full border border-border/80 bg-background/80 hover:bg-accent/60 hover:border-foreground/20 text-foreground transition-all shrink-0"
+                                  aria-label="Previous bot"
+                                >
+                                  <ChevronLeft className="size-3" />
+                                </button>
+
+                                <div className="flex items-center gap-1.5">
+                                  {orbThemes.map((t, index) => {
+                                    const isSelected = t.id === currentOrbTheme.id;
+                                    return (
+                                      <button
+                                        key={t.id}
+                                        type="button"
+                                        onClick={() => handleSelectOrb(t)}
+                                        className={cn(
+                                          "size-1.5 rounded-full transition-all shrink-0",
+                                          isSelected
+                                            ? "bg-foreground scale-125"
+                                            : "bg-muted-foreground/30 hover:bg-muted-foreground/50"
+                                        )}
+                                        aria-label={`Select ${t.name}`}
                                       />
-                                    </div>
-                                    {/* Only name below */}
-                                    <span
-                                      className={cn(
-                                        "text-xs font-semibold tracking-tight transition-colors text-center truncate w-full",
-                                        isSelected
-                                          ? "text-primary font-bold"
-                                          : "text-muted-foreground group-hover:text-foreground"
-                                      )}
-                                    >
-                                      {t.name}
-                                    </span>
-                                  </button>
-                                );
-                              })}
-                            </div>
+                                    );
+                                  })}
+                                </div>
 
-                            {/* Right Edge Fade */}
-                            <div className="pointer-events-none absolute right-0 top-0 bottom-0 z-10 w-6 bg-gradient-to-l from-popover to-transparent" />
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const currentIndex = orbThemes.findIndex(t => t.id === currentOrbTheme.id);
+                                    const nextIndex = currentIndex < orbThemes.length - 1 ? currentIndex + 1 : 0;
+                                    handleSelectOrb(orbThemes[nextIndex]);
+                                  }}
+                                  className="flex size-6 items-center justify-center rounded-full border border-border/80 bg-background/80 hover:bg-accent/60 hover:border-foreground/20 text-foreground transition-all shrink-0"
+                                  aria-label="Next bot"
+                                >
+                                  <ChevronRight className="size-3" />
+                                </button>
+                              </div>
+                            </div>
                           </DropdownMenuContent>
                         </DropdownMenu>
 

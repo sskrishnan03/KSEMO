@@ -1484,84 +1484,48 @@ function AppearanceSection() {
       {/* 2. Bot Section: directly in the page below the Bot label, no container, no overflow clipping */}
       <div className="space-y-2">
         <p className="text-sm font-medium text-muted-foreground">Bot</p>
-        <div className="flex items-center justify-center gap-3 sm:gap-6 w-full max-w-lg py-2 select-none">
-          {/* Left Chevron Button */}
-          <button
-            type="button"
-            onClick={handlePrev}
-            aria-label={`Previous: ${prevTheme.name}`}
-            className="flex size-8 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-          >
-            <ChevronLeft className="size-5 stroke-[1.75]" />
-          </button>
-
-          {/* Left Faded Preview Circle */}
-          <button
-            type="button"
-            onClick={handlePrev}
-            aria-label={`Select ${prevTheme.name}`}
-            className="group flex flex-col items-center gap-1.5 opacity-65 hover:opacity-90 transition-all duration-300 cursor-pointer focus-visible:outline-none shrink-0"
-          >
-            <RealRollingOrb
-              theme={prevTheme}
-              size={66}
-            />
-            <span className="text-[11px] font-medium text-muted-foreground group-hover:text-foreground transition-colors max-w-[85px] truncate text-center">
-              {prevTheme.name}
-            </span>
-          </button>
-
-          {/* Center Active Big Circle */}
-          <div className="flex flex-col items-center gap-2 shrink-0">
-            <button
-              type="button"
-              role="radio"
-              aria-checked={true}
-              aria-label={`${currentTheme.name} (Click to speak)`}
-              onClick={() => handleCircleVoice(currentTheme)}
-              className="group relative flex items-center justify-center cursor-pointer focus-visible:outline-none hover:scale-105 active:scale-95 transition-transform duration-200"
-            >
-              <RealRollingOrb
-                theme={currentTheme}
-                size={96}
-                active={true}
-              />
-            </button>
-            <div className="flex flex-col items-center text-center">
-              <span className="text-sm font-bold text-foreground tracking-tight">
-                {currentTheme.name}
-              </span>
-              <span className="text-xs text-muted-foreground mt-0.5">
-                {currentTheme.combinationLabel}
-              </span>
-            </div>
-          </div>
-
-          {/* Right Faded Preview Circle */}
-          <button
-            type="button"
-            onClick={handleNext}
-            aria-label={`Select ${nextTheme.name}`}
-            className="group flex flex-col items-center gap-1.5 opacity-65 hover:opacity-90 transition-all duration-300 cursor-pointer focus-visible:outline-none shrink-0"
-          >
-            <RealRollingOrb
-              theme={nextTheme}
-              size={66}
-            />
-            <span className="text-[11px] font-medium text-muted-foreground group-hover:text-foreground transition-colors max-w-[85px] truncate text-center">
-              {nextTheme.name}
-            </span>
-          </button>
-
-          {/* Right Chevron Button */}
-          <button
-            type="button"
-            onClick={handleNext}
-            aria-label={`Next: ${nextTheme.name}`}
-            className="flex size-8 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-          >
-            <ChevronRight className="size-5 stroke-[1.75]" />
-          </button>
+        <div className="flex items-center gap-2 w-full select-none">
+          {themes.map((t) => {
+            const isSelected = t.id === themeId;
+            return (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => {
+                  setTheme(t.id);
+                  handleCircleVoice(t);
+                }}
+                className={cn(
+                  "relative flex flex-col items-center gap-1.5 py-2.5 px-2.5 rounded-lg border border-border/80 bg-background/80 shrink-0 transition-all cursor-pointer outline-none flex-1",
+                  isSelected
+                    ? "border-primary/50 bg-accent/60 scale-105"
+                    : "hover:bg-accent/30"
+                )}
+                aria-label={`Select ${t.name}`}
+              >
+                {isSelected && (
+                  <div className="absolute top-1 right-1 flex size-3.5 items-center justify-center rounded-full bg-primary">
+                    <Check className="size-2 text-background" />
+                  </div>
+                )}
+                <div className="flex items-center justify-center">
+                  <RealRollingOrb
+                    theme={t}
+                    size={42}
+                    active={isSelected}
+                  />
+                </div>
+                <div className="text-center">
+                  <span className="text-[11px] font-semibold text-foreground block">
+                    {t.name}
+                  </span>
+                  <span className="text-[9px] text-muted-foreground block">
+                    {t.combinationLabel}
+                  </span>
+                </div>
+              </button>
+            );
+          })}
         </div>
       </div>
     </div>
