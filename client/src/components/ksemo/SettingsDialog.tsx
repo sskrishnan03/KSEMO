@@ -1528,8 +1528,8 @@ function AppearanceSection() {
             );
           })}
         </div>
-        {/* Mobile: carousel with left/right buttons and dots */}
-        <div className="lg:hidden flex flex-col items-center gap-2 w-full select-none">
+        {/* Mobile: carousel with left/right buttons and dots - same as ChatComposer */}
+        <div className="lg:hidden flex flex-col items-center gap-2 w-full select-none p-3 rounded-2xl border border-border/80 bg-background/80">
           <div className="flex items-center gap-2 w-full">
             <button
               type="button"
@@ -1544,7 +1544,7 @@ function AppearanceSection() {
               <div className="flex items-center justify-center">
                 <RealRollingOrb
                   theme={currentTheme}
-                  size={48}
+                  size={64}
                   active={true}
                 />
               </div>
@@ -1564,7 +1564,7 @@ function AppearanceSection() {
             </button>
           </div>
 
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1">
             {themes.map((t, index) => {
               const isSelected = t.id === themeId;
               return (
