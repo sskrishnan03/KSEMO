@@ -1131,7 +1131,7 @@ export default function Home() {
         isTtsSpeakingRef.current = false;
         setIsBotSpeakingAloud(false);
         if (botVoiceOpenRef.current) {
-          botVoice.resumeListening();
+          botVoice.pauseListening();
         }
       }
       return;
@@ -2586,11 +2586,12 @@ export default function Home() {
                 : message
             )
           );
-          if (botVoiceOpenRef.current) {
-            botVoice.resumeListening();
-          }
-          return;
-        }
+      if (botVoiceOpenRef.current) {
+        // Don't auto-resume to prevent echo loop
+        botVoice.pauseListening();
+      }
+      return;
+    }
         setComposerValue(current => (current ? current : content));
         if (selectedAttachments.length) {
           setAttachmentNotices(selectedAttachments);
@@ -2620,7 +2621,7 @@ export default function Home() {
           );
         }
         if (botVoiceOpenRef.current) {
-          botVoice.resumeListening();
+          botVoice.pauseListening();
         }
         return;
       }
@@ -2698,7 +2699,7 @@ export default function Home() {
           completedConversation.assistantMessageId
         );
       } else if (botVoiceOpenRef.current) {
-        botVoice.resumeListening();
+        botVoice.pauseListening();
       }
     }
   }
@@ -3833,14 +3834,14 @@ export default function Home() {
           setSpeakingMessageId(null);
           setSpeechState("idle");
           if (botVoiceOpenRef.current) {
-            botVoice.resumeListening();
+            botVoice.pauseListening();
           }
         },
         onError: () => {
           setSpeakingMessageId(null);
           setSpeechState("idle");
           if (botVoiceOpenRef.current) {
-            botVoice.resumeListening();
+            botVoice.pauseListening();
           }
         },
         onPause: () => {
@@ -3865,9 +3866,9 @@ export default function Home() {
 
   function stopSpeech() {
     resetStreamingTts();
-    if (botVoiceOpenRef.current) {
-      botVoice.resumeListening();
-    }
+          if (botVoiceOpenRef.current) {
+            botVoice.pauseListening();
+          }
   }
 
   // Stable wrappers for every callback handed to memoized children. Without

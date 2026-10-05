@@ -1484,7 +1484,7 @@ function AppearanceSection() {
       {/* 2. Bot Section: directly in the page below the Bot label, no container, no overflow clipping */}
       <div className="space-y-2">
         <p className="text-sm font-medium text-muted-foreground">Bot</p>
-        <div className="flex items-center gap-2 w-full select-none">
+        <div className="flex items-center gap-2 w-full select-none max-lg:overflow-x-auto max-lg:[scrollbar-width:none] max-lg:[&::-webkit-scrollbar]:hidden">
           {themes.map((t) => {
             const isSelected = t.id === themeId;
             return (
@@ -1496,7 +1496,7 @@ function AppearanceSection() {
                   handleCircleVoice(t);
                 }}
                 className={cn(
-                  "relative flex flex-col items-center gap-1.5 py-2.5 px-2.5 rounded-lg border border-border/80 bg-background/80 shrink-0 transition-all cursor-pointer outline-none flex-1",
+                  "relative flex flex-col items-center gap-1.5 py-2.5 px-2.5 rounded-lg border border-border/80 bg-background/80 transition-all cursor-pointer outline-none lg:flex-1 max-lg:shrink-0 max-lg:min-w-[90px]",
                   isSelected
                     ? "border-primary/50 bg-accent/60 scale-105"
                     : "hover:bg-accent/30"
