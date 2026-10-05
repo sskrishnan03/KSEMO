@@ -1484,7 +1484,8 @@ function AppearanceSection() {
       {/* 2. Bot Section: directly in the page below the Bot label, no container, no overflow clipping */}
       <div className="space-y-2">
         <p className="text-sm font-medium text-muted-foreground">Bot</p>
-        <div className="flex items-center gap-2 w-full select-none lg:flex-1 max-lg:flex-wrap max-lg:justify-center">
+        {/* Laptop: all 6 visible in a row */}
+        <div className="hidden lg:flex items-center gap-2 w-full select-none flex-1">
           {themes.map((t) => {
             const isSelected = t.id === themeId;
             return (
@@ -1496,7 +1497,7 @@ function AppearanceSection() {
                   handleCircleVoice(t);
                 }}
                 className={cn(
-                  "relative flex flex-col items-center gap-1.5 py-2.5 px-2.5 rounded-lg border border-border/80 bg-background/80 transition-all cursor-pointer outline-none lg:flex-1 max-lg:w-[30%]",
+                  "relative flex flex-col items-center gap-1.5 py-2.5 px-2.5 rounded-lg border border-border/80 bg-background/80 transition-all cursor-pointer outline-none flex-1",
                   isSelected
                     ? "border-primary/50 bg-accent/60 scale-105"
                     : "hover:bg-accent/30"
@@ -1526,6 +1527,65 @@ function AppearanceSection() {
               </button>
             );
           })}
+        </div>
+        {/* Mobile: carousel with left/right buttons and dots */}
+        <div className="lg:hidden flex flex-col items-center gap-2 w-full select-none">
+          <div className="flex items-center gap-2 w-full">
+            <button
+              type="button"
+              onClick={handlePrev}
+              className="flex size-6 items-center justify-center rounded-full border border-border/80 bg-background/80 hover:bg-accent/60 hover:border-foreground/20 text-foreground transition-all shrink-0"
+              aria-label="Previous bot"
+            >
+              <ChevronLeft className="size-3" />
+            </button>
+
+            <div className="flex-1 flex flex-col items-center gap-1">
+              <div className="flex items-center justify-center">
+                <RealRollingOrb
+                  theme={currentTheme}
+                  size={48}
+                  active={true}
+                />
+              </div>
+              <div className="text-center">
+                <h3 className="text-xs font-semibold text-foreground">{currentTheme.name}</h3>
+                <p className="text-[10px] text-muted-foreground">{currentTheme.combinationLabel}</p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleNext}
+              className="flex size-6 items-center justify-center rounded-full border border-border/80 bg-background/80 hover:bg-accent/60 hover:border-foreground/20 text-foreground transition-all shrink-0"
+              aria-label="Next bot"
+            >
+              <ChevronRight className="size-3" />
+            </button>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            {themes.map((t, index) => {
+              const isSelected = t.id === themeId;
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => {
+                    setTheme(t.id);
+                    handleCircleVoice(t);
+                  }}
+                  className={cn(
+                    "size-1.5 rounded-full transition-all shrink-0",
+                    isSelected
+                      ? "bg-foreground scale-125"
+                      : "bg-muted-foreground/30 hover:bg-muted-foreground/50"
+                  )}
+                  aria-label={`Select ${t.name}`}
+                />
+              );
+            })}
+          </div>
         </div>
       </div>
     </div>
