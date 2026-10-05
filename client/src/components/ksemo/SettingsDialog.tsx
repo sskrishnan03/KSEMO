@@ -1484,7 +1484,7 @@ function AppearanceSection() {
       {/* 2. Bot Section: directly in the page below the Bot label, no container, no overflow clipping */}
       <div className="space-y-2">
         <p className="text-sm font-medium text-muted-foreground">Bot</p>
-        <div className="flex items-center gap-2 w-full select-none max-lg:overflow-x-auto max-lg:overflow-y-visible max-lg:[scrollbar-width:none] max-lg:[&::-webkit-scrollbar]:hidden">
+        <div className="flex items-center gap-2 w-full select-none lg:flex-1 max-lg:overflow-x-auto max-lg:[scrollbar-width:none] max-lg:[&::-webkit-scrollbar]:hidden">
           {themes.map((t) => {
             const isSelected = t.id === themeId;
             return (
