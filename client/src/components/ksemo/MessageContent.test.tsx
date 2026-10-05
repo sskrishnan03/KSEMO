@@ -25,8 +25,10 @@ const callbacks = {
   onStop: () => undefined,
 };
 
+const OVERFLOW_LABEL = 'aria-label="More message actions"';
+
 describe("MessageContent speech controls", () => {
-  it("renders a direct read-aloud button for idle assistant message", () => {
+  it("keeps read-aloud behind the overflow menu for an idle assistant message", () => {
     const markup = renderWithTooltip(
       createElement(MessageContent, {
         message: assistantMessage,
@@ -35,11 +37,49 @@ describe("MessageContent speech controls", () => {
         speechState: "idle",
       })
     );
-    expect(markup).toContain('aria-label="Read aloud"');
-    expect(markup).not.toContain('aria-label="More message actions"');
+    expect(markup).toContain(OVERFLOW_LABEL);
+    // One button holding the select icon and the dropdown chevron.
+    expect(markup).toContain("lucide-sliders-horizontal");
+    expect(markup).toContain("lucide-chevron-down");
+    expect(markup).not.toContain("lucide-ellipsis");
+    expect(markup).not.toContain(">Actions</span>");
+    // Same surface as the top-right Share + three-dot group.
+    expect(markup).toContain("rounded-lg");
+    expect(markup).toContain("border-border/40");
+    expect(markup).toContain("bg-card");
+    expect(markup).toContain("shadow-xs");
+    // Single trigger: both glyphs fully inside one padded pill, no divider.
+    expect(markup).not.toContain("rounded-none rounded-l-lg");
+    expect(markup).not.toContain("rounded-none rounded-r-lg");
+    expect(markup).not.toContain('class="h-4 w-px shrink-0 bg-border/40"');
+    expect(markup).toContain("h-7");
+    expect(markup).toContain("px-2 py-0");
+    expect(markup).toContain("gap-1.5");
+    expect(markup).toContain('aria-label="Copy response"');
+    expect(markup).not.toContain('aria-label="Read aloud"');
   });
 
-  it("renders active animated equalizer icon with stop reading control when speech is playing", () => {
+  it("keeps the icon-only trigger and reflects the rating in its accessible name", () => {
+    const markup = renderWithTooltip(
+      createElement(MessageContent, {
+        message: assistantMessage,
+        ...callbacks,
+        isSpeaking: false,
+        speechState: "idle",
+        onFeedback: () => undefined,
+        feedback: "up",
+      })
+    );
+    expect(markup).toContain('aria-label="Remove good response"');
+    expect(markup).toContain("lucide-chevron-down");
+    expect(markup).not.toContain(">Rated</span>");
+    // Rating shows as a real thumb icon button after Copy, not a corner dot.
+    expect(markup).toContain("lucide-thumbs-up");
+    expect(markup).toContain("text-emerald-600");
+    expect(markup).not.toContain("size-1.5 rounded-full ring-2 ring-card");
+  });
+
+  it("surfaces the live equalizer on the overflow trigger while speech is playing", () => {
     const markup = renderWithTooltip(
       createElement(MessageContent, {
         message: assistantMessage,
@@ -49,8 +89,12 @@ describe("MessageContent speech controls", () => {
       })
     );
     expect(markup).toContain('aria-label="Stop reading"');
-    expect(markup).toContain("ksemo-eq-bar-1");
-    expect(markup).not.toContain('aria-label="More message actions"');
+    // The trigger keeps its segmented shape and swaps only the leading glyph.
+    expect(markup).not.toContain("lucide-sliders-horizontal");
+    expect(markup).toContain("lucide-chevron-down");
+    expect(markup).not.toContain(">Stop</span>");
+    // The equalizer sits in a fixed 16px box so the pill never resizes.
+    expect(markup).toContain("size-4 shrink-0");
   });
 
   it("shows the same segmented ring used by Dictate transcribing while audio is preparing", () => {
@@ -64,14 +108,14 @@ describe("MessageContent speech controls", () => {
       })
     );
     expect(markup).toContain('aria-label="Preparing audio"');
-    // Identical loader markup to the Dictate/Transcribe control
-    expect(markup).toContain('class="loader text-foreground"');
-    expect(markup).toContain("width:18px");
-    expect(markup).not.toContain('aria-label="Read aloud"');
-    expect(markup).not.toContain('aria-label="Stop reading"');
+    expect(markup).toContain('aria-live="polite"');
+    expect(markup).toContain('aria-label="Copy response"');
+    expect(markup).toContain('class="loader text-current"');
+    expect(markup).toContain("width:14px");
+    expect(markup).not.toContain(">Preparing</span>");
   });
 
-  it("renders copy, regenerate, and direct read-aloud entry points without share or overflow menu", () => {
+  it("groups copy, read aloud, and regenerate without share or delete controls", () => {
     const markup = renderWithTooltip(
       createElement(MessageContent, {
         message: assistantMessage,
@@ -84,10 +128,10 @@ describe("MessageContent speech controls", () => {
       })
     );
     expect(markup).toContain('aria-label="Copy response"');
-    expect(markup).toContain('aria-label="Read aloud"');
-    expect(markup).toContain('aria-label="Regenerate response"');
+    expect(markup).toContain(OVERFLOW_LABEL);
     expect(markup).not.toContain('aria-label="Share response"');
-    expect(markup).not.toContain('aria-label="More message actions"');
+    expect(markup).not.toContain('aria-label="Delete message"');
+    expect(markup).not.toContain("lucide-share-2");
   });
 
   it("keeps user actions hover-oriented with direct version history and without an avatar or delete control", () => {
@@ -113,9 +157,10 @@ describe("MessageContent speech controls", () => {
     expect(markup).not.toContain('aria-label="View version history"');
     expect(markup).not.toContain('aria-label="Delete message"');
     expect(markup).not.toContain("lucide-user-round");
+    expect(markup).not.toContain(OVERFLOW_LABEL);
   });
 
-  it("renders a centered interrupted divider line and action bar regenerate when assistant response is stopped with partial content", () => {
+  it("renders a centered interrupted divider line and action bar when stopped with partial content", () => {
     const markup = renderWithTooltip(
       createElement(MessageContent, {
         message: {
@@ -134,12 +179,12 @@ describe("MessageContent speech controls", () => {
     );
     expect(markup).toContain("Response generation was interrupted");
     expect(markup).toContain('data-testid="stopped-response-notice"');
-    expect(markup).toContain('aria-label="Regenerate response"');
+    expect(markup).toContain(OVERFLOW_LABEL);
     expect(markup).toContain('aria-label="Copy response"');
     expect(markup).not.toContain('aria-label="Share response"');
   });
 
-  it("renders centered interrupted divider line and action bar regenerate when assistant response is stopped with no content", () => {
+  it("renders centered interrupted divider line when stopped with no content", () => {
     const markup = renderWithTooltip(
       createElement(MessageContent, {
         message: {
@@ -156,7 +201,8 @@ describe("MessageContent speech controls", () => {
     );
     expect(markup).toContain("Response generation was interrupted");
     expect(markup).toContain('data-testid="stopped-response-notice"');
-    expect(markup).toContain('aria-label="Regenerate response"');
+    expect(markup).toContain(OVERFLOW_LABEL);
+    expect(markup).not.toContain('aria-label="Copy response"');
   });
 
   it("renders user message normally in workspace without inline editor when isEditing is true", () => {
@@ -207,8 +253,11 @@ describe("MessageContent speech controls", () => {
         onRegenerate: () => undefined,
       })
     );
+    // No inline retry banner, no copy (no content) — only the overflow menu.
     expect(markup).not.toContain("Try again");
-    expect(markup).not.toContain('aria-label="Regenerate response"');
+    expect(markup).not.toContain('aria-label="Copy response"');
+    expect(markup).not.toContain("lucide-copy");
+    expect(markup).toContain(OVERFLOW_LABEL);
   });
 
   it("renders linked user media before the associated message text", () => {
@@ -247,14 +296,18 @@ describe("MessageContent speech controls", () => {
         ...callbacks,
         isSpeaking: false,
         speechState: "idle",
-        fileCreationNode: createElement("div", { "data-testid": "test-file-card" }, "FileCardContent"),
+        fileCreationNode: createElement(
+          "div",
+          { "data-testid": "test-file-card" },
+          "FileCardContent"
+        ),
         onRegenerate: () => undefined,
       })
     );
     expect(markup).toContain('data-testid="test-file-card"');
-    expect(markup).toContain('aria-label="Regenerate response"');
+    expect(markup).toContain(OVERFLOW_LABEL);
     expect(markup.indexOf('data-testid="test-file-card"')).toBeLessThan(
-      markup.indexOf('aria-label="Regenerate response"')
+      markup.indexOf(OVERFLOW_LABEL)
     );
   });
 
@@ -273,7 +326,11 @@ describe("MessageContent speech controls", () => {
         isSpeaking: false,
         speechState: "idle",
         isFileGenerating: true,
-        fileCreationNode: createElement("div", { "data-testid": "drafting-card" }, "Drafting"),
+        fileCreationNode: createElement(
+          "div",
+          { "data-testid": "drafting-card" },
+          "Drafting"
+        ),
         onRegenerate: () => undefined,
         onShare: () => undefined,
         onFeedback: () => undefined,
@@ -287,10 +344,7 @@ describe("MessageContent speech controls", () => {
     expect(markup).not.toContain('aria-label="Copy response"');
     expect(markup).not.toContain('aria-label="Read aloud"');
     expect(markup).not.toContain('aria-label="Share response"');
-    expect(markup).not.toContain('aria-label="Regenerate response"');
-    expect(markup).not.toContain('aria-label="Good response"');
-    expect(markup).not.toContain('aria-label="Bad response"');
-    expect(markup).not.toContain('aria-label="More message actions"');
+    expect(markup).not.toContain(OVERFLOW_LABEL);
   });
 
   it("renders assistant action buttons once file generation completes", () => {
@@ -308,7 +362,11 @@ describe("MessageContent speech controls", () => {
         isSpeaking: false,
         speechState: "idle",
         isFileGenerating: false,
-        fileCreationNode: createElement("div", { "data-testid": "completed-card" }, "Completed"),
+        fileCreationNode: createElement(
+          "div",
+          { "data-testid": "completed-card" },
+          "Completed"
+        ),
         onRegenerate: () => undefined,
         onShare: () => undefined,
       })
@@ -317,8 +375,7 @@ describe("MessageContent speech controls", () => {
     // Both completed card and action buttons are present
     expect(markup).toContain('data-testid="completed-card"');
     expect(markup).toContain('aria-label="Copy response"');
-    expect(markup).toContain('aria-label="Read aloud"');
-    expect(markup).toContain('aria-label="Regenerate response"');
+    expect(markup).toContain(OVERFLOW_LABEL);
     expect(markup).not.toContain('aria-label="Share response"');
   });
 });
@@ -337,34 +394,39 @@ describe("MessageContent response feedback", () => {
     );
   }
 
-  it("renders both thumbs unpressed for an unrated response", () => {
+  it("collapses the thumbs into the overflow menu for an unrated response", () => {
     const markup = renderFeedback(null);
 
-    expect(markup).toContain('aria-label="Good response"');
-    expect(markup).toContain('aria-label="Bad response"');
-    expect(markup).toContain('aria-pressed="false"');
-    expect(markup).not.toContain("ksemo-feedback-thumb-pop");
+    expect(markup).toContain(OVERFLOW_LABEL);
+    expect(markup).not.toContain('aria-label="Good response"');
+    expect(markup).not.toContain('aria-label="Bad response"');
+    // No rating icon until a rating is chosen.
+    expect(markup).not.toContain("text-emerald-600");
+    expect(markup).not.toContain("text-rose-600");
     expect(markup).not.toContain("ksemo-feedback-thumb-active");
-    expect(markup).not.toContain("ksemo-feedback-outline-in");
+    // Icon-only trigger: no visible word.
+    expect(markup).not.toContain(">Actions</span>");
   });
 
-  it("animates and fills only the good thumb when rated up", () => {
+  it("shows a green thumb icon after Copy when rated up", () => {
     const markup = renderFeedback("up");
 
-    expect(markup.split('aria-pressed="true"').length - 1).toBe(1);
-    expect(markup.split("ksemo-feedback-thumb-pop").length - 1).toBe(1);
-    expect(markup.split("ksemo-feedback-thumb-active").length - 1).toBe(1);
+    expect(markup).toContain('aria-label="Remove good response"');
+    expect(markup).toContain("lucide-thumbs-up");
+    expect(markup).toContain("text-emerald-600");
+    expect(markup).not.toContain("lucide-thumbs-down");
   });
 
-  it("animates and fills only the bad thumb when rated down", () => {
+  it("shows a red thumb icon after Copy when rated down", () => {
     const markup = renderFeedback("down");
 
-    expect(markup.split('aria-pressed="true"').length - 1).toBe(1);
-    expect(markup.split("ksemo-feedback-thumb-pop").length - 1).toBe(1);
-    expect(markup.split("ksemo-feedback-thumb-active").length - 1).toBe(1);
+    expect(markup).toContain('aria-label="Remove bad response"');
+    expect(markup).toContain("lucide-thumbs-down");
+    expect(markup).toContain("text-rose-600");
+    expect(markup).not.toContain("lucide-thumbs-up");
   });
 
-  it("hides the thumbs when no feedback handler is supplied", () => {
+  it("hides the overflow menu when no feedback handler is supplied", () => {
     const markup = renderWithTooltip(
       createElement(MessageContent, {
         message: assistantMessage,
@@ -375,7 +437,7 @@ describe("MessageContent response feedback", () => {
       })
     );
 
-    expect(markup).not.toContain('aria-label="Good response"');
-    expect(markup).not.toContain('aria-label="Bad response"');
+    expect(markup).not.toContain("bg-emerald-500");
+    expect(markup).not.toContain("bg-rose-500");
   });
 });

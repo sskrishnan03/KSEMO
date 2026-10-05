@@ -148,9 +148,7 @@ function readStoredTag(): ComposerTag {
   if (typeof window === "undefined") return "chat";
   try {
     const storage = window.sessionStorage ?? window.localStorage;
-    return storage.getItem(COMPOSER_TAG_KEY) === "bot"
-      ? "bot"
-      : "chat";
+    return storage.getItem(COMPOSER_TAG_KEY) === "bot" ? "bot" : "chat";
   } catch {
     // Private mode / blocked storage — a session-only default is fine.
     return "chat";
@@ -393,7 +391,11 @@ export const ChatComposer = memo(function ChatComposer({
     () => propActiveTag ?? readStoredTag()
   );
 
-  const { theme: currentOrbTheme, setTheme: setOrbTheme, themes: orbThemes } = useBotOrbTheme();
+  const {
+    theme: currentOrbTheme,
+    setTheme: setOrbTheme,
+    themes: orbThemes,
+  } = useBotOrbTheme();
   const [orbMenuOpen, setOrbMenuOpen] = useState(false);
 
   const handleSelectOrb = useCallback(
@@ -586,9 +588,7 @@ export const ChatComposer = memo(function ChatComposer({
     // Reset to auto first to allow shrinking
     editor.style.height = "auto";
     // Then size to actual scrollHeight, capped by the current mode
-    const cap = expanded
-      ? EXPANDED_INPUT_MAX_HEIGHT
-      : COMPACT_INPUT_MAX_HEIGHT;
+    const cap = expanded ? EXPANDED_INPUT_MAX_HEIGHT : COMPACT_INPUT_MAX_HEIGHT;
     const height = Math.max(
       Math.min(editor.scrollHeight, cap),
       MIN_INPUT_HEIGHT
@@ -916,149 +916,157 @@ export const ChatComposer = memo(function ChatComposer({
 
           {/* Main Composer Content */}
           <div className="flex flex-col">
-            {/* Text Input Area */}
-            <div
-              className="relative flex flex-1 items-start cursor-text"
-              onClick={event => {
-                const editor = editorRef.current;
-                if (!editor || isEditorDisabled) return;
-                if (event.target !== editor) {
-                  placeCaretAtEnd();
-                }
-              }}
-            >
+            {/* Text Input Area — Bot mode is voice-only, so it has no typing box */}
+            {!botActive && (
               <div
-                id="ksemo-composer-textarea"
-                ref={editorRef}
-                contentEditable={isEditorDisabled ? "false" : "true"}
-                suppressContentEditableWarning
-                spellCheck={false}
-                autoCorrect="off"
-                autoCapitalize="off"
-                role="textbox"
-                aria-multiline="true"
-                aria-label={
-                  isEditingMessage ? "Edit your message" : "Message KSEMO"
-                }
-                onInput={handleEditorInput}
-                onPaste={handlePaste}
-                onKeyDown={event => {
-                  if (isEditingMessage && event.key === "Escape") {
-                    event.preventDefault();
-                    onCancelEdit?.();
-                    return;
-                  }
-                  if (isSlashActive) {
-                    if (event.key === "Escape") {
-                      event.preventDefault();
-                      onValueChange("");
-                      return;
-                    }
-                    if (event.key === "ArrowDown") {
-                      event.preventDefault();
-                      setSlashHighlight(current => {
-                        const max = Math.max(0, slashFiltered.length - 1);
-                        return Math.min(max, current + 1);
-                      });
-                      return;
-                    }
-                    if (event.key === "ArrowUp") {
-                      event.preventDefault();
-                      setSlashHighlight(current => Math.max(0, current - 1));
-                      return;
-                    }
-                    if (
-                      event.key === "Tab" ||
-                      (event.key === "Enter" && !event.shiftKey)
-                    ) {
-                      event.preventDefault();
-                      const option =
-                        slashFiltered[slashHighlight] ?? slashFiltered[0];
-                      if (option) selectSlashOption(option.mode);
-                      return;
-                    }
-                  }
-                  if (event.key === "Enter" && !event.shiftKey) {
-                    event.preventDefault();
-                    submit();
-                  }
-                  if (
-                    event.key === "Backspace" &&
-                    activeMode &&
-                    activeMode !== "chat" &&
-                    editorRef.current &&
-                    isBackspaceTargetingModeToken(editorRef.current, value)
-                  ) {
-                    event.preventDefault();
-                    onModeChange?.(null);
+                className="relative flex flex-1 items-start cursor-text"
+                onClick={event => {
+                  const editor = editorRef.current;
+                  if (!editor || isEditorDisabled) return;
+                  if (event.target !== editor) {
+                    placeCaretAtEnd();
                   }
                 }}
-                className={cn(
-                  "min-h-10 min-w-0 flex-1 overflow-y-auto whitespace-pre-wrap break-words border-0 !bg-transparent pl-2.5 py-1 text-[15px] leading-6 md:text-[15px] shadow-none focus-visible:ring-0 outline-none dark:!bg-transparent",
-                  expanded ? "max-h-80" : "max-h-48",
-                  canExpand ? "pr-10" : "pr-1"
-                )}
-                style={{ minHeight: `${MIN_INPUT_HEIGHT}px` }}
-              />
-              {canExpand && (
+              >
                 <div
-                  className="pointer-events-none absolute inset-x-0 -bottom-1 h-9 bg-gradient-to-t from-popover to-transparent"
-                  aria-hidden="true"
-                />
-              )}
-              {canExpand && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      tabIndex={-1}
-                      onClick={() => setExpanded(current => !current)}
-                      className="absolute right-1.5 top-1.5 z-10 flex size-8 items-center justify-center rounded-full bg-transparent text-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-0 focus-visible:outline-none"
-                      aria-label={expanded ? "Collapse" : "Expand"}
-                      aria-pressed={expanded}
-                    >
-                      <ChevronDown
-                        className={cn(
-                          "size-5 transition-transform duration-200",
-                          expanded ? "rotate-180" : ""
-                        )}
-                      />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom">
-                    {expanded ? "Collapse" : "Expand"}
-                  </TooltipContent>
-                </Tooltip>
-              )}
-              {value.length === 0 && !activeModeOption && (
-                <span
-                  key={
-                    isEditingMessage
-                      ? "edit"
-                      : temporary
-                        ? "temporary"
-                        : botActive
-                          ? "bot"
-                          : activeMode && activeMode !== "chat"
-                            ? activeMode
-                            : "chat"
+                  id="ksemo-composer-textarea"
+                  ref={editorRef}
+                  contentEditable={isEditorDisabled ? "false" : "true"}
+                  suppressContentEditableWarning
+                  spellCheck={false}
+                  autoCorrect="off"
+                  autoCapitalize="off"
+                  role="textbox"
+                  aria-multiline="true"
+                  aria-label={
+                    isEditingMessage ? "Edit your message" : "Message KSEMO"
                   }
-                  className="pointer-events-none absolute left-2.5 top-[7px] text-[15px] leading-6 text-muted-foreground animate-[ksemo-placeholder-rise_800ms_ease-out]"
-                  aria-hidden="true"
-                >
-                  {isEditingMessage
-                    ? "Edit your message…"
-                    : temporary
-                      ? TEMP_PLACEHOLDER
-                      : botActive
-                        ? BOT_PLACEHOLDER
-                        : CHAT_PLACEHOLDER}
-                </span>
-              )}
-            </div>
+                  onInput={handleEditorInput}
+                  onPaste={handlePaste}
+                  onKeyDown={event => {
+                    if (isEditingMessage && event.key === "Escape") {
+                      event.preventDefault();
+                      onCancelEdit?.();
+                      return;
+                    }
+                    if (isSlashActive) {
+                      if (event.key === "Escape") {
+                        event.preventDefault();
+                        onValueChange("");
+                        return;
+                      }
+                      if (event.key === "ArrowDown") {
+                        event.preventDefault();
+                        setSlashHighlight(current => {
+                          const max = Math.max(0, slashFiltered.length - 1);
+                          return Math.min(max, current + 1);
+                        });
+                        return;
+                      }
+                      if (event.key === "ArrowUp") {
+                        event.preventDefault();
+                        setSlashHighlight(current => Math.max(0, current - 1));
+                        return;
+                      }
+                      if (
+                        event.key === "Tab" ||
+                        (event.key === "Enter" && !event.shiftKey)
+                      ) {
+                        event.preventDefault();
+                        const option =
+                          slashFiltered[slashHighlight] ?? slashFiltered[0];
+                        if (option) selectSlashOption(option.mode);
+                        return;
+                      }
+                    }
+                    if (event.key === "Enter" && !event.shiftKey) {
+                      event.preventDefault();
+                      submit();
+                    }
+                    if (
+                      event.key === "Backspace" &&
+                      activeMode &&
+                      activeMode !== "chat" &&
+                      editorRef.current &&
+                      isBackspaceTargetingModeToken(editorRef.current, value)
+                    ) {
+                      event.preventDefault();
+                      onModeChange?.(null);
+                    }
+                  }}
+                  className={cn(
+                    "min-h-10 min-w-0 flex-1 overflow-y-auto whitespace-pre-wrap break-words border-0 !bg-transparent pl-2.5 py-1 text-[15px] leading-6 md:text-[15px] shadow-none focus-visible:ring-0 outline-none dark:!bg-transparent",
+                    expanded ? "max-h-80" : "max-h-48",
+                    canExpand ? "pr-10" : "pr-1"
+                  )}
+                  style={{ minHeight: `${MIN_INPUT_HEIGHT}px` }}
+                />
+                {canExpand && (
+                  <div
+                    className="pointer-events-none absolute inset-x-0 -bottom-1 h-9 bg-gradient-to-t from-popover to-transparent"
+                    aria-hidden="true"
+                  />
+                )}
+                {canExpand && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        tabIndex={-1}
+                        onClick={() => setExpanded(current => !current)}
+                        className="absolute right-1.5 top-1.5 z-10 flex size-8 items-center justify-center rounded-full bg-transparent text-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-0 focus-visible:outline-none"
+                        aria-label={expanded ? "Collapse" : "Expand"}
+                        aria-pressed={expanded}
+                      >
+                        <ChevronDown
+                          className={cn(
+                            "size-5 transition-transform duration-200",
+                            expanded ? "rotate-180" : ""
+                          )}
+                        />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">
+                      {expanded ? "Collapse" : "Expand"}
+                    </TooltipContent>
+                  </Tooltip>
+                )}
+                {value.length === 0 && !activeModeOption && (
+                  <span
+                    key={
+                      isEditingMessage
+                        ? "edit"
+                        : temporary
+                          ? "temporary"
+                          : botActive
+                            ? "bot"
+                            : activeMode && activeMode !== "chat"
+                              ? activeMode
+                              : "chat"
+                    }
+                    className="pointer-events-none absolute left-2.5 top-[7px] text-[15px] leading-6 text-muted-foreground animate-[ksemo-placeholder-rise_800ms_ease-out]"
+                    aria-hidden="true"
+                  >
+                    {isEditingMessage
+                      ? "Edit your message…"
+                      : temporary
+                        ? TEMP_PLACEHOLDER
+                        : botActive
+                          ? BOT_PLACEHOLDER
+                          : CHAT_PLACEHOLDER}
+                  </span>
+                )}
+              </div>
+            )}
 
-            {/* Bottom Control Row */}
-            <div className="flex items-center justify-between w-full flex-wrap gap-x-1.5 gap-y-1.5 pt-1">
+            {/* Bottom Control Row — in Bot mode this row is the only content, so
+                it drops the chat-only top padding and centres itself in the box. */}
+            <div
+              className={cn(
+                "flex w-full flex-wrap items-center justify-between gap-x-1.5 gap-y-1.5 pt-1",
+                botActive && "py-0"
+              )}
+            >
               {/* Left Side Controls */}
               <div className="flex items-center gap-2">
                 {!isEditingMessage && !guestMode && !botActive && (
@@ -1102,31 +1110,29 @@ export const ChatComposer = memo(function ChatComposer({
                       >
                         <Paperclip className="mr-2 size-4" /> Upload files
                       </DropdownMenuItem>
-                      {isMobile ? (
-                        !guestMode && (
-                          <DropdownMenuItem
-                            onSelect={() => {
-                              setToolsOpen(false);
-                              setCameraOpen(true);
-                            }}
-                          >
-                            <Camera className="mr-2 size-4" />
-                            Camera
-                          </DropdownMenuItem>
-                        )
-                      ) : (
-                        onTakeScreenshot && (
-                          <DropdownMenuItem
-                            onSelect={() => {
-                              setToolsOpen(false);
-                              onTakeScreenshot();
-                            }}
-                          >
-                            <Monitor className="mr-2 size-4" />
-                            Take Screenshot
-                          </DropdownMenuItem>
-                        )
-                      )}
+                      {isMobile
+                        ? !guestMode && (
+                            <DropdownMenuItem
+                              onSelect={() => {
+                                setToolsOpen(false);
+                                setCameraOpen(true);
+                              }}
+                            >
+                              <Camera className="mr-2 size-4" />
+                              Camera
+                            </DropdownMenuItem>
+                          )
+                        : onTakeScreenshot && (
+                            <DropdownMenuItem
+                              onSelect={() => {
+                                setToolsOpen(false);
+                                onTakeScreenshot();
+                              }}
+                            >
+                              <Monitor className="mr-2 size-4" />
+                              Take Screenshot
+                            </DropdownMenuItem>
+                          )}
                       <DropdownMenuItem
                         onSelect={() => {
                           setLibraryOpen(true);
@@ -1185,61 +1191,64 @@ export const ChatComposer = memo(function ChatComposer({
                   </DropdownMenu>
                 )}
 
-                {!isEditingMessage && !guestMode && !temporary && !botActive && (
-                  <div
-                    className="animate-[ksemo-tag-pop_400ms_ease-out_both] relative flex h-8 w-20 shrink-0 items-center rounded-full border border-border bg-popover p-0.5 shadow-sm sm:w-[10.5rem]"
-                    role="group"
-                    aria-label="Composer mode"
-                  >
-                    <span
-                      aria-hidden="true"
-                      className={cn(
-                        "absolute top-0.5 bottom-0.5 w-[calc(50%-2px)] rounded-full bg-foreground text-background shadow-sm transition-[left] duration-300 ease-out",
-                        activeTag === "bot" ? "left-1/2" : "left-0.5"
-                      )}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => changeTag("chat")}
-                      aria-pressed={activeTag === "chat"}
-                      aria-label="Chat mode"
-                      className={cn(
-                        "relative z-10 flex h-full flex-1 items-center justify-center gap-1.5 rounded-full text-[13px] font-medium outline-none transition-colors duration-200",
-                        activeTag === "chat"
-                          ? "text-background"
-                          : "text-foreground hover:bg-accent/60 hover:text-foreground"
-                      )}
+                {!isEditingMessage &&
+                  !guestMode &&
+                  !temporary &&
+                  !botActive && (
+                    <div
+                      className="animate-[ksemo-tag-pop_400ms_ease-out_both] relative flex h-8 w-20 shrink-0 items-center rounded-full border border-border bg-popover p-0.5 shadow-sm sm:w-[10.5rem]"
+                      role="group"
+                      aria-label="Composer mode"
                     >
-                      <MessageCircle className="size-4" />
-                      <span className="hidden sm:inline">Chat</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => changeTag("bot")}
-                      aria-pressed={activeTag === "bot"}
-                      aria-label="Bot mode"
-                      className={cn(
-                        "relative z-10 flex h-full flex-1 items-center justify-center gap-1.5 rounded-full text-[13px] font-medium outline-none transition-colors duration-200",
-                        activeTag === "bot"
-                          ? "text-background"
-                          : "text-foreground hover:bg-accent/60 hover:text-foreground"
-                      )}
-                    >
-                      <KseBotModeIcon className="size-[18px]" />
-                      <span className="hidden sm:inline">Bot</span>
-                    </button>
-                  </div>
-                )}
+                      <span
+                        aria-hidden="true"
+                        className={cn(
+                          "absolute top-0.5 bottom-0.5 w-[calc(50%-2px)] rounded-full bg-foreground text-background shadow-sm transition-[left] duration-300 ease-out",
+                          activeTag === "bot" ? "left-1/2" : "left-0.5"
+                        )}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => changeTag("chat")}
+                        aria-pressed={activeTag === "chat"}
+                        aria-label="Chat mode"
+                        className={cn(
+                          "relative z-10 flex h-full flex-1 items-center justify-center gap-1.5 rounded-full text-[13px] font-medium outline-none transition-colors duration-200",
+                          activeTag === "chat"
+                            ? "text-background"
+                            : "text-foreground hover:bg-accent/60 hover:text-foreground"
+                        )}
+                      >
+                        <MessageCircle className="size-4" />
+                        <span className="hidden sm:inline">Chat</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => changeTag("bot")}
+                        aria-pressed={activeTag === "bot"}
+                        aria-label="Bot mode"
+                        className={cn(
+                          "relative z-10 flex h-full flex-1 items-center justify-center gap-1.5 rounded-full text-[13px] font-medium outline-none transition-colors duration-200",
+                          activeTag === "bot"
+                            ? "text-background"
+                            : "text-foreground hover:bg-accent/60 hover:text-foreground"
+                        )}
+                      >
+                        <KseBotModeIcon className="size-[18px]" />
+                        <span className="hidden sm:inline">Bot</span>
+                      </button>
+                    </div>
+                  )}
 
                 {/* In Bot mode: BotVoiceOrb + dynamic status label */}
                 {botActive && (
-                  <div className="flex items-center gap-2.5 pl-1 sm:pl-1.5 animate-in fade-in zoom-in-95 duration-200">
+                  <div className="flex animate-in items-center gap-2.5 pl-1 fade-in zoom-in-95 duration-200 sm:pl-1.5">
                     <BotVoiceOrb
                       active={orbListening}
                       isSpeaking={isBotSpeaking}
                       isThinking={isGenerating && botActive}
                       levelRef={botOrbLevel}
-                      className="size-8 sm:size-9 shrink-0"
+                      className="size-10 sm:size-12 shrink-0"
                     />
                     {(isBotSpeaking || isGenerating) && (
                       <span
@@ -1412,7 +1421,10 @@ export const ChatComposer = memo(function ChatComposer({
                     {botActive ? (
                       <div className="flex items-center gap-1 sm:gap-1.5 animate-in fade-in zoom-in-95 duration-200">
                         {/* 1. Select Bot Persona Option */}
-                        <DropdownMenu open={orbMenuOpen} onOpenChange={setOrbMenuOpen}>
+                        <DropdownMenu
+                          open={orbMenuOpen}
+                          onOpenChange={setOrbMenuOpen}
+                        >
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <DropdownMenuTrigger asChild>
@@ -1421,13 +1433,16 @@ export const ChatComposer = memo(function ChatComposer({
                                   variant="outline"
                                   className={cn(
                                     "h-9 px-3 rounded-full border border-border/80 bg-background/80 hover:bg-accent/60 hover:border-foreground/20 text-foreground transition-all flex items-center gap-1.5 text-xs font-semibold select-none shadow-xs",
-                                    orbMenuOpen && "border-primary/50 bg-accent text-primary ring-1 ring-primary/20"
+                                    orbMenuOpen &&
+                                      "border-primary/50 bg-accent text-primary ring-1 ring-primary/20"
                                   )}
                                   aria-label={`Select bot: ${currentOrbTheme.name}`}
                                   aria-expanded={orbMenuOpen}
                                 >
                                   <SlidersHorizontal className="size-4 shrink-0 text-foreground" />
-                                  <span className="tracking-tight">{currentOrbTheme.name}</span>
+                                  <span className="tracking-tight">
+                                    {currentOrbTheme.name}
+                                  </span>
                                   <ChevronDown
                                     className={cn(
                                       "size-3.5 shrink-0 text-muted-foreground transition-transform duration-200 ml-0.5",
@@ -1437,14 +1452,15 @@ export const ChatComposer = memo(function ChatComposer({
                                 </Button>
                               </DropdownMenuTrigger>
                             </TooltipTrigger>
-                            <TooltipContent side="top">Select bot</TooltipContent>
+                            <TooltipContent side="top">
+                              Select bot
+                            </TooltipContent>
                           </Tooltip>
                           <DropdownMenuContent
                             align="end"
                             side="top"
-                            sideOffset={54}
+                            sideOffset={14}
                             collisionPadding={12}
-                            alignOffset={-50}
                             className="relative w-auto p-3 rounded-2xl border border-border bg-popover text-popover-foreground shadow-2xl animate-in fade-in zoom-in-95 duration-150 z-50 select-none overflow-hidden"
                           >
                             <div className="flex flex-col items-center gap-2">
@@ -1458,8 +1474,12 @@ export const ChatComposer = memo(function ChatComposer({
                                   />
                                 </div>
                                 <div className="text-center">
-                                  <h3 className="text-xs font-semibold text-foreground">{currentOrbTheme.name}</h3>
-                                  <p className="text-[10px] text-muted-foreground">{currentOrbTheme.combinationLabel}</p>
+                                  <h3 className="text-xs font-semibold text-foreground">
+                                    {currentOrbTheme.name}
+                                  </h3>
+                                  <p className="text-[10px] text-muted-foreground">
+                                    {currentOrbTheme.combinationLabel}
+                                  </p>
                                 </div>
                               </div>
 
@@ -1468,8 +1488,13 @@ export const ChatComposer = memo(function ChatComposer({
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    const currentIndex = orbThemes.findIndex(t => t.id === currentOrbTheme.id);
-                                    const prevIndex = currentIndex > 0 ? currentIndex - 1 : orbThemes.length - 1;
+                                    const currentIndex = orbThemes.findIndex(
+                                      t => t.id === currentOrbTheme.id
+                                    );
+                                    const prevIndex =
+                                      currentIndex > 0
+                                        ? currentIndex - 1
+                                        : orbThemes.length - 1;
                                     handleSelectOrb(orbThemes[prevIndex]);
                                   }}
                                   className="flex size-6 items-center justify-center rounded-full border border-border/80 bg-background/80 hover:bg-accent/60 hover:border-foreground/20 text-foreground transition-all shrink-0"
@@ -1480,7 +1505,8 @@ export const ChatComposer = memo(function ChatComposer({
 
                                 <div className="flex items-center gap-1.5">
                                   {orbThemes.map((t, index) => {
-                                    const isSelected = t.id === currentOrbTheme.id;
+                                    const isSelected =
+                                      t.id === currentOrbTheme.id;
                                     return (
                                       <button
                                         key={t.id}
@@ -1501,8 +1527,13 @@ export const ChatComposer = memo(function ChatComposer({
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    const currentIndex = orbThemes.findIndex(t => t.id === currentOrbTheme.id);
-                                    const nextIndex = currentIndex < orbThemes.length - 1 ? currentIndex + 1 : 0;
+                                    const currentIndex = orbThemes.findIndex(
+                                      t => t.id === currentOrbTheme.id
+                                    );
+                                    const nextIndex =
+                                      currentIndex < orbThemes.length - 1
+                                        ? currentIndex + 1
+                                        : 0;
                                     handleSelectOrb(orbThemes[nextIndex]);
                                   }}
                                   className="flex size-6 items-center justify-center rounded-full border border-border/80 bg-background/80 hover:bg-accent/60 hover:border-foreground/20 text-foreground transition-all shrink-0"
@@ -1534,9 +1565,7 @@ export const ChatComposer = memo(function ChatComposer({
                               <Square className="size-4 fill-current" />
                             </Button>
                           </TooltipTrigger>
-                          <TooltipContent side="top">
-                            Stop
-                          </TooltipContent>
+                          <TooltipContent side="top">Stop</TooltipContent>
                         </Tooltip>
                       </div>
                     ) : isGenerating || isBotSpeaking ? (
@@ -1546,7 +1575,11 @@ export const ChatComposer = memo(function ChatComposer({
                             onClick={onCancel}
                             size="icon"
                             className="size-10 rounded-full bg-foreground text-background hover:bg-foreground/90 transition-colors"
-                            aria-label={isBotSpeaking ? "Stop speaking" : "Stop generating"}
+                            aria-label={
+                              isBotSpeaking
+                                ? "Stop speaking"
+                                : "Stop generating"
+                            }
                           >
                             <Square className="size-4 fill-current" />
                           </Button>

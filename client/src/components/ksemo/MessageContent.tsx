@@ -5,6 +5,13 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { getFileKind } from "@/lib/fileKinds";
 import { CardWheelFan } from "@/components/ui/card-wheel-fan";
 import { ImageLightbox } from "@/components/ui/image-lightbox";
@@ -16,18 +23,17 @@ import {
   Copy,
   Download,
   ExternalLink,
+  MoreHorizontal,
   Pencil,
   RotateCcw,
+  SlidersHorizontal,
   Square,
   ThumbsDown,
   ThumbsUp,
   Volume2,
   X,
 } from "lucide-react";
-import {
-  MessageFeedback,
-  type MessageFeedbackValue,
-} from "./MessageFeedback";
+import { type MessageFeedbackValue } from "./MessageFeedback";
 import { usePersistFn } from "@/hooks/usePersistFn";
 import React, { memo, useEffect, useRef, useState } from "react";
 import { Streamdown } from "streamdown";
@@ -35,7 +41,10 @@ import { KsemoMarkdownCode } from "./code-block";
 import { sanitizeAssistantText } from "@/lib/sanitizeAssistant";
 import { usePdfViewer, isViewableDocument } from "@/contexts/PdfViewerContext";
 import type { PptOutlinePlan } from "@shared/presentationOutline";
-import { BotActionStatus, type BotActionData } from "@/components/voice/BotActionStatus";
+import {
+  BotActionStatus,
+  type BotActionData,
+} from "@/components/voice/BotActionStatus";
 import { useSpeechWaveBars } from "@/lib/speechReactive";
 
 type KsemoMessage = {
@@ -167,7 +176,7 @@ function RealtimeSpeechEqualizer({
   return (
     <span
       className={cn(
-        "group-hover/readaloud:hidden flex size-4 items-center justify-center gap-[2px]",
+        "group-hover/readaloud:hidden flex size-4 items-center justify-center gap-[2px] text-current",
         isBuffering && "opacity-60 animate-pulse"
       )}
     >
@@ -243,6 +252,7 @@ export const MessageContent = memo(function MessageContent({
   onCancelEdit?: () => void;
 }) {
   const [copied, setCopied] = useState(false);
+  const [actionsOpen, setActionsOpen] = useState(false);
   const [previewFile, setPreviewFile] = useState<KsemoFile | null>(null);
   const [lightboxFile, setLightboxFile] = useState<KsemoFile | null>(null);
   const { openPdf } = usePdfViewer();
@@ -329,6 +339,20 @@ export const MessageContent = memo(function MessageContent({
     (message.fileGeneration && message.fileGeneration.status === "processing")
   );
 
+  const canReadAloud = Boolean(message.content && onSpeak);
+  const canRegenerate = Boolean(onRegenerate || onRetry);
+  const canRate = Boolean(onFeedback && message.content);
+  const hasOverflowActions = canReadAloud || canRegenerate || canRate;
+  const hasActiveIndicator =
+    canRate && (feedback === "up" || feedback === "down");
+  const actionsMenuLabel = isPreparingSpeech
+    ? "Preparing audio"
+    : isSpeaking
+      ? "Stop reading"
+      : hasActiveIndicator
+        ? `Remove ${feedback === "up" ? "good" : "bad"} response`
+        : "More message actions";
+
   const renderStoppedNotice = () => (
     <div
       data-testid="stopped-response-notice"
@@ -414,9 +438,7 @@ export const MessageContent = memo(function MessageContent({
                                 <span className="mt-0.5 flex items-center gap-1 text-[9px] font-medium uppercase tracking-wide text-muted-foreground">
                                   <span>{kind.label}</span>
                                   {size ? (
-                                    <span className="opacity-80">
-                                      · {size}
-                                    </span>
+                                    <span className="opacity-80">· {size}</span>
                                   ) : null}
                                 </span>
                               </span>
@@ -721,78 +743,203 @@ export const MessageContent = memo(function MessageContent({
                     ),
                     copyMessage
                   )}
-                {message.content &&
-                  onSpeak &&
-                  (isPreparingSpeech ? (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
+                {hasActiveIndicator &&
+                  action(
+                    feedback === "up"
+                      ? "Remove good response"
+                      : "Remove bad response",
+                    feedback === "up" ? (
+                      <ThumbsUp
+                        className={cn(
+                          "size-4 text-emerald-600 dark:text-emerald-400",
+                          "ksemo-feedback-thumb-active"
+                        )}
+                      />
+                    ) : (
+                      <ThumbsDown
+                        className={cn(
+                          "size-4 text-rose-600 dark:text-rose-400",
+                          "ksemo-feedback-thumb-active"
+                        )}
+                      />
+                    ),
+                    () => handleFeedbackToggle(feedback as "up" | "down")
+                  )}
+                {hasOverflowActions && (
+                  <div className="relative inline-flex shrink-0">
+                    <DropdownMenu
+                      open={actionsOpen}
+                      onOpenChange={setActionsOpen}
+                    >
+                      <DropdownMenuTrigger asChild>
                         <Button
+                          type="button"
                           variant="ghost"
-                          size="icon"
-                          disabled
+                          size="sm"
                           className={cn(
-                            actionClass,
-                            "cursor-default bg-accent/70 text-foreground disabled:opacity-100"
+                            "h-7 shrink-0 gap-1.5 rounded-lg border border-border/40 bg-card px-2 py-0 has-[>svg]:px-2 text-foreground/80 shadow-xs transition-colors",
+                            "hover:bg-accent hover:text-foreground hover:border-foreground/15",
+                            "focus-visible:bg-accent focus-visible:text-foreground",
+                            actionsOpen &&
+                              "border-foreground/15 bg-accent text-foreground"
                           )}
-                          aria-label="Preparing audio"
+                          aria-label={actionsMenuLabel}
                           aria-live="polite"
                         >
-                          <div
-                            className="loader text-foreground"
-                            style={{ width: 18 }}
-                            aria-hidden
-                          />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent side="bottom">
-                        Preparing audio…
-                      </TooltipContent>
-                    </Tooltip>
-                  ) : isSpeaking ? (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className={cn(
-                            actionClass,
-                            "bg-accent/70 text-foreground hover:bg-destructive/15 hover:text-destructive group/readaloud"
+                          {isPreparingSpeech ? (
+                            <span className="flex size-4 shrink-0 items-center justify-center">
+                              <span
+                                className="loader text-current"
+                                style={{ width: 14 }}
+                                aria-hidden
+                              />
+                            </span>
+                          ) : isSpeaking ? (
+                            <span className="flex size-4 shrink-0 items-center justify-center">
+                              <RealtimeSpeechEqualizer
+                                isSpeaking={isSpeaking}
+                                speechState={speechState}
+                                messageId={message.id}
+                              />
+                            </span>
+                          ) : (
+                            <SlidersHorizontal className="size-4 shrink-0" />
                           )}
-                          onClick={onStop}
-                          aria-label="Stop reading"
-                        >
-                          <RealtimeSpeechEqualizer
-                            isSpeaking={isSpeaking}
-                            speechState={speechState}
-                            messageId={message.id}
+                          <ChevronDown
+                            className={cn(
+                              "size-4 shrink-0 transition-transform duration-200",
+                              actionsOpen && "rotate-180"
+                            )}
                           />
-                          <Square className="size-3.5 fill-current hidden group-hover/readaloud:block" />
                         </Button>
-                      </TooltipTrigger>
-                      <TooltipContent side="bottom">Stop reading</TooltipContent>
-                    </Tooltip>
-                  ) : (
-                    action(
-                      "Read aloud",
-                      <Volume2 className="size-4" />,
-                      () =>
-                        onSpeak(cleanContent || message.content, message.id)
-                    )
-                  ))}
-                {(onRegenerate || onRetry) &&
-                  action(
-                    message.status === "failed"
-                      ? "Retry response"
-                      : "Regenerate response",
-                    <RotateCcw className="size-4" />,
-                    () =>
-                      onRegenerate ? onRegenerate(message) : onRetry?.(message)
-                  )}
-                {onFeedback && message.content && (
-                  <MessageFeedback
-                    value={feedback}
-                    onToggle={handleFeedbackToggle}
-                  />
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent
+                        align="start"
+                        side="top"
+                        sideOffset={6}
+                        className="w-max min-w-44 rounded-xl"
+                      >
+                        {message.content && onSpeak ? (
+                          <DropdownMenuItem
+                            className="group/readaloud gap-2.5 whitespace-nowrap rounded-lg py-2 pl-2.5 pr-8"
+                            onSelect={() => {
+                              if (isPreparingSpeech) return;
+                              if (isSpeaking) onStop();
+                              else
+                                onSpeak(
+                                  cleanContent || message.content,
+                                  message.id
+                                );
+                            }}
+                            disabled={isPreparingSpeech}
+                            aria-label={
+                              isPreparingSpeech
+                                ? "Preparing audio"
+                                : isSpeaking
+                                  ? "Stop reading"
+                                  : "Read aloud"
+                            }
+                          >
+                            {isPreparingSpeech ? (
+                              <span className="flex size-4 items-center justify-center text-foreground">
+                                <span
+                                  className="loader text-foreground"
+                                  style={{ width: 14 }}
+                                  aria-hidden
+                                />
+                              </span>
+                            ) : isSpeaking ? (
+                              <>
+                                <RealtimeSpeechEqualizer
+                                  isSpeaking={isSpeaking}
+                                  speechState={speechState}
+                                  messageId={message.id}
+                                />
+                                <Square className="size-3.5 fill-current group-hover/readaloud:hidden" />
+                              </>
+                            ) : (
+                              <Volume2 className="size-4 text-muted-foreground" />
+                            )}
+                            <span>
+                              {isPreparingSpeech
+                                ? "Preparing audio…"
+                                : isSpeaking
+                                  ? "Stop reading"
+                                  : "Read aloud"}
+                            </span>
+                          </DropdownMenuItem>
+                        ) : null}
+                        {(onRegenerate || onRetry) && (
+                          <DropdownMenuItem
+                            className="gap-2.5 whitespace-nowrap rounded-lg py-2 pl-2.5 pr-8"
+                            onSelect={() => {
+                              if (onRegenerate) onRegenerate(message);
+                              else if (onRetry) onRetry(message);
+                            }}
+                            aria-label={
+                              onRegenerate
+                                ? "Regenerate response"
+                                : "Retry response"
+                            }
+                          >
+                            <RotateCcw className="size-4 text-muted-foreground" />
+                            <span>
+                              {onRegenerate
+                                ? "Regenerate response"
+                                : "Retry response"}
+                            </span>
+                          </DropdownMenuItem>
+                        )}
+                        {canRate && (
+                          <>
+                            {canReadAloud ? (
+                              <DropdownMenuSeparator className="my-1" />
+                            ) : null}
+                            <DropdownMenuItem
+                              className="gap-2.5 whitespace-nowrap rounded-lg py-2 pl-2.5 pr-2.5 data-[active=true]:text-emerald-600 dark:data-[active=true]:text-emerald-400"
+                              data-active={feedback === "up"}
+                              onSelect={() => handleFeedbackToggle("up")}
+                              aria-label="Good response"
+                            >
+                              <ThumbsUp
+                                className={cn(
+                                  "size-4",
+                                  feedback === "up"
+                                    ? "text-emerald-600 dark:text-emerald-400 ksemo-feedback-thumb-active"
+                                    : "text-muted-foreground"
+                                )}
+                              />
+                              <span>
+                                {feedback === "up"
+                                  ? "Remove good response"
+                                  : "Good response"}
+                              </span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="gap-2.5 whitespace-nowrap rounded-lg py-2 pl-2.5 pr-2.5 data-[active=true]:text-rose-600 dark:data-[active=true]:text-rose-400"
+                              data-active={feedback === "down"}
+                              onSelect={() => handleFeedbackToggle("down")}
+                              aria-label="Bad response"
+                            >
+                              <ThumbsDown
+                                className={cn(
+                                  "size-4",
+                                  feedback === "down"
+                                    ? "text-rose-600 dark:text-rose-400 ksemo-feedback-thumb-active"
+                                    : "text-muted-foreground"
+                                )}
+                              />
+                              <span>
+                                {feedback === "down"
+                                  ? "Remove bad response"
+                                  : "Bad response"}
+                              </span>
+                            </DropdownMenuItem>
+                          </>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                 )}
               </div>
             )}
@@ -911,4 +1058,3 @@ export const MessageContent = memo(function MessageContent({
 });
 
 export type { KsemoMessage };
-

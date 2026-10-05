@@ -57,6 +57,10 @@ export function BotVoiceOrb({
 
   const smoothedRef = useRef(0);
 
+  // The canvas fills this span with CSS rather than being told a pixel size, so
+  // it always matches the caller's box exactly without any measuring — and
+  // without re-creating the WebGL context when the box changes.
+
   useEffect(() => {
     let frame: number | null = null;
 
@@ -117,13 +121,14 @@ export function BotVoiceOrb({
       ref={nodeRef}
       aria-hidden="true"
       className={cn(
-        "ksemo-bot-orb relative inline-flex items-center justify-center rounded-full bg-black overflow-hidden will-change-transform shrink-0 select-none",
+        "ksemo-bot-orb relative inline-flex items-center justify-center rounded-full will-change-transform shrink-0 select-none",
         className
       )}
     >
       <NebulaOrbCanvas
         theme={theme}
         size={44}
+        fill
         active={active || isSpeaking || isThinking}
         activity={isSpeaking ? 0.8 : isThinking ? 0.35 : active ? 0.5 : 0}
       />

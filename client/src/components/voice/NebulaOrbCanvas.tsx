@@ -122,12 +122,15 @@ void main() {
 export function NebulaOrbCanvas({
   theme,
   size = 96,
+  fill = false,
   active = false,
   activity = 0,
   className,
 }: {
   theme: BotOrbTheme;
   size?: number;
+  /** Stretch to fill the parent box instead of using a fixed pixel size. */
+  fill?: boolean;
   active?: boolean;
   activity?: number;
   className?: string;
@@ -227,7 +230,10 @@ export function NebulaOrbCanvas({
       const uResolution = gl.getUniformLocation(program, "u_resolution");
       const uTime = gl.getUniformLocation(program, "u_time");
       const uColorPrimary = gl.getUniformLocation(program, "u_color_primary");
-      const uColorSecondary = gl.getUniformLocation(program, "u_color_secondary");
+      const uColorSecondary = gl.getUniformLocation(
+        program,
+        "u_color_secondary"
+      );
       const uColorAccent = gl.getUniformLocation(program, "u_color_accent");
       const uBrightness = gl.getUniformLocation(program, "u_brightness");
       const uSpeed = gl.getUniformLocation(program, "u_speed");
@@ -263,8 +269,14 @@ export function NebulaOrbCanvas({
         gl.uniform2f(uResolution, width, height);
         gl.uniform1f(uTime, elapsed);
 
-        gl.uniform3fv(uColorPrimary, currentTheme.primaryGl || [0.06, 0.92, 0.54]);
-        gl.uniform3fv(uColorSecondary, currentTheme.secondaryGl || [0.015, 0.42, 0.28]);
+        gl.uniform3fv(
+          uColorPrimary,
+          currentTheme.primaryGl || [0.06, 0.92, 0.54]
+        );
+        gl.uniform3fv(
+          uColorSecondary,
+          currentTheme.secondaryGl || [0.015, 0.42, 0.28]
+        );
         gl.uniform3fv(uColorAccent, currentTheme.accentGl || [0.38, 1.0, 0.78]);
 
         const baseBrightness = isActive ? 1.08 : 0.82;
@@ -291,7 +303,11 @@ export function NebulaOrbCanvas({
     };
 
     canvas.addEventListener("webglcontextlost", handleContextLost, false);
-    canvas.addEventListener("webglcontextrestored", handleContextRestored, false);
+    canvas.addEventListener(
+      "webglcontextrestored",
+      handleContextRestored,
+      false
+    );
 
     initGL();
 
@@ -307,8 +323,8 @@ export function NebulaOrbCanvas({
     <div
       className={className}
       style={{
-        width: size,
-        height: size,
+        width: fill ? "100%" : size,
+        height: fill ? "100%" : size,
         display: "inline-flex",
         alignItems: "center",
         justifyContent: "center",
@@ -332,8 +348,8 @@ export function NebulaOrbCanvas({
       <canvas
         ref={canvasRef}
         style={{
-          width: size,
-          height: size,
+          width: fill ? "100%" : size,
+          height: fill ? "100%" : size,
           display: "block",
           borderRadius: "50%",
           position: "relative",

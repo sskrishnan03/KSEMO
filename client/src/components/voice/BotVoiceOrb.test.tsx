@@ -9,12 +9,11 @@ function renderOrb(element: ReactElement) {
 }
 
 describe("BotVoiceOrb", () => {
-  it("renders a plain small black circle and nothing else", () => {
+  it("renders a compact, borderless elemental orb", () => {
     const markup = renderOrb(createElement(BotVoiceOrb, {}));
-    // One element, black, round — no ring, outline, glow, bars or lines.
     expect(markup).toContain("ksemo-bot-orb");
     expect(markup).toContain("rounded-full");
-    expect(markup).toContain("bg-black");
+    expect(markup).toContain("elemental-orb--water");
     expect(markup).not.toContain("svg");
     expect(markup).not.toContain("stroke");
   });

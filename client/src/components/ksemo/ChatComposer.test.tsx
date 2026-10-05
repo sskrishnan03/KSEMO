@@ -334,9 +334,11 @@ describe("ChatComposer", () => {
           botVoiceState: "listening",
         })
       );
-      expect(idleBot).toContain("ksemo-composer-textarea");
-      expect(idleBot).toContain("Speak or type whatever you want...");
+      // Bot mode is voice-only: no typing box, just the orb and Select bot.
+      expect(idleBot).not.toContain("ksemo-composer-textarea");
+      expect(idleBot).not.toContain("Speak or type whatever you want...");
       expect(idleBot).toContain("ksemo-bot-orb");
+      expect(idleBot).toContain("Select bot");
       expect(idleBot).not.toContain('aria-label="Attach"');
       expect(idleBot).toContain('aria-label="Stop"');
       expect(idleBot).not.toContain("Reply voice");

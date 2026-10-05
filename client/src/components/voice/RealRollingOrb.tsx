@@ -23,7 +23,7 @@ export function RealRollingOrb({
     <span
       aria-hidden="true"
       className={cn(
-        "relative inline-flex items-center justify-center rounded-full overflow-hidden shrink-0 select-none",
+        "relative inline-flex items-center justify-center rounded-full shrink-0 select-none",
         className
       )}
       style={{
@@ -31,11 +31,7 @@ export function RealRollingOrb({
         height: size,
       }}
     >
-      <NebulaOrbCanvas
-        theme={theme}
-        size={size}
-        active={active}
-      />
+      <NebulaOrbCanvas theme={theme} size={size} active={active} />
     </span>
   );
 }
