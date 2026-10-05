@@ -860,11 +860,11 @@ export const ConversationActionsMenu = memo(function ConversationActionsMenu({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent
-        align="end"
+        align="center"
         sideOffset={4}
         collisionPadding={isMobile ? 12 : 8}
         className={cn(
-          "w-auto min-w-40 whitespace-nowrap rounded-xl",
+          "w-fit min-w-[140px] whitespace-nowrap rounded-xl",
           isMobile &&
             "max-h-[calc(100dvh-2rem)] max-w-[calc(100vw-1.5rem)] overflow-y-auto overflow-x-visible shadow-xl"
         )}
