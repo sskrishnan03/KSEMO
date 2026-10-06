@@ -1184,29 +1184,12 @@ export const MessageContent = memo(function MessageContent({
                               )}
                               {isMobile && allEmojisOpen && (
                                 <DropdownMenuPortal>
-                                  <div className="fixed inset-0 z-[60] flex items-end justify-center sm:items-center">
+                                  <div className="fixed inset-0 z-[60] flex items-center justify-center p-3">
                                     <div
                                       className="absolute inset-0 bg-black/40"
                                       aria-hidden="true"
                                     />
-                                    <div className="relative flex max-h-[75dvh] w-full max-w-md flex-col overflow-hidden rounded-t-2xl border border-border bg-popover p-3 pb-4 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
-                                      <div className="mb-2 flex items-center justify-between pl-1">
-                                        <h3 className="text-sm font-semibold text-foreground">
-                                          Reactions
-                                        </h3>
-                                        <Button
-                                          type="button"
-                                          variant="ghost"
-                                          size="icon"
-                                          className="size-7"
-                                          onClick={() =>
-                                            setAllEmojisOpen(false)
-                                          }
-                                          aria-label="Close reactions"
-                                        >
-                                          <X className="size-4" />
-                                        </Button>
-                                      </div>
+                                    <div className="relative flex max-h-[80dvh] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-border bg-popover p-2 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
                                       <AllEmojiGrid
                                         reactions={reactions}
                                         onToggle={toggleReaction}
