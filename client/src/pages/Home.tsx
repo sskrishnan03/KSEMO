@@ -982,8 +982,9 @@ export default function Home() {
   );
   useEffect(() => {
     if (!messageFeedbackQuery.isSuccess) return;
-    const ratings = messageFeedbackQuery.data ?? {};
+    const serverRatings = messageFeedbackQuery.data ?? {};
     setMessageFeedback(current => {
+      const ratings = { ...current, ...serverRatings };
       if (isSameMessageFeedback(current, ratings)) return current;
       saveFeedbackCache(ratings);
       messageFeedbackRef.current = ratings;
