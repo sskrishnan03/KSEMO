@@ -203,17 +203,27 @@ export function useVoiceInput({
                 sum += freqBins[i];
               }
               const avg = sum / (freqBins.length * 255);
-              const normalizedLevel = Math.min(1, avg * 3.0);
+              // Gate the meter below the microphone noise floor. Without this,
+              // tiny ambient variations are amplified into a speech-like wave
+              // even when the user has not started speaking.
+              const hasAudibleInput = avg >= 0.035;
+              const normalizedLevel = hasAudibleInput
+                ? Math.min(1, avg * 3.0)
+                : 0;
               setAudioLevel(normalizedLevel);
 
               const bars: number[] = [];
               const step = Math.max(1, Math.floor(freqBins.length / BAR_COUNT));
               for (let i = 0; i < BAR_COUNT; i++) {
-                const raw = (freqBins[i * step] || 0) / 255;
-                const boosted = Math.min(
-                  1,
-                  Math.max(0.12, raw * 1.5 + normalizedLevel * 1.2)
-                );
+                const raw = hasAudibleInput
+                  ? (freqBins[i * step] || 0) / 255
+                  : 0;
+                const boosted = hasAudibleInput
+                  ? Math.min(
+                      1,
+                      Math.max(0.12, raw * 1.5 + normalizedLevel * 1.2)
+                    )
+                  : 0.12;
                 bars.push(boosted);
               }
               setAudioBars(bars);
