@@ -607,9 +607,9 @@ export const MessageContent = memo(function MessageContent({
     (message.fileGeneration && message.fileGeneration.status === "processing")
   );
 
-  const canReadAloud = Boolean(message.content && onSpeak);
+  const canReadAloud = Boolean(message.content && !!onSpeak && !isCancelled);
   const canRegenerate = Boolean(onRegenerate || onRetry);
-  const canRate = Boolean(onFeedback && message.content);
+  const canRate = Boolean(onFeedback && message.content && !isCancelled);
   const hasOverflowActions = canReadAloud || canRegenerate || canRate;
   const hasActiveIndicator =
     canRate && (feedback === "up" || feedback === "down");
@@ -1115,71 +1115,73 @@ export const MessageContent = memo(function MessageContent({
                         }}
                         className="w-max min-w-44 rounded-xl border-0 bg-transparent p-1 shadow-none"
                       >
-                        <div className="mb-0.5 rounded-lg border border-border/70 bg-popover px-1.5 py-1.5 shadow-sm">
-                          <div
-                            role="group"
-                            aria-label="Reactions"
-                            className="flex items-center gap-0.5"
-                          >
-                            {MESSAGE_REACTIONS.slice(0, 5).map(
-                              ({ emoji, label }) => (
-                                <DropdownMenuItem
-                                  key={label}
-                                  className="group flex-1 justify-center rounded-md px-0 py-1.5 text-2xl leading-none select-none hover:bg-transparent focus:bg-transparent data-[selected=true]:bg-accent data-[selected=true]:text-foreground"
-                                  data-selected={
-                                    reactions.includes(emoji)
-                                      ? "true"
-                                      : undefined
-                                  }
-                                  aria-label={label}
-                                  onSelect={event => {
-                                    event.preventDefault();
-                                    toggleReaction(emoji);
-                                  }}
-                                >
-                                  <span
-                                    aria-hidden="true"
-                                    className="transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] group-hover:scale-150 group-active:scale-95 motion-reduce:transform-none"
-                                  >
-                                    {emoji}
-                                  </span>
-                                </DropdownMenuItem>
-                              )
-                            )}
-                            <DropdownMenuSub
-                              open={allEmojisOpen}
-                              onOpenChange={open => {
-                                if (open) setAllEmojisOpen(true);
-                              }}
+                        {!isCancelled && (
+                          <div className="mb-0.5 rounded-lg border border-border/70 bg-popover px-1.5 py-1.5 shadow-sm">
+                            <div
+                              role="group"
+                              aria-label="Reactions"
+                              className="flex items-center gap-0.5"
                             >
-                              <DropdownMenuSubTrigger
-                                aria-label="More emojis"
-                                onPointerMove={event => {
-                                  if (event.pointerType === "mouse") {
-                                    event.preventDefault();
-                                  }
+                              {MESSAGE_REACTIONS.slice(0, 5).map(
+                                ({ emoji, label }) => (
+                                  <DropdownMenuItem
+                                    key={label}
+                                    className="group flex-1 justify-center rounded-md px-0 py-1.5 text-2xl leading-none select-none hover:bg-transparent focus:bg-transparent data-[selected=true]:bg-accent data-[selected=true]:text-foreground"
+                                    data-selected={
+                                      reactions.includes(emoji)
+                                        ? "true"
+                                        : undefined
+                                    }
+                                    aria-label={label}
+                                    onSelect={event => {
+                                      event.preventDefault();
+                                      toggleReaction(emoji);
+                                    }}
+                                  >
+                                    <span
+                                      aria-hidden="true"
+                                      className="transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] group-hover:scale-150 group-active:scale-95 motion-reduce:transform-none"
+                                    >
+                                      {emoji}
+                                    </span>
+                                  </DropdownMenuItem>
+                                )
+                              )}
+                              <DropdownMenuSub
+                                open={allEmojisOpen}
+                                onOpenChange={open => {
+                                  if (open) setAllEmojisOpen(true);
                                 }}
-                                className="size-9 justify-center gap-0 rounded-md px-0 py-0 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus:bg-accent focus:text-foreground data-[state=open]:bg-accent data-[state=open]:text-foreground [&>svg:last-child]:hidden"
                               >
-                                <ChevronRight className="size-5" />
-                              </DropdownMenuSubTrigger>
-                              <DropdownMenuSubContent
-                                sideOffset={8}
-                                style={
-                                  {
-                                    "--tw-enter-translate-x": "0",
-                                  } as React.CSSProperties
-                                }
-                                className="w-78 max-w-[calc(100vw-0.8rem)] rounded-xl p-1 data-[side=left]:slide-in-from-bottom-2 data-[side=right]:slide-in-from-bottom-2"
-                              >
-                                <AllEmojiGrid
-                                  reactions={reactions}
-                                  onToggle={toggleReaction}
-                                />
-                              </DropdownMenuSubContent>
-                            </DropdownMenuSub>
+                                <DropdownMenuSubTrigger
+                                  aria-label="More emojis"
+                                  onPointerMove={event => {
+                                    if (event.pointerType === "mouse") {
+                                      event.preventDefault();
+                                    }
+                                  }}
+                                  className="size-9 justify-center gap-0 rounded-md px-0 py-0 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus:bg-accent focus:text-foreground data-[state=open]:bg-accent data-[state=open]:text-foreground [&>svg:last-child]:hidden"
+                                >
+                                  <ChevronRight className="size-5" />
+                                </DropdownMenuSubTrigger>
+                                <DropdownMenuSubContent
+                                  sideOffset={8}
+                                  style={
+                                    {
+                                      "--tw-enter-translate-x": "0",
+                                    } as React.CSSProperties
+                                  }
+                                  className="w-78 max-w-[calc(100vw-0.8rem)] rounded-xl p-1 data-[side=left]:slide-in-from-bottom-2 data-[side=right]:slide-in-from-bottom-2"
+                                >
+                                  <AllEmojiGrid
+                                    reactions={reactions}
+                                    onToggle={toggleReaction}
+                                  />
+                                </DropdownMenuSubContent>
+                              </DropdownMenuSub>
+                            </div>
                           </div>
-                        </div>
+                        )}
                         <div className="rounded-lg border border-border/70 bg-popover p-1 shadow-sm">
                           {message.content && onSpeak ? (
                             <DropdownMenuItem
