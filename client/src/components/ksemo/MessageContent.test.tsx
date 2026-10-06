@@ -2,7 +2,10 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("streamdown", () => ({ Streamdown: () => null }));
+vi.mock("streamdown", () => ({
+  Streamdown: () => null,
+  defaultRehypePlugins: {},
+}));
 
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { MessageContent } from "./MessageContent";

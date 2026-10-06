@@ -39,7 +39,11 @@ import { type MessageFeedbackValue } from "./MessageFeedback";
 import { EMOJI_GROUPS } from "@/data/emojiGroups";
 import { usePersistFn } from "@/hooks/usePersistFn";
 import React, { memo, useEffect, useRef, useState } from "react";
-import { Streamdown } from "streamdown";
+import {
+  Streamdown,
+  defaultRehypePlugins,
+  type StreamdownProps,
+} from "streamdown";
 import { KsemoMarkdownCode } from "./code-block";
 import { sanitizeAssistantText } from "@/lib/sanitizeAssistant";
 import { usePdfViewer, isViewableDocument } from "@/contexts/PdfViewerContext";
@@ -104,9 +108,31 @@ function KsemoMarkdownLink({
 // Stable Streamdown component map so the internal `marked.Lexer` cache is not
 // invalidated on every render (a fresh `components` object defeats Streamdown's
 // memo and forces a full re-parse of the message on each streaming flush).
+const ReactionsContext = React.createContext<string[]>([]);
+
+function ReactionsSpan({
+  node: _node,
+  ...rest
+}: React.ComponentPropsWithoutRef<"span"> & { node?: unknown }) {
+  const reactions = React.useContext(ReactionsContext);
+  if ("data-ksemo-reactions" in rest) {
+    return (
+      <>
+        {reactions.map(emoji => (
+          <span key={emoji} className="ksemo-inline-reaction">
+            {emoji}
+          </span>
+        ))}
+      </>
+    );
+  }
+  return <span {...rest} />;
+}
+
 const KSEMO_MARKDOWN_COMPONENTS = {
   code: KsemoMarkdownCode,
   a: KsemoMarkdownLink,
+  span: ReactionsSpan,
 };
 
 type KsemoFile = NonNullable<KsemoMessage["attachments"]>[number];
@@ -141,6 +167,78 @@ const MESSAGE_REACTIONS = [
 const VISIBLE_EMOJI_GROUPS = EMOJI_GROUPS.filter(
   group => group.name !== "Flags" && group.name !== "Symbols"
 );
+
+type HastNode = {
+  type: string;
+  tagName?: string;
+  properties?: Record<string, unknown>;
+  children?: HastNode[];
+  value?: string;
+};
+
+const REACTION_BLOCK_TAGS = new Set([
+  "p",
+  "h1",
+  "h2",
+  "h3",
+  "h4",
+  "h5",
+  "h6",
+  "ul",
+  "ol",
+  "li",
+  "dl",
+  "dt",
+  "dd",
+  "blockquote",
+  "pre",
+  "table",
+  "thead",
+  "tbody",
+  "tfoot",
+  "tr",
+  "th",
+  "td",
+  "figure",
+  "figcaption",
+  "section",
+  "article",
+  "div",
+]);
+
+const singleMarkdownBlock = (markdown: string) => (markdown ? [markdown] : []);
+
+const appendReactionsPlaceholder = () => (tree: HastNode) => {
+  let block = tree;
+  for (;;) {
+    const children = block.children;
+    if (!children || children.length === 0) break;
+    const last = children[children.length - 1];
+    if (
+      last.type === "element" &&
+      last.tagName !== undefined &&
+      REACTION_BLOCK_TAGS.has(last.tagName) &&
+      last.children &&
+      last.children.length > 0
+    ) {
+      block = last;
+      continue;
+    }
+    break;
+  }
+  if (!block.children) return;
+  block.children.push({
+    type: "element",
+    tagName: "span",
+    properties: { dataKsemoReactions: "" },
+    children: [],
+  });
+};
+
+const STABLE_REHYPE_PLUGINS: StreamdownProps["rehypePlugins"] = [
+  ...Object.values(defaultRehypePlugins),
+  appendReactionsPlaceholder,
+];
 
 function ActionsMenuGlyph({ open }: { open: boolean }) {
   return (
@@ -308,9 +406,40 @@ export const MessageContent = memo(function MessageContent({
 }) {
   const [copied, setCopied] = useState(false);
   const [actionsOpen, setActionsOpen] = useState(false);
-  const [reaction, setReaction] = useState<string | null>(null);
+  const reactionsStorageKey = `ksemo-reactions:${message.id}`;
+  const [reactions, setReactions] = useState<string[]>(() => {
+    try {
+      const stored = localStorage.getItem(reactionsStorageKey);
+      const parsed: unknown = stored ? JSON.parse(stored) : [];
+      return Array.isArray(parsed)
+        ? parsed
+            .filter((item): item is string => typeof item === "string")
+            .slice(0, 3)
+        : [];
+    } catch {
+      return [];
+    }
+  });
   const [allEmojisOpen, setAllEmojisOpen] = useState(false);
   const [visibleGroupCount, setVisibleGroupCount] = useState(1);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(reactionsStorageKey, JSON.stringify(reactions));
+    } catch {
+      // storage unavailable; reactions stay in memory for this session
+    }
+  }, [reactionsStorageKey, reactions]);
+
+  const toggleReaction = (emoji: string) => {
+    setReactions(prev =>
+      prev.includes(emoji)
+        ? prev.filter(item => item !== emoji)
+        : prev.length < 3
+          ? [...prev, emoji]
+          : prev
+    );
+  };
   const [previewFile, setPreviewFile] = useState<KsemoFile | null>(null);
   const [lightboxFile, setLightboxFile] = useState<KsemoFile | null>(null);
   const { openPdf } = usePdfViewer();
@@ -558,158 +687,176 @@ export const MessageContent = memo(function MessageContent({
                 );
               })()
             : null}
-          {(!isUser || message.content.trim().length > 0) && (
-            <div
-              className={cn(
-                "text-[15px] leading-6",
-                isUser
-                  ? cn(
-                      "flex flex-col items-end rounded-2xl rounded-tr-md border border-border bg-muted px-3.5 py-2.5 text-[15px] leading-6 text-foreground shadow-sm",
-                      isEditing && "ring-1 ring-primary/40 border-primary/40"
-                    )
-                  : "max-w-none rounded-tl-md bg-transparent px-0 py-0 text-foreground"
-              )}
-            >
-              {isUser ? (
-                !userExpanded ? (
-                  <div
-                    role={userLong ? "button" : undefined}
-                    tabIndex={userLong ? 0 : undefined}
-                    aria-expanded={userLong ? false : undefined}
-                    onClick={userLong ? () => setUserExpanded(true) : undefined}
-                    onKeyDown={
-                      userLong
-                        ? e => {
-                            if (e.key === "Enter" || e.key === " ") {
-                              e.preventDefault();
-                              setUserExpanded(true);
+          <ReactionsContext.Provider value={reactions}>
+            {(!isUser || message.content.trim().length > 0) && (
+              <div
+                className={cn(
+                  "text-[15px] leading-6",
+                  isUser
+                    ? cn(
+                        "flex flex-col items-end rounded-2xl rounded-tr-md border border-border bg-muted px-3.5 py-2.5 text-[15px] leading-6 text-foreground shadow-sm",
+                        isEditing && "ring-1 ring-primary/40 border-primary/40"
+                      )
+                    : "max-w-none rounded-tl-md bg-transparent px-0 py-0 text-foreground"
+                )}
+              >
+                {isUser ? (
+                  !userExpanded ? (
+                    <div
+                      role={userLong ? "button" : undefined}
+                      tabIndex={userLong ? 0 : undefined}
+                      aria-expanded={userLong ? false : undefined}
+                      onClick={
+                        userLong ? () => setUserExpanded(true) : undefined
+                      }
+                      onKeyDown={
+                        userLong
+                          ? e => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                setUserExpanded(true);
+                              }
                             }
-                          }
-                        : undefined
-                    }
-                    className="relative w-full cursor-pointer text-left"
-                  >
-                    <p
-                      ref={userTextRef}
-                      className="w-full whitespace-pre-wrap text-left line-clamp-8"
+                          : undefined
+                      }
+                      className="relative w-full cursor-pointer text-left"
                     >
-                      {message.content}
-                    </p>
-                    {userLong && (
+                      <p
+                        ref={userTextRef}
+                        className="w-full whitespace-pre-wrap text-left line-clamp-8"
+                      >
+                        {message.content}
+                      </p>
+                      {userLong && (
+                        <>
+                          <div
+                            className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-muted to-transparent"
+                            aria-hidden="true"
+                          />
+                          <span className="absolute -bottom-2.5 -right-3.5 flex items-center gap-1 rounded-full bg-accent px-3 py-1 text-[13px] font-bold text-foreground/70 transition-colors hover:text-foreground">
+                            Show more
+                            <ChevronDown className="size-3.5" />
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="relative w-full pb-9">
+                      <p
+                        ref={userTextRef}
+                        className="w-full whitespace-pre-wrap text-left"
+                      >
+                        {message.content}
+                      </p>
+                      {userLong && (
+                        <button
+                          type="button"
+                          onClick={() => setUserExpanded(false)}
+                          className="absolute -bottom-2.5 -right-3.5 flex items-center gap-1 rounded-full bg-accent px-3 py-1 text-[13px] font-bold text-foreground/70 transition-colors hover:text-foreground"
+                        >
+                          Show less
+                          <ChevronDown className="size-3.5 rotate-180 transition-transform" />
+                        </button>
+                      )}
+                    </div>
+                  )
+                ) : cleanContent ? (
+                  <>
+                    {fileCreationNode ? (
                       <>
-                        <div
-                          className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-muted to-transparent"
-                          aria-hidden="true"
-                        />
-                        <span className="absolute -bottom-2.5 -right-3.5 flex items-center gap-1 rounded-full bg-accent px-3 py-1 text-[13px] font-bold text-foreground/70 transition-colors hover:text-foreground">
-                          Show more
-                          <ChevronDown className="size-3.5" />
-                        </span>
+                        {(() => {
+                          const { first, rest } =
+                            splitFirstSentence(cleanContent);
+                          return (
+                            <>
+                              {first ? (
+                                <div className="ksemo-markdown prose prose-neutral max-w-none text-[15px] leading-6 dark:prose-invert">
+                                  <Streamdown
+                                    components={KSEMO_MARKDOWN_COMPONENTS}
+                                    rehypePlugins={
+                                      rest ? undefined : STABLE_REHYPE_PLUGINS
+                                    }
+                                    parseMarkdownIntoBlocksFn={
+                                      rest ? undefined : singleMarkdownBlock
+                                    }
+                                  >
+                                    {first}
+                                  </Streamdown>
+                                </div>
+                              ) : null}
+
+                              <div className="my-2">{fileCreationNode}</div>
+
+                              {rest ? (
+                                <div className="ksemo-markdown prose prose-neutral max-w-none text-[15px] leading-6 dark:prose-invert mt-2">
+                                  <Streamdown
+                                    components={KSEMO_MARKDOWN_COMPONENTS}
+                                    rehypePlugins={STABLE_REHYPE_PLUGINS}
+                                    parseMarkdownIntoBlocksFn={
+                                      singleMarkdownBlock
+                                    }
+                                  >
+                                    {rest}
+                                  </Streamdown>
+                                </div>
+                              ) : null}
+                            </>
+                          );
+                        })()}
+                      </>
+                    ) : (
+                      <>
+                        {message.botAction && (
+                          <BotActionStatus action={message.botAction} />
+                        )}
+                        {cleanContent && (
+                          <div className="ksemo-markdown prose prose-neutral max-w-none text-[15px] leading-6 dark:prose-invert">
+                            <Streamdown
+                              components={KSEMO_MARKDOWN_COMPONENTS}
+                              rehypePlugins={STABLE_REHYPE_PLUGINS}
+                              parseMarkdownIntoBlocksFn={singleMarkdownBlock}
+                            >
+                              {cleanContent}
+                            </Streamdown>
+                          </div>
+                        )}
                       </>
                     )}
-                  </div>
+                    {isCancelled && renderStoppedNotice()}
+                  </>
+                ) : message.botAction ? (
+                  <>
+                    <BotActionStatus action={message.botAction} />
+                    {isCancelled && renderStoppedNotice()}
+                  </>
+                ) : fileCreationNode ? (
+                  <>
+                    <div className="my-2">{fileCreationNode}</div>
+                    {isCancelled && renderStoppedNotice()}
+                  </>
+                ) : isCancelled ? (
+                  renderStoppedNotice()
                 ) : (
-                  <div className="relative w-full pb-9">
-                    <p
-                      ref={userTextRef}
-                      className="w-full whitespace-pre-wrap text-left"
-                    >
-                      {message.content}
-                    </p>
-                    {userLong && (
-                      <button
-                        type="button"
-                        onClick={() => setUserExpanded(false)}
-                        className="absolute -bottom-2.5 -right-3.5 flex items-center gap-1 rounded-full bg-accent px-3 py-1 text-[13px] font-bold text-foreground/70 transition-colors hover:text-foreground"
-                      >
-                        Show less
-                        <ChevronDown className="size-3.5 rotate-180 transition-transform" />
-                      </button>
-                    )}
-                  </div>
-                )
-              ) : cleanContent ? (
-                <>
-                  {fileCreationNode ? (
-                    <>
-                      {(() => {
-                        const { first, rest } =
-                          splitFirstSentence(cleanContent);
-                        return (
-                          <>
-                            {first ? (
-                              <div className="ksemo-markdown prose prose-neutral max-w-none text-[15px] leading-6 dark:prose-invert">
-                                <Streamdown
-                                  components={KSEMO_MARKDOWN_COMPONENTS}
-                                >
-                                  {first}
-                                </Streamdown>
-                              </div>
-                            ) : null}
-
-                            <div className="my-2">{fileCreationNode}</div>
-
-                            {rest ? (
-                              <div className="ksemo-markdown prose prose-neutral max-w-none text-[15px] leading-6 dark:prose-invert mt-2">
-                                <Streamdown
-                                  components={KSEMO_MARKDOWN_COMPONENTS}
-                                >
-                                  {rest}
-                                </Streamdown>
-                              </div>
-                            ) : null}
-                          </>
-                        );
-                      })()}
-                    </>
-                  ) : (
-                    <>
-                      {message.botAction && (
-                        <BotActionStatus action={message.botAction} />
-                      )}
-                      {cleanContent && (
-                        <div className="ksemo-markdown prose prose-neutral max-w-none text-[15px] leading-6 dark:prose-invert">
-                          <Streamdown components={KSEMO_MARKDOWN_COMPONENTS}>
-                            {cleanContent}
-                          </Streamdown>
+                  <>
+                    {message.status === "streaming" &&
+                      isCurrentGeneration &&
+                      !hideTypingIndicator &&
+                      !message.botAction &&
+                      !message.fileGeneration &&
+                      !fileCreationNode &&
+                      !(message.attachments?.length && !isUser) && (
+                        <div
+                          aria-label="KSEMO is responding"
+                          className="inline-flex items-center"
+                        >
+                          <ThinkingIndicator />
                         </div>
                       )}
-                    </>
-                  )}
-                  {isCancelled && renderStoppedNotice()}
-                </>
-              ) : message.botAction ? (
-                <>
-                  <BotActionStatus action={message.botAction} />
-                  {isCancelled && renderStoppedNotice()}
-                </>
-              ) : fileCreationNode ? (
-                <>
-                  <div className="my-2">{fileCreationNode}</div>
-                  {isCancelled && renderStoppedNotice()}
-                </>
-              ) : isCancelled ? (
-                renderStoppedNotice()
-              ) : (
-                <>
-                  {message.status === "streaming" &&
-                    isCurrentGeneration &&
-                    !hideTypingIndicator &&
-                    !message.botAction &&
-                    !message.fileGeneration &&
-                    !fileCreationNode &&
-                    !(message.attachments?.length && !isUser) && (
-                      <div
-                        aria-label="KSEMO is responding"
-                        className="inline-flex items-center"
-                      >
-                        <ThinkingIndicator />
-                      </div>
-                    )}
-                </>
-              )}
-            </div>
-          )}
+                  </>
+                )}
+              </div>
+            )}
+          </ReactionsContext.Provider>
 
           {/* Attachments (e.g. images, uploaded files; generated document is presented via primary FileCreationCard) */}
           {!isUser &&
@@ -947,14 +1094,14 @@ export const MessageContent = memo(function MessageContent({
                                   key={label}
                                   className="group flex-1 justify-center rounded-md px-0 py-1.5 text-2xl leading-none select-none hover:bg-transparent focus:bg-transparent data-[selected=true]:bg-accent data-[selected=true]:text-foreground"
                                   data-selected={
-                                    reaction === emoji ? "true" : undefined
+                                    reactions.includes(emoji)
+                                      ? "true"
+                                      : undefined
                                   }
                                   aria-label={label}
                                   onSelect={event => {
                                     event.preventDefault();
-                                    setReaction(prev =>
-                                      prev === emoji ? null : emoji
-                                    );
+                                    toggleReaction(emoji);
                                   }}
                                 >
                                   <span
@@ -1015,15 +1162,15 @@ export const MessageContent = memo(function MessageContent({
                                             key={`${group.name}-${name}`}
                                             type="button"
                                             aria-label={name}
-                                            aria-pressed={reaction === emoji}
+                                            aria-pressed={reactions.includes(
+                                              emoji
+                                            )}
                                             onClick={() =>
-                                              setReaction(prev =>
-                                                prev === emoji ? null : emoji
-                                              )
+                                              toggleReaction(emoji)
                                             }
                                             className={cn(
                                               "group flex h-9 items-center justify-center rounded-md text-2xl leading-none select-none transition-colors focus-visible:ring-0 focus-visible:outline-none",
-                                              reaction === emoji &&
+                                              reactions.includes(emoji) &&
                                                 "bg-accent text-foreground"
                                             )}
                                           >
