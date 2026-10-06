@@ -443,7 +443,7 @@ export function LibraryWorkspace({
                     variant="ghost"
                     size="icon"
                     onClick={onOpenSidebar}
-                    className="size-9 shrink-0 rounded-lg border border-border/40 bg-card text-foreground/80 transition-colors hover:bg-accent hover:text-foreground shadow-xs active:scale-95 lg:hidden"
+                    className="size-9 shrink-0 rounded-lg border-0 bg-transparent p-0 text-foreground/80 shadow-none transition-colors hover:bg-transparent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring active:bg-transparent lg:hidden"
                     aria-label="Open conversations"
                     title="Open sidebar"
                   >
