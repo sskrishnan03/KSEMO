@@ -168,6 +168,57 @@ const VISIBLE_EMOJI_GROUPS = EMOJI_GROUPS.filter(
   group => group.name !== "Flags" && group.name !== "Symbols"
 );
 
+/**
+ * Full emoji grid behind the "all emojis" submenu. Extracted as a memo so that
+ * ticking a reaction re-renders only the changed button instead of the whole
+ * panel of hundreds of emojis.
+ */
+const AllEmojiGrid = memo(function AllEmojiGrid({
+  reactions,
+  onToggle,
+}: {
+  reactions: string[];
+  onToggle: (emoji: string) => void;
+}) {
+  return (
+    <div
+      role="group"
+      aria-label="All emojis"
+      className="h-[260px] overflow-x-hidden overflow-y-auto overscroll-contain"
+    >
+      {VISIBLE_EMOJI_GROUPS.map(group => (
+        <div key={group.name} role="group" aria-label={group.name}>
+          <div className="sticky top-0 bg-popover px-1 pt-1.5 pb-1 text-[11px] font-medium leading-4 text-muted-foreground">
+            {group.name}
+          </div>
+          <div className="grid grid-cols-7">
+            {group.emojis.map(({ emoji, name }) => (
+              <button
+                key={`${group.name}-${name}`}
+                type="button"
+                aria-label={name}
+                aria-pressed={reactions.includes(emoji)}
+                onClick={() => onToggle(emoji)}
+                className={cn(
+                  "group flex h-9 items-center justify-center rounded-md text-2xl leading-none select-none transition-colors focus-visible:ring-0 focus-visible:outline-none",
+                  reactions.includes(emoji) && "bg-accent text-foreground"
+                )}
+              >
+                <span
+                  aria-hidden="true"
+                  className="transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] group-hover:scale-150 group-active:scale-95 motion-reduce:transform-none"
+                >
+                  {emoji}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+});
+
 type HastNode = {
   type: string;
   tagName?: string;
@@ -421,7 +472,6 @@ export const MessageContent = memo(function MessageContent({
     }
   });
   const [allEmojisOpen, setAllEmojisOpen] = useState(false);
-  const [visibleGroupCount, setVisibleGroupCount] = useState(1);
 
   useEffect(() => {
     try {
@@ -431,7 +481,7 @@ export const MessageContent = memo(function MessageContent({
     }
   }, [reactionsStorageKey, reactions]);
 
-  const toggleReaction = (emoji: string) => {
+  const toggleReaction = usePersistFn((emoji: string) => {
     setReactions(prev =>
       prev.includes(emoji)
         ? prev.filter(item => item !== emoji)
@@ -439,7 +489,7 @@ export const MessageContent = memo(function MessageContent({
           ? [...prev, emoji]
           : prev
     );
-  };
+  });
   const [previewFile, setPreviewFile] = useState<KsemoFile | null>(null);
   const [lightboxFile, setLightboxFile] = useState<KsemoFile | null>(null);
   const { openPdf } = usePdfViewer();
@@ -470,24 +520,6 @@ export const MessageContent = memo(function MessageContent({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [previewFile]);
-
-  useEffect(() => {
-    if (!allEmojisOpen) {
-      setVisibleGroupCount(1);
-      return;
-    }
-    let frame = 0;
-    let count = 1;
-    const tick = () => {
-      count += 1;
-      setVisibleGroupCount(count);
-      if (count < VISIBLE_EMOJI_GROUPS.length) {
-        frame = requestAnimationFrame(tick);
-      }
-    };
-    frame = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frame);
-  }, [allEmojisOpen]);
 
   useEffect(() => {
     if (!actionsOpen || !allEmojisOpen) return;
@@ -1140,53 +1172,10 @@ export const MessageContent = memo(function MessageContent({
                                 }
                                 className="w-78 rounded-xl p-1 data-[side=left]:slide-in-from-bottom-2 data-[side=right]:slide-in-from-bottom-2"
                               >
-                                <div
-                                  role="group"
-                                  aria-label="All emojis"
-                                  className="h-[260px] overflow-x-hidden overflow-y-auto overscroll-contain"
-                                >
-                                  {VISIBLE_EMOJI_GROUPS.slice(
-                                    0,
-                                    visibleGroupCount
-                                  ).map(group => (
-                                    <div
-                                      key={group.name}
-                                      role="group"
-                                      aria-label={group.name}
-                                    >
-                                      <div className="sticky top-0 bg-popover px-1 pt-1.5 pb-1 text-[11px] font-medium leading-4 text-muted-foreground">
-                                        {group.name}
-                                      </div>
-                                      <div className="grid grid-cols-7">
-                                        {group.emojis.map(({ emoji, name }) => (
-                                          <button
-                                            key={`${group.name}-${name}`}
-                                            type="button"
-                                            aria-label={name}
-                                            aria-pressed={reactions.includes(
-                                              emoji
-                                            )}
-                                            onClick={() =>
-                                              toggleReaction(emoji)
-                                            }
-                                            className={cn(
-                                              "group flex h-9 items-center justify-center rounded-md text-2xl leading-none select-none transition-colors focus-visible:ring-0 focus-visible:outline-none",
-                                              reactions.includes(emoji) &&
-                                                "bg-accent text-foreground"
-                                            )}
-                                          >
-                                            <span
-                                              aria-hidden="true"
-                                              className="transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] group-hover:scale-150 group-active:scale-95 motion-reduce:transform-none"
-                                            >
-                                              {emoji}
-                                            </span>
-                                          </button>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
+                                <AllEmojiGrid
+                                  reactions={reactions}
+                                  onToggle={toggleReaction}
+                                />
                               </DropdownMenuSubContent>
                             </DropdownMenuSub>
                           </div>
