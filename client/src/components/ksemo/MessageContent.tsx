@@ -9,6 +9,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuPortal,
   DropdownMenuSeparator,
   DropdownMenuSub,
   DropdownMenuSubContent,
@@ -38,6 +39,7 @@ import {
 import { type MessageFeedbackValue } from "./MessageFeedback";
 import { EMOJI_GROUPS } from "@/data/emojiGroups";
 import { usePersistFn } from "@/hooks/usePersistFn";
+import { useIsMobile } from "@/hooks/useIsMobile";
 import React, { memo, useEffect, useRef, useState } from "react";
 import {
   Streamdown,
@@ -472,6 +474,7 @@ export const MessageContent = memo(function MessageContent({
     }
   });
   const [allEmojisOpen, setAllEmojisOpen] = useState(false);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     try {
@@ -1163,20 +1166,55 @@ export const MessageContent = memo(function MessageContent({
                               >
                                 <ChevronRight className="size-5" />
                               </DropdownMenuSubTrigger>
-                              <DropdownMenuSubContent
-                                sideOffset={8}
-                                style={
-                                  {
-                                    "--tw-enter-translate-x": "0",
-                                  } as React.CSSProperties
-                                }
-                                className="w-78 rounded-xl p-1 data-[side=left]:slide-in-from-bottom-2 data-[side=right]:slide-in-from-bottom-2"
-                              >
-                                <AllEmojiGrid
-                                  reactions={reactions}
-                                  onToggle={toggleReaction}
-                                />
-                              </DropdownMenuSubContent>
+                              {!isMobile && (
+                                <DropdownMenuSubContent
+                                  sideOffset={8}
+                                  style={
+                                    {
+                                      "--tw-enter-translate-x": "0",
+                                    } as React.CSSProperties
+                                  }
+                                  className="w-78 rounded-xl p-1 data-[side=left]:slide-in-from-bottom-2 data-[side=right]:slide-in-from-bottom-2"
+                                >
+                                  <AllEmojiGrid
+                                    reactions={reactions}
+                                    onToggle={toggleReaction}
+                                  />
+                                </DropdownMenuSubContent>
+                              )}
+                              {isMobile && allEmojisOpen && (
+                                <DropdownMenuPortal>
+                                  <div className="fixed inset-0 z-[60] flex items-end justify-center sm:items-center">
+                                    <div
+                                      className="absolute inset-0 bg-black/40"
+                                      aria-hidden="true"
+                                    />
+                                    <div className="relative flex max-h-[75dvh] w-full max-w-md flex-col overflow-hidden rounded-t-2xl border border-border bg-popover p-3 pb-4 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+                                      <div className="mb-2 flex items-center justify-between pl-1">
+                                        <h3 className="text-sm font-semibold text-foreground">
+                                          Reactions
+                                        </h3>
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="icon"
+                                          className="size-7"
+                                          onClick={() =>
+                                            setAllEmojisOpen(false)
+                                          }
+                                          aria-label="Close reactions"
+                                        >
+                                          <X className="size-4" />
+                                        </Button>
+                                      </div>
+                                      <AllEmojiGrid
+                                        reactions={reactions}
+                                        onToggle={toggleReaction}
+                                      />
+                                    </div>
+                                  </div>
+                                </DropdownMenuPortal>
+                              )}
                             </DropdownMenuSub>
                           </div>
                         </div>
