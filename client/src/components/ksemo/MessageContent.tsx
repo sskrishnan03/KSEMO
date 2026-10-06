@@ -180,13 +180,26 @@ const AllEmojiGrid = memo(function AllEmojiGrid({
   reactions: string[];
   onToggle: (emoji: string) => void;
 }) {
+  const [visibleGroupCount, setVisibleGroupCount] = useState(1);
+
   return (
     <div
       role="group"
       aria-label="All emojis"
       className="h-[260px] overflow-x-hidden overflow-y-auto overscroll-contain"
+      onScroll={event => {
+        const element = event.currentTarget;
+        if (
+          element.scrollTop + element.clientHeight >=
+          element.scrollHeight - 100
+        ) {
+          setVisibleGroupCount(current =>
+            Math.min(VISIBLE_EMOJI_GROUPS.length, current + 2)
+          );
+        }
+      }}
     >
-      {VISIBLE_EMOJI_GROUPS.map(group => (
+      {VISIBLE_EMOJI_GROUPS.slice(0, visibleGroupCount).map(group => (
         <div key={group.name} role="group" aria-label={group.name}>
           <div className="sticky top-0 bg-popover px-1 pt-1.5 pb-1 text-[11px] font-medium leading-4 text-muted-foreground">
             {group.name}
@@ -1039,6 +1052,16 @@ export const MessageContent = memo(function MessageContent({
                         sideOffset={6}
                         onPointerDownOutside={event => {
                           if (allEmojisOpen) {
+                            const target = event.detail.originalEvent.target;
+                            if (
+                              target instanceof Element &&
+                              target.closest(
+                                '[data-slot="dropdown-menu-sub-content"]'
+                              )
+                            ) {
+                              event.preventDefault();
+                              return;
+                            }
                             event.preventDefault();
                             setAllEmojisOpen(false);
                           }
@@ -1104,32 +1127,28 @@ export const MessageContent = memo(function MessageContent({
                                 >
                                   <ChevronRight className="size-5" />
                                 </DropdownMenuSubTrigger>
-                                {!isMobile && (
-                                  <DropdownMenuSubContent
-                                    sideOffset={8}
-                                    style={
-                                      {
-                                        "--tw-enter-translate-x": "0",
-                                      } as React.CSSProperties
-                                    }
-                                    className="w-78 max-w-[calc(100vw-0.8rem)] rounded-xl p-1 data-[side=left]:slide-in-from-bottom-2 data-[side=right]:slide-in-from-bottom-2"
-                                  >
-                                    <AllEmojiGrid
-                                      reactions={reactions}
-                                      onToggle={toggleReaction}
-                                    />
-                                  </DropdownMenuSubContent>
-                                )}
+                                <DropdownMenuSubContent
+                                  sideOffset={8}
+                                  collisionPadding={8}
+                                  style={
+                                    {
+                                      "--tw-enter-translate-x": "0",
+                                    } as React.CSSProperties
+                                  }
+                                  className={cn(
+                                    isMobile
+                                      ? "w-[min(18rem,calc(100vw-1rem))] max-w-[calc(100vw-1rem)]"
+                                      : "w-78 max-w-[calc(100vw-0.8rem)]",
+                                    "max-h-[min(60vh,24rem)] rounded-xl p-1 data-[side=left]:slide-in-from-bottom-2 data-[side=right]:slide-in-from-bottom-2"
+                                  )}
+                                >
+                                  <AllEmojiGrid
+                                    reactions={reactions}
+                                    onToggle={toggleReaction}
+                                  />
+                                </DropdownMenuSubContent>
                               </DropdownMenuSub>
                             </div>
-                            {isMobile && allEmojisOpen && (
-                              <div className="mt-1.5 w-full border-t border-border/70 pt-1.5">
-                                <AllEmojiGrid
-                                  reactions={reactions}
-                                  onToggle={toggleReaction}
-                                />
-                              </div>
-                            )}
                           </div>
                         )}
                         <div className="rounded-lg border border-border/70 bg-popover p-1 shadow-sm">
