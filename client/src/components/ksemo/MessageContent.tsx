@@ -10,6 +10,9 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { getFileKind } from "@/lib/fileKinds";
@@ -20,10 +23,10 @@ import { ThinkingIndicator } from "@/components/ui/thinking-indicator";
 import {
   Check,
   ChevronDown,
+  ChevronRight,
   Copy,
   Download,
   ExternalLink,
-  MoreHorizontal,
   Pencil,
   RotateCcw,
   Square,
@@ -33,6 +36,7 @@ import {
   X,
 } from "lucide-react";
 import { type MessageFeedbackValue } from "./MessageFeedback";
+import { EMOJI_GROUPS } from "@/data/emojiGroups";
 import { usePersistFn } from "@/hooks/usePersistFn";
 import React, { memo, useEffect, useRef, useState } from "react";
 import { Streamdown } from "streamdown";
@@ -123,6 +127,20 @@ const LIST_ARROW_LINES_D =
   "M2.25 5C2.25 4.58579 2.58579 4.25 3 4.25H21C21.4142 4.25 21.75 4.58579 21.75 5C21.75 5.41421 21.4142 5.75 21 5.75H3C2.58579 5.75 2.25 5.41421 2.25 5ZM2.25 9C2.25 8.58579 2.58579 8.25 3 8.25H21C21.4142 8.25 21.75 8.58579 21.75 9C21.75 9.41421 21.4142 9.75 21 9.75H3C2.58579 9.75 2.25 9.41421 2.25 9ZM2.25 13C2.25 12.5858 2.58579 12.25 3 12.25H11C11.4142 12.25 11.75 12.5858 11.75 13C11.75 13.4142 11.4142 13.75 11 13.75H3C2.58579 13.75 2.25 13.4142 2.25 13ZM2.25 17C2.25 16.5858 2.58579 16.25 3 16.25H11C11.4142 16.25 11.75 16.5858 11.75 17C11.75 17.4142 11.4142 17.75 11 17.75H3C2.58579 17.75 2.25 17.4142 2.25 17Z";
 const LIST_ARROW_ARROW_D =
   "M17.5 12.25C17.9142 12.25 18.25 12.5858 18.25 13V17.1893L19.4697 15.9697C19.7626 15.6768 20.2374 15.6768 20.5303 15.9697C20.8232 16.2626 20.8232 16.7374 20.5303 17.0303L18.0303 19.5303C17.7374 19.8232 17.2626 19.8232 16.9697 19.5303L14.4697 17.0303C14.1768 16.7374 14.1768 16.2626 14.4697 15.9697C14.7626 15.6768 15.2374 15.6768 15.5303 15.9697L16.75 17.1893V13C16.75 12.5858 17.0858 12.25 17.5 12.25Z";
+
+// Compact reaction strip pinned to the top of the More menu: :) :D :| :( :O ;)
+const MESSAGE_REACTIONS = [
+  { emoji: "🙂", label: "React with slightly smiling face" },
+  { emoji: "😀", label: "React with grinning face" },
+  { emoji: "😐", label: "React with neutral face" },
+  { emoji: "🙁", label: "React with slightly frowning face" },
+  { emoji: "😮", label: "React with surprised face" },
+  { emoji: "😉", label: "React with winking face" },
+] as const;
+
+const VISIBLE_EMOJI_GROUPS = EMOJI_GROUPS.filter(
+  group => group.name !== "Flags" && group.name !== "Symbols"
+);
 
 function ActionsMenuGlyph({ open }: { open: boolean }) {
   return (
@@ -290,6 +308,9 @@ export const MessageContent = memo(function MessageContent({
 }) {
   const [copied, setCopied] = useState(false);
   const [actionsOpen, setActionsOpen] = useState(false);
+  const [reaction, setReaction] = useState<string | null>(null);
+  const [allEmojisOpen, setAllEmojisOpen] = useState(false);
+  const [visibleGroupCount, setVisibleGroupCount] = useState(1);
   const [previewFile, setPreviewFile] = useState<KsemoFile | null>(null);
   const [lightboxFile, setLightboxFile] = useState<KsemoFile | null>(null);
   const { openPdf } = usePdfViewer();
@@ -320,6 +341,55 @@ export const MessageContent = memo(function MessageContent({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [previewFile]);
+
+  useEffect(() => {
+    if (!allEmojisOpen) {
+      setVisibleGroupCount(1);
+      return;
+    }
+    let frame = 0;
+    let count = 1;
+    const tick = () => {
+      count += 1;
+      setVisibleGroupCount(count);
+      if (count < VISIBLE_EMOJI_GROUPS.length) {
+        frame = requestAnimationFrame(tick);
+      }
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [allEmojisOpen]);
+
+  useEffect(() => {
+    if (!actionsOpen || !allEmojisOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
+        setAllEmojisOpen(false);
+      }
+    };
+    document.addEventListener("keydown", onKeyDown, true);
+    return () => document.removeEventListener("keydown", onKeyDown, true);
+  }, [actionsOpen, allEmojisOpen]);
+
+  useEffect(() => {
+    if (!allEmojisOpen) return;
+    const onPointerDown = (event: Event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      if (
+        target.closest('[role="menu"]') ||
+        target.closest('[aria-haspopup="menu"]') ||
+        target.closest('[data-slot^="dropdown-menu"]')
+      ) {
+        return;
+      }
+      setAllEmojisOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [allEmojisOpen]);
 
   useEffect(() => {
     if (!isUser || !userTextRef.current) return;
@@ -806,166 +876,285 @@ export const MessageContent = memo(function MessageContent({
                   <div className="relative inline-flex shrink-0">
                     <DropdownMenu
                       open={actionsOpen}
-                      onOpenChange={setActionsOpen}
+                      onOpenChange={open => {
+                        setActionsOpen(open);
+                        if (!open) setAllEmojisOpen(false);
+                      }}
                     >
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className={cn(
-                            actionClass,
-                            actionsOpen &&
-                              "bg-accent/70 text-foreground hover:bg-accent/70 hover:text-foreground"
-                          )}
-                          aria-label={actionsMenuLabel}
-                          aria-live="polite"
-                        >
-                          {isPreparingSpeech ? (
-                            <span className="flex size-6 shrink-0 items-center justify-center">
-                              <span
-                                className="loader text-current"
-                                style={{ width: 16 }}
-                                aria-hidden
-                              />
-                            </span>
-                          ) : isSpeaking ? (
-                            <span className="flex size-6 shrink-0 items-center justify-center">
-                              <RealtimeSpeechEqualizer
-                                isSpeaking={isSpeaking}
-                                speechState={speechState}
-                                messageId={message.id}
-                              />
-                            </span>
-                          ) : (
-                            <ActionsMenuGlyph open={actionsOpen} />
-                          )}
-                        </Button>
-                      </DropdownMenuTrigger>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className={cn(
+                                actionClass,
+                                actionsOpen &&
+                                  "bg-accent/70 text-foreground hover:bg-accent/70 hover:text-foreground"
+                              )}
+                              aria-label={actionsMenuLabel}
+                              aria-live="polite"
+                            >
+                              {isPreparingSpeech ? (
+                                <span className="flex size-6 shrink-0 items-center justify-center">
+                                  <span
+                                    className="loader text-current"
+                                    style={{ width: 16 }}
+                                    aria-hidden
+                                  />
+                                </span>
+                              ) : isSpeaking ? (
+                                <span className="flex size-6 shrink-0 items-center justify-center">
+                                  <RealtimeSpeechEqualizer
+                                    isSpeaking={isSpeaking}
+                                    speechState={speechState}
+                                    messageId={message.id}
+                                  />
+                                </span>
+                              ) : (
+                                <ActionsMenuGlyph open={actionsOpen} />
+                              )}
+                            </Button>
+                          </DropdownMenuTrigger>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom">More</TooltipContent>
+                      </Tooltip>
                       <DropdownMenuContent
                         align="start"
                         side="top"
                         sideOffset={6}
-                        className="w-max min-w-44 rounded-xl"
+                        onPointerDownOutside={event => {
+                          if (allEmojisOpen) {
+                            event.preventDefault();
+                            setAllEmojisOpen(false);
+                          }
+                        }}
+                        onFocusOutside={event => {
+                          if (allEmojisOpen) event.preventDefault();
+                        }}
+                        className="w-max min-w-44 rounded-xl border-0 bg-transparent p-1 shadow-none"
                       >
-                        {message.content && onSpeak ? (
-                          <DropdownMenuItem
-                            className="group/readaloud gap-2.5 whitespace-nowrap rounded-lg py-2 pl-2.5 pr-8"
-                            onSelect={() => {
-                              if (isPreparingSpeech) return;
-                              if (isSpeaking) onStop();
-                              else
-                                onSpeak(
-                                  cleanContent || message.content,
-                                  message.id
-                                );
-                            }}
-                            disabled={isPreparingSpeech}
-                            aria-label={
-                              isPreparingSpeech
-                                ? "Preparing audio"
-                                : isSpeaking
-                                  ? "Stop reading"
-                                  : "Read aloud"
-                            }
+                        <div className="mb-0.5 rounded-lg border border-border/70 bg-popover px-1.5 py-1.5 shadow-sm">
+                          <div
+                            role="group"
+                            aria-label="Reactions"
+                            className="flex items-center gap-0.5"
                           >
-                            {isPreparingSpeech ? (
-                              <span className="flex size-4 items-center justify-center text-foreground">
-                                <span
-                                  className="loader text-foreground"
-                                  style={{ width: 16 }}
-                                  aria-hidden
-                                />
-                              </span>
-                            ) : isSpeaking ? (
-                              <>
-                                <RealtimeSpeechEqualizer
-                                  isSpeaking={isSpeaking}
-                                  speechState={speechState}
-                                  messageId={message.id}
-                                />
-                                <Square className="size-3.5 fill-current group-hover/readaloud:hidden" />
-                              </>
-                            ) : (
-                              <Volume2 className="size-4 text-muted-foreground" />
+                            {MESSAGE_REACTIONS.slice(0, 5).map(
+                              ({ emoji, label }) => (
+                                <DropdownMenuItem
+                                  key={label}
+                                  className="flex-1 justify-center rounded-md px-0 py-1.5 text-2xl leading-none select-none data-[selected=true]:bg-accent data-[selected=true]:text-foreground"
+                                  data-selected={
+                                    reaction === emoji ? "true" : undefined
+                                  }
+                                  aria-label={label}
+                                  onSelect={event => {
+                                    event.preventDefault();
+                                    setReaction(prev =>
+                                      prev === emoji ? null : emoji
+                                    );
+                                  }}
+                                >
+                                  <span aria-hidden="true">{emoji}</span>
+                                </DropdownMenuItem>
+                              )
                             )}
-                            <span>
-                              {isPreparingSpeech
-                                ? "Preparing audio…"
-                                : isSpeaking
-                                  ? "Stop reading"
-                                  : "Read aloud"}
-                            </span>
-                          </DropdownMenuItem>
-                        ) : null}
-                        {(onRegenerate || onRetry) && (
-                          <DropdownMenuItem
-                            className="gap-2.5 whitespace-nowrap rounded-lg py-2 pl-2.5 pr-8"
-                            onSelect={() => {
-                              if (onRegenerate) onRegenerate(message);
-                              else if (onRetry) onRetry(message);
-                            }}
-                            aria-label={
-                              onRegenerate
-                                ? "Regenerate response"
-                                : "Retry response"
-                            }
-                          >
-                            <RotateCcw className="size-4 text-muted-foreground" />
-                            <span>
-                              {onRegenerate
-                                ? "Regenerate response"
-                                : "Retry response"}
-                            </span>
-                          </DropdownMenuItem>
-                        )}
-                        {canRate && (
-                          <>
-                            {canReadAloud ? (
-                              <DropdownMenuSeparator className="my-1" />
-                            ) : null}
-                            <DropdownMenuItem
-                              className="gap-2.5 whitespace-nowrap rounded-lg py-2 pl-2.5 pr-2.5 data-[active=true]:text-emerald-600 dark:data-[active=true]:text-emerald-400"
-                              data-active={feedback === "up"}
-                              onSelect={() => handleFeedbackToggle("up")}
-                              aria-label="Good response"
+                            <DropdownMenuSub
+                              open={allEmojisOpen}
+                              onOpenChange={open => {
+                                if (open) setAllEmojisOpen(true);
+                              }}
                             >
-                              <ThumbsUp
-                                className={cn(
-                                  "size-4",
-                                  feedback === "up"
-                                    ? "text-emerald-600 dark:text-emerald-400 ksemo-feedback-thumb-active"
-                                    : "text-muted-foreground"
-                                )}
-                              />
+                              <DropdownMenuSubTrigger
+                                aria-label="More emojis"
+                                onPointerMove={event => {
+                                  if (event.pointerType === "mouse") {
+                                    event.preventDefault();
+                                  }
+                                }}
+                                className="size-9 justify-center gap-0 rounded-md px-0 py-0 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus:bg-accent focus:text-foreground data-[state=open]:bg-accent data-[state=open]:text-foreground [&>svg:last-child]:hidden"
+                              >
+                                <ChevronRight className="size-5" />
+                              </DropdownMenuSubTrigger>
+                              <DropdownMenuSubContent
+                                sideOffset={8}
+                                style={
+                                  {
+                                    "--tw-enter-translate-x": "0",
+                                  } as React.CSSProperties
+                                }
+                                className="w-64 rounded-xl p-1 data-[side=left]:slide-in-from-bottom-2 data-[side=right]:slide-in-from-bottom-2"
+                              >
+                                <div
+                                  role="group"
+                                  aria-label="All emojis"
+                                  className="h-[260px] overflow-y-auto overscroll-contain"
+                                >
+                                  {VISIBLE_EMOJI_GROUPS.slice(
+                                    0,
+                                    visibleGroupCount
+                                  ).map(group => (
+                                    <div
+                                      key={group.name}
+                                      role="group"
+                                      aria-label={group.name}
+                                    >
+                                      <div className="sticky top-0 bg-popover px-1 pt-1.5 pb-1 text-[11px] font-medium leading-4 text-muted-foreground">
+                                        {group.name}
+                                      </div>
+                                      <div className="grid grid-cols-8">
+                                        {group.emojis.map(({ emoji, name }) => (
+                                          <button
+                                            key={`${group.name}-${name}`}
+                                            type="button"
+                                            aria-label={name}
+                                            aria-pressed={reaction === emoji}
+                                            onClick={() =>
+                                              setReaction(prev =>
+                                                prev === emoji ? null : emoji
+                                              )
+                                            }
+                                            className={cn(
+                                              "flex h-9 items-center justify-center rounded-md text-2xl leading-none select-none transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:ring-0 focus-visible:outline-none",
+                                              reaction === emoji &&
+                                                "bg-accent text-foreground"
+                                            )}
+                                          >
+                                            <span aria-hidden="true">
+                                              {emoji}
+                                            </span>
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </DropdownMenuSubContent>
+                            </DropdownMenuSub>
+                          </div>
+                        </div>
+                        <div className="rounded-lg border border-border/70 bg-popover p-1 shadow-sm">
+                          {message.content && onSpeak ? (
+                            <DropdownMenuItem
+                              className="group/readaloud gap-2.5 whitespace-nowrap rounded-lg py-2 pl-2.5 pr-8"
+                              onSelect={() => {
+                                if (isPreparingSpeech) return;
+                                if (isSpeaking) onStop();
+                                else
+                                  onSpeak(
+                                    cleanContent || message.content,
+                                    message.id
+                                  );
+                              }}
+                              disabled={isPreparingSpeech}
+                              aria-label={
+                                isPreparingSpeech
+                                  ? "Preparing audio"
+                                  : isSpeaking
+                                    ? "Stop reading"
+                                    : "Read aloud"
+                              }
+                            >
+                              {isPreparingSpeech ? (
+                                <span className="flex size-4 items-center justify-center text-foreground">
+                                  <span
+                                    className="loader text-foreground"
+                                    style={{ width: 16 }}
+                                    aria-hidden
+                                  />
+                                </span>
+                              ) : isSpeaking ? (
+                                <>
+                                  <RealtimeSpeechEqualizer
+                                    isSpeaking={isSpeaking}
+                                    speechState={speechState}
+                                    messageId={message.id}
+                                  />
+                                  <Square className="size-3.5 fill-current group-hover/readaloud:hidden" />
+                                </>
+                              ) : (
+                                <Volume2 className="size-4 text-muted-foreground" />
+                              )}
                               <span>
-                                {feedback === "up"
-                                  ? "Remove good response"
-                                  : "Good response"}
+                                {isPreparingSpeech
+                                  ? "Preparing audio…"
+                                  : isSpeaking
+                                    ? "Stop reading"
+                                    : "Read aloud"}
                               </span>
                             </DropdownMenuItem>
+                          ) : null}
+                          {(onRegenerate || onRetry) && (
                             <DropdownMenuItem
-                              className="gap-2.5 whitespace-nowrap rounded-lg py-2 pl-2.5 pr-2.5 data-[active=true]:text-rose-600 dark:data-[active=true]:text-rose-400"
-                              data-active={feedback === "down"}
-                              onSelect={() => handleFeedbackToggle("down")}
-                              aria-label="Bad response"
+                              className="gap-2.5 whitespace-nowrap rounded-lg py-2 pl-2.5 pr-8"
+                              onSelect={() => {
+                                if (onRegenerate) onRegenerate(message);
+                                else if (onRetry) onRetry(message);
+                              }}
+                              aria-label={
+                                onRegenerate
+                                  ? "Regenerate response"
+                                  : "Retry response"
+                              }
                             >
-                              <ThumbsDown
-                                className={cn(
-                                  "size-4",
-                                  feedback === "down"
-                                    ? "text-rose-600 dark:text-rose-400 ksemo-feedback-thumb-active"
-                                    : "text-muted-foreground"
-                                )}
-                              />
+                              <RotateCcw className="size-4 text-muted-foreground" />
                               <span>
-                                {feedback === "down"
-                                  ? "Remove bad response"
-                                  : "Bad response"}
+                                {onRegenerate
+                                  ? "Regenerate response"
+                                  : "Retry response"}
                               </span>
                             </DropdownMenuItem>
-                          </>
-                        )}
+                          )}
+                          {canRate && (
+                            <>
+                              {canReadAloud ? (
+                                <DropdownMenuSeparator className="my-1" />
+                              ) : null}
+                              <DropdownMenuItem
+                                className="gap-2.5 whitespace-nowrap rounded-lg py-2 pl-2.5 pr-2.5 data-[active=true]:text-emerald-600 dark:data-[active=true]:text-emerald-400"
+                                data-active={feedback === "up"}
+                                onSelect={() => handleFeedbackToggle("up")}
+                                aria-label="Good response"
+                              >
+                                <ThumbsUp
+                                  className={cn(
+                                    "size-4",
+                                    feedback === "up"
+                                      ? "text-emerald-600 dark:text-emerald-400 ksemo-feedback-thumb-active"
+                                      : "text-muted-foreground"
+                                  )}
+                                />
+                                <span>
+                                  {feedback === "up"
+                                    ? "Remove good response"
+                                    : "Good response"}
+                                </span>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className="gap-2.5 whitespace-nowrap rounded-lg py-2 pl-2.5 pr-2.5 data-[active=true]:text-rose-600 dark:data-[active=true]:text-rose-400"
+                                data-active={feedback === "down"}
+                                onSelect={() => handleFeedbackToggle("down")}
+                                aria-label="Bad response"
+                              >
+                                <ThumbsDown
+                                  className={cn(
+                                    "size-4",
+                                    feedback === "down"
+                                      ? "text-rose-600 dark:text-rose-400 ksemo-feedback-thumb-active"
+                                      : "text-muted-foreground"
+                                  )}
+                                />
+                                <span>
+                                  {feedback === "down"
+                                    ? "Remove bad response"
+                                    : "Bad response"}
+                                </span>
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                        </div>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
