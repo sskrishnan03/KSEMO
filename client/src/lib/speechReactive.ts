@@ -75,6 +75,8 @@ class SpeechReactiveService {
   private currentWordIndex: number = 0;
   private animFrameId: number | null = null;
   private wordDecayTimerId: number | null = null;
+  private wordProgressTimerId: number | null = null;
+  private hasNativeWordBoundaries = false;
 
   // Real-time acoustic energy envelope
   private currentEnergy: number = 0; // 0 to 1
@@ -130,6 +132,7 @@ class SpeechReactiveService {
     this.state = "buffering";
     this.words = parseSpeechWords(cleanText);
     this.currentWordIndex = 0;
+    this.hasNativeWordBoundaries = false;
     this.currentEnergy = 0;
     this.targetEnergy = 0;
     this.currentHeights = [3, 3, 3, 3];
@@ -146,6 +149,14 @@ class SpeechReactiveService {
       if (this.activeMessageId === messageId) {
         this.state = "playing";
         this.startLoop();
+        // Speech has actually begun, so use the first spoken word to wake the
+        // waveform immediately while subsequent word events keep it in sync.
+        const firstWord = this.words[0];
+        if (firstWord) {
+          this.currentWordIndex = 1;
+          this.triggerWord(firstWord);
+          this.scheduleWordProgress(utterance.rate || 1);
+        }
       }
       originalOnStart?.call(utterance, e);
       callbacks?.onStart?.();
@@ -156,6 +167,11 @@ class SpeechReactiveService {
         this.activeMessageId === messageId &&
         (e.name === "word" || e.name === "sentence" || !e.name)
       ) {
+        this.hasNativeWordBoundaries = true;
+        if (this.wordProgressTimerId !== null) {
+          window.clearTimeout(this.wordProgressTimerId);
+          this.wordProgressTimerId = null;
+        }
         const charIdx = e.charIndex;
         // Find matching word
         let matchedIndex = this.words.findIndex(
@@ -175,6 +191,10 @@ class SpeechReactiveService {
       if (this.activeMessageId === messageId) {
         this.state = "paused";
         this.targetEnergy = 0;
+        if (this.wordProgressTimerId !== null) {
+          window.clearTimeout(this.wordProgressTimerId);
+          this.wordProgressTimerId = null;
+        }
       }
       originalOnPause?.call(utterance, e);
       callbacks?.onPause?.();
@@ -183,6 +203,7 @@ class SpeechReactiveService {
     utterance.onresume = e => {
       if (this.activeMessageId === messageId) {
         this.state = "playing";
+        this.scheduleWordProgress(utterance.rate || 1);
       }
       originalOnResume?.call(utterance, e);
       callbacks?.onResume?.();
@@ -230,6 +251,38 @@ class SpeechReactiveService {
         this.targetEnergy = 0.05;
       }
     }, wordDuration);
+  }
+
+  /**
+   * SpeechSynthesis boundary events are optional. When a voice omits them,
+   * advance through the response's real words once at its selected speech
+   * rate. Native boundary events cancel this estimate and take over.
+   */
+  private scheduleWordProgress(rate: number) {
+    if (
+      this.hasNativeWordBoundaries ||
+      this.state !== "playing" ||
+      this.currentWordIndex >= this.words.length
+    ) {
+      return;
+    }
+    const previousWord = this.words[this.currentWordIndex - 1];
+    if (!previousWord) return;
+    const delay = Math.max(
+      180,
+      Math.round(
+        (previousWord.syllables * 190 + previousWord.pauseAfterMs) / rate
+      )
+    );
+    this.wordProgressTimerId = window.setTimeout(() => {
+      this.wordProgressTimerId = null;
+      if (this.hasNativeWordBoundaries || this.state !== "playing") return;
+      const word = this.words[this.currentWordIndex];
+      if (!word) return;
+      this.currentWordIndex += 1;
+      this.triggerWord(word);
+      this.scheduleWordProgress(rate);
+    }, delay);
   }
 
   private startLoop() {
@@ -294,6 +347,10 @@ class SpeechReactiveService {
     if (this.wordDecayTimerId !== null) {
       window.clearTimeout(this.wordDecayTimerId);
       this.wordDecayTimerId = null;
+    }
+    if (this.wordProgressTimerId !== null) {
+      window.clearTimeout(this.wordProgressTimerId);
+      this.wordProgressTimerId = null;
     }
     if (this.animFrameId !== null) {
       cancelAnimationFrame(this.animFrameId);
