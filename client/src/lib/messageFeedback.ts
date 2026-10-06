@@ -19,7 +19,7 @@ export type ToggledMessageFeedback = {
 export function toggleMessageFeedback(
   current: MessageFeedbackMap,
   messageId: string,
-  value: MessageFeedbackValue,
+  value: MessageFeedbackValue
 ): ToggledMessageFeedback {
   const next = current[messageId] === value ? null : value;
   const ratings = { ...current };
@@ -31,9 +31,38 @@ export function toggleMessageFeedback(
 /** Value identity check so re-reading the same ratings never re-renders the chat. */
 export function isSameMessageFeedback(
   a: MessageFeedbackMap,
-  b: MessageFeedbackMap,
+  b: MessageFeedbackMap
 ): boolean {
   const keys = Object.keys(a);
   if (keys.length !== Object.keys(b).length) return false;
   return keys.every(key => a[key] === b[key]);
+}
+
+const STORAGE_KEY = "ksemo-message-feedback";
+
+/**
+ * Ratings are rendered straight from this local cache so the thumbs the user
+ * pressed reappear instantly on reload, while the server query syncs in the
+ * background and remains authoritative.
+ */
+export function loadFeedbackCache(): MessageFeedbackMap {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as unknown;
+    if (typeof parsed !== "object" || parsed === null) return {};
+    const ratings: MessageFeedbackMap = {};
+    for (const [id, value] of Object.entries(parsed)) {
+      if (value === "up" || value === "down") ratings[id] = value;
+    }
+    return ratings;
+  } catch {
+    return {};
+  }
+}
+
+export function saveFeedbackCache(ratings: MessageFeedbackMap) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(ratings));
+  } catch {}
 }

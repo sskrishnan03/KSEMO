@@ -93,6 +93,8 @@ import { ScanToOpenCard } from "../components/ksemo/ScanToOpenCard";
 import { setGuestModeActive } from "@/lib/guestMode";
 import {
   isSameMessageFeedback,
+  loadFeedbackCache,
+  saveFeedbackCache,
   toggleMessageFeedback,
   type MessageFeedbackValue,
 } from "@/lib/messageFeedback";
@@ -108,7 +110,11 @@ import { openExternalUrl } from "../lib/bot/urlSafety";
 import type { ComposerTag } from "../components/ksemo/ChatComposer";
 import type { BotActionData } from "../components/voice/BotActionStatus";
 import { usePersistFn } from "../hooks/usePersistFn";
-import { speechReactiveService, speakWithPrepareDelay, type SpeechVisualizerState } from "@/lib/speechReactive";
+import {
+  speechReactiveService,
+  speakWithPrepareDelay,
+  type SpeechVisualizerState,
+} from "@/lib/speechReactive";
 import { WorkspacePanel } from "../components/ksemo/WorkspacePanel";
 import { LibraryWorkspace } from "../components/ksemo/LibraryWorkspace";
 import { SearchWorkspace } from "../components/ksemo/PremiumSearch";
@@ -195,37 +201,39 @@ function appendUniqueAttachments(
 
 function prepareTextForSpeech(rawText: string): string {
   if (!rawText) return "";
-  return rawText
-    // Remove code blocks
-    .replace(/```[\s\S]*?```/g, " ")
-    // Remove inline code
-    .replace(/`([^`]+)`/g, "$1")
-    // Remove image tags
-    .replace(/!\[[^\]]*\]\([^)]*\)/g, " ")
-    // Remove links but keep link text
-    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
-    // Remove HTML tags
-    .replace(/<[^>]+>/g, " ")
-    // Remove headers
-    .replace(/^#{1,6}\s+/gm, "")
-    // Remove bold, italics, strikethrough
-    .replace(/(\*\*|__)(.*?)\1/g, "$2")
-    .replace(/(\*|_)(.*?)\1/g, "$2")
-    .replace(/~~(.*?)~~/g, "$1")
-    // Remove bullet points and list markers
-    .replace(/^[\s*+-]+(?=\S)/gm, "")
-    .replace(/^\d+\.\s+/gm, "")
-    // Remove blockquote markers
-    .replace(/^>\s+/gm, "")
-    // Remove divider lines
-    .replace(/^[-*_]{3,}\s*$/gm, "")
-    // Remove raw URLs
-    .replace(/https?:\/\/\S+/g, "")
-    // Clean up punctuation and spacing
-    .replace(/\n+/g, ". ")
-    .replace(/\s+/g, " ")
-    .replace(/\.{2,}/g, ".")
-    .trim();
+  return (
+    rawText
+      // Remove code blocks
+      .replace(/```[\s\S]*?```/g, " ")
+      // Remove inline code
+      .replace(/`([^`]+)`/g, "$1")
+      // Remove image tags
+      .replace(/!\[[^\]]*\]\([^)]*\)/g, " ")
+      // Remove links but keep link text
+      .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+      // Remove HTML tags
+      .replace(/<[^>]+>/g, " ")
+      // Remove headers
+      .replace(/^#{1,6}\s+/gm, "")
+      // Remove bold, italics, strikethrough
+      .replace(/(\*\*|__)(.*?)\1/g, "$2")
+      .replace(/(\*|_)(.*?)\1/g, "$2")
+      .replace(/~~(.*?)~~/g, "$1")
+      // Remove bullet points and list markers
+      .replace(/^[\s*+-]+(?=\S)/gm, "")
+      .replace(/^\d+\.\s+/gm, "")
+      // Remove blockquote markers
+      .replace(/^>\s+/gm, "")
+      // Remove divider lines
+      .replace(/^[-*_]{3,}\s*$/gm, "")
+      // Remove raw URLs
+      .replace(/https?:\/\/\S+/g, "")
+      // Clean up punctuation and spacing
+      .replace(/\n+/g, ". ")
+      .replace(/\s+/g, " ")
+      .replace(/\.{2,}/g, ".")
+      .trim()
+  );
 }
 
 function extractNextSpeechSentence(
@@ -446,8 +454,9 @@ export default function Home() {
   // without being re-created on every render.
   const [messageFeedback, setMessageFeedback] = useState<
     Record<string, "up" | "down">
-  >({});
-  const messageFeedbackRef = useRef<Record<string, "up" | "down">>({});
+  >(() => loadFeedbackCache());
+  const messageFeedbackRef =
+    useRef<Record<string, "up" | "down">>(loadFeedbackCache());
   // Guest ("signed-out") mode state. Guests keep the same Home screen, but
   // sending a message (or opening any locked feature) asks them to sign in via
   // a dismissible card in the bottom-right corner.
@@ -487,7 +496,9 @@ export default function Home() {
   // Bot's auto-send has to reach the send pipeline, but useBotVoice is created
   // long before sendMessage's stable wrapper exists. This bridges the two.
   const botSendRef = useRef<((text: string) => void) | null>(null);
-  const botVoiceTurnRef = useRef<((text: string) => Promise<void>) | null>(null);
+  const botVoiceTurnRef = useRef<((text: string) => Promise<void>) | null>(
+    null
+  );
   // Mirrors whether the bot voice session is open, for stable callbacks that
   // must decide on the fly whether a finished reply should be spoken aloud.
   const botVoiceOpenRef = useRef(
@@ -560,9 +571,7 @@ export default function Home() {
   const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(
     null
   );
-  const [speechState, setSpeechState] = useState<SpeechVisualizerState>(
-    "idle"
-  );
+  const [speechState, setSpeechState] = useState<SpeechVisualizerState>("idle");
   const [isBotSpeakingAloud, setIsBotSpeakingAloud] = useState(false);
   const [primaryWorkspace, setPrimaryWorkspace] = useState<
     "library" | "search" | null
@@ -794,14 +803,33 @@ export default function Home() {
   ]);
   const conversationFormattedDate = useMemo(() => {
     const raw =
-      (activeConversation as { updatedAt?: string | Date; createdAt?: string | Date } | null)?.updatedAt ||
-      (activeConversation as { updatedAt?: string | Date; createdAt?: string | Date } | null)?.createdAt ||
-      (chatMessages.length > 0 ? (chatMessages[0] as unknown as { createdAt?: string | Date }).createdAt : null);
+      (
+        activeConversation as {
+          updatedAt?: string | Date;
+          createdAt?: string | Date;
+        } | null
+      )?.updatedAt ||
+      (
+        activeConversation as {
+          updatedAt?: string | Date;
+          createdAt?: string | Date;
+        } | null
+      )?.createdAt ||
+      (chatMessages.length > 0
+        ? (chatMessages[0] as unknown as { createdAt?: string | Date })
+            .createdAt
+        : null);
     const d = raw ? new Date(raw) : new Date();
     if (isNaN(d.getTime())) {
-      return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(new Date());
+      return new Intl.DateTimeFormat("en-US", {
+        month: "short",
+        day: "numeric",
+      }).format(new Date());
     }
-    return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(d);
+    return new Intl.DateTimeFormat("en-US", {
+      month: "short",
+      day: "numeric",
+    }).format(d);
   }, [activeConversation, chatMessages]);
   const preferencesQuery = trpc.preferences.get.useQuery(undefined, {
     enabled: Boolean(user),
@@ -957,6 +985,7 @@ export default function Home() {
     const ratings = messageFeedbackQuery.data ?? {};
     setMessageFeedback(current => {
       if (isSameMessageFeedback(current, ratings)) return current;
+      saveFeedbackCache(ratings);
       messageFeedbackRef.current = ratings;
       return ratings;
     });
@@ -1095,7 +1124,8 @@ export default function Home() {
       if (msgId && fullText) {
         setChatMessages(current =>
           current.map(msg =>
-            msg.id === msgId || (msg.role === "assistant" && msg.status === "streaming")
+            msg.id === msgId ||
+            (msg.role === "assistant" && msg.status === "streaming")
               ? { ...msg, content: fullText, status: "completed" }
               : msg
           )
@@ -1115,12 +1145,14 @@ export default function Home() {
 
     if (streamingTtsQueueRef.current.length === 0) {
       if (streamTtsFinishedRef.current) {
-        const fullText = activeVoiceFullTextRef.current || baseSpokenTextRef.current;
+        const fullText =
+          activeVoiceFullTextRef.current || baseSpokenTextRef.current;
         const msgId = activeVoiceMessageIdRef.current;
         if (msgId && fullText) {
           setChatMessages(current =>
             current.map(msg =>
-              msg.id === msgId || (msg.role === "assistant" && msg.status === "streaming")
+              msg.id === msgId ||
+              (msg.role === "assistant" && msg.status === "streaming")
                 ? { ...msg, content: fullText, status: "completed" }
                 : msg
             )
@@ -1165,11 +1197,15 @@ export default function Home() {
       const currentFull = baseSpokenTextRef.current;
       setChatMessages(current =>
         current.map(msg =>
-          msg.id === messageId || (msg.role === "assistant" && msg.status === "streaming")
+          msg.id === messageId ||
+          (msg.role === "assistant" && msg.status === "streaming")
             ? {
                 ...msg,
                 content: currentFull,
-                status: isFinalChunk && streamingTtsQueueRef.current.length === 0 ? "completed" : msg.status,
+                status:
+                  isFinalChunk && streamingTtsQueueRef.current.length === 0
+                    ? "completed"
+                    : msg.status,
               }
             : msg
         )
@@ -1191,7 +1227,8 @@ export default function Home() {
 
       setChatMessages(current =>
         current.map(msg =>
-          msg.id === messageId || (msg.role === "assistant" && msg.status === "streaming")
+          msg.id === messageId ||
+          (msg.role === "assistant" && msg.status === "streaming")
             ? { ...msg, content: fullTextSoFar }
             : msg
         )
@@ -1258,7 +1295,8 @@ export default function Home() {
             break;
           }
         }
-        const ratio = cleanWords.length > 0 ? (wordIdx + 1) / cleanWords.length : 1;
+        const ratio =
+          cleanWords.length > 0 ? (wordIdx + 1) / cleanWords.length : 1;
         const targetTokens = Math.round(ratio * rawTokens.length);
         revealTokensUpTo(targetTokens);
       }
@@ -1269,7 +1307,8 @@ export default function Home() {
     let tickerWordIdx = 0;
     wordTicker = window.setInterval(() => {
       tickerWordIdx++;
-      const ratio = cleanWords.length > 0 ? (tickerWordIdx + 1) / cleanWords.length : 1;
+      const ratio =
+        cleanWords.length > 0 ? (tickerWordIdx + 1) / cleanWords.length : 1;
       const targetTokens = Math.round(ratio * rawTokens.length);
       revealTokensUpTo(targetTokens);
       if (tickerWordIdx >= cleanWords.length) {
@@ -1370,11 +1409,14 @@ export default function Home() {
         });
         spokenCharsIndexRef.current = fullText.length;
       } else if (streamingTtsQueueRef.current.length > 0) {
-        streamingTtsQueueRef.current[streamingTtsQueueRef.current.length - 1].isFinalChunk = true;
+        streamingTtsQueueRef.current[
+          streamingTtsQueueRef.current.length - 1
+        ].isFinalChunk = true;
       } else if (!isTtsSpeakingRef.current) {
         setChatMessages(current =>
           current.map(msg =>
-            msg.id === messageId || (msg.role === "assistant" && msg.status === "streaming")
+            msg.id === messageId ||
+            (msg.role === "assistant" && msg.status === "streaming")
               ? { ...msg, content: fullText, status: "completed" }
               : msg
           )
@@ -2207,9 +2249,17 @@ export default function Home() {
               setChatMessages(current =>
                 current.map(message =>
                   message.id.startsWith("local-user")
-                    ? { ...message, id: conv.userMessageId, clientId: message.clientId ?? message.id }
+                    ? {
+                        ...message,
+                        id: conv.userMessageId,
+                        clientId: message.clientId ?? message.id,
+                      }
                     : message.id.startsWith("local-assistant")
-                      ? { ...message, id: conv.assistantMessageId, clientId: message.clientId ?? message.id }
+                      ? {
+                          ...message,
+                          id: conv.assistantMessageId,
+                          clientId: message.clientId ?? message.id,
+                        }
                       : message
                 )
               );
@@ -2586,12 +2636,12 @@ export default function Home() {
                 : message
             )
           );
-      if (botVoiceOpenRef.current) {
-        // Don't auto-resume to prevent echo loop
-        botVoice.pauseListening();
-      }
-      return;
-    }
+          if (botVoiceOpenRef.current) {
+            // Don't auto-resume to prevent echo loop
+            botVoice.pauseListening();
+          }
+          return;
+        }
         setComposerValue(current => (current ? current : content));
         if (selectedAttachments.length) {
           setAttachmentNotices(selectedAttachments);
@@ -3770,8 +3820,6 @@ export default function Home() {
     requestComposerFocus();
   }
 
-
-
   function speak(text: string, messageId: string, voiceName?: string | null) {
     if (!("speechSynthesis" in window)) {
       return;
@@ -3812,7 +3860,7 @@ export default function Home() {
       }
     }
     utterance.rate = (preferencesQuery.data?.speechRate ?? 100) / 100;
-    
+
     // Pause listening so the microphone doesn't pick up the bot's own voice
     botVoice.pauseListening();
 
@@ -3866,9 +3914,9 @@ export default function Home() {
 
   function stopSpeech() {
     resetStreamingTts();
-          if (botVoiceOpenRef.current) {
-            botVoice.pauseListening();
-          }
+    if (botVoiceOpenRef.current) {
+      botVoice.pauseListening();
+    }
   }
 
   // Stable wrappers for every callback handed to memoized children. Without
@@ -4109,6 +4157,7 @@ export default function Home() {
         value
       );
       messageFeedbackRef.current = toggled.ratings;
+      saveFeedbackCache(toggled.ratings);
       setMessageFeedback(toggled.ratings);
       messageFeedbackMutation.mutate({
         messageId,
@@ -4606,7 +4655,10 @@ export default function Home() {
                   <ShareConversationDialog
                     open={Boolean(shareTarget) || isSharePreview}
                     onOpenChange={stableShareOnOpenChange}
-                    title={shareTarget?.title ?? (activeConversation?.title || "your conversation")}
+                    title={
+                      shareTarget?.title ??
+                      (activeConversation?.title || "your conversation")
+                    }
                     conversationId={shareTarget?.id ?? activeConversation?.id}
                     shareUrl={
                       shareTarget?.shareToken
@@ -4620,8 +4672,13 @@ export default function Home() {
                     onCopy={stableShareOnCopy}
                     onEmail={stableShareOnEmail}
                     onSetPublic={stableShareOnSetPublic}
-                    enabled={Boolean(shareTarget || activeConversation) && !publicShareMutation.isPending}
-                    isPublic={Boolean(shareTarget?.isPublic ?? activeConversation?.isPublic)}
+                    enabled={
+                      Boolean(shareTarget || activeConversation) &&
+                      !publicShareMutation.isPending
+                    }
+                    isPublic={Boolean(
+                      shareTarget?.isPublic ?? activeConversation?.isPublic
+                    )}
                     messages={shareDialogMessages}
                     sideOffset={6}
                     anchor={
@@ -4679,118 +4736,130 @@ export default function Home() {
                             sideOffset={6}
                             className="w-44 rounded-xl"
                           >
-                      {/* Conversation title and date/month */}
-                      <div className="px-2.5 pt-1.5 pb-1 select-none">
-                        <p className="text-[12.5px] font-semibold text-foreground break-words leading-tight">
-                          {activeConversation?.title || "New Chat"}
-                        </p>
-                        <div className="mt-1 flex items-center justify-between text-[11.5px] font-medium text-muted-foreground/80 leading-none">
-                          <span className="whitespace-nowrap">Latest activity</span>
-                          <span className="whitespace-nowrap">{conversationFormattedDate}</span>
-                        </div>
+                            {/* Conversation title and date/month */}
+                            <div className="px-2.5 pt-1.5 pb-1 select-none">
+                              <p className="text-[12.5px] font-semibold text-foreground break-words leading-tight">
+                                {activeConversation?.title || "New Chat"}
+                              </p>
+                              <div className="mt-1 flex items-center justify-between text-[11.5px] font-medium text-muted-foreground/80 leading-none">
+                                <span className="whitespace-nowrap">
+                                  Latest activity
+                                </span>
+                                <span className="whitespace-nowrap">
+                                  {conversationFormattedDate}
+                                </span>
+                              </div>
+                            </div>
+                            <DropdownMenuSeparator className="my-1" />
+
+                            {/* Best order: Pin, Rename, Archive, View files, Export, Delete */}
+                            <DropdownMenuItem
+                              disabled={!activeConversationId}
+                              onSelect={() => {
+                                if (activeConversationId) {
+                                  const pinned =
+                                    activeConversation?.isPinned ?? false;
+                                  stableOnPin({
+                                    id: activeConversationId,
+                                    isPinned: pinned,
+                                  });
+                                }
+                              }}
+                            >
+                              {activeConversation?.isPinned ? (
+                                <UnpinTackIcon className="mr-2 size-4" />
+                              ) : (
+                                <PinTackIcon className="mr-2 size-4" />
+                              )}
+                              {activeConversation?.isPinned ? "Unpin" : "Pin"}
+                            </DropdownMenuItem>
+
+                            <DropdownMenuItem
+                              disabled={!activeConversationId}
+                              onSelect={() => {
+                                if (activeConversationId) {
+                                  stableOnArchive({ id: activeConversationId });
+                                  newChat();
+                                  toast.success("Chat archived");
+                                }
+                              }}
+                            >
+                              <Archive className="mr-2 size-4" />
+                              Archive
+                            </DropdownMenuItem>
+
+                            <DropdownMenuItem
+                              onSelect={() => setChatFilesOpen(true)}
+                            >
+                              <WinrarIcon className="mr-2 size-4" />
+                              View files
+                            </DropdownMenuItem>
+
+                            <DropdownMenuSub>
+                              <DropdownMenuSubTrigger
+                                disabled={!activeConversationId}
+                              >
+                                <Download className="mr-2 size-4" />
+                                Export
+                              </DropdownMenuSubTrigger>
+                              <DropdownMenuSubContent
+                                sideOffset={6}
+                                collisionPadding={12}
+                                className="w-28 min-w-0 rounded-xl p-1"
+                              >
+                                <DropdownMenuItem
+                                  onSelect={() => {
+                                    if (activeConversationId) {
+                                      void exportConversation(
+                                        activeConversationId,
+                                        "pdf"
+                                      );
+                                    }
+                                  }}
+                                >
+                                  <PdfFileIcon className="mr-2 size-5 shrink-0" />
+                                  <span>PDF</span>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onSelect={() => {
+                                    if (activeConversationId) {
+                                      void exportConversation(
+                                        activeConversationId,
+                                        "word"
+                                      );
+                                    }
+                                  }}
+                                >
+                                  <WordFileIcon className="mr-2 size-5 shrink-0" />
+                                  <span>Word</span>
+                                </DropdownMenuItem>
+                              </DropdownMenuSubContent>
+                            </DropdownMenuSub>
+
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              disabled={!activeConversationId}
+                              variant="destructive"
+                              onSelect={() => {
+                                if (activeConversationId)
+                                  stableOnDelete({
+                                    id: activeConversationId,
+                                    title:
+                                      activeConversation?.title ??
+                                      "this conversation",
+                                  });
+                              }}
+                            >
+                              <Trash6Icon className="mr-2 size-4" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
-                      <DropdownMenuSeparator className="my-1" />
-
-                      {/* Best order: Pin, Rename, Archive, View files, Export, Delete */}
-                      <DropdownMenuItem
-                        disabled={!activeConversationId}
-                        onSelect={() => {
-                          if (activeConversationId) {
-                            const pinned =
-                              activeConversation?.isPinned ?? false;
-                            stableOnPin({
-                              id: activeConversationId,
-                              isPinned: pinned,
-                            });
-                          }
-                        }}
-                      >
-                        {activeConversation?.isPinned ? (
-                          <UnpinTackIcon className="mr-2 size-4" />
-                        ) : (
-                          <PinTackIcon className="mr-2 size-4" />
-                        )}
-                        {activeConversation?.isPinned ? "Unpin" : "Pin"}
-                      </DropdownMenuItem>
-
-                      <DropdownMenuItem
-                        disabled={!activeConversationId}
-                        onSelect={() => {
-                          if (activeConversationId) {
-                            stableOnArchive({ id: activeConversationId });
-                            newChat();
-                            toast.success("Chat archived");
-                          }
-                        }}
-                      >
-                        <Archive className="mr-2 size-4" />
-                        Archive
-                      </DropdownMenuItem>
-
-                      <DropdownMenuItem onSelect={() => setChatFilesOpen(true)}>
-                        <WinrarIcon className="mr-2 size-4" />
-                        View files
-                      </DropdownMenuItem>
-
-                      <DropdownMenuSub>
-                        <DropdownMenuSubTrigger
-                          disabled={!activeConversationId}
-                        >
-                          <Download className="mr-2 size-4" />
-                          Export
-                        </DropdownMenuSubTrigger>
-                        <DropdownMenuSubContent
-                          sideOffset={6}
-                          collisionPadding={12}
-                          className="w-28 min-w-0 rounded-xl p-1"
-                        >
-                          <DropdownMenuItem
-                            onSelect={() => {
-                              if (activeConversationId) {
-                                void exportConversation(activeConversationId, "pdf");
-                              }
-                            }}
-                          >
-                            <PdfFileIcon className="mr-2 size-5 shrink-0" />
-                            <span>PDF</span>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onSelect={() => {
-                              if (activeConversationId) {
-                                void exportConversation(activeConversationId, "word");
-                              }
-                            }}
-                          >
-                            <WordFileIcon className="mr-2 size-5 shrink-0" />
-                            <span>Word</span>
-                          </DropdownMenuItem>
-                        </DropdownMenuSubContent>
-                      </DropdownMenuSub>
-
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        disabled={!activeConversationId}
-                        variant="destructive"
-                        onSelect={() => {
-                          if (activeConversationId)
-                            stableOnDelete({
-                              id: activeConversationId,
-                              title:
-                                activeConversation?.title ??
-                                "this conversation",
-                            });
-                        }}
-                      >
-                        <Trash6Icon className="mr-2 size-4" />
-                        Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                    }
+                  />
                 </div>
-              }
-            />
-          </div>
-        )}
+              )}
             <ChatFilesDialog
               open={chatFilesOpen}
               onOpenChange={setChatFilesOpen}
@@ -4878,7 +4947,8 @@ export default function Home() {
                         isSpeaking={speakingMessageId === message.id}
                         speechState={speechState}
                         isPreparingSpeech={
-                          speakingMessageId === message.id && speechState === "buffering"
+                          speakingMessageId === message.id &&
+                          speechState === "buffering"
                         }
                         isCurrentGeneration={
                           isGenerating && generatingMessageId === message.id
@@ -5029,7 +5099,9 @@ export default function Home() {
         onAction={stableEditAction}
       />
       <ConfirmDeleteDialog
-        open={Boolean(deleteTarget) || (isDeletePreview && !deletePreviewDismissed)}
+        open={
+          Boolean(deleteTarget) || (isDeletePreview && !deletePreviewDismissed)
+        }
         onOpenChange={stableDeleteDialogOpen}
         title={
           deleteTarget?.kind === "conversation" || isDeletePreview

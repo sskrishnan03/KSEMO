@@ -1,6 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import {
   isSameMessageFeedback,
+  loadFeedbackCache,
+  saveFeedbackCache,
   toggleMessageFeedback,
 } from "./messageFeedback";
 
@@ -75,5 +77,48 @@ describe("isSameMessageFeedback", () => {
   it("detects an added or removed rating", () => {
     expect(isSameMessageFeedback({}, { a: "up" })).toBe(false);
     expect(isSameMessageFeedback({ a: "up" }, {})).toBe(false);
+  });
+});
+
+describe("feedback cache", () => {
+  const KEY = "ksemo-message-feedback";
+  const store = new Map<string, string>();
+
+  beforeAll(() => {
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) => store.get(key) ?? null,
+      setItem: (key: string, value: string) => {
+        store.set(key, String(value));
+      },
+      removeItem: (key: string) => {
+        store.delete(key);
+      },
+      clear: () => {
+        store.clear();
+      },
+    });
+  });
+
+  afterAll(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("round-trips ratings through localStorage", () => {
+    store.clear();
+    saveFeedbackCache({ m1: "up", m2: "down" });
+    expect(loadFeedbackCache()).toEqual({ m1: "up", m2: "down" });
+  });
+
+  it("returns an empty map when nothing is stored", () => {
+    store.clear();
+    expect(loadFeedbackCache()).toEqual({});
+  });
+
+  it("ignores corrupted or invalid stored values", () => {
+    store.clear();
+    store.set(KEY, "not json");
+    expect(loadFeedbackCache()).toEqual({});
+    store.set(KEY, JSON.stringify({ m1: "up", m2: "sideways", m3: 3 }));
+    expect(loadFeedbackCache()).toEqual({ m1: "up" });
   });
 });

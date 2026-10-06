@@ -1017,7 +1017,8 @@ export const MessageContent = memo(function MessageContent({
                         )}
                       />
                     ),
-                    () => handleFeedbackToggle(feedback as "up" | "down")
+                    () => handleFeedbackToggle(feedback as "up" | "down"),
+                    true
                   )}
                 {hasOverflowActions && (
                   <div className="relative inline-flex shrink-0">
