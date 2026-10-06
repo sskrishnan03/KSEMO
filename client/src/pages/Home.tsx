@@ -34,7 +34,10 @@ import {
   Download,
   LogIn,
   MoreHorizontal,
+  Pause,
+  Play,
   UserPlus,
+  X,
 } from "lucide-react";
 import {
   ShareIcon,
@@ -113,6 +116,7 @@ import { usePersistFn } from "../hooks/usePersistFn";
 import {
   speechReactiveService,
   speakWithPrepareDelay,
+  useSpeechWaveBars,
   type SpeechVisualizerState,
 } from "@/lib/speechReactive";
 import { WorkspacePanel } from "../components/ksemo/WorkspacePanel";
@@ -141,6 +145,36 @@ type StreamConversation = {
   userMessageId: string;
   assistantMessageId: string;
 };
+
+function ReadAloudWaveform({
+  messageId,
+  state,
+}: {
+  messageId: string;
+  state: SpeechVisualizerState;
+}) {
+  const { heights } = useSpeechWaveBars(true, state, messageId);
+  const visibleHeights: [number, number, number, number] =
+    state === "playing" ? heights : [3, 3, 3, 3];
+  return (
+    <span
+      aria-hidden="true"
+      className="flex h-5 w-6 items-center justify-center gap-[2px] text-sidebar-foreground"
+    >
+      {state === "buffering" ? (
+        <span className="loader text-current" style={{ width: 15 }} />
+      ) : (
+        visibleHeights.map((height, index) => (
+          <i
+            key={index}
+            className="block w-[2px] rounded-full bg-current transition-[height] duration-75 ease-out"
+            style={{ height }}
+          />
+        ))
+      )}
+    </span>
+  );
+}
 
 // Streaming safety limits. Without them a silent connection (stalled
 // provider, dropped socket behind a proxy) would spin the composer forever.
@@ -572,6 +606,7 @@ export default function Home() {
     null
   );
   const [speechState, setSpeechState] = useState<SpeechVisualizerState>("idle");
+  const [readAloudActive, setReadAloudActive] = useState(false);
   const [isBotSpeakingAloud, setIsBotSpeakingAloud] = useState(false);
   const [primaryWorkspace, setPrimaryWorkspace] = useState<
     "library" | "search" | null
@@ -1050,6 +1085,7 @@ export default function Home() {
   };
 
   const currentUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const speechSessionIdRef = useRef(0);
   const streamingTtsQueueRef = useRef<StreamingTtsChunk[]>([]);
   const isTtsSpeakingRef = useRef(false);
   const streamTtsFinishedRef = useRef(false);
@@ -1068,6 +1104,7 @@ export default function Home() {
   }, [preferencesQuery.data?.speechRate]);
 
   const resetStreamingTts = useCallback(() => {
+    const cancelledSessionId = ++speechSessionIdRef.current;
     if (wordTickerRef.current !== null) {
       window.clearInterval(wordTickerRef.current);
       wordTickerRef.current = null;
@@ -1101,6 +1138,8 @@ export default function Home() {
       currentUtteranceRef.current.onend = null;
       currentUtteranceRef.current.onerror = null;
       currentUtteranceRef.current.onboundary = null;
+      currentUtteranceRef.current.onpause = null;
+      currentUtteranceRef.current.onresume = null;
       currentUtteranceRef.current = null;
     }
     if (readAloudPrepareCancelRef.current) {
@@ -1111,10 +1150,16 @@ export default function Home() {
       speechReactiveService.stop();
       if (typeof window !== "undefined" && "speechSynthesis" in window) {
         window.speechSynthesis.cancel();
+        window.setTimeout(() => {
+          if (speechSessionIdRef.current === cancelledSessionId) {
+            window.speechSynthesis.cancel();
+          }
+        }, 0);
       }
     } catch {}
     setSpeakingMessageId(null);
     setSpeechState("idle");
+    setReadAloudActive(false);
     setIsBotSpeakingAloud(false);
   }, []);
 
@@ -3825,6 +3870,7 @@ export default function Home() {
     if (!("speechSynthesis" in window)) {
       return;
     }
+    speechSessionIdRef.current += 1;
     try {
       window.speechSynthesis.cancel();
     } catch {}
@@ -3834,6 +3880,8 @@ export default function Home() {
     if (!cleanText) return;
 
     const utterance = new SpeechSynthesisUtterance(cleanText);
+    currentUtteranceRef.current = utterance;
+    setReadAloudActive(true);
     const voices = window.speechSynthesis.getVoices();
     if (voiceName) {
       const voice = voices.find(candidate => candidate.name === voiceName);
@@ -3860,7 +3908,7 @@ export default function Home() {
         utterance.lang = preferred.lang;
       }
     }
-    utterance.rate = (preferencesQuery.data?.speechRate ?? 100) / 100;
+    utterance.rate = 1;
 
     // Pause listening so the microphone doesn't pick up the bot's own voice
     botVoice.pauseListening();
@@ -3877,26 +3925,35 @@ export default function Home() {
       cleanText,
       {
         onStart: () => {
+          if (currentUtteranceRef.current !== utterance) return;
           setSpeechState("playing");
         },
         onEnd: () => {
+          if (currentUtteranceRef.current !== utterance) return;
+          currentUtteranceRef.current = null;
           setSpeakingMessageId(null);
           setSpeechState("idle");
+          setReadAloudActive(false);
           if (botVoiceOpenRef.current) {
             botVoice.pauseListening();
           }
         },
         onError: () => {
+          if (currentUtteranceRef.current !== utterance) return;
+          currentUtteranceRef.current = null;
           setSpeakingMessageId(null);
           setSpeechState("idle");
+          setReadAloudActive(false);
           if (botVoiceOpenRef.current) {
             botVoice.pauseListening();
           }
         },
         onPause: () => {
+          if (currentUtteranceRef.current !== utterance) return;
           setSpeechState("paused");
         },
         onResume: () => {
+          if (currentUtteranceRef.current !== utterance) return;
           setSpeechState("playing");
         },
       }
@@ -4102,8 +4159,6 @@ export default function Home() {
     })();
   });
   const stableSpeak = usePersistFn(speak);
-  const stablePauseSpeech = usePersistFn(pauseSpeech);
-  const stableResumeSpeech = usePersistFn(resumeSpeech);
   const stableStopSpeech = usePersistFn(stopSpeech);
   const stableEditMessage = usePersistFn(editMessage);
   const stableRegenerateMessage = usePersistFn(regenerateMessage);
@@ -4539,6 +4594,42 @@ export default function Home() {
           />
         ) : (
           <>
+            {readAloudActive && (
+              <div
+                role="group"
+                aria-label="Read aloud playback controls"
+                className="ksemo-read-aloud-pill absolute left-1/2 top-2 z-30 flex h-12 -translate-x-1/2 items-center gap-2 rounded-full border border-sidebar-border bg-sidebar py-1 pl-3 pr-1.5 text-sidebar-foreground shadow-xl shadow-black/20 backdrop-blur-xl"
+              >
+                <ReadAloudWaveform
+                  messageId={speakingMessageId ?? "read-aloud"}
+                  state={speechState}
+                />
+                <button
+                  type="button"
+                  onClick={
+                    speechState === "paused" ? resumeSpeech : pauseSpeech
+                  }
+                  aria-label={
+                    speechState === "paused" ? "Resume speech" : "Pause speech"
+                  }
+                  className="flex size-9 items-center justify-center rounded-lg text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  {speechState === "paused" ? (
+                    <Play className="size-4 fill-current" />
+                  ) : (
+                    <Pause className="size-4 fill-current" />
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={stopSpeech}
+                  aria-label="Stop read aloud"
+                  className="-ml-2 flex size-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <X className="size-4" />
+                </button>
+              </div>
+            )}
             {/* Mobile-only Navbar with subtle fade below it */}
             <div
               aria-hidden="true"
@@ -4942,15 +5033,8 @@ export default function Home() {
                           activeFileGen && activeFileGen.status === "processing"
                         )}
                         onSpeak={stableSpeak}
-                        onPause={stablePauseSpeech}
-                        onResume={stableResumeSpeech}
                         onStop={stableStopSpeech}
                         isSpeaking={speakingMessageId === message.id}
-                        speechState={speechState}
-                        isPreparingSpeech={
-                          speakingMessageId === message.id &&
-                          speechState === "buffering"
-                        }
                         isCurrentGeneration={
                           isGenerating && generatingMessageId === message.id
                         }

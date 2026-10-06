@@ -31,10 +31,13 @@ export function parseSpeechWords(text: string): SpeechWordData[] {
   while ((match = regex.exec(text)) !== null) {
     const rawWord = match[0];
     const letters = rawWord.toLowerCase().replace(/[^a-z]/g, "");
-    
+
     // Approximate syllables by vowel clusters
     const vowelMatches = letters.match(/[aeiouy]+/g);
-    const syllables = Math.max(1, Math.min(5, vowelMatches ? vowelMatches.length : 1));
+    const syllables = Math.max(
+      1,
+      Math.min(5, vowelMatches ? vowelMatches.length : 1)
+    );
 
     // Natural breathing / punctuation pauses
     let pauseAfterMs = 40; // normal inter-word gap
@@ -45,7 +48,10 @@ export function parseSpeechWords(text: string): SpeechWordData[] {
     }
 
     // Energy based on vowel weight and word length
-    const energy = Math.min(1.0, 0.45 + syllables * 0.12 + (letters.length > 5 ? 0.15 : 0));
+    const energy = Math.min(
+      1.0,
+      0.45 + syllables * 0.12 + (letters.length > 5 ? 0.15 : 0)
+    );
 
     words.push({
       text: rawWord,
@@ -68,13 +74,14 @@ class SpeechReactiveService {
   private words: SpeechWordData[] = [];
   private currentWordIndex: number = 0;
   private animFrameId: number | null = null;
-  private fallbackTimerId: number | null = null;
-  private lastBoundaryTime: number = 0;
+  private wordDecayTimerId: number | null = null;
 
   // Real-time acoustic energy envelope
   private currentEnergy: number = 0; // 0 to 1
   private targetEnergy: number = 0;
-  private barMultipliers: [number, number, number, number] = [0.75, 1.0, 0.85, 0.65];
+  private barMultipliers: [number, number, number, number] = [
+    0.75, 1.0, 0.85, 0.65,
+  ];
   private currentHeights: [number, number, number, number] = [3, 3, 3, 3];
 
   private listeners = new Set<HeightsListener>();
@@ -135,37 +142,36 @@ class SpeechReactiveService {
     const originalOnPause = utterance.onpause;
     const originalOnResume = utterance.onresume;
 
-    utterance.onstart = (e) => {
+    utterance.onstart = e => {
       if (this.activeMessageId === messageId) {
         this.state = "playing";
         this.startLoop();
-        // Trigger first word or initial speech burst
-        if (this.words.length > 0) {
-          this.triggerWord(this.words[0]);
-        }
       }
       originalOnStart?.call(utterance, e);
       callbacks?.onStart?.();
     };
 
-    utterance.onboundary = (e) => {
-      if (this.activeMessageId === messageId && (e.name === "word" || !e.name)) {
-        this.lastBoundaryTime = performance.now();
+    utterance.onboundary = e => {
+      if (
+        this.activeMessageId === messageId &&
+        (e.name === "word" || e.name === "sentence" || !e.name)
+      ) {
         const charIdx = e.charIndex;
         // Find matching word
-        let matched = this.words.find(w => w.start <= charIdx && charIdx <= w.end);
-        if (!matched && this.words[this.currentWordIndex]) {
-          matched = this.words[this.currentWordIndex];
-          this.currentWordIndex++;
-        }
+        let matchedIndex = this.words.findIndex(
+          word => word.start <= charIdx && charIdx <= word.end
+        );
+        if (matchedIndex < 0) matchedIndex = this.currentWordIndex;
+        const matched = this.words[matchedIndex];
         if (matched) {
+          this.currentWordIndex = matchedIndex + 1;
           this.triggerWord(matched);
         }
       }
       originalOnBoundary?.call(utterance, e);
     };
 
-    utterance.onpause = (e) => {
+    utterance.onpause = e => {
       if (this.activeMessageId === messageId) {
         this.state = "paused";
         this.targetEnergy = 0;
@@ -174,7 +180,7 @@ class SpeechReactiveService {
       callbacks?.onPause?.();
     };
 
-    utterance.onresume = (e) => {
+    utterance.onresume = e => {
       if (this.activeMessageId === messageId) {
         this.state = "playing";
       }
@@ -182,7 +188,7 @@ class SpeechReactiveService {
       callbacks?.onResume?.();
     };
 
-    utterance.onend = (e) => {
+    utterance.onend = e => {
       if (this.activeMessageId === messageId) {
         this.stop();
       }
@@ -190,7 +196,7 @@ class SpeechReactiveService {
       callbacks?.onEnd?.();
     };
 
-    utterance.onerror = (e) => {
+    utterance.onerror = e => {
       if (this.activeMessageId === messageId) {
         this.stop();
       }
@@ -200,24 +206,25 @@ class SpeechReactiveService {
   }
 
   private triggerWord(word: SpeechWordData) {
-    // Dynamically calculate vocal formant multipliers with organic variance
+    const lengthRatio = Math.min(word.text.length / 10, 1);
+    const syllableRatio = Math.min(word.syllables / 4, 1);
     this.barMultipliers = [
-      0.65 + Math.random() * 0.35, // Bar 1: Low frequency formant
-      0.85 + Math.random() * 0.30, // Bar 2: Mid-vowel peak
-      0.75 + Math.random() * 0.35, // Bar 3: Upper-mid resonance
-      0.55 + Math.random() * 0.40, // Bar 4: High consonant sibilance
+      0.55 + lengthRatio * 0.2,
+      0.65 + syllableRatio * 0.3,
+      0.55 + lengthRatio * 0.3,
+      0.45 + syllableRatio * 0.35,
     ];
 
-    // High attack energy proportional to word syllables & weight
-    this.targetEnergy = Math.max(0.65, word.energy * (0.85 + Math.random() * 0.25));
+    // Each update is driven by the word that the speech engine reports.
+    this.targetEnergy = word.energy;
 
-    // Schedule decay towards the end of the word or during pause
-    if (this.fallbackTimerId !== null) {
-      window.clearTimeout(this.fallbackTimerId);
+    // Schedule decay for the word reported by the speech engine.
+    if (this.wordDecayTimerId !== null) {
+      window.clearTimeout(this.wordDecayTimerId);
     }
 
     const wordDuration = Math.max(120, word.syllables * 130);
-    this.fallbackTimerId = window.setTimeout(() => {
+    this.wordDecayTimerId = window.setTimeout(() => {
       if (this.state === "playing") {
         // Natural drop during pause between words / punctuation
         this.targetEnergy = 0.05;
@@ -227,9 +234,8 @@ class SpeechReactiveService {
 
   private startLoop() {
     if (this.animFrameId !== null) return;
-    this.lastBoundaryTime = performance.now();
 
-    const tick = (now: number) => {
+    const tick = () => {
       if (this.state !== "playing") {
         // Smoothly settle down to resting 3px
         let changed = false;
@@ -247,22 +253,16 @@ class SpeechReactiveService {
           return;
         }
       } else {
-        // If boundary events are not fired by the browser, run synthetic cadence fallback
-        if (now - this.lastBoundaryTime > 350 && this.words.length > 0) {
-          this.lastBoundaryTime = now;
-          this.currentWordIndex = (this.currentWordIndex + 1) % this.words.length;
-          this.triggerWord(this.words[this.currentWordIndex]);
-        }
-
         // Smooth acoustic envelope interpolation
         const attackRate = 0.35; // Fast attack for crisp syllables
-        const decayRate = 0.15;  // Smooth natural vocal decay
-        const rate = this.targetEnergy > this.currentEnergy ? attackRate : decayRate;
+        const decayRate = 0.15; // Smooth natural vocal decay
+        const rate =
+          this.targetEnergy > this.currentEnergy ? attackRate : decayRate;
         this.currentEnergy += (this.targetEnergy - this.currentEnergy) * rate;
 
-        // Sub-syllable organic micro-jitter (speech is continuous, not flat)
-        const jitter = Math.sin(now * 0.02) * 0.1;
-        const baseLevel = Math.max(0, Math.min(1, this.currentEnergy + jitter));
+        // Envelope changes come from actual word boundaries; interpolation only
+        // smooths each word's attack and decay instead of inventing a loop.
+        const baseLevel = Math.max(0, Math.min(1, this.currentEnergy));
 
         // Map to bar heights: 3px (resting) to 15px (peak volume)
         const minH = 3;
@@ -291,16 +291,16 @@ class SpeechReactiveService {
     this.targetEnergy = 0;
     this.currentEnergy = 0;
     this.currentHeights = [3, 3, 3, 3];
-    if (this.fallbackTimerId !== null) {
-      window.clearTimeout(this.fallbackTimerId);
-      this.fallbackTimerId = null;
+    if (this.wordDecayTimerId !== null) {
+      window.clearTimeout(this.wordDecayTimerId);
+      this.wordDecayTimerId = null;
     }
     if (this.animFrameId !== null) {
       cancelAnimationFrame(this.animFrameId);
       this.animFrameId = null;
     }
     this.notify();
-}
+  }
 }
 
 export const speechReactiveService = new SpeechReactiveService();
@@ -418,12 +418,14 @@ export function useSpeechWaveBars(
   messageId: string
 ): { heights: [number, number, number, number]; isBuffering: boolean } {
   // Default resting height is 3px
-  const [heights, setHeights] = useState<[number, number, number, number]>(() => {
-    if (isSpeaking && speechState === "playing") {
-      return [7, 14, 11, 8];
+  const [heights, setHeights] = useState<[number, number, number, number]>(
+    () => {
+      if (isSpeaking && speechState === "playing") {
+        return [7, 14, 11, 8];
+      }
+      return [3, 3, 3, 3];
     }
-    return [3, 3, 3, 3];
-  });
+  );
 
   useEffect(() => {
     if (!isSpeaking || speechState === "idle") {
@@ -437,7 +439,7 @@ export function useSpeechWaveBars(
     }
 
     // If active in service, subscribe to real-time speech acoustic envelope
-    const unsubscribe = speechReactiveService.subscribe((newHeights) => {
+    const unsubscribe = speechReactiveService.subscribe(newHeights => {
       const activeId = speechReactiveService.getActiveMessageId();
       if (!activeId || activeId === messageId) {
         setHeights(newHeights);

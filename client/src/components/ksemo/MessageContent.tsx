@@ -53,7 +53,6 @@ import {
   BotActionStatus,
   type BotActionData,
 } from "@/components/voice/BotActionStatus";
-import { useSpeechWaveBars } from "@/lib/speechReactive";
 
 type KsemoMessage = {
   id: string;
@@ -363,48 +362,6 @@ export function splitFirstSentence(content: string): {
   };
 }
 
-function RealtimeSpeechEqualizer({
-  isSpeaking,
-  speechState,
-  messageId,
-}: {
-  isSpeaking: boolean;
-  speechState?: "idle" | "buffering" | "playing" | "paused";
-  messageId: string;
-}) {
-  const { heights, isBuffering } = useSpeechWaveBars(
-    isSpeaking,
-    speechState ?? "playing",
-    messageId
-  );
-
-  return (
-    <span
-      className={cn(
-        "group-hover/readaloud:hidden flex size-4 items-center justify-center gap-[2px] text-current",
-        isBuffering && "opacity-60 animate-pulse"
-      )}
-    >
-      <span
-        className="ksemo-eq-bar-1 w-[2px] rounded-full bg-current transition-all duration-75 ease-out"
-        style={{ height: `${heights[0]}px` }}
-      />
-      <span
-        className="ksemo-eq-bar-2 w-[2px] rounded-full bg-current transition-all duration-75 ease-out"
-        style={{ height: `${heights[1]}px` }}
-      />
-      <span
-        className="ksemo-eq-bar-3 w-[2px] rounded-full bg-current transition-all duration-75 ease-out"
-        style={{ height: `${heights[2]}px` }}
-      />
-      <span
-        className="ksemo-eq-bar-4 w-[2px] rounded-full bg-current transition-all duration-75 ease-out"
-        style={{ height: `${heights[3]}px` }}
-      />
-    </span>
-  );
-}
-
 export const MessageContent = memo(function MessageContent({
   message,
   onSpeak,
@@ -412,8 +369,6 @@ export const MessageContent = memo(function MessageContent({
   onResume,
   onStop,
   isSpeaking,
-  speechState,
-  isPreparingSpeech = false,
   isCurrentGeneration = false,
   isFileGenerating = false,
   hideTypingIndicator = false,
@@ -434,8 +389,8 @@ export const MessageContent = memo(function MessageContent({
   message: KsemoMessage;
   fileCreationNode?: React.ReactNode;
   onSpeak: (text: string, messageId: string) => void;
-  onPause: () => void;
-  onResume: () => void;
+  onPause?: () => void;
+  onResume?: () => void;
   onStop: () => void;
   isSpeaking: boolean;
   speechState?: "idle" | "buffering" | "playing" | "paused";
@@ -615,13 +570,7 @@ export const MessageContent = memo(function MessageContent({
   const hasOverflowActions = canReadAloud || canRegenerate || canRate;
   const hasActiveIndicator =
     canRate && (feedback === "up" || feedback === "down");
-  const actionsMenuLabel = isPreparingSpeech
-    ? "Preparing audio"
-    : isSpeaking
-      ? "Stop reading"
-      : hasActiveIndicator
-        ? `Remove ${feedback === "up" ? "good" : "bad"} response`
-        : "More message actions";
+  const actionsMenuLabel = "More message actions";
 
   const renderStoppedNotice = () => (
     <div
@@ -1078,25 +1027,7 @@ export const MessageContent = memo(function MessageContent({
                               aria-label={actionsMenuLabel}
                               aria-live="polite"
                             >
-                              {isPreparingSpeech ? (
-                                <span className="flex size-6 shrink-0 items-center justify-center">
-                                  <span
-                                    className="loader text-current"
-                                    style={{ width: 16 }}
-                                    aria-hidden
-                                  />
-                                </span>
-                              ) : isSpeaking ? (
-                                <span className="flex size-6 shrink-0 items-center justify-center">
-                                  <RealtimeSpeechEqualizer
-                                    isSpeaking={isSpeaking}
-                                    speechState={speechState}
-                                    messageId={message.id}
-                                  />
-                                </span>
-                              ) : (
-                                <ActionsMenuGlyph open={actionsOpen} />
-                              )}
+                              <ActionsMenuGlyph open={actionsOpen} />
                             </Button>
                           </DropdownMenuTrigger>
                         </TooltipTrigger>
@@ -1206,7 +1137,6 @@ export const MessageContent = memo(function MessageContent({
                             <DropdownMenuItem
                               className="group/readaloud gap-2.5 whitespace-nowrap rounded-lg py-2 pl-2.5 pr-8"
                               onSelect={() => {
-                                if (isPreparingSpeech) return;
                                 if (isSpeaking) onStop();
                                 else
                                   onSpeak(
@@ -1214,41 +1144,17 @@ export const MessageContent = memo(function MessageContent({
                                     message.id
                                   );
                               }}
-                              disabled={isPreparingSpeech}
                               aria-label={
-                                isPreparingSpeech
-                                  ? "Preparing audio"
-                                  : isSpeaking
-                                    ? "Stop reading"
-                                    : "Read aloud"
+                                isSpeaking ? "Stop reading" : "Read aloud"
                               }
                             >
-                              {isPreparingSpeech ? (
-                                <span className="flex size-4 items-center justify-center text-foreground">
-                                  <span
-                                    className="loader text-foreground"
-                                    style={{ width: 16 }}
-                                    aria-hidden
-                                  />
-                                </span>
-                              ) : isSpeaking ? (
-                                <>
-                                  <RealtimeSpeechEqualizer
-                                    isSpeaking={isSpeaking}
-                                    speechState={speechState}
-                                    messageId={message.id}
-                                  />
-                                  <Square className="size-3.5 fill-current group-hover/readaloud:hidden" />
-                                </>
+                              {isSpeaking ? (
+                                <Square className="size-3.5 fill-current text-muted-foreground" />
                               ) : (
                                 <Volume2 className="size-4 text-muted-foreground" />
                               )}
                               <span>
-                                {isPreparingSpeech
-                                  ? "Preparing audio…"
-                                  : isSpeaking
-                                    ? "Stop reading"
-                                    : "Read aloud"}
+                                {isSpeaking ? "Stop reading" : "Read aloud"}
                               </span>
                             </DropdownMenuItem>
                           ) : null}
