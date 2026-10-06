@@ -38,6 +38,7 @@ import {
 import { type MessageFeedbackValue } from "./MessageFeedback";
 import { EMOJI_GROUPS } from "@/data/emojiGroups";
 import { usePersistFn } from "@/hooks/usePersistFn";
+import { useIsMobile } from "@/hooks/useIsMobile";
 import React, { memo, useEffect, useRef, useState } from "react";
 import {
   Streamdown,
@@ -472,6 +473,7 @@ export const MessageContent = memo(function MessageContent({
     }
   });
   const [allEmojisOpen, setAllEmojisOpen] = useState(false);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     try {
@@ -1116,7 +1118,14 @@ export const MessageContent = memo(function MessageContent({
                         className="w-max min-w-44 rounded-xl border-0 bg-transparent p-1 shadow-none"
                       >
                         {!isCancelled && (
-                          <div className="mb-0.5 rounded-lg border border-border/70 bg-popover px-1.5 py-1.5 shadow-sm">
+                          <div
+                            className={cn(
+                              "mb-0.5 rounded-lg border border-border/70 bg-popover px-1.5 py-1.5 shadow-sm",
+                              isMobile &&
+                                allEmojisOpen &&
+                                "max-w-[calc(100vw-0.9rem)]"
+                            )}
+                          >
                             <div
                               role="group"
                               aria-label="Reactions"
@@ -1150,7 +1159,7 @@ export const MessageContent = memo(function MessageContent({
                               <DropdownMenuSub
                                 open={allEmojisOpen}
                                 onOpenChange={open => {
-                                  if (open) setAllEmojisOpen(true);
+                                  setAllEmojisOpen(open);
                                 }}
                               >
                                 <DropdownMenuSubTrigger
@@ -1164,22 +1173,32 @@ export const MessageContent = memo(function MessageContent({
                                 >
                                   <ChevronRight className="size-5" />
                                 </DropdownMenuSubTrigger>
-                                <DropdownMenuSubContent
-                                  sideOffset={8}
-                                  style={
-                                    {
-                                      "--tw-enter-translate-x": "0",
-                                    } as React.CSSProperties
-                                  }
-                                  className="w-78 max-w-[calc(100vw-0.8rem)] rounded-xl p-1 data-[side=left]:slide-in-from-bottom-2 data-[side=right]:slide-in-from-bottom-2"
-                                >
-                                  <AllEmojiGrid
-                                    reactions={reactions}
-                                    onToggle={toggleReaction}
-                                  />
-                                </DropdownMenuSubContent>
+                                {!isMobile && (
+                                  <DropdownMenuSubContent
+                                    sideOffset={8}
+                                    style={
+                                      {
+                                        "--tw-enter-translate-x": "0",
+                                      } as React.CSSProperties
+                                    }
+                                    className="w-78 max-w-[calc(100vw-0.8rem)] rounded-xl p-1 data-[side=left]:slide-in-from-bottom-2 data-[side=right]:slide-in-from-bottom-2"
+                                  >
+                                    <AllEmojiGrid
+                                      reactions={reactions}
+                                      onToggle={toggleReaction}
+                                    />
+                                  </DropdownMenuSubContent>
+                                )}
                               </DropdownMenuSub>
                             </div>
+                            {isMobile && allEmojisOpen && (
+                              <div className="mt-1.5 w-full border-t border-border/70 pt-1.5">
+                                <AllEmojiGrid
+                                  reactions={reactions}
+                                  onToggle={toggleReaction}
+                                />
+                              </div>
+                            )}
                           </div>
                         )}
                         <div className="rounded-lg border border-border/70 bg-popover p-1 shadow-sm">
