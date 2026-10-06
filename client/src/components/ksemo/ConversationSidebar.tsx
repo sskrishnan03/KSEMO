@@ -271,10 +271,10 @@ export const ConversationSidebar = memo(function ConversationSidebar({
                     variant="ghost"
                     size="icon"
                     onClick={onToggleCollapsed}
-          className="absolute inset-0 size-10 lg:size-[2.125rem] rounded-lg opacity-100 transition-all duration-150 group-hover/brand:scale-100 max-lg:opacity-100 lg:opacity-0 lg:group-hover/brand:opacity-100 lg:group-focus-within/brand:opacity-100 lg:hover:bg-sidebar-accent active:scale-95"
+          className="absolute inset-0 size-10 rounded-lg opacity-100 transition-all duration-150 group-hover/brand:scale-100 max-lg:bg-transparent max-lg:opacity-100 max-lg:hover:bg-sidebar-accent/80 max-lg:active:bg-sidebar-accent lg:size-[2.125rem] lg:opacity-0 lg:group-hover/brand:opacity-100 lg:group-focus-within/brand:opacity-100 lg:hover:bg-sidebar-accent active:scale-95"
           aria-label="Expand sidebar"
         >
-          <ChevronsRight className="size-4.5 lg:size-[1.125rem]" />
+          <ChevronsRight className="size-5 stroke-[2.75] lg:size-[1.125rem] lg:stroke-2" />
         </Button>
                 </TooltipTrigger>
                 <TooltipContent
@@ -314,10 +314,10 @@ export const ConversationSidebar = memo(function ConversationSidebar({
                   variant="ghost"
                   size="icon"
                   onClick={onClose}
-                  className="size-9 rounded-lg border-0 text-foreground/80 hover:bg-accent hover:text-foreground transition-colors outline-none focus-visible:ring-0 focus-visible:border-transparent active:scale-95 lg:hidden"
+                  className="size-10 rounded-lg border-0 bg-transparent p-0 text-foreground transition-colors outline-none hover:bg-accent/80 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring active:bg-accent lg:hidden"
                   aria-label="Close navigation"
                 >
-                  <ChevronsLeft className="size-4.5" />
+                  <ChevronsLeft className="size-5 stroke-[2.75]" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom">Close sidebar</TooltipContent>

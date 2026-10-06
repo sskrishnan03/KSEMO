@@ -4642,11 +4642,11 @@ export default function Home() {
               variant="ghost"
               size="icon"
               onClick={() => setSidebarOpen(true)}
-              className="absolute left-2 top-2 z-20 size-9 rounded-lg border-0 bg-transparent p-0 text-foreground/80 shadow-none transition-colors hover:bg-transparent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring active:bg-transparent lg:hidden"
+              className="absolute left-2 top-2 z-20 size-10 rounded-lg border-0 bg-transparent p-0 text-foreground shadow-none transition-colors hover:bg-accent/80 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring active:bg-accent lg:hidden"
               aria-label="Open conversations"
               data-testid="mobile-sidebar-toggle"
             >
-              <ChevronsRight className="size-4.5" />
+              <ChevronsRight className="size-5 stroke-[2.75]" />
             </Button>
 
             {!guestMode &&

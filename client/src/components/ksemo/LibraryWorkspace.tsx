@@ -443,11 +443,11 @@ export function LibraryWorkspace({
                     variant="ghost"
                     size="icon"
                     onClick={onOpenSidebar}
-                    className="size-9 shrink-0 rounded-lg border-0 bg-transparent p-0 text-foreground/80 shadow-none transition-colors hover:bg-transparent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring active:bg-transparent lg:hidden"
+                    className="size-10 shrink-0 rounded-lg border-0 bg-transparent p-0 text-foreground shadow-none transition-colors hover:bg-accent/80 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring active:bg-accent lg:hidden"
                     aria-label="Open conversations"
                     title="Open sidebar"
                   >
-                    <ChevronsRight className="size-4.5" />
+                    <ChevronsRight className="size-5 stroke-[2.75]" />
                   </Button>
                 )}
                 <h1 className="text-2xl font-semibold tracking-[-0.03em]">
