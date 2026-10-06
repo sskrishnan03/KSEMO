@@ -38,23 +38,22 @@ describe("MessageContent speech controls", () => {
       })
     );
     expect(markup).toContain(OVERFLOW_LABEL);
-    // One button holding the select icon and the dropdown chevron.
-    expect(markup).toContain("lucide-sliders-horizontal");
-    expect(markup).toContain("lucide-chevron-down");
+    // One plain list-arrow button opens the menu — no sliders glyph, no chevron.
+    expect(markup).toContain('data-testid="actions-menu-glyph"');
+    expect(markup).not.toContain("lucide-plus");
+    expect(markup).not.toContain("lucide-sliders-horizontal");
+    expect(markup).not.toContain("lucide-chevron-down");
     expect(markup).not.toContain("lucide-ellipsis");
     expect(markup).not.toContain(">Actions</span>");
-    // Same surface as the top-right Share + three-dot group.
-    expect(markup).toContain("rounded-lg");
-    expect(markup).toContain("border-border/40");
-    expect(markup).toContain("bg-card");
-    expect(markup).toContain("shadow-xs");
-    // Single trigger: both glyphs fully inside one padded pill, no divider.
-    expect(markup).not.toContain("rounded-none rounded-l-lg");
-    expect(markup).not.toContain("rounded-none rounded-r-lg");
-    expect(markup).not.toContain('class="h-4 w-px shrink-0 bg-border/40"');
-    expect(markup).toContain("h-7");
-    expect(markup).toContain("px-2 py-0");
-    expect(markup).toContain("gap-1.5");
+    // Same plain icon surface across Copy, rating, and the menu trigger.
+    expect(markup).toContain("size-8 rounded-md");
+    // Copy sits at 17px while the menu trigger glyph stays 24px.
+    expect(markup).toContain("lucide lucide-copy size-[17px]");
+    expect(markup).toContain(
+      'hover:text-foreground" type="button" aria-label="More message actions"'
+    );
+    // Only the arrow inside the glyph flips while the menu is open.
+    expect(markup).toContain("transition-transform duration-300");
     expect(markup).toContain('aria-label="Copy response"');
     expect(markup).not.toContain('aria-label="Read aloud"');
   });
@@ -71,10 +70,11 @@ describe("MessageContent speech controls", () => {
       })
     );
     expect(markup).toContain('aria-label="Remove good response"');
-    expect(markup).toContain("lucide-chevron-down");
+    expect(markup).toContain('data-testid="actions-menu-glyph"');
     expect(markup).not.toContain(">Rated</span>");
-    // Rating shows as a real thumb icon button after Copy, not a corner dot.
+    // Rating shows as a real 17px thumb icon button after Copy, not a corner dot.
     expect(markup).toContain("lucide-thumbs-up");
+    expect(markup).toContain("size-[17px] text-emerald-600");
     expect(markup).toContain("text-emerald-600");
     expect(markup).not.toContain("size-1.5 rounded-full ring-2 ring-card");
   });
@@ -89,12 +89,12 @@ describe("MessageContent speech controls", () => {
       })
     );
     expect(markup).toContain('aria-label="Stop reading"');
-    // The trigger keeps its segmented shape and swaps only the leading glyph.
+    // The trigger swaps the plus for the equalizer and keeps no chevron.
     expect(markup).not.toContain("lucide-sliders-horizontal");
-    expect(markup).toContain("lucide-chevron-down");
+    expect(markup).not.toContain("lucide-chevron-down");
     expect(markup).not.toContain(">Stop</span>");
-    // The equalizer sits in a fixed 16px box so the pill never resizes.
-    expect(markup).toContain("size-4 shrink-0");
+    // The equalizer sits in a fixed 24px box so the pill never resizes.
+    expect(markup).toContain("size-6 shrink-0");
   });
 
   it("shows the same segmented ring used by Dictate transcribing while audio is preparing", () => {
@@ -111,7 +111,7 @@ describe("MessageContent speech controls", () => {
     expect(markup).toContain('aria-live="polite"');
     expect(markup).toContain('aria-label="Copy response"');
     expect(markup).toContain('class="loader text-current"');
-    expect(markup).toContain("width:14px");
+    expect(markup).toContain("width:16px");
     expect(markup).not.toContain(">Preparing</span>");
   });
 

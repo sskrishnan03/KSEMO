@@ -26,7 +26,6 @@ import {
   MoreHorizontal,
   Pencil,
   RotateCcw,
-  SlidersHorizontal,
   Square,
   ThumbsDown,
   ThumbsUp,
@@ -116,6 +115,44 @@ function formatBytes(bytes?: number): string | null {
   let unit = 0;
   const digits = unit === 0 || value >= 100 ? 0 : value >= 10 ? 1 : 2;
   return `${value.toFixed(digits)} ${units[unit]}`;
+}
+
+// List-with-arrow glyph for the message actions menu. The arrow is its own
+// path so only it flips up when the menu opens — the list lines never move.
+const LIST_ARROW_LINES_D =
+  "M2.25 5C2.25 4.58579 2.58579 4.25 3 4.25H21C21.4142 4.25 21.75 4.58579 21.75 5C21.75 5.41421 21.4142 5.75 21 5.75H3C2.58579 5.75 2.25 5.41421 2.25 5ZM2.25 9C2.25 8.58579 2.58579 8.25 3 8.25H21C21.4142 8.25 21.75 8.58579 21.75 9C21.75 9.41421 21.4142 9.75 21 9.75H3C2.58579 9.75 2.25 9.41421 2.25 9ZM2.25 13C2.25 12.5858 2.58579 12.25 3 12.25H11C11.4142 12.25 11.75 12.5858 11.75 13C11.75 13.4142 11.4142 13.75 11 13.75H3C2.58579 13.75 2.25 13.4142 2.25 13ZM2.25 17C2.25 16.5858 2.58579 16.25 3 16.25H11C11.4142 16.25 11.75 16.5858 11.75 17C11.75 17.4142 11.4142 17.75 11 17.75H3C2.58579 17.75 2.25 17.4142 2.25 17Z";
+const LIST_ARROW_ARROW_D =
+  "M17.5 12.25C17.9142 12.25 18.25 12.5858 18.25 13V17.1893L19.4697 15.9697C19.7626 15.6768 20.2374 15.6768 20.5303 15.9697C20.8232 16.2626 20.8232 16.7374 20.5303 17.0303L18.0303 19.5303C17.7374 19.8232 17.2626 19.8232 16.9697 19.5303L14.4697 17.0303C14.1768 16.7374 14.1768 16.2626 14.4697 15.9697C14.7626 15.6768 15.2374 15.6768 15.5303 15.9697L16.75 17.1893V13C16.75 12.5858 17.0858 12.25 17.5 12.25Z";
+
+function ActionsMenuGlyph({ open }: { open: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width={24}
+      height={24}
+      fill="none"
+      aria-hidden="true"
+      data-testid="actions-menu-glyph"
+      className="size-6 shrink-0"
+    >
+      <path
+        fill="currentColor"
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d={LIST_ARROW_LINES_D}
+      />
+      <path
+        fill="currentColor"
+        d={LIST_ARROW_ARROW_D}
+        className="transition-transform duration-300 ease-out"
+        style={{
+          transformBox: "fill-box",
+          transformOrigin: "center",
+          transform: open ? "rotate(180deg)" : "rotate(0deg)",
+        }}
+      />
+    </svg>
+  );
 }
 
 export function splitFirstSentence(content: string): {
@@ -306,7 +343,7 @@ export const MessageContent = memo(function MessageContent({
   if (message.role === "system" || message.role === "tool") return null;
 
   const actionClass =
-    "size-7 rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground";
+    "size-8 rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground";
   const action = (
     label: string,
     icon: React.ReactNode,
@@ -713,15 +750,15 @@ export const MessageContent = memo(function MessageContent({
               {action(
                 "Copy message",
                 copied ? (
-                  <Check className="size-4" />
+                  <Check className="size-[17px]" />
                 ) : (
-                  <Copy className="size-4" />
+                  <Copy className="size-[17px]" />
                 ),
                 copyMessage
               )}
               {onEdit &&
                 !isEditing &&
-                action("Edit message", <Pencil className="size-4" />, () =>
+                action("Edit message", <Pencil className="size-[17px]" />, () =>
                   onEdit(message)
                 )}
             </div>
@@ -737,9 +774,9 @@ export const MessageContent = memo(function MessageContent({
                   action(
                     copied ? "Copied" : "Copy response",
                     copied ? (
-                      <Check className="size-4" />
+                      <Check className="size-[17px]" />
                     ) : (
-                      <Copy className="size-4" />
+                      <Copy className="size-[17px]" />
                     ),
                     copyMessage
                   )}
@@ -751,14 +788,14 @@ export const MessageContent = memo(function MessageContent({
                     feedback === "up" ? (
                       <ThumbsUp
                         className={cn(
-                          "size-4 text-emerald-600 dark:text-emerald-400",
+                          "size-[17px] text-emerald-600 dark:text-emerald-400",
                           "ksemo-feedback-thumb-active"
                         )}
                       />
                     ) : (
                       <ThumbsDown
                         className={cn(
-                          "size-4 text-rose-600 dark:text-rose-400",
+                          "size-[17px] text-rose-600 dark:text-rose-400",
                           "ksemo-feedback-thumb-active"
                         )}
                       />
@@ -775,27 +812,25 @@ export const MessageContent = memo(function MessageContent({
                         <Button
                           type="button"
                           variant="ghost"
-                          size="sm"
+                          size="icon"
                           className={cn(
-                            "h-7 shrink-0 gap-1.5 rounded-lg border border-border/40 bg-card px-2 py-0 has-[>svg]:px-2 text-foreground/80 shadow-xs transition-colors",
-                            "hover:bg-accent hover:text-foreground hover:border-foreground/15",
-                            "focus-visible:bg-accent focus-visible:text-foreground",
+                            actionClass,
                             actionsOpen &&
-                              "border-foreground/15 bg-accent text-foreground"
+                              "bg-accent/70 text-foreground hover:bg-accent/70 hover:text-foreground"
                           )}
                           aria-label={actionsMenuLabel}
                           aria-live="polite"
                         >
                           {isPreparingSpeech ? (
-                            <span className="flex size-4 shrink-0 items-center justify-center">
+                            <span className="flex size-6 shrink-0 items-center justify-center">
                               <span
                                 className="loader text-current"
-                                style={{ width: 14 }}
+                                style={{ width: 16 }}
                                 aria-hidden
                               />
                             </span>
                           ) : isSpeaking ? (
-                            <span className="flex size-4 shrink-0 items-center justify-center">
+                            <span className="flex size-6 shrink-0 items-center justify-center">
                               <RealtimeSpeechEqualizer
                                 isSpeaking={isSpeaking}
                                 speechState={speechState}
@@ -803,14 +838,8 @@ export const MessageContent = memo(function MessageContent({
                               />
                             </span>
                           ) : (
-                            <SlidersHorizontal className="size-4 shrink-0" />
+                            <ActionsMenuGlyph open={actionsOpen} />
                           )}
-                          <ChevronDown
-                            className={cn(
-                              "size-4 shrink-0 transition-transform duration-200",
-                              actionsOpen && "rotate-180"
-                            )}
-                          />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent
@@ -844,7 +873,7 @@ export const MessageContent = memo(function MessageContent({
                               <span className="flex size-4 items-center justify-center text-foreground">
                                 <span
                                   className="loader text-foreground"
-                                  style={{ width: 14 }}
+                                  style={{ width: 16 }}
                                   aria-hidden
                                 />
                               </span>

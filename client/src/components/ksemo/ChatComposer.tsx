@@ -1459,7 +1459,7 @@ export const ChatComposer = memo(function ChatComposer({
                           <DropdownMenuContent
                             align="end"
                             side="top"
-                            sideOffset={14}
+                            sideOffset={13}
                             collisionPadding={12}
                             className="relative w-auto p-3 rounded-2xl border border-border bg-popover text-popover-foreground shadow-2xl animate-in fade-in zoom-in-95 duration-150 z-50 select-none overflow-hidden"
                           >
