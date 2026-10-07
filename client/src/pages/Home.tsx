@@ -5075,7 +5075,10 @@ export default function Home() {
                       aria-label="Jump to latest"
                       aria-hidden={!showJumpToLatest}
                       className={cn(
-                        "absolute -top-10 right-4 z-20 flex size-10 items-center justify-center rounded-full border border-border bg-popover/95 text-popover-foreground shadow-md backdrop-blur transition-[opacity,transform] ease-out hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none active:scale-95 sm:right-6",
+                        cn(
+                          "absolute right-4 z-20 flex size-10 items-center justify-center rounded-full border border-sidebar-border bg-sidebar text-sidebar-foreground shadow-xl shadow-black/20 backdrop-blur transition-[opacity,transform] ease-out hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none active:scale-95 sm:right-6",
+                          readAloudActive ? "-top-[6.125rem]" : "-top-10"
+                        ),
                         showJumpToLatest
                           ? "translate-y-0 opacity-100 pointer-events-auto duration-200"
                           : "translate-y-2 opacity-0 pointer-events-none duration-100"
@@ -5094,7 +5097,7 @@ export default function Home() {
                     <div
                       role="group"
                       aria-label="Read aloud playback controls"
-                      className="ksemo-read-aloud-pill absolute -top-14 left-1/2 z-30 flex h-12 -translate-x-1/2 items-center gap-2 rounded-full border border-sidebar-border bg-sidebar py-1 pl-3 pr-1.5 text-sidebar-foreground shadow-xl shadow-black/20 backdrop-blur-xl"
+                      className="ksemo-read-aloud-pill absolute -top-[3.25rem] right-4 z-30 flex h-12 items-center gap-2 rounded-full border border-sidebar-border bg-sidebar py-1 pl-3 pr-1.5 text-sidebar-foreground shadow-xl shadow-black/20 backdrop-blur-xl"
                     >
                       <ReadAloudWaveform
                         messageId={speakingMessageId ?? "read-aloud"}

@@ -27,6 +27,7 @@ import {
   Copy,
   Download,
   ExternalLink,
+  MoreHorizontal,
   Pencil,
   Search,
   RotateCcw,
@@ -1134,7 +1135,10 @@ export const MessageContent = memo(function MessageContent({
                               aria-label={actionsMenuLabel}
                               aria-live="polite"
                             >
-                              <ActionsMenuGlyph open={actionsOpen} />
+                              <MoreHorizontal
+                                className="size-[22px] shrink-0"
+                                style={{ width: 22, height: 22 }}
+                              />
                             </Button>
                           </DropdownMenuTrigger>
                         </TooltipTrigger>
