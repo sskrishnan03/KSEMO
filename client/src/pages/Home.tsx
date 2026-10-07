@@ -38,7 +38,7 @@ import {
   UserPlus,
   X,
 } from "lucide-react";
-import { Layout } from "reicon-react/icons/Layout";
+import { Sidebar2 } from "reicon-react/icons/Sidebar2";
 import {
   ShareIcon,
   TemporaryChatIcon,
@@ -47,7 +47,8 @@ import {
   WinrarIcon,
   Trash6Icon,
 } from "../components/ksemo/icons";
-import { PdfFileIcon, WordFileIcon } from "../components/ksemo/FileBrandIcons";
+import { DocumentText } from "reicon-react/icons/DocumentText";
+import { FilePdf } from "reicon-react/icons/FilePdf";
 
 import {
   Tooltip,
@@ -4611,7 +4612,7 @@ export default function Home() {
               aria-label="Open conversations"
               data-testid="mobile-sidebar-toggle"
             >
-              <Layout size={20} strokeWidth={2} className="size-5" />
+              <Sidebar2 size={20} strokeWidth={2} className="size-5" />
             </Button>
 
             {!guestMode &&
@@ -4874,7 +4875,7 @@ export default function Home() {
                                     }
                                   }}
                                 >
-                                  <PdfFileIcon className="mr-2 size-5 shrink-0" />
+                                  <FilePdf className="mr-2 size-5 shrink-0" />
                                   <span>PDF</span>
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
@@ -4887,7 +4888,7 @@ export default function Home() {
                                     }
                                   }}
                                 >
-                                  <WordFileIcon className="mr-2 size-5 shrink-0" />
+                                  <DocumentText className="mr-2 size-5 shrink-0" />
                                   <span>Word</span>
                                 </DropdownMenuItem>
                               </DropdownMenuSubContent>

@@ -37,7 +37,7 @@ import {
   LockKeyhole,
 } from "lucide-react";
 import { Library } from "reicon-react/icons/Library";
-import { Layout } from "reicon-react/icons/Layout";
+import { Sidebar2 } from "reicon-react/icons/Sidebar2";
 import { ChatLine } from "reicon-react/icons/ChatLine";
 import { ChatSquareCall } from "reicon-react/icons/ChatSquareCall";
 import { ShareIcon, PinTackIcon, UnpinTackIcon, Trash6Icon } from "./icons";
@@ -286,7 +286,7 @@ export const ConversationSidebar = memo(function ConversationSidebar({
                     className="absolute inset-0 size-10 rounded-lg opacity-100 transition-all duration-150 group-hover/brand:scale-100 max-lg:bg-transparent max-lg:opacity-100 max-lg:hover:bg-sidebar-accent/80 max-lg:active:bg-sidebar-accent lg:size-[2.125rem] lg:opacity-0 lg:group-hover/brand:opacity-100 lg:group-focus-within/brand:opacity-100 lg:hover:bg-sidebar-accent active:scale-95"
                     aria-label="Expand sidebar"
                   >
-                    <Layout
+                    <Sidebar2
                       size={20}
                       strokeWidth={2}
                       className="size-5 text-sidebar-foreground/90 lg:size-[17px]"
@@ -317,7 +317,7 @@ export const ConversationSidebar = memo(function ConversationSidebar({
                   className="hidden size-[2.125rem] rounded-lg text-foreground/90 transition-transform duration-150 hover:bg-sidebar-accent active:scale-95 lg:inline-flex"
                   aria-label="Collapse sidebar"
                 >
-                  <Layout size={17} strokeWidth={2} className="size-[17px]" />
+                  <Sidebar2 size={17} strokeWidth={2} className="size-[17px]" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom">Collapse sidebar</TooltipContent>
@@ -333,7 +333,7 @@ export const ConversationSidebar = memo(function ConversationSidebar({
                   className="size-10 rounded-lg border-0 bg-transparent p-0 text-foreground/90 transition-colors outline-none hover:bg-accent/80 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring active:bg-accent lg:hidden"
                   aria-label="Close navigation"
                 >
-                  <Layout size={20} strokeWidth={2} className="size-5" />
+                  <Sidebar2 size={20} strokeWidth={2} className="size-5" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom">Close sidebar</TooltipContent>

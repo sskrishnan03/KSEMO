@@ -148,6 +148,74 @@ export function FileBrandMark({
 
 export type FileBrandIconComponent = ComponentType<{ className?: string }>;
 
+function FormatOutlineIcon({
+  className,
+  label,
+}: {
+  className?: string;
+  label: string;
+}) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.35"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path d="M4 2.5h9l6 6v13H4z" />
+      <path d="M13 2.75V8.5h5.75" />
+      <text
+        x="12"
+        y="16"
+        textAnchor="middle"
+        dominantBaseline="middle"
+        fill="currentColor"
+        stroke="none"
+        fontSize="5.2"
+        fontWeight="700"
+        fontFamily="Arial, sans-serif"
+      >
+        {label}
+      </text>
+    </svg>
+  );
+}
+
+export const DocxOutlineIcon = memo(function DocxOutlineIcon({ className }: { className?: string }) {
+  return <FormatOutlineIcon className={className} label="DOCX" />;
+});
+export const XlsxOutlineIcon = memo(function XlsxOutlineIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path d="M6.5 2.75h8l4.75 4.75v12.9a1.6 1.6 0 0 1-1.6 1.6H6.5a1.6 1.6 0 0 1-1.6-1.6V4.35a1.6 1.6 0 0 1 1.6-1.6Z" />
+      <path d="M14.5 2.9v4.6h4.5" />
+      <rect x="8" y="11" width="9" height="6.5" rx="0.3" />
+      <path d="M8 14.25h9M12.5 11v6.5" />
+    </svg>
+  );
+});
+export const PptxOutlineIcon = memo(function PptxOutlineIcon({ className }: { className?: string }) {
+  return <FormatOutlineIcon className={className} label="PPTX" />;
+});
+export const TxtOutlineIcon = memo(function TxtOutlineIcon({ className }: { className?: string }) {
+  return <FormatOutlineIcon className={className} label="TXT" />;
+});
+
 function brandIcon(variant: FileBrandVariant, displayName: string): FileBrandIconComponent {
   const Component = ({ className }: { className?: string }) => (
     <FileBrandMark variant={variant} className={className} />

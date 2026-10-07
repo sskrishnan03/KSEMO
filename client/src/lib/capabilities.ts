@@ -7,13 +7,11 @@
  * menu, active-mode chip and routing all derive from this configuration.
  */
 import type { ComponentType } from "react";
-import {
-  ExcelFileIcon,
-  PdfFileIcon,
-  PowerPointFileIcon,
-  TextFileIcon,
-  WordFileIcon,
-} from "@/components/ksemo/FileBrandIcons";
+import { DocumentText } from "reicon-react/icons/DocumentText";
+import { FilePdf } from "reicon-react/icons/FilePdf";
+import { PresentationPlay } from "reicon-react/icons/PresentationPlay";
+import { Server2 } from "reicon-react/icons/Server2";
+import { TextSquare } from "reicon-react/icons/TextSquare";
 import type {
   CapabilityMode,
   CreateMode,
@@ -46,7 +44,7 @@ const CREATE: CapabilityOption[] = [
     kind: "create",
     title: "PDF",
     description: "Create a formatted PDF document.",
-    icon: PdfFileIcon,
+    icon: FilePdf,
     iconColor: "text-red-500",
     iconBg: "bg-red-500/15",
     placeholder: "Describe the PDF you want to create...",
@@ -57,7 +55,7 @@ const CREATE: CapabilityOption[] = [
     kind: "create",
     title: "Word",
     description: "Create a Word document.",
-    icon: WordFileIcon,
+    icon: DocumentText,
     iconColor: "text-blue-600",
     iconBg: "bg-blue-500/15",
     placeholder: "Describe the Word document you want to create...",
@@ -68,7 +66,7 @@ const CREATE: CapabilityOption[] = [
     kind: "create",
     title: "Excel",
     description: "Create a structured Excel spreadsheet.",
-    icon: ExcelFileIcon,
+    icon: Server2,
     iconColor: "text-emerald-600",
     iconBg: "bg-emerald-500/15",
     placeholder: "Describe the spreadsheet you want to create...",
@@ -79,7 +77,7 @@ const CREATE: CapabilityOption[] = [
     kind: "create",
     title: "PowerPoint",
     description: "Create a professional PowerPoint presentation.",
-    icon: PowerPointFileIcon,
+    icon: PresentationPlay,
     iconColor: "text-orange-500",
     iconBg: "bg-orange-500/15",
     placeholder: "Describe the presentation you want to create...",
@@ -90,7 +88,7 @@ const CREATE: CapabilityOption[] = [
     kind: "create",
     title: "Text",
     description: "Create a plain text file.",
-    icon: TextFileIcon,
+    icon: TextSquare,
     iconColor: "text-sky-500",
     iconBg: "bg-sky-500/15",
     placeholder: "Describe the text file you want to create...",
