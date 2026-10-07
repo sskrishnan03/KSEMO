@@ -1599,6 +1599,7 @@ export default function Home() {
             ? ""
             : message.content,
         status: message.status,
+        createdAt: message.createdAt,
         attachments: message.attachments,
         // Rebuild completed fileGeneration with durable sources and metrics restored from attachment metadata
         fileGeneration:

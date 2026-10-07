@@ -4,6 +4,7 @@ export type StreamDraftMessage = {
   role: "user" | "assistant" | "system" | "tool";
   content: string;
   status?: string;
+  createdAt?: Date | string | number;
   attachments?: Array<{
     id: string;
     filename: string;
@@ -36,11 +37,12 @@ export function buildStreamingDrafts(
     role: "assistant",
     content: "",
     status: "streaming",
+    createdAt: now,
   };
   if (options.isRegeneration && options.replaceAssistantMessageId)
     return messages.map(message =>
       message.id === options.replaceAssistantMessageId
-        ? { ...message, content: "", status: "streaming" }
+        ? { ...message, content: "", status: "streaming", createdAt: now }
         : message
     );
   if (options.isRegeneration) return [...messages, assistant];
@@ -52,6 +54,7 @@ export function buildStreamingDrafts(
       role: "user",
       content,
       status: "completed",
+      createdAt: now,
       attachments: options.attachments,
     },
     assistant,

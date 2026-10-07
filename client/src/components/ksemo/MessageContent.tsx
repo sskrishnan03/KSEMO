@@ -63,6 +63,7 @@ type KsemoMessage = {
   role: "user" | "assistant" | "system" | "tool";
   content: string;
   status?: "sending" | "streaming" | "completed" | "failed" | "cancelled";
+  createdAt?: Date | string | number;
   attachments?: Array<{
     id: string;
     filename: string;
@@ -148,6 +149,29 @@ function formatBytes(bytes?: number): string | null {
   let unit = 0;
   const digits = unit === 0 || value >= 100 ? 0 : value >= 10 ? 1 : 2;
   return `${value.toFixed(digits)} ${units[unit]}`;
+}
+
+function formatMessageTimestamp(timestamp?: Date | string | number) {
+  if (timestamp === undefined || timestamp === null) return null;
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) return null;
+  const time = new Intl.DateTimeFormat(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date);
+  const dateKey = (value: Date) =>
+    `${value.getFullYear()}-${value.getMonth()}-${value.getDate()}`;
+  const now = new Date();
+  if (dateKey(date) === dateKey(now)) return `Today, ${time}`;
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (dateKey(date) === dateKey(yesterday)) return `Yesterday, ${time}`;
+  const dateLabel = new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(date);
+  return `${dateLabel}, ${time}`;
 }
 
 // List-with-arrow glyph for the message actions menu. The arrow is its own
@@ -559,6 +583,7 @@ export const MessageContent = memo(function MessageContent({
   );
 
   const isCancelled = !isUser && message.status === "cancelled";
+  const messageTimestamp = formatMessageTimestamp(message.createdAt);
   const isGeneratingFile = Boolean(
     isFileGenerating ||
     (message.fileGeneration && message.fileGeneration.status === "processing")
@@ -1002,7 +1027,91 @@ export const MessageContent = memo(function MessageContent({
                     ),
                     () => handleFeedbackToggle(feedback as "up" | "down"),
                     true
-                  )}
+                  )}{" "}
+                {message.content && !isCancelled && (
+                  <Popover
+                    open={emojiPickerOpen}
+                    onOpenChange={open => {
+                      setEmojiPickerOpen(open);
+                      if (!open) setEmojiSearch("");
+                    }}
+                  >
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <PopoverTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className={cn(
+                              actionClass,
+                              emojiPickerOpen &&
+                                "bg-accent/70 text-foreground hover:bg-accent/70 hover:text-foreground"
+                            )}
+                            aria-label="Add reaction"
+                          >
+                            <SmilePlus className="size-[18px]" />
+                          </Button>
+                        </PopoverTrigger>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom">React</TooltipContent>
+                    </Tooltip>
+                    <PopoverContent
+                      side="top"
+                      align="start"
+                      sideOffset={8}
+                      collisionPadding={8}
+                      className="w-[min(20rem,calc(100vw-1rem))] rounded-xl border border-border/70 p-2 shadow-lg data-[state=open]:animate-none data-[state=closed]:animate-none data-[state=open]:transition-none data-[state=closed]:transition-none"
+                    >
+                      {!isMobile && (
+                        <div className="mb-2 flex min-h-9 items-center gap-2 rounded-lg bg-muted/60 px-2.5">
+                          <Search className="size-4 shrink-0 text-muted-foreground" />
+                          <input
+                            type="text"
+                            value={emojiSearch}
+                            onChange={event =>
+                              setEmojiSearch(event.target.value)
+                            }
+                            placeholder="Search emoji"
+                            aria-label="Search emojis"
+                            autoComplete="off"
+                            className="min-w-0 flex-1 bg-transparent py-2 text-sm outline-none placeholder:text-muted-foreground"
+                          />
+                          {reactions.length > 0 && (
+                            <span
+                              className="flex shrink-0 items-center gap-0.5 border-l border-border/50 pl-1"
+                              aria-label={`${reactions.length} selected reactions`}
+                            >
+                              {reactions.map(emoji => {
+                                const name = EMOJI_GROUPS.flatMap(
+                                  group => group.emojis
+                                ).find(item => item.emoji === emoji)?.name;
+                                return (
+                                  <button
+                                    key={emoji}
+                                    type="button"
+                                    aria-label={`Undo ${name ?? "emoji"} reaction`}
+                                    title={`Undo ${name ?? "emoji"} reaction`}
+                                    onClick={() => toggleReaction(emoji)}
+                                    className="flex size-8 shrink-0 items-center justify-center rounded-md text-2xl hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                                  >
+                                    <span aria-hidden="true">{emoji}</span>
+                                  </button>
+                                );
+                              })}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      <AllEmojiGrid
+                        reactions={reactions}
+                        onToggle={toggleReaction}
+                        isMobile={isMobile}
+                        searchQuery={isMobile ? "" : emojiSearch}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                )}
                 {hasOverflowActions && (
                   <div className="relative inline-flex shrink-0">
                     <DropdownMenu
@@ -1130,89 +1239,15 @@ export const MessageContent = memo(function MessageContent({
                               </DropdownMenuItem>
                             </>
                           )}
+                          {messageTimestamp && (
+                            <time className="mt-1 flex justify-start px-2.5 pt-1 text-xs leading-4 tabular-nums text-muted-foreground/80">
+                              {messageTimestamp}
+                            </time>
+                          )}
                         </div>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
-                )}
-                {message.content && !isCancelled && (
-                  <Popover
-                    open={emojiPickerOpen}
-                    onOpenChange={open => {
-                      setEmojiPickerOpen(open);
-                      if (!open) setEmojiSearch("");
-                    }}
-                  >
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <PopoverTrigger asChild>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className={actionClass}
-                            aria-label="Add reaction"
-                          >
-                            <SmilePlus className="size-[18px]" />
-                          </Button>
-                        </PopoverTrigger>
-                      </TooltipTrigger>
-                      <TooltipContent side="bottom">React</TooltipContent>
-                    </Tooltip>
-                    <PopoverContent
-                      side="top"
-                      align="start"
-                      sideOffset={8}
-                      collisionPadding={8}
-                      className="w-[min(20rem,calc(100vw-1rem))] rounded-xl border border-border/70 p-2 shadow-lg data-[state=open]:animate-none data-[state=closed]:animate-none data-[state=open]:transition-none data-[state=closed]:transition-none"
-                    >
-                      <div className="mb-2 flex min-h-9 items-center gap-2 rounded-lg bg-muted/60 px-2.5">
-                        <Search className="size-4 shrink-0 text-muted-foreground" />
-                        <input
-                          type="text"
-                          value={emojiSearch}
-                          onChange={event => setEmojiSearch(event.target.value)}
-                          placeholder="Search emoji"
-                          aria-label="Search emojis"
-                          autoComplete="off"
-                          className="min-w-0 flex-1 bg-transparent py-2 text-sm outline-none placeholder:text-muted-foreground"
-                        />
-                        {reactions.length > 0 && (
-                          <span
-                            className="flex shrink-0 items-center gap-0.5 border-l border-border/50 pl-1"
-                            aria-label={`${reactions.length} selected reactions`}
-                          >
-                            {reactions.map(emoji => {
-                              const name = EMOJI_GROUPS.flatMap(
-                                group => group.emojis
-                              ).find(item => item.emoji === emoji)?.name;
-                              return (
-                                <button
-                                  key={emoji}
-                                  type="button"
-                                  aria-label={`Undo ${name ?? "emoji"} reaction`}
-                                  title={`Undo ${name ?? "emoji"} reaction`}
-                                  onClick={() => toggleReaction(emoji)}
-                                  className={cn(
-                                    "flex size-8 shrink-0 items-center justify-center rounded-md hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
-                                    isMobile ? "text-xl" : "text-2xl"
-                                  )}
-                                >
-                                  <span aria-hidden="true">{emoji}</span>
-                                </button>
-                              );
-                            })}
-                          </span>
-                        )}
-                      </div>
-                      <AllEmojiGrid
-                        reactions={reactions}
-                        onToggle={toggleReaction}
-                        isMobile={isMobile}
-                        searchQuery={emojiSearch}
-                      />
-                    </PopoverContent>
-                  </Popover>
                 )}
               </div>
             )}

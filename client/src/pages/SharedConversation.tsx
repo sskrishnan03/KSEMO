@@ -2,17 +2,19 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Loading } from "@/components/ui/loading";
 import { Button } from "@/components/ui/button";
-import {
-  MessageCircle,
-  Sparkles,
-  LogIn,
-  UserPlus,
-} from "lucide-react";
+import { MessageCircle, Sparkles, LogIn, UserPlus } from "lucide-react";
 import { useLocation, useRoute } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { toast } from "sonner";
-import { MessageContent, type KsemoMessage } from "@/components/ksemo/MessageContent";
-import { speechReactiveService, speakWithPrepareDelay, type SpeechVisualizerState } from "@/lib/speechReactive";
+import {
+  MessageContent,
+  type KsemoMessage,
+} from "@/components/ksemo/MessageContent";
+import {
+  speechReactiveService,
+  speakWithPrepareDelay,
+  type SpeechVisualizerState,
+} from "@/lib/speechReactive";
 
 export default function SharedConversation() {
   const [, params] = useRoute("/share/:token");
@@ -20,7 +22,9 @@ export default function SharedConversation() {
   const { user } = useAuth();
   const token = params?.token ?? "";
 
-  const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
+  const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(
+    null
+  );
   const [speechState, setSpeechState] = useState<SpeechVisualizerState>("idle");
   const cancelPrepareRef = useRef<(() => void) | null>(null);
 
@@ -44,13 +48,19 @@ export default function SharedConversation() {
     if (shared.data?.conversation.isOwner && shared.data.conversation.id) {
       setLocation(`/c/${encodeURIComponent(shared.data.conversation.id)}`);
     }
-  }, [shared.data?.conversation.isOwner, shared.data?.conversation.id, setLocation]);
+  }, [
+    shared.data?.conversation.isOwner,
+    shared.data?.conversation.id,
+    setLocation,
+  ]);
 
   const handleContinueChat = () => {
     if (user) {
       forkMutation.mutate({ token });
     } else {
-      setLocation(`/signin?redirect=${encodeURIComponent(window.location.pathname)}`);
+      setLocation(
+        `/signin?redirect=${encodeURIComponent(window.location.pathname)}`
+      );
     }
   };
 
@@ -69,21 +79,26 @@ export default function SharedConversation() {
 
     // Deferred playback: the control shows its loading ring for the
     // "preparing audio" beat, then speech begins and the equalizer takes over.
-    cancelPrepareRef.current = speakWithPrepareDelay(utterance, messageId, text, {
-      onStart: () => setSpeechState("playing"),
-      onEnd: () => {
-        cancelPrepareRef.current = null;
-        setSpeakingMessageId(null);
-        setSpeechState("idle");
-      },
-      onError: () => {
-        cancelPrepareRef.current = null;
-        setSpeakingMessageId(null);
-        setSpeechState("idle");
-      },
-      onPause: () => setSpeechState("paused"),
-      onResume: () => setSpeechState("playing"),
-    });
+    cancelPrepareRef.current = speakWithPrepareDelay(
+      utterance,
+      messageId,
+      text,
+      {
+        onStart: () => setSpeechState("playing"),
+        onEnd: () => {
+          cancelPrepareRef.current = null;
+          setSpeakingMessageId(null);
+          setSpeechState("idle");
+        },
+        onError: () => {
+          cancelPrepareRef.current = null;
+          setSpeakingMessageId(null);
+          setSpeechState("idle");
+        },
+        onPause: () => setSpeechState("paused"),
+        onResume: () => setSpeechState("playing"),
+      }
+    );
   }, []);
 
   const handlePause = useCallback(() => {
@@ -236,7 +251,8 @@ export default function SharedConversation() {
               {conversation.title}
             </h1>
             <p className="text-xs text-muted-foreground">
-              {messages.length} {messages.length === 1 ? "message" : "messages"} · Shared from KSEMO
+              {messages.length} {messages.length === 1 ? "message" : "messages"}{" "}
+              · Shared from KSEMO
             </p>
           </div>
 
@@ -247,6 +263,7 @@ export default function SharedConversation() {
                 role: message.role as "user" | "assistant",
                 content: message.content,
                 status: "completed",
+                createdAt: message.createdAt,
               };
               return (
                 <MessageContent
@@ -259,7 +276,8 @@ export default function SharedConversation() {
                   isSpeaking={speakingMessageId === message.id}
                   speechState={speechState}
                   isPreparingSpeech={
-                    speakingMessageId === message.id && speechState === "buffering"
+                    speakingMessageId === message.id &&
+                    speechState === "buffering"
                   }
                 />
               );
@@ -303,7 +321,8 @@ export default function SharedConversation() {
                     Sign in to continue this chat
                   </p>
                   <p className="truncate text-xs text-muted-foreground">
-                    After signing in, you can edit, branch, or ask follow-up questions.
+                    After signing in, you can edit, branch, or ask follow-up
+                    questions.
                   </p>
                 </div>
               </div>
@@ -344,7 +363,8 @@ export default function SharedConversation() {
                     Continue this conversation in your workspace
                   </p>
                   <p className="truncate text-xs text-muted-foreground">
-                    Pick up where this chat left off, edit messages, or ask follow-ups.
+                    Pick up where this chat left off, edit messages, or ask
+                    follow-ups.
                   </p>
                 </div>
               </div>
