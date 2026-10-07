@@ -1009,8 +1009,8 @@ export const MessageContent = memo(function MessageContent({
                 {hasActiveIndicator &&
                   action(
                     feedback === "up"
-                      ? "Remove good response"
-                      : "Remove bad response",
+                      ? "Liked"
+                      : "Disliked",
                     feedback === "up" ? (
                       <ThumbsUp
                         className={cn(
@@ -1138,7 +1138,9 @@ export const MessageContent = memo(function MessageContent({
                             </Button>
                           </DropdownMenuTrigger>
                         </TooltipTrigger>
-                        <TooltipContent side="bottom">More</TooltipContent>
+                        <TooltipContent side="bottom">
+                          More actions
+                        </TooltipContent>
                       </Tooltip>
                       <DropdownMenuContent
                         align="start"
