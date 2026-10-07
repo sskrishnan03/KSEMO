@@ -39,7 +39,13 @@ import { type MessageFeedbackValue } from "./MessageFeedback";
 import { EMOJI_GROUPS } from "@/data/emojiGroups";
 import { usePersistFn } from "@/hooks/usePersistFn";
 import { useIsMobile } from "@/hooks/useIsMobile";
-import React, { memo, useEffect, useRef, useState } from "react";
+import React, {
+  memo,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import {
   Streamdown,
   defaultRehypePlugins,
@@ -176,9 +182,11 @@ const VISIBLE_EMOJI_GROUPS = EMOJI_GROUPS.filter(
 const AllEmojiGrid = memo(function AllEmojiGrid({
   reactions,
   onToggle,
+  isMobile,
 }: {
   reactions: string[];
   onToggle: (emoji: string) => void;
+  isMobile: boolean;
 }) {
   const [visibleGroupCount, setVisibleGroupCount] = useState(1);
 
@@ -186,7 +194,10 @@ const AllEmojiGrid = memo(function AllEmojiGrid({
     <div
       role="group"
       aria-label="All emojis"
-      className="h-[260px] overflow-x-hidden overflow-y-auto overscroll-contain"
+      className={cn(
+        "overflow-x-hidden overflow-y-auto overscroll-contain",
+        isMobile ? "h-[min(220px,42vh)]" : "h-[260px]"
+      )}
       onScroll={event => {
         const element = event.currentTarget;
         if (
@@ -204,7 +215,7 @@ const AllEmojiGrid = memo(function AllEmojiGrid({
           <div className="sticky top-0 bg-popover px-1 pt-1.5 pb-1 text-[11px] font-medium leading-4 text-muted-foreground">
             {group.name}
           </div>
-          <div className="grid grid-cols-7">
+          <div className={cn("grid", isMobile ? "grid-cols-8" : "grid-cols-7")}>
             {group.emojis.map(({ emoji, name }) => (
               <button
                 key={`${group.name}-${name}`}
@@ -213,7 +224,10 @@ const AllEmojiGrid = memo(function AllEmojiGrid({
                 aria-pressed={reactions.includes(emoji)}
                 onClick={() => onToggle(emoji)}
                 className={cn(
-                  "group flex h-9 items-center justify-center rounded-md text-2xl leading-none select-none transition-colors focus-visible:ring-0 focus-visible:outline-none",
+                  cn(
+                    "group flex items-center justify-center rounded-md leading-none select-none transition-colors focus-visible:ring-0 focus-visible:outline-none",
+                    isMobile ? "h-8 text-xl" : "h-9 text-2xl"
+                  ),
                   reactions.includes(emoji) && "bg-accent text-foreground"
                 )}
               >
@@ -442,6 +456,52 @@ export const MessageContent = memo(function MessageContent({
   });
   const [allEmojisOpen, setAllEmojisOpen] = useState(false);
   const isMobile = useIsMobile();
+  const emojiTriggerRef = useRef<HTMLDivElement>(null);
+  const emojiPanelRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    if (!isMobile || !allEmojisOpen) return;
+    const placeEmojiPanel = () => {
+      const trigger = emojiTriggerRef.current;
+      const panel = emojiPanelRef.current;
+      if (!trigger || !panel) return;
+
+      const triggerRect = trigger.getBoundingClientRect();
+      const panelRect = panel.getBoundingClientRect();
+      const viewportWidth = document.documentElement.clientWidth;
+      const viewportHeight = document.documentElement.clientHeight;
+      const left = Math.max(
+        8,
+        Math.min(
+          triggerRect.left + triggerRect.width / 2 - panelRect.width / 2,
+          viewportWidth - panelRect.width - 8
+        )
+      );
+      const top = Math.max(8, triggerRect.top - panelRect.height - 8);
+
+      // Radix's desktop submenu opens sideways. On narrow screens pin it above
+      // the reaction row and clamp both axes so it stays inside the viewport.
+      panel.style.setProperty("position", "fixed", "important");
+      panel.style.setProperty("left", `${left}px`, "important");
+      const maxTop = Math.max(8, viewportHeight - panelRect.height - 8);
+      panel.style.setProperty(
+        "top",
+        `${Math.min(top, maxTop)}px`,
+        "important"
+      );
+      panel.style.setProperty("right", "auto", "important");
+      panel.style.setProperty("bottom", "auto", "important");
+      panel.style.setProperty("transform", "none", "important");
+    };
+
+    placeEmojiPanel();
+    window.addEventListener("resize", placeEmojiPanel);
+    window.visualViewport?.addEventListener("resize", placeEmojiPanel);
+    return () => {
+      window.removeEventListener("resize", placeEmojiPanel);
+      window.visualViewport?.removeEventListener("resize", placeEmojiPanel);
+    };
+  }, [allEmojisOpen, isMobile]);
 
   useEffect(() => {
     try {
@@ -1117,6 +1177,7 @@ export const MessageContent = memo(function MessageContent({
                                 }}
                               >
                                 <DropdownMenuSubTrigger
+                                  ref={emojiTriggerRef}
                                   aria-label="More emojis"
                                   onPointerMove={event => {
                                     if (event.pointerType === "mouse") {
@@ -1128,6 +1189,7 @@ export const MessageContent = memo(function MessageContent({
                                   <ChevronRight className="size-5" />
                                 </DropdownMenuSubTrigger>
                                 <DropdownMenuSubContent
+                                  ref={emojiPanelRef}
                                   sideOffset={8}
                                   collisionPadding={8}
                                   style={
@@ -1145,6 +1207,7 @@ export const MessageContent = memo(function MessageContent({
                                   <AllEmojiGrid
                                     reactions={reactions}
                                     onToggle={toggleReaction}
+                                    isMobile={isMobile}
                                   />
                                 </DropdownMenuSubContent>
                               </DropdownMenuSub>
