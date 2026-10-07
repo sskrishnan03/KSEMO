@@ -4595,42 +4595,6 @@ export default function Home() {
           />
         ) : (
           <>
-            {readAloudActive && (
-              <div
-                role="group"
-                aria-label="Read aloud playback controls"
-                className="ksemo-read-aloud-pill absolute left-1/2 top-2 z-30 flex h-12 -translate-x-1/2 items-center gap-2 rounded-full border border-sidebar-border bg-sidebar py-1 pl-3 pr-1.5 text-sidebar-foreground shadow-xl shadow-black/20 backdrop-blur-xl"
-              >
-                <ReadAloudWaveform
-                  messageId={speakingMessageId ?? "read-aloud"}
-                  state={speechState}
-                />
-                <button
-                  type="button"
-                  onClick={
-                    speechState === "paused" ? resumeSpeech : pauseSpeech
-                  }
-                  aria-label={
-                    speechState === "paused" ? "Resume speech" : "Pause speech"
-                  }
-                  className="flex size-9 items-center justify-center rounded-lg text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  {speechState === "paused" ? (
-                    <Play className="size-4 fill-current" />
-                  ) : (
-                    <Pause className="size-4 fill-current" />
-                  )}
-                </button>
-                <button
-                  type="button"
-                  onClick={stopSpeech}
-                  aria-label="Stop read aloud"
-                  className="-ml-2 flex size-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  <X className="size-4" />
-                </button>
-              </div>
-            )}
             {/* Mobile-only Navbar with subtle fade below it */}
             <div
               aria-hidden="true"
@@ -5125,7 +5089,47 @@ export default function Home() {
                   aria-hidden="true"
                   className="pointer-events-none absolute -top-8 left-0 right-0 h-8 bg-gradient-to-b from-transparent to-background"
                 />
-                {composerElement}
+                <div className="relative mx-auto w-full max-w-3xl">
+                  {readAloudActive && (
+                    <div
+                      role="group"
+                      aria-label="Read aloud playback controls"
+                      className="ksemo-read-aloud-pill absolute -top-14 left-1/2 z-30 flex h-12 -translate-x-1/2 items-center gap-2 rounded-full border border-sidebar-border bg-sidebar py-1 pl-3 pr-1.5 text-sidebar-foreground shadow-xl shadow-black/20 backdrop-blur-xl"
+                    >
+                      <ReadAloudWaveform
+                        messageId={speakingMessageId ?? "read-aloud"}
+                        state={speechState}
+                      />
+                      <button
+                        type="button"
+                        onClick={
+                          speechState === "paused" ? resumeSpeech : pauseSpeech
+                        }
+                        aria-label={
+                          speechState === "paused"
+                            ? "Resume speech"
+                            : "Pause speech"
+                        }
+                        className="flex size-9 items-center justify-center rounded-lg text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        {speechState === "paused" ? (
+                          <Play className="size-4 fill-current" />
+                        ) : (
+                          <Pause className="size-4 fill-current" />
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={stopSpeech}
+                        aria-label="Stop read aloud"
+                        className="-ml-2 flex size-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        <X className="size-4" />
+                      </button>
+                    </div>
+                  )}
+                  {composerElement}
+                </div>
               </div>
             )}
           </>
