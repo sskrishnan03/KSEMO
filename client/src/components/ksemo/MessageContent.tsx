@@ -308,12 +308,12 @@ function ActionsMenuGlyph({ open }: { open: boolean }) {
   return (
     <svg
       viewBox="0 0 24 24"
-      width={24}
-      height={24}
+      width={22}
+      height={22}
       fill="none"
       aria-hidden="true"
       data-testid="actions-menu-glyph"
-      className="size-6 shrink-0"
+      className="size-[22px] shrink-0"
     >
       <path
         fill="currentColor"
@@ -963,15 +963,15 @@ export const MessageContent = memo(function MessageContent({
               {action(
                 "Copy message",
                 copied ? (
-                  <Check className="size-[17px]" />
+                  <Check className="size-4" />
                 ) : (
-                  <Copy className="size-[17px]" />
+                  <Copy className="size-4" />
                 ),
                 copyMessage
               )}
               {onEdit &&
                 !isEditing &&
-                action("Edit message", <Pencil className="size-[17px]" />, () =>
+                action("Edit message", <Pencil className="size-4" />, () =>
                   onEdit(message)
                 )}
             </div>
@@ -987,9 +987,9 @@ export const MessageContent = memo(function MessageContent({
                   action(
                     copied ? "Copied" : "Copy response",
                     copied ? (
-                      <Check className="size-[17px]" />
+                      <Check className="size-4" />
                     ) : (
-                      <Copy className="size-[17px]" />
+                      <Copy className="size-4" />
                     ),
                     copyMessage
                   )}
