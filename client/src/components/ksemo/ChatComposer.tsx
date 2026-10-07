@@ -1081,14 +1081,23 @@ export const ChatComposer = memo(function ChatComposer({
                             variant="ghost"
                             size="icon"
                             className="size-10 shrink-0 rounded-full bg-transparent text-foreground hover:bg-accent hover:text-foreground transition-colors"
-                            aria-label="Attach"
+                            aria-label={
+                              toolsOpen && !libraryOpen
+                                ? "Close attachment options"
+                                : "Attach"
+                            }
                           >
-                            <Plus className="size-5" />
+                            <Plus
+                              className={cn(
+                                "size-5 transition-transform duration-200 ease-out",
+                                toolsOpen && !libraryOpen && "rotate-45"
+                              )}
+                            />
                           </Button>
                         </DropdownMenuTrigger>
                       </TooltipTrigger>
                       <TooltipContent side="bottom">
-                        {MENU_TITLE}
+                        {toolsOpen && !libraryOpen ? "Close" : MENU_TITLE}
                       </TooltipContent>
                     </Tooltip>
                     <DropdownMenuContent

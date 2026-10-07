@@ -9,7 +9,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -1146,6 +1145,68 @@ export const MessageContent = memo(function MessageContent({
                         className="w-max min-w-44 rounded-xl border-0 bg-transparent p-1 shadow-none"
                       >
                         <div className="rounded-lg border border-border/70 bg-popover p-1 shadow-sm">
+                          {messageTimestamp && (
+                            <time className="flex w-full justify-start px-2.5 pt-1 pb-2 text-left text-xs leading-4 tabular-nums text-muted-foreground/80">
+                              {messageTimestamp}
+                            </time>
+                          )}
+                          {canRate && (
+                            <>
+                              <DropdownMenuItem
+                                className="gap-2.5 whitespace-nowrap rounded-lg py-2 pl-2.5 pr-2.5 data-[active=true]:text-emerald-600 dark:data-[active=true]:text-emerald-400"
+                                data-active={feedback === "up"}
+                                onSelect={() => handleFeedbackToggle("up")}
+                                aria-label={
+                                  feedback === "up" ? "Liked" : "Like"
+                                }
+                              >
+                                <ThumbsUp
+                                  className={cn(
+                                    "size-4",
+                                    feedback === "up"
+                                      ? "text-emerald-600 dark:text-emerald-400 ksemo-feedback-thumb-active"
+                                      : "text-muted-foreground"
+                                  )}
+                                />
+                                <span>
+                                  {feedback === "up" ? "Liked" : "Like"}
+                                </span>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className="gap-2.5 whitespace-nowrap rounded-lg py-2 pl-2.5 pr-2.5 data-[active=true]:text-rose-600 dark:data-[active=true]:text-rose-400"
+                                data-active={feedback === "down"}
+                                onSelect={() => handleFeedbackToggle("down")}
+                                aria-label={
+                                  feedback === "down" ? "Disliked" : "Dislike"
+                                }
+                              >
+                                <ThumbsDown
+                                  className={cn(
+                                    "size-4",
+                                    feedback === "down"
+                                      ? "text-rose-600 dark:text-rose-400 ksemo-feedback-thumb-active"
+                                      : "text-muted-foreground"
+                                  )}
+                                />
+                                <span>
+                                  {feedback === "down" ? "Disliked" : "Dislike"}
+                                </span>
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                          {(onRegenerate || onRetry) && (
+                            <DropdownMenuItem
+                              className="gap-2.5 whitespace-nowrap rounded-lg py-2 pl-2.5 pr-8"
+                              onSelect={() => {
+                                if (onRegenerate) onRegenerate(message);
+                                else if (onRetry) onRetry(message);
+                              }}
+                              aria-label="Try again"
+                            >
+                              <RotateCcw className="size-4 text-muted-foreground" />
+                              <span>Try again</span>
+                            </DropdownMenuItem>
+                          )}
                           {message.content && onSpeak ? (
                             <DropdownMenuItem
                               className="group/readaloud gap-2.5 whitespace-nowrap rounded-lg py-2 pl-2.5 pr-8"
@@ -1171,79 +1232,6 @@ export const MessageContent = memo(function MessageContent({
                               </span>
                             </DropdownMenuItem>
                           ) : null}
-                          {(onRegenerate || onRetry) && (
-                            <DropdownMenuItem
-                              className="gap-2.5 whitespace-nowrap rounded-lg py-2 pl-2.5 pr-8"
-                              onSelect={() => {
-                                if (onRegenerate) onRegenerate(message);
-                                else if (onRetry) onRetry(message);
-                              }}
-                              aria-label={
-                                onRegenerate
-                                  ? "Regenerate response"
-                                  : "Retry response"
-                              }
-                            >
-                              <RotateCcw className="size-4 text-muted-foreground" />
-                              <span>
-                                {onRegenerate
-                                  ? "Regenerate response"
-                                  : "Retry response"}
-                              </span>
-                            </DropdownMenuItem>
-                          )}
-                          {canRate && (
-                            <>
-                              {canReadAloud ? (
-                                <DropdownMenuSeparator className="my-1" />
-                              ) : null}
-                              <DropdownMenuItem
-                                className="gap-2.5 whitespace-nowrap rounded-lg py-2 pl-2.5 pr-2.5 data-[active=true]:text-emerald-600 dark:data-[active=true]:text-emerald-400"
-                                data-active={feedback === "up"}
-                                onSelect={() => handleFeedbackToggle("up")}
-                                aria-label="Good response"
-                              >
-                                <ThumbsUp
-                                  className={cn(
-                                    "size-4",
-                                    feedback === "up"
-                                      ? "text-emerald-600 dark:text-emerald-400 ksemo-feedback-thumb-active"
-                                      : "text-muted-foreground"
-                                  )}
-                                />
-                                <span>
-                                  {feedback === "up"
-                                    ? "Remove good response"
-                                    : "Good response"}
-                                </span>
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                className="gap-2.5 whitespace-nowrap rounded-lg py-2 pl-2.5 pr-2.5 data-[active=true]:text-rose-600 dark:data-[active=true]:text-rose-400"
-                                data-active={feedback === "down"}
-                                onSelect={() => handleFeedbackToggle("down")}
-                                aria-label="Bad response"
-                              >
-                                <ThumbsDown
-                                  className={cn(
-                                    "size-4",
-                                    feedback === "down"
-                                      ? "text-rose-600 dark:text-rose-400 ksemo-feedback-thumb-active"
-                                      : "text-muted-foreground"
-                                  )}
-                                />
-                                <span>
-                                  {feedback === "down"
-                                    ? "Remove bad response"
-                                    : "Bad response"}
-                                </span>
-                              </DropdownMenuItem>
-                            </>
-                          )}
-                          {messageTimestamp && (
-                            <time className="mt-1 flex justify-start px-2.5 pt-1 text-xs leading-4 tabular-nums text-muted-foreground/80">
-                              {messageTimestamp}
-                            </time>
-                          )}
                         </div>
                       </DropdownMenuContent>
                     </DropdownMenu>
