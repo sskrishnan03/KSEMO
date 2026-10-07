@@ -25,7 +25,6 @@ import { cn } from "@/lib/utils";
 import {
   Check,
   CheckCircle2,
-  ChevronsRight,
   Download,
   FolderOpen,
   Grid2X2,
@@ -40,6 +39,7 @@ import {
   Upload,
   X,
 } from "lucide-react";
+import { Layout } from "reicon-react/icons/Layout";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -443,11 +443,15 @@ export function LibraryWorkspace({
                     variant="ghost"
                     size="icon"
                     onClick={onOpenSidebar}
-                    className="size-10 shrink-0 rounded-lg border-0 bg-transparent p-0 text-foreground shadow-none transition-colors hover:bg-accent/80 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring active:bg-accent lg:hidden"
+                    className="size-10 shrink-0 rounded-lg border-0 bg-transparent p-0 text-foreground/90 shadow-none transition-colors hover:bg-accent/80 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring active:bg-accent lg:hidden"
                     aria-label="Open conversations"
                     title="Open sidebar"
                   >
-                    <ChevronsRight className="size-5 stroke-[2.75]" />
+                    <Layout
+                      size={17}
+                      strokeWidth={2}
+                      className="size-[17px]"
+                    />
                   </Button>
                 )}
                 <h1 className="text-2xl font-semibold tracking-[-0.03em]">
@@ -487,7 +491,10 @@ export function LibraryWorkspace({
             <Input
               value={query}
               onChange={event => setQuery(event.target.value)}
-              className={cn("h-9 sm:h-10 rounded-xl pl-9 text-xs sm:text-sm", query && "pr-9")}
+              className={cn(
+                "h-9 sm:h-10 rounded-xl pl-9 text-xs sm:text-sm",
+                query && "pr-9"
+              )}
               placeholder="Search your Library"
               aria-label="Search your Library"
             />
@@ -520,7 +527,7 @@ export function LibraryWorkspace({
 
         {selectedFiles.length > 0 && (
           <>
-{/* Mobile Selection Toolbar: same dock design as desktop,
+            {/* Mobile Selection Toolbar: same dock design as desktop,
                 centered horizontally at the bottom */}
             <div
               className="fixed bottom-0 inset-x-0 z-40 flex justify-center px-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:hidden select-none animate-in slide-in-from-bottom-5 duration-200"
@@ -1162,8 +1169,16 @@ const LibraryGridCard = memo(function LibraryGridCard({
       )}
       <a
         href={file.url}
-        target={isPdfFile || isImageFile(file.filename, file.mimeType) ? undefined : "_blank"}
-        rel={isPdfFile || isImageFile(file.filename, file.mimeType) ? undefined : "noreferrer"}
+        target={
+          isPdfFile || isImageFile(file.filename, file.mimeType)
+            ? undefined
+            : "_blank"
+        }
+        rel={
+          isPdfFile || isImageFile(file.filename, file.mimeType)
+            ? undefined
+            : "noreferrer"
+        }
         onClick={event => {
           event.stopPropagation();
           if (isImageFile(file.filename, file.mimeType)) {
@@ -1188,8 +1203,16 @@ const LibraryGridCard = memo(function LibraryGridCard({
       <div className="p-3">
         <a
           href={file.url}
-          target={isPdfFile || isImageFile(file.filename, file.mimeType) ? undefined : "_blank"}
-          rel={isPdfFile || isImageFile(file.filename, file.mimeType) ? undefined : "noreferrer"}
+          target={
+            isPdfFile || isImageFile(file.filename, file.mimeType)
+              ? undefined
+              : "_blank"
+          }
+          rel={
+            isPdfFile || isImageFile(file.filename, file.mimeType)
+              ? undefined
+              : "noreferrer"
+          }
           onClick={event => {
             event.stopPropagation();
             if (isImageFile(file.filename, file.mimeType)) {
@@ -1285,8 +1308,16 @@ const LibraryListRow = memo(function LibraryListRow({
       </button>
       <a
         href={file.url}
-        target={isPdfFile || isImageFile(file.filename, file.mimeType) ? undefined : "_blank"}
-        rel={isPdfFile || isImageFile(file.filename, file.mimeType) ? undefined : "noreferrer"}
+        target={
+          isPdfFile || isImageFile(file.filename, file.mimeType)
+            ? undefined
+            : "_blank"
+        }
+        rel={
+          isPdfFile || isImageFile(file.filename, file.mimeType)
+            ? undefined
+            : "noreferrer"
+        }
         onClick={event => {
           event.stopPropagation();
           if (isImageFile(file.filename, file.mimeType)) {
@@ -1310,8 +1341,16 @@ const LibraryListRow = memo(function LibraryListRow({
       </a>
       <a
         href={file.url}
-        target={isPdfFile || isImageFile(file.filename, file.mimeType) ? undefined : "_blank"}
-        rel={isPdfFile || isImageFile(file.filename, file.mimeType) ? undefined : "noreferrer"}
+        target={
+          isPdfFile || isImageFile(file.filename, file.mimeType)
+            ? undefined
+            : "_blank"
+        }
+        rel={
+          isPdfFile || isImageFile(file.filename, file.mimeType)
+            ? undefined
+            : "noreferrer"
+        }
         onClick={event => {
           event.stopPropagation();
           if (isImageFile(file.filename, file.mimeType)) {

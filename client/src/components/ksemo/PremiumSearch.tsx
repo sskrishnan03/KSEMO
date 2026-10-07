@@ -15,11 +15,11 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  ChevronsRight,
   MessageCircle,
   Search,
   X,
 } from "lucide-react";
+import { Layout } from "reicon-react/icons/Layout";
 import { PinTackIcon } from "./icons";
 import { memo, useEffect, useMemo, useState } from "react";
 import {
@@ -317,7 +317,9 @@ export function SearchWorkspace({
   const [dateFilter, setDateFilter] = useState<DateFilter>("all");
   const [customDate, setCustomDate] = useState("");
   const [filterMenuOpen, setFilterMenuOpen] = useState(false);
-  const [mobileDateView, setMobileDateView] = useState<"menu" | "calendar">("menu");
+  const [mobileDateView, setMobileDateView] = useState<"menu" | "calendar">(
+    "menu"
+  );
   const trimmed = query.trim().toLowerCase();
 
   useEffect(() => {
@@ -467,11 +469,15 @@ export function SearchWorkspace({
                     variant="ghost"
                     size="icon"
                     onClick={onOpenSidebar}
-                    className="size-10 shrink-0 rounded-lg border-0 bg-transparent p-0 text-foreground shadow-none transition-colors hover:bg-accent/80 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring active:bg-accent lg:hidden"
+                    className="size-10 shrink-0 rounded-lg border-0 bg-transparent p-0 text-foreground/90 shadow-none transition-colors hover:bg-accent/80 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring active:bg-accent lg:hidden"
                     aria-label="Open conversations"
                     title="Open sidebar"
                   >
-                    <ChevronsRight className="size-5 stroke-[2.75]" />
+                    <Layout
+                      size={17}
+                      strokeWidth={2}
+                      className="size-[17px]"
+                    />
                   </Button>
                 )}
                 <h1 className="text-2xl font-semibold tracking-[-0.03em]">

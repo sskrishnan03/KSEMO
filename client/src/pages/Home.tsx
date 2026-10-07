@@ -30,7 +30,6 @@ import { cn } from "@/lib/utils";
 import {
   Archive,
   ArrowDown,
-  ChevronsRight,
   Download,
   LogIn,
   MoreHorizontal,
@@ -39,6 +38,7 @@ import {
   UserPlus,
   X,
 } from "lucide-react";
+import { Layout } from "reicon-react/icons/Layout";
 import {
   ShareIcon,
   TemporaryChatIcon,
@@ -4642,11 +4642,11 @@ export default function Home() {
               variant="ghost"
               size="icon"
               onClick={() => setSidebarOpen(true)}
-              className="absolute left-2 top-2 z-20 size-10 rounded-lg border-0 bg-transparent p-0 text-foreground shadow-none transition-colors hover:bg-accent/80 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring active:bg-accent lg:hidden"
+              className="absolute left-2 top-2 z-20 size-10 rounded-lg border-0 bg-transparent p-0 text-foreground/90 shadow-none transition-colors hover:bg-accent/80 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring active:bg-accent lg:hidden"
               aria-label="Open conversations"
               data-testid="mobile-sidebar-toggle"
             >
-              <ChevronsRight className="size-5 stroke-[2.75]" />
+              <Layout size={17} strokeWidth={2} className="size-[17px]" />
             </Button>
 
             {!guestMode &&
@@ -5089,7 +5089,6 @@ export default function Home() {
                 />
               )}
             </section>
-
             {(visibleMessages.length > 0 || isMobile) && (
               <div
                 className={cn(
