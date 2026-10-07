@@ -10,11 +10,13 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { getFileKind } from "@/lib/fileKinds";
 import { CardWheelFan } from "@/components/ui/card-wheel-fan";
 import { ImageLightbox } from "@/components/ui/image-lightbox";
@@ -23,13 +25,13 @@ import { ThinkingIndicator } from "@/components/ui/thinking-indicator";
 import {
   Check,
   ChevronDown,
-  ChevronLeft,
-  ChevronRight,
   Copy,
   Download,
   ExternalLink,
   Pencil,
+  Search,
   RotateCcw,
+  SmilePlus,
   Square,
   ThumbsDown,
   ThumbsUp,
@@ -155,19 +157,7 @@ const LIST_ARROW_LINES_D =
 const LIST_ARROW_ARROW_D =
   "M17.5 12.25C17.9142 12.25 18.25 12.5858 18.25 13V17.1893L19.4697 15.9697C19.7626 15.6768 20.2374 15.6768 20.5303 15.9697C20.8232 16.2626 20.8232 16.7374 20.5303 17.0303L18.0303 19.5303C17.7374 19.8232 17.2626 19.8232 16.9697 19.5303L14.4697 17.0303C14.1768 16.7374 14.1768 16.2626 14.4697 15.9697C14.7626 15.6768 15.2374 15.6768 15.5303 15.9697L16.75 17.1893V13C16.75 12.5858 17.0858 12.25 17.5 12.25Z";
 
-// Compact reaction strip pinned to the top of the More menu: :) :D :| :( :O ;)
-const MESSAGE_REACTIONS = [
-  { emoji: "🙂", label: "React with slightly smiling face" },
-  { emoji: "😀", label: "React with grinning face" },
-  { emoji: "😐", label: "React with neutral face" },
-  { emoji: "🙁", label: "React with slightly frowning face" },
-  { emoji: "😮", label: "React with surprised face" },
-  { emoji: "😉", label: "React with winking face" },
-] as const;
-
-const VISIBLE_EMOJI_GROUPS = EMOJI_GROUPS.filter(
-  group => group.name !== "Flags" && group.name !== "Symbols"
-);
+const VISIBLE_EMOJI_GROUPS = EMOJI_GROUPS;
 
 /**
  * Full emoji grid behind the "all emojis" submenu. Extracted as a memo so that
@@ -178,12 +168,25 @@ const AllEmojiGrid = memo(function AllEmojiGrid({
   reactions,
   onToggle,
   isMobile,
+  searchQuery,
 }: {
   reactions: string[];
   onToggle: (emoji: string) => void;
   isMobile: boolean;
+  searchQuery: string;
 }) {
   const [visibleGroupCount, setVisibleGroupCount] = useState(1);
+  const normalizedSearch = searchQuery.trim().toLocaleLowerCase();
+  const matchingGroups = normalizedSearch
+    ? VISIBLE_EMOJI_GROUPS.map(group => ({
+        ...group,
+        emojis: group.emojis.filter(
+          ({ emoji, name }) =>
+            name.toLocaleLowerCase().includes(normalizedSearch) ||
+            emoji.includes(normalizedSearch)
+        ),
+      })).filter(group => group.emojis.length > 0)
+    : VISIBLE_EMOJI_GROUPS.slice(0, visibleGroupCount);
 
   return (
     <div
@@ -205,7 +208,7 @@ const AllEmojiGrid = memo(function AllEmojiGrid({
         }
       }}
     >
-      {VISIBLE_EMOJI_GROUPS.slice(0, visibleGroupCount).map(group => (
+      {matchingGroups.map(group => (
         <div key={group.name} role="group" aria-label={group.name}>
           <div className="sticky top-0 bg-popover px-1 pt-1.5 pb-1 text-[11px] font-medium leading-4 text-muted-foreground">
             {group.name}
@@ -228,7 +231,7 @@ const AllEmojiGrid = memo(function AllEmojiGrid({
               >
                 <span
                   aria-hidden="true"
-                  className="transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] group-hover:scale-150 group-active:scale-95 motion-reduce:transform-none"
+                  className="transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] group-hover:scale-[1.7] group-active:scale-95 motion-reduce:transform-none"
                 >
                   {emoji}
                 </span>
@@ -237,6 +240,11 @@ const AllEmojiGrid = memo(function AllEmojiGrid({
           </div>
         </div>
       ))}
+      {normalizedSearch && matchingGroups.length === 0 && (
+        <p className="px-2 py-8 text-center text-sm text-muted-foreground">
+          No emojis found
+        </p>
+      )}
     </div>
   );
 });
@@ -449,7 +457,8 @@ export const MessageContent = memo(function MessageContent({
       return [];
     }
   });
-  const [allEmojisOpen, setAllEmojisOpen] = useState(false);
+  const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
+  const [emojiSearch, setEmojiSearch] = useState("");
   const isMobile = useIsMobile();
 
   useEffect(() => {
@@ -499,37 +508,6 @@ export const MessageContent = memo(function MessageContent({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [previewFile]);
-
-  useEffect(() => {
-    if (!actionsOpen || !allEmojisOpen) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        event.stopPropagation();
-        setAllEmojisOpen(false);
-      }
-    };
-    document.addEventListener("keydown", onKeyDown, true);
-    return () => document.removeEventListener("keydown", onKeyDown, true);
-  }, [actionsOpen, allEmojisOpen]);
-
-  useEffect(() => {
-    if (!allEmojisOpen) return;
-    const onPointerDown = (event: Event) => {
-      const target = event.target;
-      if (!(target instanceof Element)) return;
-      if (
-        target.closest('[role="menu"]') ||
-        target.closest('[aria-haspopup="menu"]') ||
-        target.closest('[data-slot^="dropdown-menu"]')
-      ) {
-        return;
-      }
-      setAllEmojisOpen(false);
-    };
-    document.addEventListener("pointerdown", onPointerDown);
-    return () => document.removeEventListener("pointerdown", onPointerDown);
-  }, [allEmojisOpen]);
 
   useEffect(() => {
     if (!isUser || !userTextRef.current) return;
@@ -1029,10 +1007,7 @@ export const MessageContent = memo(function MessageContent({
                   <div className="relative inline-flex shrink-0">
                     <DropdownMenu
                       open={actionsOpen}
-                      onOpenChange={open => {
-                        setActionsOpen(open);
-                        if (!open) setAllEmojisOpen(false);
-                      }}
+                      onOpenChange={setActionsOpen}
                     >
                       <Tooltip>
                         <TooltipTrigger asChild>
@@ -1059,251 +1034,185 @@ export const MessageContent = memo(function MessageContent({
                         align="start"
                         side="top"
                         sideOffset={6}
-                        onPointerDownOutside={event => {
-                          if (allEmojisOpen && !isMobile) {
-                            const target = event.detail.originalEvent.target;
-                            if (
-                              target instanceof Element &&
-                              target.closest(
-                                '[data-slot="dropdown-menu-sub-content"]'
-                              )
-                            ) {
-                              event.preventDefault();
-                              return;
-                            }
-                            event.preventDefault();
-                            setAllEmojisOpen(false);
-                          }
-                        }}
-                        onFocusOutside={event => {
-                          if (allEmojisOpen && !isMobile)
-                            event.preventDefault();
-                        }}
-                        className={cn(
-                          "w-max min-w-44 rounded-xl border-0 bg-transparent p-1 shadow-none",
-                          isMobile &&
-                            allEmojisOpen &&
-                            "w-[min(20rem,calc(100vw-1rem))] max-w-[calc(100vw-1rem)]"
-                        )}
+                        className="w-max min-w-44 rounded-xl border-0 bg-transparent p-1 shadow-none"
                       >
-                        {!isCancelled && (
-                          <div
-                            className={cn(
-                              "mb-0.5 rounded-lg border border-border/70 bg-popover px-1.5 py-1.5 shadow-sm",
-                              isMobile && allEmojisOpen && "w-full"
-                            )}
-                          >
-                            {isMobile && allEmojisOpen ? (
-                              <>
-                                <div className="mb-1 flex items-center border-b border-border/60 pb-1">
-                                  <DropdownMenuItem
-                                    aria-label="Back to message actions"
-                                    onSelect={event => {
-                                      event.preventDefault();
-                                      setAllEmojisOpen(false);
-                                    }}
-                                    className="h-8 gap-1 rounded-md px-2 text-sm font-medium"
-                                  >
-                                    <ChevronLeft className="size-4" />
-                                    <span>Back</span>
-                                  </DropdownMenuItem>
-                                  <span className="flex-1 pr-2 text-center text-sm font-medium text-foreground">
-                                    All emojis
-                                  </span>
-                                </div>
-                                <AllEmojiGrid
-                                  reactions={reactions}
-                                  onToggle={toggleReaction}
-                                  isMobile
+                        <div className="rounded-lg border border-border/70 bg-popover p-1 shadow-sm">
+                          {message.content && onSpeak ? (
+                            <DropdownMenuItem
+                              className="group/readaloud gap-2.5 whitespace-nowrap rounded-lg py-2 pl-2.5 pr-8"
+                              onSelect={() => {
+                                if (isSpeaking) onStop();
+                                else
+                                  onSpeak(
+                                    cleanContent || message.content,
+                                    message.id
+                                  );
+                              }}
+                              aria-label={
+                                isSpeaking ? "Stop reading" : "Read aloud"
+                              }
+                            >
+                              {isSpeaking ? (
+                                <Square className="size-3.5 fill-current text-muted-foreground" />
+                              ) : (
+                                <Volume2 className="size-4 text-muted-foreground" />
+                              )}
+                              <span>
+                                {isSpeaking ? "Stop reading" : "Read aloud"}
+                              </span>
+                            </DropdownMenuItem>
+                          ) : null}
+                          {(onRegenerate || onRetry) && (
+                            <DropdownMenuItem
+                              className="gap-2.5 whitespace-nowrap rounded-lg py-2 pl-2.5 pr-8"
+                              onSelect={() => {
+                                if (onRegenerate) onRegenerate(message);
+                                else if (onRetry) onRetry(message);
+                              }}
+                              aria-label={
+                                onRegenerate
+                                  ? "Regenerate response"
+                                  : "Retry response"
+                              }
+                            >
+                              <RotateCcw className="size-4 text-muted-foreground" />
+                              <span>
+                                {onRegenerate
+                                  ? "Regenerate response"
+                                  : "Retry response"}
+                              </span>
+                            </DropdownMenuItem>
+                          )}
+                          {canRate && (
+                            <>
+                              {canReadAloud ? (
+                                <DropdownMenuSeparator className="my-1" />
+                              ) : null}
+                              <DropdownMenuItem
+                                className="gap-2.5 whitespace-nowrap rounded-lg py-2 pl-2.5 pr-2.5 data-[active=true]:text-emerald-600 dark:data-[active=true]:text-emerald-400"
+                                data-active={feedback === "up"}
+                                onSelect={() => handleFeedbackToggle("up")}
+                                aria-label="Good response"
+                              >
+                                <ThumbsUp
+                                  className={cn(
+                                    "size-4",
+                                    feedback === "up"
+                                      ? "text-emerald-600 dark:text-emerald-400 ksemo-feedback-thumb-active"
+                                      : "text-muted-foreground"
+                                  )}
                                 />
-                              </>
-                            ) : (
-                              <div
-                                role="group"
-                                aria-label="Reactions"
-                                className="flex items-center gap-0.5"
-                              >
-                                {MESSAGE_REACTIONS.slice(0, 5).map(
-                                  ({ emoji, label }) => (
-                                    <DropdownMenuItem
-                                      key={label}
-                                      className="group flex-1 justify-center rounded-md px-0 py-1.5 text-2xl leading-none select-none hover:bg-transparent focus:bg-transparent data-[selected=true]:bg-accent data-[selected=true]:text-foreground"
-                                      data-selected={
-                                        reactions.includes(emoji)
-                                          ? "true"
-                                          : undefined
-                                      }
-                                      aria-label={label}
-                                      onSelect={event => {
-                                        event.preventDefault();
-                                        toggleReaction(emoji);
-                                      }}
-                                    >
-                                      <span
-                                        aria-hidden="true"
-                                        className="transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] group-hover:scale-150 group-active:scale-95 motion-reduce:transform-none"
-                                      >
-                                        {emoji}
-                                      </span>
-                                    </DropdownMenuItem>
-                                  )
-                                )}
-                                {isMobile ? (
-                                  <DropdownMenuItem
-                                    aria-label="More emojis"
-                                    onSelect={event => {
-                                      event.preventDefault();
-                                      setAllEmojisOpen(true);
-                                    }}
-                                    className="size-9 justify-center rounded-md px-0 py-0 text-muted-foreground hover:bg-accent hover:text-foreground focus:bg-accent focus:text-foreground"
-                                  >
-                                    <ChevronRight className="size-5" />
-                                  </DropdownMenuItem>
-                                ) : (
-                                  <DropdownMenuSub
-                                    open={allEmojisOpen}
-                                    onOpenChange={open => {
-                                      setAllEmojisOpen(open);
-                                    }}
-                                  >
-                                    <DropdownMenuSubTrigger
-                                      aria-label="More emojis"
-                                      onPointerMove={event => {
-                                        if (event.pointerType === "mouse") {
-                                          event.preventDefault();
-                                        }
-                                      }}
-                                      className="size-9 justify-center gap-0 rounded-md px-0 py-0 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus:bg-accent focus:text-foreground data-[state=open]:bg-accent data-[state=open]:text-foreground [&>svg:last-child]:hidden"
-                                    >
-                                      <ChevronRight className="size-5" />
-                                    </DropdownMenuSubTrigger>
-                                    <DropdownMenuSubContent
-                                      sideOffset={8}
-                                      collisionPadding={8}
-                                      style={
-                                        {
-                                          "--tw-enter-translate-x": "0",
-                                        } as React.CSSProperties
-                                      }
-                                      className={cn(
-                                        isMobile
-                                          ? "w-[min(18rem,calc(100vw-1rem))] max-w-[calc(100vw-1rem)]"
-                                          : "w-78 max-w-[calc(100vw-0.8rem)]",
-                                        "max-h-[min(60vh,24rem)] rounded-xl p-1 data-[side=left]:slide-in-from-bottom-2 data-[side=right]:slide-in-from-bottom-2"
-                                      )}
-                                    >
-                                      <AllEmojiGrid
-                                        reactions={reactions}
-                                        onToggle={toggleReaction}
-                                        isMobile={isMobile}
-                                      />
-                                    </DropdownMenuSubContent>
-                                  </DropdownMenuSub>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                        {(!isMobile || !allEmojisOpen) && (
-                          <div className="rounded-lg border border-border/70 bg-popover p-1 shadow-sm">
-                            {message.content && onSpeak ? (
-                              <DropdownMenuItem
-                                className="group/readaloud gap-2.5 whitespace-nowrap rounded-lg py-2 pl-2.5 pr-8"
-                                onSelect={() => {
-                                  if (isSpeaking) onStop();
-                                  else
-                                    onSpeak(
-                                      cleanContent || message.content,
-                                      message.id
-                                    );
-                                }}
-                                aria-label={
-                                  isSpeaking ? "Stop reading" : "Read aloud"
-                                }
-                              >
-                                {isSpeaking ? (
-                                  <Square className="size-3.5 fill-current text-muted-foreground" />
-                                ) : (
-                                  <Volume2 className="size-4 text-muted-foreground" />
-                                )}
                                 <span>
-                                  {isSpeaking ? "Stop reading" : "Read aloud"}
+                                  {feedback === "up"
+                                    ? "Remove good response"
+                                    : "Good response"}
                                 </span>
                               </DropdownMenuItem>
-                            ) : null}
-                            {(onRegenerate || onRetry) && (
                               <DropdownMenuItem
-                                className="gap-2.5 whitespace-nowrap rounded-lg py-2 pl-2.5 pr-8"
-                                onSelect={() => {
-                                  if (onRegenerate) onRegenerate(message);
-                                  else if (onRetry) onRetry(message);
-                                }}
-                                aria-label={
-                                  onRegenerate
-                                    ? "Regenerate response"
-                                    : "Retry response"
-                                }
+                                className="gap-2.5 whitespace-nowrap rounded-lg py-2 pl-2.5 pr-2.5 data-[active=true]:text-rose-600 dark:data-[active=true]:text-rose-400"
+                                data-active={feedback === "down"}
+                                onSelect={() => handleFeedbackToggle("down")}
+                                aria-label="Bad response"
                               >
-                                <RotateCcw className="size-4 text-muted-foreground" />
+                                <ThumbsDown
+                                  className={cn(
+                                    "size-4",
+                                    feedback === "down"
+                                      ? "text-rose-600 dark:text-rose-400 ksemo-feedback-thumb-active"
+                                      : "text-muted-foreground"
+                                  )}
+                                />
                                 <span>
-                                  {onRegenerate
-                                    ? "Regenerate response"
-                                    : "Retry response"}
+                                  {feedback === "down"
+                                    ? "Remove bad response"
+                                    : "Bad response"}
                                 </span>
                               </DropdownMenuItem>
-                            )}
-                            {canRate && (
-                              <>
-                                {canReadAloud ? (
-                                  <DropdownMenuSeparator className="my-1" />
-                                ) : null}
-                                <DropdownMenuItem
-                                  className="gap-2.5 whitespace-nowrap rounded-lg py-2 pl-2.5 pr-2.5 data-[active=true]:text-emerald-600 dark:data-[active=true]:text-emerald-400"
-                                  data-active={feedback === "up"}
-                                  onSelect={() => handleFeedbackToggle("up")}
-                                  aria-label="Good response"
-                                >
-                                  <ThumbsUp
-                                    className={cn(
-                                      "size-4",
-                                      feedback === "up"
-                                        ? "text-emerald-600 dark:text-emerald-400 ksemo-feedback-thumb-active"
-                                        : "text-muted-foreground"
-                                    )}
-                                  />
-                                  <span>
-                                    {feedback === "up"
-                                      ? "Remove good response"
-                                      : "Good response"}
-                                  </span>
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  className="gap-2.5 whitespace-nowrap rounded-lg py-2 pl-2.5 pr-2.5 data-[active=true]:text-rose-600 dark:data-[active=true]:text-rose-400"
-                                  data-active={feedback === "down"}
-                                  onSelect={() => handleFeedbackToggle("down")}
-                                  aria-label="Bad response"
-                                >
-                                  <ThumbsDown
-                                    className={cn(
-                                      "size-4",
-                                      feedback === "down"
-                                        ? "text-rose-600 dark:text-rose-400 ksemo-feedback-thumb-active"
-                                        : "text-muted-foreground"
-                                    )}
-                                  />
-                                  <span>
-                                    {feedback === "down"
-                                      ? "Remove bad response"
-                                      : "Bad response"}
-                                  </span>
-                                </DropdownMenuItem>
-                              </>
-                            )}
-                          </div>
-                        )}
+                            </>
+                          )}
+                        </div>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
+                )}
+                {message.content && !isCancelled && (
+                  <Popover
+                    open={emojiPickerOpen}
+                    onOpenChange={open => {
+                      setEmojiPickerOpen(open);
+                      if (!open) setEmojiSearch("");
+                    }}
+                  >
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <PopoverTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className={actionClass}
+                            aria-label="Add reaction"
+                          >
+                            <SmilePlus className="size-[18px]" />
+                          </Button>
+                        </PopoverTrigger>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom">React</TooltipContent>
+                    </Tooltip>
+                    <PopoverContent
+                      side="top"
+                      align="start"
+                      sideOffset={8}
+                      collisionPadding={8}
+                      className="w-[min(20rem,calc(100vw-1rem))] rounded-xl border border-border/70 p-2 shadow-lg data-[state=open]:animate-none data-[state=closed]:animate-none data-[state=open]:transition-none data-[state=closed]:transition-none"
+                    >
+                      <div className="mb-2 flex min-h-9 items-center gap-2 rounded-lg bg-muted/60 px-2.5">
+                        <Search className="size-4 shrink-0 text-muted-foreground" />
+                        <input
+                          type="text"
+                          value={emojiSearch}
+                          onChange={event => setEmojiSearch(event.target.value)}
+                          placeholder="Search emoji"
+                          aria-label="Search emojis"
+                          autoComplete="off"
+                          className="min-w-0 flex-1 bg-transparent py-2 text-sm outline-none placeholder:text-muted-foreground"
+                        />
+                        {reactions.length > 0 && (
+                          <span
+                            className="flex shrink-0 items-center gap-0.5 border-l border-border/50 pl-1"
+                            aria-label={`${reactions.length} selected reactions`}
+                          >
+                            {reactions.map(emoji => {
+                              const name = EMOJI_GROUPS.flatMap(
+                                group => group.emojis
+                              ).find(item => item.emoji === emoji)?.name;
+                              return (
+                                <button
+                                  key={emoji}
+                                  type="button"
+                                  aria-label={`Undo ${name ?? "emoji"} reaction`}
+                                  title={`Undo ${name ?? "emoji"} reaction`}
+                                  onClick={() => toggleReaction(emoji)}
+                                  className={cn(
+                                    "flex size-8 shrink-0 items-center justify-center rounded-md hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+                                    isMobile ? "text-xl" : "text-2xl"
+                                  )}
+                                >
+                                  <span aria-hidden="true">{emoji}</span>
+                                </button>
+                              );
+                            })}
+                          </span>
+                        )}
+                      </div>
+                      <AllEmojiGrid
+                        reactions={reactions}
+                        onToggle={toggleReaction}
+                        isMobile={isMobile}
+                        searchQuery={emojiSearch}
+                      />
+                    </PopoverContent>
+                  </Popover>
                 )}
               </div>
             )}
