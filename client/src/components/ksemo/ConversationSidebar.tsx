@@ -287,9 +287,9 @@ export const ConversationSidebar = memo(function ConversationSidebar({
                     aria-label="Expand sidebar"
                   >
                     <Layout
-                      size={17}
+                      size={20}
                       strokeWidth={2}
-                      className="size-[17px] text-sidebar-foreground/90"
+                      className="size-5 text-sidebar-foreground/90 lg:size-[17px]"
                     />
                   </Button>
                 </TooltipTrigger>
@@ -333,7 +333,7 @@ export const ConversationSidebar = memo(function ConversationSidebar({
                   className="size-10 rounded-lg border-0 bg-transparent p-0 text-foreground/90 transition-colors outline-none hover:bg-accent/80 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring active:bg-accent lg:hidden"
                   aria-label="Close navigation"
                 >
-                  <Layout size={17} strokeWidth={2} className="size-[17px]" />
+                  <Layout size={20} strokeWidth={2} className="size-5" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom">Close sidebar</TooltipContent>

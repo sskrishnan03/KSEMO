@@ -474,9 +474,9 @@ export function SearchWorkspace({
                     title="Open sidebar"
                   >
                     <Layout
-                      size={17}
+                      size={20}
                       strokeWidth={2}
-                      className="size-[17px]"
+                      className="size-5"
                     />
                   </Button>
                 )}

@@ -4646,7 +4646,7 @@ export default function Home() {
               aria-label="Open conversations"
               data-testid="mobile-sidebar-toggle"
             >
-              <Layout size={17} strokeWidth={2} className="size-[17px]" />
+              <Layout size={20} strokeWidth={2} className="size-5" />
             </Button>
 
             {!guestMode &&
