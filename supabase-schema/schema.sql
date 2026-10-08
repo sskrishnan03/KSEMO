@@ -37,6 +37,28 @@ CREATE INDEX idx_users_role ON users(role);
 CREATE INDEX idx_users_magic_link_token_hash ON users(magic_link_token_hash);
 CREATE UNIQUE INDEX idx_users_email_unique ON users(email);
 
+-- Optional Google Drive / OneDrive OAuth grants (application-encrypted tokens).
+CREATE TABLE IF NOT EXISTS user_integrations (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    provider TEXT NOT NULL CHECK (provider IN ('google', 'microsoft')),
+    token_ciphertext TEXT NOT NULL,
+    token_iv TEXT NOT NULL,
+    token_tag TEXT NOT NULL,
+    refresh_ciphertext TEXT,
+    refresh_iv TEXT,
+    refresh_tag TEXT,
+    expires_at TIMESTAMPTZ NOT NULL,
+    account_email TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (user_id, provider)
+);
+ALTER TABLE user_integrations ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Service role manages cloud integrations" ON user_integrations;
+CREATE POLICY "Service role manages cloud integrations" ON user_integrations
+    FOR ALL TO service_role USING (true) WITH CHECK (true);
+
 -- ============================================
 -- USER PREFERENCES TABLE
 -- ============================================

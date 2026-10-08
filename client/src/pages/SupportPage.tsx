@@ -1165,6 +1165,11 @@ function PrivacyContent() {
           items={[
             <>Google: account authentication and identity verification.</>,
             <>
+              Google Drive and Microsoft OneDrive: optional read-only access
+              when you connect an account and choose to import a file into your
+              Library. Imported files are copied to KSEMO storage.
+            </>,
+            <>
               Server-side AI services: processing prompts, attachments, and
               transcripts to generate responses.
             </>,

@@ -1,7 +1,10 @@
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import {
   getMemorySettings,
   listUserMemories,
+  updateUserMemory,
+  deleteUserMemory,
   upsertMemorySettings,
   type MemorySettings,
 } from "../supabase-db";
@@ -44,4 +47,35 @@ export const memoryRouter = router({
   list: protectedProcedure.query(async ({ ctx }) =>
     listUserMemories(ctx.user.id)
   ),
+  update: protectedProcedure
+    .input(
+      z.object({
+        id: z.string().uuid(),
+        content: z.string().trim().min(1).max(2000),
+        category: z.enum([
+          "general",
+          "preference",
+          "personal",
+          "health",
+          "religion",
+          "politics",
+          "financial",
+          "relationship",
+        ]),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const updated = await updateUserMemory(ctx.user.id, input.id, input);
+      if (!updated)
+        throw new TRPCError({ code: "NOT_FOUND", message: "Memory not found" });
+      return { success: true };
+    }),
+  remove: protectedProcedure
+    .input(z.object({ id: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const removed = await deleteUserMemory(ctx.user.id, input.id);
+      if (!removed)
+        throw new TRPCError({ code: "NOT_FOUND", message: "Memory not found" });
+      return { success: true };
+    }),
 });

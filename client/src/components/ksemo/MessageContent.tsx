@@ -72,6 +72,12 @@ type KsemoMessage = {
     sizeBytes?: number;
   }>;
   botAction?: BotActionData;
+  memoryUses?: Array<{
+    id: string;
+    content: string;
+    category?: string;
+    sourceConversationId?: string | null;
+  }>;
   fileGeneration?: {
     stage: string;
     format: string;
@@ -864,6 +870,29 @@ export const MessageContent = memo(function MessageContent({
                       )}
                   </>
                 )}
+                {!isUser && (message.memoryUses?.length ?? 0) > 0 && (
+                  <details className="mt-2 max-w-xl rounded-lg border border-border/70 px-3 py-2 text-xs text-muted-foreground">
+                    <summary className="cursor-pointer select-none">
+                      Personalized using {message.memoryUses!.length} saved{" "}
+                      {message.memoryUses!.length === 1 ? "memory" : "memories"}
+                    </summary>
+                    <ul className="mt-2 space-y-1.5">
+                      {message.memoryUses!.map(memory => (
+                        <li key={memory.id}>
+                          {memory.content}
+                          {memory.sourceConversationId && (
+                            <a
+                              className="ml-2 underline underline-offset-2 hover:text-foreground"
+                              href={`/c/${memory.sourceConversationId}`}
+                            >
+                              Source chat
+                            </a>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
               </div>
             )}
           </ReactionsContext.Provider>
@@ -1009,9 +1038,7 @@ export const MessageContent = memo(function MessageContent({
                   )}
                 {hasActiveIndicator &&
                   action(
-                    feedback === "up"
-                      ? "Liked"
-                      : "Disliked",
+                    feedback === "up" ? "Liked" : "Disliked",
                     feedback === "up" ? (
                       <ThumbsUp
                         className={cn(

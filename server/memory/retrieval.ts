@@ -156,6 +156,13 @@ export async function buildUserMemoryContext(
   userId: number,
   query: string
 ): Promise<string | null> {
+  return (await buildUserMemoryContextWithSources(userId, query))?.text ?? null;
+}
+
+export async function buildUserMemoryContextWithSources(
+  userId: number,
+  query: string
+): Promise<{ text: string; memories: Memory[] } | null> {
   const settings = await getMemorySettings(userId);
   if (!settings?.memoryEnabled) return null;
 
@@ -168,13 +175,19 @@ export async function buildUserMemoryContext(
   const relevant = retrieveRelevantMemories(eligible, query);
   if (relevant.length === 0) return null;
 
-  const lines = relevant.map(
-    memory => `- ${memory.title}: ${memory.content}`
-  );
-  const body = [
-    "You have the following saved facts about the user. Use them only where they are relevant to the conversation. Never contradict them, and never claim the user mentioned something that is not in these facts.",
-    ...lines,
-  ].join("\n");
+  const preamble =
+    "You have the following saved facts about the user. Use them only where they are relevant to the conversation. Never contradict them, and never claim the user mentioned something that is not in these facts.";
+  const used: Memory[] = [];
+  let body = preamble;
+  for (const memory of relevant) {
+    const line = `- ${memory.title}: ${memory.content}`;
+    if (body.length + line.length + 1 > 2_000) break;
+    used.push(memory);
+    body += `\n${line}`;
+  }
 
-  return body.length > 2_000 ? `${body.slice(0, 1_997)}…` : body;
+  return {
+    text: body.length > 2_000 ? `${body.slice(0, 1_997)}…` : body,
+    memories: used,
+  };
 }

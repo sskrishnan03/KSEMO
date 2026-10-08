@@ -247,9 +247,7 @@ export async function getUserByOpenId(
   return data ? dbToUser(data) : undefined;
 }
 
-export async function getUserByEmail(
-  email: string
-): Promise<User | undefined> {
+export async function getUserByEmail(email: string): Promise<User | undefined> {
   if (useMemoryFallback()) {
     return inMemoryStore.getUserByEmail(email);
   }
@@ -435,7 +433,8 @@ export async function getPublicConversationByToken(
     .eq("is_public", true)
     .is("deleted_at", null)
     .maybeSingle();
-  if (error && !isNotFound(error)) throwDb("getPublicConversationByToken", error);
+  if (error && !isNotFound(error))
+    throwDb("getPublicConversationByToken", error);
   if (!conv) return null;
   const { data: messages, error: msgError } = await supabase
     .from("messages")
@@ -488,7 +487,8 @@ export async function getConversationByShareToken(
     .eq("share_token", shareToken)
     .is("deleted_at", null)
     .maybeSingle();
-  if (error && !isNotFound(error)) throwDb("getConversationByShareToken", error);
+  if (error && !isNotFound(error))
+    throwDb("getConversationByShareToken", error);
   return data ? dbToConversation(data) : undefined;
 }
 
@@ -722,7 +722,8 @@ export async function removeFollowingAssistantDuplicatesForUser(
       .from("messages")
       .delete()
       .in("id", deletedIds);
-    if (delError) throwDb("removeFollowingAssistantDuplicatesForUser.delete", delError);
+    if (delError)
+      throwDb("removeFollowingAssistantDuplicatesForUser.delete", delError);
   }
   return deletedIds;
 }
@@ -739,11 +740,13 @@ export async function editMessageForUser(input: {
   const existing = await getMessageForUser(input.id, input.userId);
   if (!existing) return undefined;
 
-  const { error: versionError } = await supabase.from("message_versions").insert({
-    id: input.versionId,
-    message_id: input.id,
-    content: existing.content,
-  });
+  const { error: versionError } = await supabase
+    .from("message_versions")
+    .insert({
+      id: input.versionId,
+      message_id: input.id,
+      content: existing.content,
+    });
   if (versionError) throwDb("editMessageForUser.version", versionError);
 
   const { data, error } = await supabase
@@ -803,10 +806,13 @@ export async function clearMessageFeedbackForUser(input: {
   if (useMemoryFallback()) {
     return inMemoryStore.clearMessageFeedbackForUser(input);
   }
-  const { error } = await supabase.rpc("clear_message_feedback", {
-    p_message_id: input.messageId,
-    p_user_id: input.userId,
-  });
+  // Use an owner-scoped table delete instead of depending on the optional
+  // clear_message_feedback RPC being present in every deployed schema cache.
+  const { error } = await supabase
+    .from("message_feedback")
+    .delete()
+    .eq("message_id", input.messageId)
+    .eq("user_id", input.userId);
   if (error) throwDb("clearMessageFeedbackForUser", error);
 }
 
@@ -926,17 +932,20 @@ export async function upsertUserPreferences(
     .select("user_id")
     .eq("user_id", userId)
     .maybeSingle();
-  if (findError && !isNotFound(findError)) throwDb("upsertUserPreferences.find", findError);
+  if (findError && !isNotFound(findError))
+    throwDb("upsertUserPreferences.find", findError);
 
   const row: Record<string, any> = {};
-  if (values.selectedModel !== undefined) row.selected_model = values.selectedModel;
+  if (values.selectedModel !== undefined)
+    row.selected_model = values.selectedModel;
   if (values.persona !== undefined) row.persona = values.persona;
   if (values.customInstructions !== undefined)
     row.custom_instructions = values.customInstructions;
   if (values.speechRate !== undefined) row.speech_rate = values.speechRate;
   if (values.autoPlayResponses !== undefined)
     row.auto_play_responses = values.autoPlayResponses;
-  if (values.reduceMotion !== undefined) row.reduce_motion = values.reduceMotion;
+  if (values.reduceMotion !== undefined)
+    row.reduce_motion = values.reduceMotion;
 
   if (existing) {
     if (Object.keys(row).length === 0) return;
@@ -998,7 +1007,8 @@ export async function upsertMemorySettings(
     .select("user_id")
     .eq("user_id", userId)
     .maybeSingle();
-  if (findError && !isNotFound(findError)) throwDb("upsertMemorySettings.find", findError);
+  if (findError && !isNotFound(findError))
+    throwDb("upsertMemorySettings.find", findError);
 
   if (existing) {
     row.updated_at = nowIso();
@@ -1042,7 +1052,7 @@ export async function saveUserMemoryFacts(
     typeof conversationIdOrFacts === "string" ? conversationIdOrFacts : null;
   const facts = Array.isArray(conversationIdOrFacts)
     ? conversationIdOrFacts
-    : (factsArg || []);
+    : factsArg || [];
 
   if (useMemoryFallback()) {
     return inMemoryStore.saveUserMemoryFacts(
@@ -1262,7 +1272,8 @@ export async function updateFileForUser(
   }
   const update: Record<string, any> = { updated_at: nowIso() };
   if (values.filename !== undefined) update.filename = values.filename;
-  if (values.contentText !== undefined) update.content_text = values.contentText;
+  if (values.contentText !== undefined)
+    update.content_text = values.contentText;
   if (values.status !== undefined) update.status = values.status;
   if (values.sizeBytes !== undefined) update.size_bytes = values.sizeBytes;
   const { error } = await supabase
@@ -1319,14 +1330,14 @@ export async function listMessageFilesForUser(
     .eq("message_id", messageId);
   if (attError) throwDb("listMessageFilesForUser.attachments", attError);
 
-  const fileIds = Array.from(
-    new Set((atts || []).map((a: any) => a.file_id))
-  );
+  const fileIds = Array.from(new Set((atts || []).map((a: any) => a.file_id)));
   if (fileIds.length === 0) return [];
 
   const { data, error } = await supabase
     .from("files")
-    .select("id, filename, mime_type, size_bytes, url, storage_key, content_text, user_id")
+    .select(
+      "id, filename, mime_type, size_bytes, url, storage_key, content_text, user_id"
+    )
     .in("id", fileIds)
     .eq("user_id", userId);
   if (error) throwDb("listMessageFilesForUser", error);
@@ -1355,14 +1366,14 @@ export async function listConversationFilesForUser(
     .eq("conversation_id", conversationId);
   if (attError) throwDb("listConversationFilesForUser.attachments", attError);
 
-  const fileIds = Array.from(
-    new Set((atts || []).map((a: any) => a.file_id))
-  );
+  const fileIds = Array.from(new Set((atts || []).map((a: any) => a.file_id)));
   if (fileIds.length === 0) return [];
 
   const { data, error } = await supabase
     .from("files")
-    .select("id, filename, mime_type, size_bytes, url, storage_key, content_text, user_id")
+    .select(
+      "id, filename, mime_type, size_bytes, url, storage_key, content_text, user_id"
+    )
     .in("id", fileIds)
     .eq("user_id", userId);
   if (error) throwDb("listConversationFilesForUser", error);
@@ -1556,7 +1567,9 @@ export async function updateTaskActivityForUser(
   if (values.detail !== undefined) update.detail = values.detail;
   if (values.status !== undefined) update.status = values.status;
   if (values.startedAt !== undefined)
-    update.started_at = values.startedAt ? values.startedAt.toISOString() : null;
+    update.started_at = values.startedAt
+      ? values.startedAt.toISOString()
+      : null;
   if (values.completedAt !== undefined)
     update.completed_at = values.completedAt
       ? values.completedAt.toISOString()
@@ -1567,4 +1580,38 @@ export async function updateTaskActivityForUser(
     .eq("id", id)
     .eq("user_id", userId);
   if (error) throwDb("updateTaskActivityForUser", error);
+}
+
+export async function updateUserMemory(
+  userId: number,
+  id: string,
+  values: { content: string; category: Memory["category"] }
+): Promise<boolean> {
+  if (useMemoryFallback())
+    return inMemoryStore.updateUserMemory(userId, id, values);
+  const { data, error } = await supabase
+    .from("conversation_memories")
+    .update({ content: values.content, category: values.category })
+    .eq("id", id)
+    .eq("user_id", userId)
+    .select("id")
+    .maybeSingle();
+  if (error) throwDb("updateUserMemory", error);
+  return Boolean(data);
+}
+
+export async function deleteUserMemory(
+  userId: number,
+  id: string
+): Promise<boolean> {
+  if (useMemoryFallback()) return inMemoryStore.deleteUserMemory(userId, id);
+  const { data, error } = await supabase
+    .from("conversation_memories")
+    .delete()
+    .eq("id", id)
+    .eq("user_id", userId)
+    .select("id")
+    .maybeSingle();
+  if (error) throwDb("deleteUserMemory", error);
+  return Boolean(data);
 }

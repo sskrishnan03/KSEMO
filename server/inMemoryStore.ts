@@ -32,7 +32,11 @@ import {
 // chats, users, and identity survive server restarts. Persistence is skipped
 // in tests and can be relocated with KSEMO_STORE_FILE.
 const STORE_ENV_OVERRIDE = process.env.KSEMO_STORE_FILE?.trim();
-const DEFAULT_STORE_FILE = path.join(process.cwd(), ".ksemo-data", "store.json");
+const DEFAULT_STORE_FILE = path.join(
+  process.cwd(),
+  ".ksemo-data",
+  "store.json"
+);
 const STORE_FILE = STORE_ENV_OVERRIDE || DEFAULT_STORE_FILE;
 const SAVE_DEBOUNCE_MS = 250;
 const STORE_VERSION = 1;
@@ -63,7 +67,9 @@ function tagDatesForStorage(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(tagDatesForStorage);
   if (value && typeof value === "object") {
     const out: Record<string, unknown> = {};
-    for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
+    for (const [key, item] of Object.entries(
+      value as Record<string, unknown>
+    )) {
       out[key] = tagDatesForStorage(item);
     }
     return out;
@@ -116,7 +122,10 @@ function readStoredSnapshot(): StoreSnapshot | null {
       return null;
     return parsed as StoreSnapshot;
   } catch (error) {
-    console.warn("[KSEMO] Could not read persisted store, starting fresh:", error);
+    console.warn(
+      "[KSEMO] Could not read persisted store, starting fresh:",
+      error
+    );
     return null;
   }
 }
@@ -228,17 +237,20 @@ class InMemoryStore {
       this.usersByEmail.set(key, value);
     for (const [key, value] of snapshot.conversations || [])
       this.conversations.set(key, value);
-    for (const [key, value] of snapshot.messages || []) this.messages.set(key, value);
+    for (const [key, value] of snapshot.messages || [])
+      this.messages.set(key, value);
     for (const [key, value] of snapshot.messageVersions || [])
       this.messageVersions.set(key, value);
     for (const [key, value] of snapshot.messageFeedback || [])
       this.messageFeedback.set(key, value);
     for (const [key, value] of snapshot.userPreferences || [])
       this.userPreferences.set(key, value);
-    for (const [key, value] of snapshot.memories || []) this.memories.set(key, value);
+    for (const [key, value] of snapshot.memories || [])
+      this.memories.set(key, value);
     for (const [key, value] of snapshot.memorySettings || [])
       this.memorySettings.set(key, value);
-    for (const [key, value] of snapshot.projects || []) this.projects.set(key, value);
+    for (const [key, value] of snapshot.projects || [])
+      this.projects.set(key, value);
     for (const [key, value] of snapshot.files || []) this.files.set(key, value);
     for (const [key, value] of snapshot.attachments || [])
       this.attachments.set(key, value);
@@ -318,9 +330,13 @@ class InMemoryStore {
         name: user.name !== undefined ? user.name : existing.name,
         email: user.email !== undefined ? user.email : existing.email,
         loginMethod:
-          user.loginMethod !== undefined ? user.loginMethod : existing.loginMethod,
+          user.loginMethod !== undefined
+            ? user.loginMethod
+            : existing.loginMethod,
         passwordHash:
-          user.passwordHash !== undefined ? user.passwordHash : existing.passwordHash,
+          user.passwordHash !== undefined
+            ? user.passwordHash
+            : existing.passwordHash,
         resetTokenHash:
           user.resetTokenHash !== undefined
             ? user.resetTokenHash
@@ -374,7 +390,10 @@ class InMemoryStore {
     return this.users.get(id);
   }
 
-  async updateUserProfile(userId: number, name: string): Promise<User | undefined> {
+  async updateUserProfile(
+    userId: number,
+    name: string
+  ): Promise<User | undefined> {
     const user = this.users.get(userId);
     if (!user) return undefined;
     user.name = name;
@@ -405,7 +424,11 @@ class InMemoryStore {
       if (isEphemeralConversationTitle(conv.title)) continue;
       if (scope === "active" && conv.deletedAt === null && !conv.isArchived) {
         list.push(conv);
-      } else if (scope === "archived" && conv.isArchived && conv.deletedAt === null) {
+      } else if (
+        scope === "archived" &&
+        conv.isArchived &&
+        conv.deletedAt === null
+      ) {
         list.push(conv);
       } else if (scope === "trash" && conv.deletedAt !== null) {
         list.push(conv);
@@ -509,7 +532,9 @@ class InMemoryStore {
     return conv ?? undefined;
   }
 
-  async getConversationByShareToken(shareToken: string): Promise<Conversation | undefined> {
+  async getConversationByShareToken(
+    shareToken: string
+  ): Promise<Conversation | undefined> {
     for (const conv of this.conversations.values()) {
       if (conv.shareToken === shareToken) {
         return conv;
@@ -585,7 +610,11 @@ class InMemoryStore {
     let count = 0;
     const now = new Date();
     for (const conv of this.conversations.values()) {
-      if (conv.userId !== userId || conv.deletedAt !== null || conv.isArchived) {
+      if (
+        conv.userId !== userId ||
+        conv.deletedAt !== null ||
+        conv.isArchived
+      ) {
         continue;
       }
       conv.isArchived = true;
@@ -623,7 +652,9 @@ class InMemoryStore {
 
   // --- Messages ---
 
-  async listMessagesForConversation(conversationId: string): Promise<Message[]> {
+  async listMessagesForConversation(
+    conversationId: string
+  ): Promise<Message[]> {
     const list: Message[] = [];
     for (const msg of this.messages.values()) {
       if (msg.conversationId === conversationId) {
@@ -788,7 +819,10 @@ class InMemoryStore {
     return rows;
   }
 
-  async searchConversationMessages(userId: number, query: string): Promise<any[]> {
+  async searchConversationMessages(
+    userId: number,
+    query: string
+  ): Promise<any[]> {
     const q = query.toLowerCase().trim();
     if (!q) return [];
     const results: any[] = [];
@@ -809,7 +843,10 @@ class InMemoryStore {
     return results;
   }
 
-  async searchConversationTitles(userId: number, query: string): Promise<any[]> {
+  async searchConversationTitles(
+    userId: number,
+    query: string
+  ): Promise<any[]> {
     const q = query.toLowerCase().trim();
     if (!q) return [];
     const results: any[] = [];
@@ -829,7 +866,9 @@ class InMemoryStore {
 
   // --- Preferences ---
 
-  async getUserPreferences(userId: number): Promise<UserPreference | undefined> {
+  async getUserPreferences(
+    userId: number
+  ): Promise<UserPreference | undefined> {
     return this.userPreferences.get(userId);
   }
 
@@ -907,13 +946,37 @@ class InMemoryStore {
     return list.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
   }
 
+  async updateUserMemory(
+    userId: number,
+    id: string,
+    values: { content: string; category: any }
+  ) {
+    const memory = this.memories.get(id);
+    if (!memory || memory.userId !== userId) return false;
+    memory.content = values.content;
+    memory.title = values.content.slice(0, 80);
+    memory.category = values.category;
+    memory.updatedAt = new Date();
+    this.requestPersist();
+    return true;
+  }
+
+  async deleteUserMemory(userId: number, id: string) {
+    const memory = this.memories.get(id);
+    if (!memory || memory.userId !== userId) return false;
+    this.memories.delete(id);
+    this.requestPersist();
+    return true;
+  }
+
   async saveUserMemoryFacts(
     userId: number,
     arg2: string | any[],
     arg3?: any
   ): Promise<number> {
-    const conversationId = typeof arg2 === "string" ? arg2 : (typeof arg3 === "string" ? arg3 : "");
-    const facts = Array.isArray(arg2) ? arg2 : (Array.isArray(arg3) ? arg3 : []);
+    const conversationId =
+      typeof arg2 === "string" ? arg2 : typeof arg3 === "string" ? arg3 : "";
+    const facts = Array.isArray(arg2) ? arg2 : Array.isArray(arg3) ? arg3 : [];
     let saved = 0;
     const now = new Date();
     for (const fact of facts) {
@@ -1005,7 +1068,16 @@ class InMemoryStore {
     return project;
   }
 
-  async createFileForUser(input: Partial<KsemoFile> & { userId: number; filename: string; mimeType: string; storageKey: string; url: string; sizeBytes: number }): Promise<KsemoFile> {
+  async createFileForUser(
+    input: Partial<KsemoFile> & {
+      userId: number;
+      filename: string;
+      mimeType: string;
+      storageKey: string;
+      url: string;
+      sizeBytes: number;
+    }
+  ): Promise<KsemoFile> {
     const file: KsemoFile = {
       id: input.id || crypto.randomUUID(),
       userId: input.userId,
@@ -1025,10 +1097,18 @@ class InMemoryStore {
     return file;
   }
 
-  async getFileForUser(id: string, userId?: number): Promise<KsemoFile | undefined> {
+  async getFileForUser(
+    id: string,
+    userId?: number
+  ): Promise<KsemoFile | undefined> {
     const file = this.files.get(id);
     if (!file) return undefined;
-    if (userId !== undefined && userId !== -1 && file.userId !== -1 && file.userId !== userId) {
+    if (
+      userId !== undefined &&
+      userId !== -1 &&
+      file.userId !== -1 &&
+      file.userId !== userId
+    ) {
       return undefined;
     }
     return file;
@@ -1054,7 +1134,8 @@ class InMemoryStore {
   async deleteFile(id: string, userId: number): Promise<boolean> {
     const file = this.files.get(id);
     if (!file) return false;
-    if (userId !== -1 && file.userId !== -1 && file.userId !== userId) return false;
+    if (userId !== -1 && file.userId !== -1 && file.userId !== userId)
+      return false;
     this.files.delete(id);
     // Remove attachments referencing this file
     for (const [attId, att] of this.attachments.entries()) {
@@ -1064,12 +1145,18 @@ class InMemoryStore {
     return true;
   }
 
-  async listMessageFilesForUser(messageId: string, userId: number): Promise<any[]> {
+  async listMessageFilesForUser(
+    messageId: string,
+    userId: number
+  ): Promise<any[]> {
     const results: any[] = [];
     for (const att of this.attachments.values()) {
       if (att.messageId === messageId) {
         const file = this.files.get(att.fileId);
-        if (file && (userId === -1 || file.userId === -1 || file.userId === userId)) {
+        if (
+          file &&
+          (userId === -1 || file.userId === -1 || file.userId === userId)
+        ) {
           results.push({
             id: file.id,
             filename: file.filename,
@@ -1086,14 +1173,20 @@ class InMemoryStore {
     return results;
   }
 
-  async listConversationFiles(conversationId: string, userId: number): Promise<any[]> {
+  async listConversationFiles(
+    conversationId: string,
+    userId: number
+  ): Promise<any[]> {
     const results: any[] = [];
     const seenIds = new Set<string>();
     for (const att of this.attachments.values()) {
       if (att.conversationId === conversationId) {
         if (seenIds.has(att.fileId)) continue;
         const file = this.files.get(att.fileId);
-        if (file && (userId === -1 || file.userId === -1 || file.userId === userId)) {
+        if (
+          file &&
+          (userId === -1 || file.userId === -1 || file.userId === userId)
+        ) {
           seenIds.add(att.fileId);
           results.push({
             id: file.id,
@@ -1148,13 +1241,19 @@ class InMemoryStore {
     return att;
   }
 
-  async getTaskForUser(taskId: string, userId: number): Promise<Task | undefined> {
+  async getTaskForUser(
+    taskId: string,
+    userId: number
+  ): Promise<Task | undefined> {
     const task = this.tasks.get(taskId);
     if (!task || task.userId !== userId) return undefined;
     return task;
   }
 
-  async listTaskActivitiesForUser(taskId: string, userId: number): Promise<any[]> {
+  async listTaskActivitiesForUser(
+    taskId: string,
+    userId: number
+  ): Promise<any[]> {
     return this.taskActivities.get(taskId) || [];
   }
 
@@ -1251,7 +1350,8 @@ export function createMockSupabaseClient() {
 }
 
 class MockQueryBuilder implements PromiseLike<any> {
-  private operation: "select" | "insert" | "update" | "delete" | "upsert" = "select";
+  private operation: "select" | "insert" | "update" | "delete" | "upsert" =
+    "select";
   private selectColumns = "*";
   private insertData: any = null;
   private updateData: any = null;
@@ -1296,7 +1396,8 @@ class MockQueryBuilder implements PromiseLike<any> {
 
   eq(column: string, value: any) {
     this.filters.push((row: any) => {
-      const val = row[column] !== undefined ? row[column] : row[toCamelCase(column)];
+      const val =
+        row[column] !== undefined ? row[column] : row[toCamelCase(column)];
       return val === value;
     });
     return this;
@@ -1304,7 +1405,8 @@ class MockQueryBuilder implements PromiseLike<any> {
 
   neq(column: string, value: any) {
     this.filters.push((row: any) => {
-      const val = row[column] !== undefined ? row[column] : row[toCamelCase(column)];
+      const val =
+        row[column] !== undefined ? row[column] : row[toCamelCase(column)];
       return val !== value;
     });
     return this;
@@ -1312,7 +1414,8 @@ class MockQueryBuilder implements PromiseLike<any> {
 
   gt(column: string, value: any) {
     this.filters.push((row: any) => {
-      const val = row[column] !== undefined ? row[column] : row[toCamelCase(column)];
+      const val =
+        row[column] !== undefined ? row[column] : row[toCamelCase(column)];
       return val > value;
     });
     return this;
@@ -1320,7 +1423,8 @@ class MockQueryBuilder implements PromiseLike<any> {
 
   gte(column: string, value: any) {
     this.filters.push((row: any) => {
-      const val = row[column] !== undefined ? row[column] : row[toCamelCase(column)];
+      const val =
+        row[column] !== undefined ? row[column] : row[toCamelCase(column)];
       return val >= value;
     });
     return this;
@@ -1328,7 +1432,8 @@ class MockQueryBuilder implements PromiseLike<any> {
 
   lt(column: string, value: any) {
     this.filters.push((row: any) => {
-      const val = row[column] !== undefined ? row[column] : row[toCamelCase(column)];
+      const val =
+        row[column] !== undefined ? row[column] : row[toCamelCase(column)];
       return val < value;
     });
     return this;
@@ -1336,7 +1441,8 @@ class MockQueryBuilder implements PromiseLike<any> {
 
   lte(column: string, value: any) {
     this.filters.push((row: any) => {
-      const val = row[column] !== undefined ? row[column] : row[toCamelCase(column)];
+      const val =
+        row[column] !== undefined ? row[column] : row[toCamelCase(column)];
       return val <= value;
     });
     return this;
@@ -1348,7 +1454,8 @@ class MockQueryBuilder implements PromiseLike<any> {
 
   in(column: string, values: any[]) {
     this.filters.push((row: any) => {
-      const val = row[column] !== undefined ? row[column] : row[toCamelCase(column)];
+      const val =
+        row[column] !== undefined ? row[column] : row[toCamelCase(column)];
       return values.includes(val);
     });
     return this;
@@ -1512,7 +1619,7 @@ class MockQueryBuilder implements PromiseLike<any> {
           }
         }
 
-        const res = this.isSingle ? inserted[0] ?? null : inserted;
+        const res = this.isSingle ? (inserted[0] ?? null) : inserted;
         inMemoryStore.requestPersist();
         return { data: res, error: null, count: inserted.length };
       }
@@ -1531,7 +1638,8 @@ class MockQueryBuilder implements PromiseLike<any> {
               if (this.updateData.reset_token_hash !== undefined)
                 user.resetTokenHash = this.updateData.reset_token_hash;
               if (this.updateData.reset_token_expires_at !== undefined)
-                user.resetTokenExpiresAt = this.updateData.reset_token_expires_at
+                user.resetTokenExpiresAt = this.updateData
+                  .reset_token_expires_at
                   ? new Date(this.updateData.reset_token_expires_at)
                   : null;
               if (this.updateData.name !== undefined)
@@ -1583,9 +1691,12 @@ class MockQueryBuilder implements PromiseLike<any> {
         );
         for (const row of rows) {
           if (this.table === "files") inMemoryStore.files.delete(row.id);
-          else if (this.table === "projects") inMemoryStore.projects.delete(row.id);
-          else if (this.table === "attachments") inMemoryStore.attachments.delete(row.id);
-          else if (this.table === "conversations") inMemoryStore.conversations.delete(row.id);
+          else if (this.table === "projects")
+            inMemoryStore.projects.delete(row.id);
+          else if (this.table === "attachments")
+            inMemoryStore.attachments.delete(row.id);
+          else if (this.table === "conversations")
+            inMemoryStore.conversations.delete(row.id);
         }
         inMemoryStore.requestPersist();
         return { data: rows, error: null, count: rows.length };
@@ -1617,14 +1728,20 @@ class MockQueryBuilder implements PromiseLike<any> {
         const singleRow = rows[0] ?? null;
         return {
           data: singleRow,
-          error: singleRow ? null : { code: "PGRST116", message: "Row not found" },
+          error: singleRow
+            ? null
+            : { code: "PGRST116", message: "Row not found" },
           count: singleRow ? 1 : 0,
         };
       }
 
       return { data: rows, error: null, count: rows.length };
     } catch (err: any) {
-      return { data: null, error: { message: err?.message || String(err) }, count: null };
+      return {
+        data: null,
+        error: { message: err?.message || String(err) },
+        count: null,
+      };
     }
   }
 

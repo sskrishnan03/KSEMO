@@ -16,7 +16,7 @@ import {
 import { streamLLM, type Message } from "./_core/llm";
 import { sdk, SessionLookupError } from "./_core/sdk";
 import { storageDownload } from "./storage";
-import { buildUserMemoryContext } from "./memory/retrieval";
+import { buildUserMemoryContextWithSources } from "./memory/retrieval";
 import { memorizeConversation } from "./memory/autoMemorize";
 import { isEphemeralConversationTitle } from "./conversationTypes";
 import {
@@ -33,7 +33,10 @@ import {
   type PipelineProgressEvent,
 } from "./docgen/service";
 import { buildOutlineMetadata } from "./docgen/presentation/outline";
-import { isPptOutlinePlan, type PptOutlinePlan } from "@shared/presentationOutline";
+import {
+  isPptOutlinePlan,
+  type PptOutlinePlan,
+} from "@shared/presentationOutline";
 import type { CapabilityMode } from "@shared/capabilities";
 import { ensureExtractedContent } from "./fileExtract";
 import {
@@ -462,8 +465,20 @@ export function registerChatStream(app: Express) {
           getUserPreferences(user.id)
         );
         const memoryContext = await retryPreparation("memory context", () =>
-          buildUserMemoryContext(user.id, content ?? "")
+          buildUserMemoryContextWithSources(user.id, content ?? "")
         );
+        const memoryUses = (memoryContext?.memories ?? []).map(memory => ({
+          id: memory.id,
+          content: memory.content,
+          category: memory.category,
+          sourceConversationId: memory.sourceConversationId,
+        }));
+        if (memoryUses.length) {
+          writeEvent(res, "memory.used", {
+            messageId: assistantMessageId,
+            memories: memoryUses,
+          });
+        }
         const assistantContext = await retryPreparation(
           "message context setup",
           () =>
@@ -535,7 +550,10 @@ export function registerChatStream(app: Express) {
                         });
                       }
                     } else if (file.mimeType === "application/pdf") {
-                      const text = await ensureExtractedContent({ ...file, userId: user.id });
+                      const text = await ensureExtractedContent({
+                        ...file,
+                        userId: user.id,
+                      });
 
                       if (text) {
                         contentParts.push({
@@ -549,7 +567,10 @@ export function registerChatStream(app: Express) {
                         });
                       }
                     } else {
-                      const text = await ensureExtractedContent({ ...file, userId: user.id });
+                      const text = await ensureExtractedContent({
+                        ...file,
+                        userId: user.id,
+                      });
 
                       if (text) {
                         contentParts.push({
@@ -565,10 +586,10 @@ export function registerChatStream(app: Express) {
                     }
                   }
                   if (oversizeImages.length > 0) {
-                    const shown = oversizeImages.length === 1 ? "image" : "images";
-                    const listing = oversizeImages
-                      .slice(0, 8)
-                      .join(", ") +
+                    const shown =
+                      oversizeImages.length === 1 ? "image" : "images";
+                    const listing =
+                      oversizeImages.slice(0, 8).join(", ") +
                       (oversizeImages.length > 8 ? ", …" : "");
                     contentParts.push({
                       type: "text",
@@ -622,7 +643,7 @@ export function registerChatStream(app: Express) {
           personaInstruction,
           preferences?.customInstructions?.trim(),
           body.mode === "voice" ? VOICE_STYLE_INSTRUCTION : null,
-          memoryContext,
+          memoryContext?.text,
         ]
           .filter(Boolean)
           .join("\n\n");
@@ -714,12 +735,22 @@ export function registerChatStream(app: Express) {
         // Auto-detect file creation from natural language if not explicitly selected from UI
         // e.g. "I want this in PDF", "give me this in Word", "create a spreadsheet of...", etc.
         const isVoiceMode = body.mode === "voice";
-        const detected = (!forcedFormat && content && !isVoiceMode) ? detectFileRequest(content) : null;
+        const detected =
+          !forcedFormat && content && !isVoiceMode
+            ? detectFileRequest(content)
+            : null;
         const targetFormat: GeneratedFileResult["format"] | null =
-          forcedFormat ?? (detected?.isFileRequest && detected.format && FILE_FORMATS.has(detected.format) ? (detected.format as GeneratedFileResult["format"]) : null);
+          forcedFormat ??
+          (detected?.isFileRequest &&
+          detected.format &&
+          FILE_FORMATS.has(detected.format)
+            ? (detected.format as GeneratedFileResult["format"])
+            : null);
 
         if (targetFormat) {
-          const cleanUserMessage = detected?.cleanedPrompt || cleanPromptText(content ?? "", targetFormat);
+          const cleanUserMessage =
+            detected?.cleanedPrompt ||
+            cleanPromptText(content ?? "", targetFormat);
 
           try {
             // Clean command prefixes if present while preserving core prompt
@@ -764,16 +795,14 @@ export function registerChatStream(app: Express) {
               });
             }
           } catch (error) {
-            console.warn(
-              "[ChatStream] file generation failed",
-              error
-            );
+            console.warn("[ChatStream] file generation failed", error);
             fileModeFailed = true;
             writeEvent(res, "file.error", {
               messageId: assistantMessageId,
-              message: error instanceof Error
-                ? `File generation failed: ${error.message}`
-                : "File generation could not be completed. Please try again.",
+              message:
+                error instanceof Error
+                  ? `File generation failed: ${error.message}`
+                  : "File generation could not be completed. Please try again.",
             });
           }
         }
@@ -848,7 +877,10 @@ export function registerChatStream(app: Express) {
             status: "failed",
           });
           terminalStatusWritten = true;
-        } else if ((generationError || timedOut) && !controller.signal.aborted) {
+        } else if (
+          (generationError || timedOut) &&
+          !controller.signal.aborted
+        ) {
           await updateMessage(assistantMessageId, {
             content: responseText,
             status: "failed",
@@ -870,14 +902,34 @@ export function registerChatStream(app: Express) {
           });
         } else {
           const cancelled = controller.signal.aborted;
+          let assistantMetadata: Record<string, unknown> | undefined;
+          if (memoryUses.length > 0) {
+            try {
+              const previousAssistant = await getMessageForUser(
+                assistantMessageId,
+                user.id
+              );
+              assistantMetadata = {
+                ...(previousAssistant?.metadata ?? {}),
+                memoryUses,
+              };
+            } catch (error) {
+              console.warn(
+                "[ChatStream] could not merge memory disclosure metadata",
+                error
+              );
+              assistantMetadata = { memoryUses };
+            }
+          }
           await updateMessage(assistantMessageId, {
             content: cancelled
               ? responseText
-              : (responseText || "I’m sorry, I couldn’t generate a response."),
+              : responseText || "I’m sorry, I couldn’t generate a response.",
             model: usedFallbackModel
               ? QUOTA_FALLBACK_MODEL
               : (preferences?.selectedModel ?? null),
             status: cancelled ? "cancelled" : "completed",
+            metadata: assistantMetadata,
           });
           terminalStatusWritten = true;
           if (!cancelled) {
@@ -898,9 +950,13 @@ export function registerChatStream(app: Express) {
               content &&
               !ephemeralConversation
             ) {
-              const messages = await listMessagesForConversation(conversation.id);
+              const messages = await listMessagesForConversation(
+                conversation.id
+              );
               const userMessages = messages.filter(m => m.role === "user");
-              const assistantMessages = messages.filter(m => m.role === "assistant");
+              const assistantMessages = messages.filter(
+                m => m.role === "assistant"
+              );
 
               // Only update title if this is the first assistant response
               if (assistantMessages.length === 1 && userMessages.length > 0) {
@@ -910,7 +966,10 @@ export function registerChatStream(app: Express) {
                   messages,
                   signal: controller.signal,
                 });
-                if (intelligentTitle && intelligentTitle !== conversation.title) {
+                if (
+                  intelligentTitle &&
+                  intelligentTitle !== conversation.title
+                ) {
                   await updateConversationForUser(conversation.id, user.id, {
                     title: intelligentTitle,
                   });
@@ -994,204 +1053,236 @@ export function registerChatStream(app: Express) {
   // Reuses the same SSE machinery so the client's existing file-progress UI
   // and FileCreationCard work without changes.
   // -----------------------------------------------------------------------
-  app.post("/api/chat/presentation/stream", async (req: Request, res: Response) => {
-    let user;
-    try {
-      user = await sdk.authenticateRequest(req);
-    } catch (error) {
-      if (error instanceof DatabaseUnavailableError || error instanceof SessionLookupError) {
-        res.status(503).json({
-          error: "KSEMO's data store is temporarily unavailable. Please try again.",
+  app.post(
+    "/api/chat/presentation/stream",
+    async (req: Request, res: Response) => {
+      let user;
+      try {
+        user = await sdk.authenticateRequest(req);
+      } catch (error) {
+        if (
+          error instanceof DatabaseUnavailableError ||
+          error instanceof SessionLookupError
+        ) {
+          res.status(503).json({
+            error:
+              "KSEMO's data store is temporarily unavailable. Please try again.",
+          });
+          return;
+        }
+        res.status(401).json({ error: "Authentication required" });
+        return;
+      }
+      if (!user) {
+        res.status(401).json({ error: "Authentication required" });
+        return;
+      }
+
+      const body = req.body as {
+        assistantMessageId?: string;
+        conversationId?: string;
+        outline?: unknown;
+        pptConfig?: Record<string, unknown>;
+        pptStyle?: string;
+      };
+
+      if (!body.assistantMessageId || !body.conversationId || !body.outline) {
+        res.status(400).json({
+          error:
+            "assistantMessageId, conversationId, and outline are required.",
         });
         return;
       }
-      res.status(401).json({ error: "Authentication required" });
-      return;
-    }
-    if (!user) {
-      res.status(401).json({ error: "Authentication required" });
-      return;
-    }
 
-    const body = req.body as {
-      assistantMessageId?: string;
-      conversationId?: string;
-      outline?: unknown;
-      pptConfig?: Record<string, unknown>;
-      pptStyle?: string;
-    };
-
-    if (!body.assistantMessageId || !body.conversationId || !body.outline) {
-      res.status(400).json({ error: "assistantMessageId, conversationId, and outline are required." });
-      return;
-    }
-
-    // Validate outline structure before doing any work
-    if (!isPptOutlinePlan(body.outline)) {
-      res.status(400).json({ error: "Invalid presentation outline. Please regenerate the outline and try again." });
-      return;
-    }
-
-    // Validate the assistant message exists, is in this conversation, and
-    // belongs to the authenticated user.
-    const message = await getMessageForUser(body.assistantMessageId, user.id);
-    if (!message) {
-      res.status(404).json({ error: "Message not found" });
-      return;
-    }
-    if (message.conversationId !== body.conversationId) {
-      res.status(400).json({ error: "Message does not belong to this conversation" });
-      return;
-    }
-
-    const conversation = await getConversationForUser(body.conversationId, user.id);
-    if (!conversation) {
-      res.status(404).json({ error: "Conversation not found" });
-      return;
-    }
-
-    // The prompt recorded in metadata is the user message that preceded this
-    // assistant message (the assistant placeholder content is always empty
-    // during the outline phase).
-    let outlinePrompt = "";
-    try {
-      const conversationMessages = await listMessagesForConversation(body.conversationId);
-      const assistantIndex = conversationMessages.findIndex(m => m.id === body.assistantMessageId);
-      const sourceUser = assistantIndex >= 0
-        ? [...conversationMessages.slice(0, assistantIndex)].reverse().find(m => m.role === "user")
-        : undefined;
-      outlinePrompt = sourceUser?.content ?? "";
-    } catch {}
-
-    // Persist the (potentially user-edited) outline so it survives a refresh
-    await updateMessage(body.assistantMessageId, {
-      metadata: {
-        pptOutline: {
-          kind: "pptOutline",
-          outline: body.outline,
-          prompt: outlinePrompt,
-          updatedAt: new Date().toISOString(),
-          headerText: (body.outline as PptOutlinePlan).summary || "",
-        },
-      },
-    });
-
-    res.status(200);
-    res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
-    res.setHeader("Cache-Control", "no-cache, no-transform");
-    res.setHeader("Connection", "keep-alive");
-    res.flushHeaders();
-
-    let finished = false;
-    const controller = new AbortController();
-    res.on("close", () => { if (!finished) controller.abort(); });
-
-    const heartbeat = setInterval(() => {
-      if (!finished && !res.writableEnded && !res.destroyed) {
-        try { res.write(": ping\n\n"); } catch {}
+      // Validate outline structure before doing any work
+      if (!isPptOutlinePlan(body.outline)) {
+        res.status(400).json({
+          error:
+            "Invalid presentation outline. Please regenerate the outline and try again.",
+        });
+        return;
       }
-    }, HEARTBEAT_INTERVAL_MS);
-    const deadline = createDeadlineTimer(GENERATION_DEADLINE_MS);
-    const generationSignal = composeAbortSignals(controller.signal, deadline.signal);
 
-    let settled = false;
-    try {
-      const outlinePlan = body.outline as PptOutlinePlan;
+      // Validate the assistant message exists, is in this conversation, and
+      // belongs to the authenticated user.
+      const message = await getMessageForUser(body.assistantMessageId, user.id);
+      if (!message) {
+        res.status(404).json({ error: "Message not found" });
+        return;
+      }
+      if (message.conversationId !== body.conversationId) {
+        res
+          .status(400)
+          .json({ error: "Message does not belong to this conversation" });
+        return;
+      }
 
-      writeEvent(res, "conversation", {
-        conversationId: body.conversationId,
-        title: conversation.title,
-        userMessageId: message.conversationId,
-        assistantMessageId: body.assistantMessageId,
+      const conversation = await getConversationForUser(
+        body.conversationId,
+        user.id
+      );
+      if (!conversation) {
+        res.status(404).json({ error: "Conversation not found" });
+        return;
+      }
+
+      // The prompt recorded in metadata is the user message that preceded this
+      // assistant message (the assistant placeholder content is always empty
+      // during the outline phase).
+      let outlinePrompt = "";
+      try {
+        const conversationMessages = await listMessagesForConversation(
+          body.conversationId
+        );
+        const assistantIndex = conversationMessages.findIndex(
+          m => m.id === body.assistantMessageId
+        );
+        const sourceUser =
+          assistantIndex >= 0
+            ? [...conversationMessages.slice(0, assistantIndex)]
+                .reverse()
+                .find(m => m.role === "user")
+            : undefined;
+        outlinePrompt = sourceUser?.content ?? "";
+      } catch {}
+
+      // Persist the (potentially user-edited) outline so it survives a refresh
+      await updateMessage(body.assistantMessageId, {
+        metadata: {
+          pptOutline: {
+            kind: "pptOutline",
+            outline: body.outline,
+            prompt: outlinePrompt,
+            updatedAt: new Date().toISOString(),
+            headerText: (body.outline as PptOutlinePlan).summary || "",
+          },
+        },
       });
 
-      const result = await runPresentationFromOutline({
-        userId: user.id,
-        assistantMessageId: body.assistantMessageId,
-        conversationId: body.conversationId,
-        outline: outlinePlan,
-        onProgress: (event: PipelineProgressEvent) => {
-          writeEvent(res, "file.progress", {
+      res.status(200);
+      res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+      res.setHeader("Cache-Control", "no-cache, no-transform");
+      res.setHeader("Connection", "keep-alive");
+      res.flushHeaders();
+
+      let finished = false;
+      const controller = new AbortController();
+      res.on("close", () => {
+        if (!finished) controller.abort();
+      });
+
+      const heartbeat = setInterval(() => {
+        if (!finished && !res.writableEnded && !res.destroyed) {
+          try {
+            res.write(": ping\n\n");
+          } catch {}
+        }
+      }, HEARTBEAT_INTERVAL_MS);
+      const deadline = createDeadlineTimer(GENERATION_DEADLINE_MS);
+      const generationSignal = composeAbortSignals(
+        controller.signal,
+        deadline.signal
+      );
+
+      let settled = false;
+      try {
+        const outlinePlan = body.outline as PptOutlinePlan;
+
+        writeEvent(res, "conversation", {
+          conversationId: body.conversationId,
+          title: conversation.title,
+          userMessageId: message.conversationId,
+          assistantMessageId: body.assistantMessageId,
+        });
+
+        const result = await runPresentationFromOutline({
+          userId: user.id,
+          assistantMessageId: body.assistantMessageId,
+          conversationId: body.conversationId,
+          outline: outlinePlan,
+          onProgress: (event: PipelineProgressEvent) => {
+            writeEvent(res, "file.progress", {
+              messageId: body.assistantMessageId,
+              stage: event.stage,
+              format: event.format,
+              message: event.message,
+              researchSourceCount: event.researchSourceCount,
+              researchFindingCount: event.researchFindingCount,
+              qualityPassed: event.qualityPassed,
+              qualityIssueCount: event.qualityIssueCount,
+              code: event.code,
+            });
+          },
+          signal: generationSignal,
+        });
+
+        // Persist the outline once more with an updated timestamp so the client
+        // knows the version that produced this specific .pptx
+        await updateMessage(body.assistantMessageId, {
+          metadata: {
+            pptOutline: {
+              kind: "pptOutline",
+              outline: outlinePlan,
+              prompt: outlinePrompt,
+              updatedAt: new Date().toISOString(),
+              headerText: outlinePlan.summary,
+            },
+          },
+        });
+
+        writeEvent(res, "file.created", {
+          messageId: body.assistantMessageId,
+          file: result,
+        });
+
+        const summary = outlinePlan.summary || result.summary;
+        for (let i = 0; i < summary.length; i += 64) {
+          writeEvent(res, "assistant.delta", {
             messageId: body.assistantMessageId,
-            stage: event.stage,
-            format: event.format,
-            message: event.message,
-            researchSourceCount: event.researchSourceCount,
-            researchFindingCount: event.researchFindingCount,
-            qualityPassed: event.qualityPassed,
-            qualityIssueCount: event.qualityIssueCount,
-            code: event.code,
+            delta: summary.slice(i, i + 64),
           });
-        },
-        signal: generationSignal,
-      });
+        }
 
-      // Persist the outline once more with an updated timestamp so the client
-      // knows the version that produced this specific .pptx
-      await updateMessage(body.assistantMessageId, {
-        metadata: {
-          pptOutline: {
-            kind: "pptOutline",
-            outline: outlinePlan,
-            prompt: outlinePrompt,
-            updatedAt: new Date().toISOString(),
-            headerText: outlinePlan.summary,
+        await updateMessage(body.assistantMessageId, {
+          content: summary,
+          status: "completed",
+          metadata: {
+            pptOutline: {
+              kind: "pptOutline",
+              outline: outlinePlan,
+              prompt: outlinePrompt,
+              updatedAt: new Date().toISOString(),
+              headerText: outlinePlan.summary,
+            },
           },
-        },
-      });
-
-      writeEvent(res, "file.created", {
-        messageId: body.assistantMessageId,
-        file: result,
-      });
-
-      const summary = outlinePlan.summary || result.summary;
-      for (let i = 0; i < summary.length; i += 64) {
-        writeEvent(res, "assistant.delta", {
-          messageId: body.assistantMessageId,
-          delta: summary.slice(i, i + 64),
         });
-      }
+        settled = true;
 
-      await updateMessage(body.assistantMessageId, {
-        content: summary,
-        status: "completed",
-        metadata: {
-          pptOutline: {
-            kind: "pptOutline",
-            outline: outlinePlan,
-            prompt: outlinePrompt,
-            updatedAt: new Date().toISOString(),
-            headerText: outlinePlan.summary,
-          },
-        },
-      });
-      settled = true;
-
-      writeEvent(res, "assistant.completed", {
-        messageId: body.assistantMessageId,
-      });
-    } catch (error) {
-      console.warn("[ChatStream] presentation generation failed", error);
-      if (!controller.signal.aborted) {
-        writeEvent(res, "file.error", {
+        writeEvent(res, "assistant.completed", {
           messageId: body.assistantMessageId,
-          message:
-            error instanceof Error
-              ? `Presentation generation failed: ${error.message}`
-              : "Presentation generation could not be completed. Please try again.",
         });
-        try {
-          await updateMessage(body.assistantMessageId, {
-            status: "failed",
+      } catch (error) {
+        console.warn("[ChatStream] presentation generation failed", error);
+        if (!controller.signal.aborted) {
+          writeEvent(res, "file.error", {
+            messageId: body.assistantMessageId,
+            message:
+              error instanceof Error
+                ? `Presentation generation failed: ${error.message}`
+                : "Presentation generation could not be completed. Please try again.",
           });
-        } catch {}
+          try {
+            await updateMessage(body.assistantMessageId, {
+              status: "failed",
+            });
+          } catch {}
+        }
+      } finally {
+        finished = true;
+        clearInterval(heartbeat);
+        deadline.clear();
+        if (!res.writableEnded) res.end();
       }
-    } finally {
-      finished = true;
-      clearInterval(heartbeat);
-      deadline.clear();
-      if (!res.writableEnded) res.end();
     }
-  });
+  );
 }

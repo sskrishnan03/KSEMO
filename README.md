@@ -52,13 +52,14 @@ The application architecture and user journey are organized across five core int
 </p>
 
 #### 🔍 Analysis & Capabilities:
-- **Central Conversational Hub**: Features a sleek dark-themed workspace with a distraction-free conversational canvas and responsive prompt input box (*"Ask KSEMO anything..."*).
+
+- **Central Conversational Hub**: Features a sleek dark-themed workspace with a distraction-free conversational canvas and responsive prompt input box (_"Ask KSEMO anything..."_).
 - **Multimodal Composer & Action Menu**:
   - **Upload Files**: Direct attachment of documents, raw text, and images for real-time document Q&A.
   - **Take Screenshot**: Integrated screen capture tool to seamlessly paste visual snapshots into the prompt.
   - **Browse Library**: Rapid access to previously uploaded and processed documents stored in your private library.
   - **Create Files (Submenu)**: Direct on-the-fly document compilation into **PDF**, **Microsoft Word (`.docx`)**, **Microsoft Excel (`.xlsx`)**, **Microsoft PowerPoint (`.pptx`)**, and **Plain Text (`.txt`)**.
-- **Sidebar & Quick Navigation**: Accessible sidebar navigation for *New Chat*, global *Search*, *Library*, *Recent Sessions*, and profile/account settings.
+- **Sidebar & Quick Navigation**: Accessible sidebar navigation for _New Chat_, global _Search_, _Library_, _Recent Sessions_, and profile/account settings.
 
 ---
 
@@ -69,6 +70,7 @@ The application architecture and user journey are organized across five core int
 </p>
 
 #### 🔍 Analysis & Capabilities:
+
 - **Immersive Voice Interaction**: Dedicated voice interface with a centered pulsating audio visualizer that provides real-time visual feedback for listening and speaking states.
 - **Bi-Directional Speech Streaming**:
   - Continuous speech-to-text (STT) captures natural speech with instant transcription.
@@ -87,8 +89,9 @@ The application architecture and user journey are organized across five core int
 </p>
 
 #### 🔍 Analysis & Capabilities:
+
 - **Zero Data Retention**: A dedicated incognito mode designed for disposable inquiries, sensitive data processing, and quick brainstorming.
-- **Visual Privacy Feedback**: Distinctive top notification and glowing input badge (*"Temporary chat — This conversation won't be saved to your chat history"*).
+- **Visual Privacy Feedback**: Distinctive top notification and glowing input badge (_"Temporary chat — This conversation won't be saved to your chat history"_).
 - **Ephemeral State Lifecycle**:
   - Conversations exist exclusively in client memory for the duration of the session.
   - No database logging, no analytics tracking, and excluded from long-term memory extraction.
@@ -102,8 +105,9 @@ The application architecture and user journey are organized across five core int
 </p>
 
 #### 🔍 Analysis & Capabilities:
+
 - **Deep Historical Search**: Instant indexing and querying across all past conversation titles, user prompts, assistant answers, and attached notes.
-- **Time-Range Filters**: Dropdown filtering system (*"All time"*, today, past week, past month) to quickly narrow down relevant insights.
+- **Time-Range Filters**: Dropdown filtering system (_"All time"_, today, past week, past month) to quickly narrow down relevant insights.
 - **Quick Jump & Preview**: Clean search result cards enabling instant message navigation and one-click session resumption.
 
 ---
@@ -115,10 +119,11 @@ The application architecture and user journey are organized across five core int
 </p>
 
 #### 🔍 Analysis & Capabilities:
+
 - **Private Asset Vault**: A secure hub for storing, organizing, and referencing documents, spreadsheets, slides, and images across conversations.
 - **Automated Text & Data Extraction**: Uploaded files (PDFs, Word docs, Excel sheets) are automatically parsed and indexed for context injection.
 - **Advanced Asset Organization**:
-  - **Categorical Filters**: Filter by *All*, *Images*, *Files*, or *Favorites*.
+  - **Categorical Filters**: Filter by _All_, _Images_, _Files_, or _Favorites_.
   - **View Layout Switching**: Toggle between responsive **Grid View** and detailed **List View**.
   - **Direct Search**: In-library instant keyword search to locate specific uploaded assets in seconds.
 
@@ -127,31 +132,44 @@ The application architecture and user journey are organized across five core int
 ## Key Features
 
 ### 🧠 Durable Cross-Session Memory
+
 - Automatically identifies and retains key user facts, preferences, project requirements, and personal contexts.
 - Contextually injects relevant memories into future prompts without manual re-prompting.
 - Full user control to view, edit, sensitive-tag, or delete stored memories.
 
 ### 📄 Native Document Creation Engine
+
 - **PDF Generation**: High-fidelity structured PDF rendering via `pdf-lib` and `unpdf`.
 - **Word (`.docx`)**: Formatted document compilation with headings, bullet points, and styled callouts using `docx`.
 - **Excel (`.xlsx`)**: Structured multi-column analytical spreadsheets powered by `xlsx`.
 - **PowerPoint (`.pptx`)**: Polished presentation decks with slides and title layouts via `pptxgenjs`.
 
 ### 🎙️ Full-Duplex Voice & Audio Processing
+
 - Hands-free live conversation with customizable speech rates and natural TTS synthesis.
 - Audio activity visualization with immediate mid-sentence interruption handling.
 - Live subtitle rendering during voice playback.
 
 ### 🔄 Message Branching & Version History
+
 - Edit previous prompts to regenerate alternative reasoning paths.
 - Linear version history lets you switch between past iterations without losing data.
 
 ### 🌐 Secure Sharing & Collaboration
+
 - Generate public, read-only shareable links with cryptographic tokens.
 - Export transcripts directly to PDF or Word documents for offline sharing.
 - Built-in email sharing integration via SMTP.
 
 ---
+
+### Optional Google Drive and OneDrive import
+
+- In the Library, choose **Import from cloud**, connect Google Drive or OneDrive, search your files, and import individual supported documents (up to 25 MB) into KSEMO's private Library.
+- The integration requests read-only access. Imports are user-selected copies; disconnecting removes the saved OAuth grant.
+- Configure `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` (or the existing `VITE_GOOGLE_CLIENT_ID` / `VITE_GOOGLE_CLIENT_SECRET` pair) and register `https://<your-host>/api/cloud/google/callback` in the Google OAuth client. Enable the Google Drive API.
+- Configure `MICROSOFT_CLIENT_ID` and `MICROSOFT_CLIENT_SECRET` and register `https://<your-host>/api/cloud/microsoft/callback` as a Web redirect URI. Add delegated `Files.Read`, `User.Read`, and `offline_access` permissions.
+- Apply `supabase-schema/09-cloud-integrations.sql` to existing databases, or use the consolidated `supabase-schema/schema.sql` for a new database. Keep `JWT_SECRET` stable across deployments because it encrypts stored OAuth tokens.
 
 ## Architecture & Tech Stack
 
@@ -174,6 +192,7 @@ KSEMO/
 ```
 
 ### Technology Highlights:
+
 - **Frontend**: React 19, TypeScript, Tailwind CSS v4, Radix UI Primitives, Framer Motion, TanStack Query.
 - **Backend & API**: Node.js, Express, tRPC v11, Zod schema validation, Jose (JWT authentication).
 - **Database & Storage**: Supabase (PostgreSQL with Row Level Security & full-text search) + in-memory development store fallback.
@@ -188,7 +207,7 @@ KSEMO/
 flowchart TD
     User([User / Client]) -->|1. Text / Voice / File| ChatInterface[Chat & Voice Workspace]
     ChatInterface -->|2. tRPC Mutation| BackendServer[Express + tRPC Server]
-    
+
     subgraph Core Services
         BackendServer --> MemoryService[Memory Extraction & Vector Search]
         BackendServer --> DocGen[Document Engine: PDF / DOCX / XLSX / PPTX]
@@ -206,12 +225,14 @@ flowchart TD
 ## Installation & Setup
 
 ### Prerequisites
+
 - **Node.js**: `v20.x` or higher
 - **pnpm**: `v10.x` or higher
 - **Supabase Account**: (Optional for cloud database; in-memory demo mode runs automatically if unset)
 - **AI API Key**: Gemini API key or compatible LLM provider key
 
 ### 1. Clone & Install Dependencies
+
 ```bash
 git clone https://github.com/your-username/KSEMO.git
 cd KSEMO
@@ -220,6 +241,7 @@ pnpm install
 ```
 
 ### 2. Configure Environment Variables
+
 Create a `.env` file in the project root:
 
 ```env
@@ -248,27 +270,30 @@ SMTP_FROM=noreply@ksemo.ai
 ```
 
 ### 3. Initialize Database Schema (Supabase)
+
 Execute the SQL migrations found in the `supabase-schema/` directory within the Supabase SQL editor to set up tables, triggers, and Row Level Security (RLS) policies.
 
 ### 4. Run Development Server
+
 ```bash
 pnpm dev
 ```
+
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ---
 
 ## Usage Guide
 
-| Action | Steps |
-| :--- | :--- |
-| **Start Chatting** | Type any query into the central prompt box or click the microphone to dictate. |
-| **Create Documents** | Click the `+` button in the composer &rarr; select **Create Files** &rarr; choose PDF, Word, Excel, PowerPoint, or Text. |
-| **Hands-Free Voice** | Click the audio visualizer icon in the chat composer to open Voice Mode with real-time speech synthesis. |
-| **Temporary Incognito Mode** | Toggle temporary chat mode to conduct private, unlogged conversational sessions. |
-| **Manage File Library** | Navigate to `Library` from the sidebar to upload documents, preview assets, and organize favorites. |
-| **Full-Text Search** | Navigate to `Search` to query conversation history and message logs by keyword and date filters. |
-| **Share Conversation** | Open conversation settings &rarr; generate a public link or send directly via email. |
+| Action                       | Steps                                                                                                                    |
+| :--------------------------- | :----------------------------------------------------------------------------------------------------------------------- |
+| **Start Chatting**           | Type any query into the central prompt box or click the microphone to dictate.                                           |
+| **Create Documents**         | Click the `+` button in the composer &rarr; select **Create Files** &rarr; choose PDF, Word, Excel, PowerPoint, or Text. |
+| **Hands-Free Voice**         | Click the audio visualizer icon in the chat composer to open Voice Mode with real-time speech synthesis.                 |
+| **Temporary Incognito Mode** | Toggle temporary chat mode to conduct private, unlogged conversational sessions.                                         |
+| **Manage File Library**      | Navigate to `Library` from the sidebar to upload documents, preview assets, and organize favorites.                      |
+| **Full-Text Search**         | Navigate to `Search` to query conversation history and message logs by keyword and date filters.                         |
+| **Share Conversation**       | Open conversation settings &rarr; generate a public link or send directly via email.                                     |
 
 ---
 

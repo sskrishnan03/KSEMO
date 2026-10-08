@@ -14,6 +14,7 @@ import {
   voiceRouter,
 } from "./routers/ksemo";
 import { memoryRouter } from "./routers/memory";
+import { cloudRouter } from "./cloudIntegrations";
 import { workspaceRouter } from "./routers/product";
 
 export const appRouter = router({
@@ -32,17 +33,13 @@ export const appRouter = router({
         });
       }
       const user = opts.ctx.user;
-      return user
-        ? { id: user.id, name: user.name, email: user.email }
-        : null;
+      return user ? { id: user.id, name: user.name, email: user.email } : null;
     }),
     logout: publicProcedure.mutation(async ({ ctx }) => {
       // Revoke the presented session BEFORE clearing the cookie, so neither
       // the stale cookie nor the Authorization-header fallback can ever
       // re-authenticate this user after sign-out.
-      const token = ctx.req
-        ? sdk.extractSessionToken(ctx.req)
-        : undefined;
+      const token = ctx.req ? sdk.extractSessionToken(ctx.req) : undefined;
       if (token) {
         await sdk.revokeSession(token);
       }
@@ -59,6 +56,7 @@ export const appRouter = router({
   message: messageRouter,
   preferences: preferenceRouter,
   memory: memoryRouter,
+  cloud: cloudRouter,
   voice: voiceRouter,
   fileGeneration: fileGenerationRouter,
   workspace: workspaceRouter,

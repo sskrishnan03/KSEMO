@@ -605,7 +605,11 @@ export default function Home() {
   const [isBotSpeakingAloud, setIsBotSpeakingAloud] = useState(false);
   const [primaryWorkspace, setPrimaryWorkspace] = useState<
     "library" | "search" | null
-  >(() => inlineWorkspaceSection);
+  >(
+    () =>
+      inlineWorkspaceSection ??
+      (searchParams.get("workspace") === "library" ? "library" : null)
+  );
   const [chatFilesOpen, setChatFilesOpen] = useState(false);
   const [showCode, setShowCode] = useState<{
     code: string;
@@ -1531,7 +1535,16 @@ export default function Home() {
         | undefined;
 
       const metadata = (message as Record<string, unknown>).metadata as
-        { pptOutline?: { outline?: unknown } } | undefined;
+        | {
+            pptOutline?: { outline?: unknown };
+            memoryUses?: Array<{
+              id: string;
+              content: string;
+              category?: string;
+              sourceConversationId?: string | null;
+            }>;
+          }
+        | undefined;
       const restoredOutline = isPptOutlinePlan(metadata?.pptOutline?.outline)
         ? (metadata!.pptOutline!.outline as PptOutlinePlan)
         : undefined;
@@ -1596,6 +1609,7 @@ export default function Home() {
         status: message.status,
         createdAt: message.createdAt,
         attachments: message.attachments,
+        memoryUses: metadata?.memoryUses,
         // Rebuild completed fileGeneration with durable sources and metrics restored from attachment metadata
         fileGeneration:
           fileGeneration ??
@@ -2343,6 +2357,20 @@ export default function Home() {
             }
           } else if (eventName === "assistant.completed") {
             lastProgressAt = Date.now();
+          } else if (eventName === "memory.used") {
+            const usedMessageId = str(data.messageId);
+            const memoryUses = Array.isArray(data.memories)
+              ? data.memories
+              : [];
+            if (isViewingThisStream()) {
+              setChatMessages(current =>
+                current.map(message =>
+                  message.id === usedMessageId
+                    ? { ...message, memoryUses: memoryUses as any }
+                    : message
+                )
+              );
+            }
           } else if (eventName === "search.progress") {
             lastProgressAt = Date.now();
             const searchMsgId = str(data.messageId);

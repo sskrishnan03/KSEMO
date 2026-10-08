@@ -53,6 +53,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { ShareIcon, Trash6Icon } from "./icons";
+import { CloudDriveImport } from "./CloudDriveImport";
 import { downloadFile } from "@/lib/downloadFile";
 import React, {
   memo,
@@ -447,11 +448,7 @@ export function LibraryWorkspace({
                     aria-label="Open conversations"
                     title="Open sidebar"
                   >
-                    <Layout
-                      size={20}
-                      strokeWidth={2}
-                      className="size-5"
-                    />
+                    <Layout size={20} strokeWidth={2} className="size-5" />
                   </Button>
                 )}
                 <h1 className="text-2xl font-semibold tracking-[-0.03em]">
@@ -462,17 +459,21 @@ export function LibraryWorkspace({
                 Your private space for files and images you can chat about.
               </p>
             </div>
-            <Button
-              size="sm"
-              className="h-8 rounded-xl bg-foreground text-xs text-background hover:bg-foreground/90 sm:hidden"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploadMutation.isPending}
-            >
-              <Upload className="mr-1.5 size-3.5" />
-              {uploadMutation.isPending ? "Uploading…" : "Upload files"}
-            </Button>
+            <div className="flex items-center gap-2 sm:hidden">
+              <CloudDriveImport />
+              <Button
+                size="sm"
+                className="h-8 rounded-xl bg-foreground text-xs text-background hover:bg-foreground/90"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadMutation.isPending}
+              >
+                <Upload className="mr-1.5 size-3.5" />
+                {uploadMutation.isPending ? "Uploading…" : "Upload files"}
+              </Button>
+            </div>
           </div>
           <div className="hidden shrink-0 flex-wrap items-center gap-2 sm:flex">
+            <CloudDriveImport />
             <Button
               size="sm"
               className="h-8 sm:h-9 rounded-xl bg-foreground text-xs sm:text-sm text-background hover:bg-foreground/90"

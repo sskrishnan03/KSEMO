@@ -16,6 +16,7 @@ import { createServer } from "http";
 import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerGoogleOAuthRoutes } from "./googleOAuth";
+import { registerCloudOAuthRoutes } from "../cloudIntegrations";
 import { registerStorageProxy } from "./storageProxy";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
@@ -50,9 +51,9 @@ function registerLogoutRoute(app: express.Express) {
         typeof authHeader === "string" && authHeader.startsWith("Bearer ")
           ? authHeader.slice(7).trim()
           : undefined;
-      const cookieToken = parseCookieHeader(
-        req.headers.cookie ?? ""
-      )[COOKIE_NAME];
+      const cookieToken = parseCookieHeader(req.headers.cookie ?? "")[
+        COOKIE_NAME
+      ];
 
       // Revoke every distinct token the request presented, best-effort. A JWT
       // cannot be un-issued, so revoking is what actually de-scopes the session
@@ -150,6 +151,7 @@ async function startServer() {
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
   registerStorageProxy(app);
   registerGoogleOAuthRoutes(app);
+  registerCloudOAuthRoutes(app);
   // Plain-Express logout — registered BEFORE the tRPC middleware so it never
   // runs through createContext (which performs Supabase round-trips that can
   // hang a slow sign-out).
