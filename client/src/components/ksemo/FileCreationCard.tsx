@@ -1,4 +1,5 @@
 import type { DocFormat } from "@/lib/docFormats";
+import { getCapabilityOption } from "@/lib/capabilities";
 import { Check, ChevronRight, Code2, Eye, RotateCw } from "lucide-react";
 import React, {
   memo,
@@ -332,6 +333,9 @@ export const FileCreationCard = memo(function FileCreationCard({
 
   const config = FORMAT_CONFIGS[format] || FORMAT_CONFIGS.pdf;
   const variant = FORMAT_TO_VARIANT[format] || "generic";
+  const capabilityFormat =
+    format === "markdown" || format === "csv" ? "txt" : format;
+  const FormatIcon = getCapabilityOption(capabilityFormat).icon;
   const displayName = filename || `document.${format}`;
 
   const cleanBaseName = useMemo(() => {
@@ -376,10 +380,7 @@ export const FileCreationCard = memo(function FileCreationCard({
     return (
       <div className="my-2 w-fit max-w-md animate-in fade-in duration-200">
         <div className="flex items-center gap-3.5 rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-destructive">
-          <FileBrandMark
-            variant={variant}
-            className="size-9 shrink-0 opacity-80 saturate-[0.5]"
-          />
+          <FormatIcon className="size-9 shrink-0 opacity-80" />
           <div className="min-w-0 flex-1">
             <p className="text-[13px] font-medium text-foreground">
               Document creation could not be completed
@@ -411,33 +412,24 @@ export const FileCreationCard = memo(function FileCreationCard({
   // ── Interrupted / stopped state ────────────────────────────────────────
   if (stage === "interrupted") {
     return (
-      <div className="my-2 w-fit max-w-md animate-in fade-in duration-200">
-        <div className="flex items-center gap-3.5 rounded-2xl border border-border/60 bg-muted/40 px-4 py-3 text-foreground">
-          <FileBrandMark
-            variant={variant}
-            className="size-9 shrink-0 opacity-70 saturate-[0.6]"
-          />
-          <div className="min-w-0 flex-1">
-            <p className="text-[13px] font-medium text-foreground">
-              Document creation was stopped
-            </p>
-            <p className="mt-0.5 text-[11px] text-muted-foreground">
-              You interrupted the process while the {config.short} was being
-              generated.
-            </p>
-          </div>
+      <div className="my-2 w-fit max-w-full animate-in fade-in duration-200">
+        <div className="flex w-fit max-w-full items-center gap-2 rounded-xl border border-border/60 bg-muted/40 px-3 py-2 text-foreground">
+          <FormatIcon className="size-5 shrink-0 opacity-70" />
+          <span className="whitespace-nowrap text-[13px] font-medium text-foreground">
+            Creation stopped
+          </span>
           {onRetry && (
             <button
               type="button"
               onClick={onRetry}
               className={cn(
-                "inline-flex shrink-0 items-center gap-1.5 rounded-xl",
-                "border border-border/70 bg-card px-3 py-1.5",
-                "text-[11.5px] font-medium text-foreground shadow-sm",
+                "inline-flex shrink-0 items-center gap-1.5 rounded-lg",
+                "border border-border/70 bg-card px-2.5 py-1",
+                "text-xs font-medium text-foreground shadow-sm",
                 "transition-all duration-150 hover:bg-muted active:scale-[0.98]"
               )}
             >
-              <RotateCw className="size-3" />
+              <RotateCw className="size-3.5" />
               Try again
             </button>
           )}
@@ -453,15 +445,21 @@ export const FileCreationCard = memo(function FileCreationCard({
     return (
       <div
         data-testid="file-creation-drafting"
-        className="my-2 flex items-center gap-2.5 py-1 select-none animate-in fade-in duration-150"
+        className="relative my-2 flex items-center gap-2.5 py-1 select-none motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-left-2 motion-safe:duration-300"
       >
-        <FileBrandMark
-          variant={variant}
-          className="size-6 shrink-0 select-none"
-        />
-        <span className="ksemo-shimmer-text text-[14.5px] font-medium select-none">
+        <FormatIcon className="size-5 shrink-0 select-none text-muted-foreground" />
+        <span className="text-[13.5px] font-medium select-none text-muted-foreground">
           {creatingPhrase}
         </span>
+        <div
+          aria-hidden="true"
+          className="ksemo-file-status-sweep pointer-events-none absolute inset-0 flex items-center gap-2.5 text-foreground"
+        >
+          <FormatIcon className="size-5 shrink-0 select-none" />
+          <span className="text-[13.5px] font-medium select-none">
+            {creatingPhrase}
+          </span>
+        </div>
       </div>
     );
   }

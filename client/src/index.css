@@ -577,10 +577,10 @@ html.ksemo-reduce-motion .loader-xs {
 /* Continuous Left-to-Right Text Shimmer for live file creation */
 @keyframes ksemo-text-shimmer-ltr {
   0% {
-    background-position: 200% 0;
+    background-position: -200% 0;
   }
   100% {
-    background-position: -200% 0;
+    background-position: 200% 0;
   }
 }
 
@@ -606,6 +606,45 @@ html.ksemo-reduce-motion .ksemo-shimmer-text {
   animation: none;
   -webkit-text-fill-color: currentColor;
   color: currentColor;
+}
+
+@keyframes ksemo-file-status-sweep-ltr {
+  from {
+    -webkit-mask-position: -40% 0;
+    mask-position: -40% 0;
+  }
+  to {
+    -webkit-mask-position: 140% 0;
+    mask-position: 140% 0;
+  }
+}
+
+.ksemo-file-status-sweep {
+  -webkit-mask-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    #000 25%,
+    #000 75%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    #000 25%,
+    #000 75%,
+    transparent 100%
+  );
+  -webkit-mask-size: 40% 100%;
+  mask-size: 40% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  animation: ksemo-file-status-sweep-ltr 2s linear infinite;
+}
+
+html.ksemo-reduce-motion .ksemo-file-status-sweep {
+  animation: none;
+  -webkit-mask-image: none;
+  mask-image: none;
 }
 
 /* Continuous inside rolling/swirling loop for Bot voice orbs */

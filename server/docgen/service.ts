@@ -5,10 +5,11 @@
 // Each stage emits real progress events via the onProgress callback, ensuring
 // the UI reflects actual backend processing — not fake timers.
 
-import { storagePut } from "../storage";
+import { storageDelete, storagePut } from "../storage";
 import {
   attachFileToMessageForUser,
   createFileForUser,
+  deleteFileForUser,
 } from "../supabase-db";
 import { generateDocument, type GeneratedArtifact } from "./generate";
 import type { DocBlock, DocumentSpec, DocFormat, SourceReference } from "./spec";
@@ -24,6 +25,13 @@ import type { Message } from "../_core/llm";
 import { planPresentationOutline, outlineToSlideDefinitions, type OutlineProgressStage } from "./presentation/outline";
 import type { PptOutlinePlan } from "../../shared/presentationOutline";
 import { generatePythonScript } from "./pythonGenerator";
+
+function throwIfAborted(signal?: AbortSignal): void {
+  if (!signal?.aborted) return;
+  const error = new Error("File creation was stopped.");
+  error.name = "AbortError";
+  throw error;
+}
 
 export type GeneratedFileResult = {
   fileId: string;
@@ -114,6 +122,8 @@ export async function runDocumentPipeline(input: {
     presentationStyle,
   } = input;
 
+  throwIfAborted(signal);
+
   // ── Stage 1: Analyzing ────────────────────────────────────────────────
   onProgress({ stage: "analyzing", format, message: "Analyzing prompt & scope" });
   await paceStage(450, signal);
@@ -147,9 +157,11 @@ export async function runDocumentPipeline(input: {
       signal
     );
   } catch (error) {
+    throwIfAborted(signal);
     console.warn("[DocGen] Research failed; continuing without web research:", error);
     research = { needed: false, query: userMessage, sources: [], findings: [], summary: "", sourceCount: 0 };
   }
+  throwIfAborted(signal);
 
   if (research.needed && research.sourceCount > 0) {
     console.log(`[DocGen] Research complete: ${research.sourceCount} sources, ${research.findings.length} findings`);
@@ -204,8 +216,10 @@ export async function runDocumentPipeline(input: {
       slideTarget:
         pptxConfig && pptxConfig.slides !== "auto" ? pptxConfig.slides : undefined,
       visualStyle: lockedStyle,
+      signal,
     }
   );
+  throwIfAborted(signal);
 
   if (plan.kind !== "file") {
     throw new Error("Document planner could not produce a file plan for this request.");
@@ -235,6 +249,7 @@ export async function runDocumentPipeline(input: {
     }));
   }
   await paceStage(450, signal);
+  throwIfAborted(signal);
 
   // Pre-generate Python script so the client can show code immediately
   let earlyPythonCode: string | undefined;
@@ -251,6 +266,7 @@ export async function runDocumentPipeline(input: {
   });
 
   const generated = await generateDocument(spec);
+  throwIfAborted(signal);
   await paceStage(400, signal);
 
   // ── Metrics: real page/sheet/slide/word counts for the artifact → ───────
@@ -267,6 +283,7 @@ export async function runDocumentPipeline(input: {
   // report is included in the result, and only logged here for transparency.
   const qualityReport = validateDocument(spec, generated.buffer);
   await paceStage(350, signal);
+  throwIfAborted(signal);
 
   if (!qualityReport.passed) {
     console.warn(
@@ -284,6 +301,7 @@ export async function runDocumentPipeline(input: {
     generated,
     sources: spec.sources && spec.sources.length > 0 ? spec.sources : undefined,
     metrics,
+    signal,
   });
 
   return {
@@ -454,9 +472,19 @@ export async function generateAndDeliverFile(input: {
   generated?: GeneratedArtifact;
   sources?: Array<{ title: string; url: string; publisher?: string }>;
   metrics?: { pages?: number; sheets?: number; slides?: number; words?: number };
+  signal?: AbortSignal;
 }): Promise<GeneratedFileResult> {
-  const { userId, assistantMessageId, conversationId, spec, generated } = input;
+  const {
+    userId,
+    assistantMessageId,
+    conversationId,
+    spec,
+    generated,
+    signal,
+  } = input;
+  throwIfAborted(signal);
   const artifact = generated ?? (await generateDocument(spec));
+  throwIfAborted(signal);
   const { buffer, filename, mimeType, code } = artifact;
   const sources =
     input.sources ??
@@ -475,6 +503,10 @@ export async function generateAndDeliverFile(input: {
     buffer,
     mimeType
   );
+  if (signal?.aborted) {
+    await storageDelete(saved.key);
+    throwIfAborted(signal);
+  }
 
   // Create the file record (Supabase or inMemoryStore)
   await createFileForUser({
@@ -493,6 +525,11 @@ export async function generateAndDeliverFile(input: {
   }).catch(err => {
     console.warn("[DocGen] file creation warning:", err);
   });
+  if (signal?.aborted) {
+    await deleteFileForUser(fileId, userId).catch(() => false);
+    await storageDelete(saved.key);
+    throwIfAborted(signal);
+  }
 
   try {
     const attached = await attachFileToMessageForUser({
@@ -506,6 +543,11 @@ export async function generateAndDeliverFile(input: {
     }
   } catch (attErr) {
     console.warn("[DocGen] attachFileToMessageForUser error:", attErr);
+  }
+  if (signal?.aborted) {
+    await deleteFileForUser(fileId, userId).catch(() => false);
+    await storageDelete(saved.key);
+    throwIfAborted(signal);
   }
 
   // The assistant's reply is a short natural description of the file. Source
@@ -587,9 +629,11 @@ export async function runPresentationOutline(input: {
       signal
     );
   } catch (error) {
+    throwIfAborted(signal);
     console.warn("[DocGen] Research failed; continuing without web research:", error);
     research = undefined;
   }
+  throwIfAborted(signal);
 
   if (research?.needed && (research.sourceCount ?? 0) > 0) {
     console.log(`[DocGen] Outline research complete: ${research.sourceCount} sources`);
@@ -627,6 +671,7 @@ export async function runPresentationOutline(input: {
       }
     },
   });
+  throwIfAborted(signal);
 
   return outline;
 }
@@ -669,8 +714,11 @@ export async function runPresentationFromOutline(input: {
 }): Promise<GeneratedFileResult> {
   const { userId, assistantMessageId, conversationId, outline, onProgress, signal } = input;
 
+  throwIfAborted(signal);
+
   onProgress({ stage: "designing", format: "pptx", message: "Formatting layout & typography" });
   await paceStage(450, signal);
+  throwIfAborted(signal);
 
   const slideDefinitions = outlineToSlideDefinitions(outline.slides, outline.title);
   const spec: DocumentSpec = {
@@ -697,6 +745,7 @@ export async function runPresentationFromOutline(input: {
     code: earlyPptPythonCode,
   });
   const generated = await generateDocument(spec);
+  throwIfAborted(signal);
   await paceStage(400, signal);
 
   const metrics = { slides: slideDefinitions.length };
@@ -704,6 +753,7 @@ export async function runPresentationFromOutline(input: {
   onProgress({ stage: "validating", format: "pptx", message: "Validating deck integrity" });
   const qualityReport = validateDocument(spec, generated.buffer);
   await paceStage(350, signal);
+  throwIfAborted(signal);
 
   if (!qualityReport.passed) {
     console.warn("[DocGen] Presentation quality check found issues:", qualityReport.issues);
@@ -717,6 +767,7 @@ export async function runPresentationFromOutline(input: {
     summary: outline.summary,
     generated,
     metrics,
+    signal,
   });
 
   return {

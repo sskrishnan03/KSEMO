@@ -402,7 +402,7 @@ export async function planDocument(
   history: Message[],
   forcedFormat?: Extract<DocumentPlan, { kind: "file" }>["format"] | null,
   research?: ResearchResult,
-  opts?: { slideTarget?: number; visualStyle?: string }
+  opts?: { slideTarget?: number; visualStyle?: string; signal?: AbortSignal }
 ): Promise<DocumentPlan> {
   const forced = normalizeFormat(forcedFormat);
 
@@ -461,6 +461,7 @@ Produce substantive, authentic slides reflecting this design archetype. If "AUTO
         ],
         responseFormat: { type: "json_object" },
         maxTokens: 16000,
+        signal: opts?.signal,
       });
 
       const raw = result.choices?.[0]?.message?.content;
@@ -475,6 +476,7 @@ Produce substantive, authentic slides reflecting this design archetype. If "AUTO
 
       return synthesizeFallbackPlan(userMessage, forced, text, research, history);
     } catch (error) {
+      if (opts?.signal?.aborted) throw error;
       console.warn(`[DocGen] planning call with forced ${forced} failed; synthesizing document.`, error);
       return synthesizeFallbackPlan(userMessage, forced, undefined, research, history);
     }
@@ -497,6 +499,7 @@ Produce substantive, authentic slides reflecting this design archetype. If "AUTO
       ],
       responseFormat: { type: "json_object" },
       maxTokens: 16000,
+      signal: opts?.signal,
     });
     const raw = result.choices?.[0]?.message?.content;
     const text = Array.isArray(raw)
@@ -510,6 +513,7 @@ Produce substantive, authentic slides reflecting this design archetype. If "AUTO
     if (!format) return { kind: "none" };
     return buildPlanFromParsed(parsed, format, userMessage, research, history);
   } catch (error) {
+    if (opts?.signal?.aborted) throw error;
     console.warn("[DocGen] planning call failed; no file generated.", error);
     return { kind: "none" };
   }
