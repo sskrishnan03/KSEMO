@@ -28,6 +28,7 @@ import type {
   DocProcessFlow,
   DocQuote,
   DocStatGrid,
+  DocFormat,
   DocumentSpec,
   DocumentTheme,
   SheetCell,
@@ -1518,8 +1519,11 @@ export async function generatePdf(spec: DocumentSpec): Promise<Buffer> {
         break;
       }
       case "pageBreak": {
-        page = pdfDoc.addPage([pageWidth, pageHeight]);
-        y = pageHeight - margin;
+        // A redundant break at the top of a page must not create a blank page.
+        if (y < pageHeight - margin - 1) {
+          page = pdfDoc.addPage([pageWidth, pageHeight]);
+          y = pageHeight - margin;
+        }
         break;
       }
       default:
@@ -1643,6 +1647,14 @@ export type GeneratedArtifact = {
   code?: string;
 };
 
+function hasExpectedFileHeader(format: DocFormat, buffer: Buffer): boolean {
+  if (format === "pdf") return buffer.slice(0, 8).toString("ascii").startsWith("%PDF");
+  if (format === "docx" || format === "xlsx" || format === "pptx") {
+    return buffer[0] === 0x50 && buffer[1] === 0x4b;
+  }
+  return buffer.length > 0;
+}
+
 export async function generateDocument(spec: DocumentSpec): Promise<GeneratedArtifact> {
   const filename = sanitizeFilename(spec.format, spec.filename);
   const mimeTypes: Record<string, string> = {
@@ -1656,7 +1668,9 @@ export async function generateDocument(spec: DocumentSpec): Promise<GeneratedArt
   // Step 1: Generate clean, production Python code for this document
   let pythonCode: string | undefined;
   try {
-    pythonCode = generatePythonScript(spec);
+    // References and summaries are already represented in normalized content.
+    // Keep Python and JavaScript renderers from duplicating those sections.
+    pythonCode = generatePythonScript({ ...spec, sources: undefined, summary: undefined });
   } catch (err) {
     console.warn(`[DocGen] Failed to generate Python script for ${spec.format}:`, err);
   }
@@ -1667,8 +1681,12 @@ export async function generateDocument(spec: DocumentSpec): Promise<GeneratedArt
     try {
       const execResult = await executePythonCode(pythonCode, filename);
       if (execResult.success && execResult.fileBuffer && execResult.fileBuffer.length > 0) {
-        buffer = execResult.fileBuffer;
-        console.log(`[DocGen] Successfully generated ${spec.format} (${filename}) via Python (${buffer.length} bytes)`);
+        if (hasExpectedFileHeader(spec.format, execResult.fileBuffer)) {
+          buffer = execResult.fileBuffer;
+          console.log(`[DocGen] Successfully generated ${spec.format} (${filename}) via Python (${buffer.length} bytes)`);
+        } else {
+          console.warn(`[DocGen] Python output did not have a valid ${spec.format} signature; trying the native renderer.`);
+        }
       } else {
         console.warn(`[DocGen] Python execution completed with issue: ${execResult.error || execResult.stderr}`);
       }
@@ -1697,13 +1715,19 @@ export async function generateDocument(spec: DocumentSpec): Promise<GeneratedArt
           buffer = generateTxt(spec);
           break;
         default:
-          buffer = generateTxt(spec);
-          break;
+          throw new Error(`Unsupported document format: ${spec.format}`);
       }
     } catch (genError) {
-      console.warn(`[DocGen] Specific generator for ${spec.format} encountered an issue; falling back to clean text compilation.`, genError);
-      buffer = generateTxt(spec);
+      console.error(`[DocGen] Native ${spec.format} generation failed.`, genError);
+      throw new Error(`KSEMO could not create a valid ${spec.format.toUpperCase()} file. Please try again.`);
     }
+  }
+
+  if (!buffer) {
+    throw new Error(`KSEMO could not create a valid ${spec.format.toUpperCase()} file. Please try again.`);
+  }
+  if (!hasExpectedFileHeader(spec.format, buffer)) {
+    throw new Error(`KSEMO could not create a valid ${spec.format.toUpperCase()} file. Please try again.`);
   }
 
   return {

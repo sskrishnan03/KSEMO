@@ -49,6 +49,10 @@ const MAX_SEARCH_RESULTS = 8;
 const MAX_FETCH_URLS = 4;
 const MAX_EXTRACT_CHARS = 3_000;
 
+export function requiresCurrentDataResearch(userMessage: string): boolean {
+  return /\b(latest|current|currently|right now|real[ -]?time|up[ -]?to[ -]?date|today|this week|this month|this year|as of \d{4}|recent(?:ly)?|newest|most recent)\b/i.test(userMessage);
+}
+
 /**
  * Performs a web search using DuckDuckGo HTML endpoint and extracts
  * result links, titles, and snippets from the response.
@@ -270,7 +274,10 @@ async function analyzeResearchNeeds(
   format: string,
   signal?: AbortSignal
 ): Promise<SearchPlan> {
+  const explicitCurrentDataRequest = requiresCurrentDataResearch(userMessage);
+  const currentDate = new Date().toISOString().slice(0, 10);
   const systemPrompt = `You are a research strategy analyst for a document generation system.
+Today's date is ${currentDate}. Treat requests for current or recent information as requiring web research.
 Analyze the user's document request and determine:
 
 1. Does this document need current, factual, historical, statistical, technical, scientific, financial, political, or otherwise externally verifiable information that would benefit from web research?
@@ -312,7 +319,7 @@ Rules for search queries:
       model: DEFAULT_LLM_MODEL,
       messages: [
         { role: "system", content: systemPrompt },
-        ...history.slice(-4),
+        ...history,
         {
           role: "user",
           content: `Document format: ${format}\nUser request: ${userMessage.slice(0, 600)}`,
@@ -333,9 +340,11 @@ Rules for search queries:
         ? parsed.searchQueries.map(String).slice(0, 5)
         : [];
       return {
-        needsResearch: parsed.needsResearch,
+        needsResearch: parsed.needsResearch || explicitCurrentDataRequest,
         reason: String(parsed.reason || ""),
-        searchQueries: queries,
+        searchQueries: explicitCurrentDataRequest && queries.length === 0
+          ? [userMessage.slice(0, 180)]
+          : queries,
         complexity: ["simple", "moderate", "complex"].includes(complexity)
           ? (complexity as "simple" | "moderate" | "complex")
           : "moderate",
@@ -343,6 +352,15 @@ Rules for search queries:
     }
   } catch (error) {
     console.warn("[Research] analysis call failed:", error);
+  }
+
+  if (explicitCurrentDataRequest) {
+    return {
+      needsResearch: true,
+      reason: "The user explicitly asked for current information.",
+      searchQueries: [userMessage.slice(0, 180)],
+      complexity: "moderate",
+    };
   }
 
   return { needsResearch: false, reason: "", searchQueries: [], complexity: "simple" };
@@ -564,7 +582,12 @@ export async function performResearch(
 
   if (allResults.length === 0) {
     console.log("[Research] No search results found.");
-    return emptyResult;
+    return {
+      ...emptyResult,
+      needed: true,
+      query: analysis.searchQueries[0] || userMessage,
+      summary: "Research was required, but no usable web results were found.",
+    };
   }
 
   console.log(`[Research] Found ${allResults.length} search results.`);

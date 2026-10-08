@@ -617,6 +617,7 @@ export function registerChatStream(app: Express) {
         const systemInstruction = [
           BASE_SYSTEM_INSTRUCTION,
           UNIVERSAL_RESPONSE_INSTRUCTION,
+          "Current-turn priority: treat the final user message in this conversation as the request to answer now. Use earlier turns only to resolve references, carry forward relevant facts, or follow an explicit request to continue. If the user changes topic, answer the new topic. Do not repeat an earlier answer unless asked.",
           `The current date and time is: ${currentTimeString}.${timeZoneNote} Use this to answer questions about time, dates, and scheduling. You may be asked about mathematical equations, code analysis, general reasoning, and anything else — always attempt to answer helpfully.`,
           personaInstruction,
           preferences?.customInstructions?.trim(),

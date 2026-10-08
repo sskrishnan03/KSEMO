@@ -31,13 +31,13 @@ import {
   DEFAULT_PRESENTATION_CONFIG,
   PPT_CONCRETE_STYLES,
   normalizeStyleId,
-  type PresentationConfig,
   type PptVisualStyle,
   type PptSlidesConfig,
 } from "../../../shared/presentation";
 import { pickAutoTheme } from "../../../shared/pptThemes";
 import { sanitizePresentationConfig } from "./config";
 import type { SlideDefinition } from "../spec";
+import { compactDocumentHistory } from "../plan";
 
 // ---------------------------------------------------------------------------
 // Output schema fed to the LLM for strict JSON extraction
@@ -323,7 +323,7 @@ function coerceRawSlide(raw: Record<string, unknown>): PptOutlineSlide {
         ? raw.id
         : createSlideId(),
     type: coerceSlideType(raw.type),
-    title: coerceString(raw.title, "Untitled slide"),
+    title: coerceString(raw.title, ""),
     subtitle: raw.subtitle ? String(raw.subtitle) : undefined,
     purpose: raw.purpose ? String(raw.purpose) : undefined,
     bullets: coerceBullets(raw.bullets),
@@ -341,12 +341,14 @@ function coerceRawSlide(raw: Record<string, unknown>): PptOutlineSlide {
 function coerceRawOutline(raw: Record<string, unknown>): PptOutlinePlan | null {
   const slides = Array.isArray(raw.slides) ? raw.slides : [];
   if (slides.length < 2) return null;
+  const title = coerceString(raw.title, "");
+  if (!title) return null;
 
   const config = sanitizePresentationConfig(raw.config ?? {});
 
   return {
     version: 1,
-    title: coerceString(raw.title, "Presentation"),
+    title,
     filename: coerceString(raw.filename, "presentation"),
     analysis: coerceAnalysis(raw.analysis) ?? {
       topic: "",
@@ -417,15 +419,15 @@ function resolveSlideCount(
   const match = userPrompt.toLowerCase().match(/\b(\d{1,2})\s*-?\s*slides?\b/);
   if (match) {
     const n = parseInt(match[1], 10);
-    if (n >= 3 && n <= 25) return n;
+    if (n >= 2 && n <= 25) return n;
   }
 
   // Slides-mentioning words indicate desire for more substance
   if (/\bextensive|detailed|comprehensive|in-depth\b/i.test(userPrompt))
-    return 12;
+    return 8;
 
-  // Default heuristic
-  return 8;
+  // Keep the default deck focused; explicit or substantial requests can grow it.
+  return 5;
 }
 
 // ---------------------------------------------------------------------------
@@ -435,21 +437,21 @@ function resolveSlideCount(
 const STYLE_GUIDE = `
 You MUST honour the selected visual style in your content decisions, NOT just backgrounds. Style affects tone, vocabulary, data density, slide layouts chosen, and bullet word count:
 - Minimal: ≤3 short bullets per slide (under 8 words each); high signal; generous whitespace.
-- Modern: clean, forward-looking; 3-4 crisp bullets; metric highlights.
-- Corporate: executive tone; scorecards, benchmarks, ROI framing; 3-5 bullets.
+- Modern: clean, forward-looking; 3-4 crisp bullets; use metrics only when supplied or sourced.
+- Corporate: executive tone; scorecards and ROI framing only when supported by actual data; 3-5 bullets.
 - Editorial: rich analysis; 3-5 detailed bullets; magazine-style storytelling.
-- Bold: dramatic headlines; fewer bullets (2-4), high-impact numbers.
+- Bold: dramatic headlines; fewer bullets (2-4); use high-impact numbers only when verified.
 - Elegant: refined language; restrained bullet count (2-4); polished framing.
 - Creative: energetic, expressive; 3-4 vivid bullets; playful metaphors.
-- Dark: dramatic high-contrast; striking statistics; confident declarations.
+- Dark: dramatic high-contrast; use striking statistics only when supported.
 - Light: accessible, friendly; clear simple structure; 3-4 approachable bullets.
 - Glass: layered concepts; modern tech-leaning; 3-4 concise bullets.
 - Academic: rigorous, citation-ready; formal definitions; 3-5 analytical bullets.
-- Technical: precise terminology; architecture blocks; metrics-driven; 3-5 bullets.
+- Technical: precise terminology; architecture blocks; use metrics only when available; 3-5 bullets.
 - Luxury: prestigious, understated; refined statistics; 2-4 premium bullets.
-- Startup: product-led; traction metrics; 3-4 crisp value proposition bullets.
+- Startup: product-led; use traction metrics only when supported; 3-4 crisp value proposition bullets.
 - Magazine: feature-article tone; bold pull-quotes; 3-4 vivid details.
-- Data: every claim backed by metrics; 3-5 quantified bullets.
+- Data: use verified metrics when available; never invent figures to quantify a claim.
 - Presentation: all-purpose professional; clear structure; 3-4 adaptable bullets.
 
 When the style is "auto", pick the archetype that best fits the topic and audience, then state it in styleName.
@@ -465,28 +467,27 @@ function buildOutlineSystemPrompt(
 TASK
 1. Analyse the user's topic to determine its type, audience, complexity, goal, and required visual richness.
 2. Pick the best visual style: ${styleName === "auto" ? "choose the most appropriate from the 17 concrete styles" : `use "${styleLower}" authoritatively`}.
-3. Structure a coherent narrative across exactly ${slideCount} content slides that tells a complete story. Avoid random or padded slides.
+3. Structure a coherent narrative across exactly ${slideCount} slides. Include only slides that advance the user's requested goal; avoid padding.
 
 NARRATIVE ARC (apply to every deck):
 Slide 1 — Title slide (hero): bold title + subtitle framing the topic.
-Slide 2 — Agenda / Overview: give the audience a clear map of the deck.
-Slides 3..N-1 — Content body: variety of types (content, stats, process, comparison, timeline, chart, quote, key_message, section, agenda). No two consecutive slides may share the same type. NEVER use "title" or "agenda" or "closing" in the content body.
-Slide N — Closing slide (closing): key takeaways, next steps, or call to action.
-
+Use an agenda only when it helps the audience navigate a substantial deck; otherwise begin with the first substantive point.
+Middle slides: use only the layouts needed to answer the request. Vary layouts when it improves understanding, not for variety alone.
+Final slide: provide a useful conclusion or next step when appropriate; do not add a generic closing slide to a short factual deck.
 SLIDE TYPE RULES
 - type "title": exactly 1, always slide 1. subtitle required.
-- type "agenda": exactly 1, always slide 2. bullets are section labels.
-- type "closing": exactly 1, always the last slide. bullets list takeaways.
+- type "agenda": optional; include only when useful, with section labels.
+- type "closing": use only when a distinct takeaway or next step helps the audience.
 - type "content": bullets is the primary content carrier (2-5 bullets).
-- type "stats": metrics array required (2-4 metrics: value + label + change).
+- type "stats": use only when the user or verified sources provide 2-4 real metrics. Never invent values, trends, or changes.
 - type "process": steps array required (3-5 steps: step number + title + description).
 - type "timeline": steps array required (3-5 entries, chronological).
 - type "comparison": columns (2 columns with bullets each) OR bullets used as row descriptions.
-- type "chart": chart array required (3-6 data points: label + numeric value).
+- type "chart": use only with user-provided or verified numeric data; never manufacture data points.
 - type "quote": quote.text required; quote.author optional.
 - type "key_message": keyMessage.statement required; keyMessage.context optional.
 - type "section": a divider slide — brief subtitle as purpose.
-NO slide may have an empty bullets array. Every slide must have at least 1 bullet or structured data (metrics/steps/chart/quote/keyMessage).
+Every content slide must contain relevant bullets or supported structured data. The title slide may omit bullets. If evidence is unavailable, use qualitative content instead of made-up metrics.
 
 CONTENT DENSITY
 - bullets: max 12 words per bullet; max 5 bullets per slide.
@@ -495,7 +496,7 @@ CONTENT DENSITY
 - Keep ALL text SHORT so the professional layout engine can render it at large, readable font sizes (title 32-44pt, body 18-24pt).
 
 SLIDE COUNT
-You MUST produce exactly ${slideCount} slides including the title and closing.
+Produce exactly ${slideCount} slides, including a title slide. Do not force an agenda or closing slide when the deck is short; use that space for substantive content.
 
 OUTPUT
 Return a single JSON object with no markdown fences. Keys:
@@ -515,7 +516,8 @@ ${STYLE_GUIDE}
 CRITICAL PROHIBITIONS:
 - NEVER write page numbers, slide numbers, "Slide N", "Page N", or the file name inside any slide text.
 - NEVER use filler or placeholder text. Every bullet must contain real, substantive content grounded in the user's topic.
-- NEVER make title-only slides (every slide has bullets or structured data).
+- Make content slides substantive. A title slide may contain only its title and subtitle.
+- Use metrics and charts only when supplied by the user or supported by research. Do not invent statistics, examples, quotes, sources, or outcomes.
 `;
 }
 
@@ -528,14 +530,14 @@ function buildUserPrompt(
   const researchBlock = researchContext
     ? `\n\nRESEARCH FINDINGS:\n${researchContext}`
     : "";
-  return `User request:\n"${userMessage.slice(0, 4000)}"${researchContext}
+  return `The final user message below is the request to fulfill now. Use earlier conversation only when it clarifies a reference or provides relevant facts; do not repeat an earlier answer by default.\n\nUser request:\n"${userMessage.slice(0, 4000)}"
 
 Deck requirements:
 - slideCount: ${slideCount}
 - styleName: "${selectedStyle}"
 ${researchBlock}
 
-Produce the complete JSON outline now. You MUST return exactly ${slideCount} slides, following all rules above.`;
+Produce the complete JSON outline now. Return exactly ${slideCount} slides, following all rules above.`;
 }
 
 // ---------------------------------------------------------------------------
@@ -572,6 +574,7 @@ export async function planPresentationOutline(input: {
     signal,
     researchContext,
   } = input;
+  const planningHistory = compactDocumentHistory(history);
 
   // ── Resolve config & style ────────────────────────────────────────────
   onProgress?.("analyzing");
@@ -613,7 +616,7 @@ export async function planPresentationOutline(input: {
       model: DEFAULT_LLM_MODEL,
       messages: [
         { role: "system", content: systemPrompt },
-        ...history.slice(-6).map(m => ({
+        ...planningHistory.map(m => ({
           role: m.role as "user" | "assistant" | "system",
           content: m.content,
         })),
@@ -636,22 +639,32 @@ export async function planPresentationOutline(input: {
     const parsed = parseJsonFromText(text);
     if (parsed) {
       const outline = coerceSlidesResult(parsed);
-      if (outline && outline.slides.length >= 2) {
+      const completeOutline = outline &&
+        outline.slides.length === slideCount &&
+        outline.slides.every(slide =>
+          Boolean(slide.title.trim()) &&
+          (slide.type === "title" ||
+            slide.bullets.length > 0 ||
+            Boolean(slide.metrics?.length) ||
+            Boolean(slide.steps?.length) ||
+            Boolean(slide.columns?.length) ||
+            Boolean(slide.quote?.text) ||
+            Boolean(slide.keyMessage?.statement) ||
+            Boolean(slide.chart?.length))
+        );
+      if (outline && completeOutline) {
         onProgress?.("content_generated");
         return outline;
       }
     }
   } catch (error) {
-    console.warn("[PPT Outline] LLM call failed; using synthesis fallback.", error);
+    if (signal?.aborted) throw error;
+    console.error("[PPT Outline] Could not produce a reliable presentation outline.", error);
+    throw new Error("I couldn't create a reliable presentation outline. Please try again.");
   }
 
   // ── Synthesis fallback ────────────────────────────────────────────────
-  return synthesizeFallbackOutline(
-    userMessage,
-    resolvedStyleName,
-    slideCount,
-    config
-  );
+  throw new Error("The planner returned an incomplete presentation outline. Please try again.");
 }
 
 /**
@@ -897,172 +910,3 @@ export function coerceOutlineFromMetadata(
 }
 
 // ---------------------------------------------------------------------------
-// Fallback outline synthesiser (never returns empty)
-// ---------------------------------------------------------------------------
-
-function synthesizeFallbackOutline(
-  userMessage: string,
-  styleName: PptVisualStyle,
-  slideCount: number,
-  config: PresentationConfig
-): PptOutlinePlan {
-  const topicClean = userMessage
-    .replace(
-      /\b(presentation|pptx|powerpoint|slides|create|generate|make)\b/gi,
-      ""
-    )
-    .trim()
-    .slice(0, 100);
-  const title = topicClean
-    ? topicClean.charAt(0).toUpperCase() + topicClean.slice(1)
-    : "Presentation";
-  const filename = title
-    .replace(/[^a-zA-Z0-9 _-]/g, "")
-    .trim()
-    .split(/\s+/)
-    .slice(0, 5)
-    .join("_")
-    .toLowerCase();
-  const actualSlideCount = Math.max(3, Math.min(25, slideCount));
-
-  const bodySlides: PptOutlineSlide[] = [];
-  const bodyTypes: PptSlideType[] = [
-    "content",
-    "stats",
-    "process",
-    "content",
-    "comparison",
-    "chart",
-    "key_message",
-    "content",
-    "quote",
-    "content",
-    "timeline",
-    "content",
-    "stats",
-    "content",
-    "content",
-  ];
-
-  const usedTypes = new Set<string>(["title", "agenda", "closing"]);
-
-  for (let i = 0; i < actualSlideCount - 2; i++) {
-    let type =
-      bodyTypes[i % bodyTypes.length] ?? "content";
-    // Avoid repeats
-    let attempts = 0;
-    while (usedTypes.has(type) && attempts < bodyTypes.length) {
-      type = bodyTypes[(i + attempts + 1) % bodyTypes.length] ?? "content";
-      attempts++;
-    }
-    usedTypes.add(type);
-
-    const slide: PptOutlineSlide = {
-      id: createSlideId(),
-      type,
-      title: `Slide ${i + 2} — ${type.charAt(0).toUpperCase() + type.slice(1)}`,
-      bullets: [
-        `Key point ${i * 2 + 1} for this section`,
-        `Supporting evidence for point ${i * 2 + 1}`,
-      ],
-    };
-
-    if (type === "stats") {
-      slide.metrics = [
-        { value: "78%", label: "Primary metric", change: "+12%" },
-        { value: "3.2x", label: "Growth rate", change: "year over year" },
-      ];
-      slide.bullets = [];
-    }
-    if (type === "process") {
-      slide.steps = [
-        { step: 1, title: "Step 1", description: "Initial action" },
-        { step: 2, title: "Step 2", description: "Follow-up action" },
-        { step: 3, title: "Step 3", description: "Final action" },
-      ];
-      slide.bullets = [];
-    }
-    if (type === "chart") {
-      slide.chart = [
-        { label: "Q1", value: 42 },
-        { label: "Q2", value: 58 },
-        { label: "Q3", value: 71 },
-        { label: "Q4", value: 85 },
-      ];
-      slide.bullets = [];
-    }
-    if (type === "quote") {
-      slide.quote = {
-        text: "A meaningful observation about this topic.",
-        author: "Expert",
-      };
-      slide.bullets = [];
-    }
-    if (type === "key_message") {
-      slide.keyMessage = {
-        statement: `The core takeaway from ${title}.`,
-        context: "Derived from comprehensive analysis.",
-      };
-      slide.bullets = [];
-    }
-    if (type === "comparison") {
-      slide.columns = [
-        { title: "Option A", bullets: ["Feature 1", "Feature 2"] },
-        { title: "Option B", bullets: ["Feature 3", "Feature 4"] },
-      ];
-      slide.bullets = [];
-    }
-
-    bodySlides.push(slide);
-  }
-
-  const outline: PptOutlinePlan = {
-    version: 1,
-    title,
-    filename: filename || "presentation",
-    analysis: {
-      topic: title,
-      contentType: "concept",
-      audience: "general audience",
-      complexity: "moderate",
-      goal: "inform",
-      visualNeed: "rich",
-      styleRationale: `Fallback: using ${styleName} as the selected style.`,
-    },
-    slideCount: actualSlideCount,
-    styleName,
-    config,
-    summary: `I prepared a ${actualSlideCount}-slide presentation outline on "${title}". Review and edit the slides below, then click "Generate presentation" when ready.`,
-    slides: [
-      {
-        id: createSlideId(),
-        type: "title",
-        title,
-        subtitle: "Presentation outline",
-        purpose: "Open the deck with a clear, bold title",
-        bullets: [],
-      },
-      {
-        id: createSlideId(),
-        type: "agenda",
-        title: "Agenda",
-        purpose: "Give the audience a clear map",
-        bullets: bodySlides.slice(0, 5).map(s => s.title),
-      },
-      ...bodySlides,
-      {
-        id: createSlideId(),
-        type: "closing",
-        title: "Summary & Next Steps",
-        purpose: "Close with clear takeaways and next actions",
-        bullets: [
-          "Recap the core insights",
-          "Outline the immediate next steps",
-          "Invite questions or discussion",
-        ],
-      },
-    ],
-  };
-
-  return outline;
-}

@@ -18,8 +18,8 @@ import { pickAutoTheme } from "@shared/pptThemes";
 import { sanitizePresentationConfig, sanitizeStyleName } from "./presentation/config";
 import { sanitizeFilename, FORMAT_MIME, coerceBlocks, coerceSheets, coerceSlides } from "./spec";
 import type { DocumentPlan } from "./plan";
-import { planDocument } from "./plan";
-import { performResearch, type ResearchResult } from "./research";
+import { compactDocumentHistory, planDocument } from "./plan";
+import { performResearch, requiresCurrentDataResearch, type ResearchResult } from "./research";
 import { validateDocument, type QualityReport } from "./quality";
 import type { Message } from "../_core/llm";
 import { planPresentationOutline, outlineToSlideDefinitions, type OutlineProgressStage } from "./presentation/outline";
@@ -130,6 +130,7 @@ export async function runDocumentPipeline(input: {
 
   // ── Stage 2: Planning & Research ──────────────────────────────────────
   let research: ResearchResult | undefined;
+  const planningHistory = compactDocumentHistory(history);
 
   onProgress({ stage: "planning", format, message: "Planning document architecture" });
   await paceStage(350, signal);
@@ -137,7 +138,7 @@ export async function runDocumentPipeline(input: {
   try {
     research = await performResearch(
       userMessage,
-      history,
+      planningHistory,
       format,
       (researchStage) => {
         switch (researchStage) {
@@ -159,7 +160,14 @@ export async function runDocumentPipeline(input: {
   } catch (error) {
     throwIfAborted(signal);
     console.warn("[DocGen] Research failed; continuing without web research:", error);
-    research = { needed: false, query: userMessage, sources: [], findings: [], summary: "", sourceCount: 0 };
+    research = {
+      needed: requiresCurrentDataResearch(userMessage),
+      query: userMessage,
+      sources: [],
+      findings: [],
+      summary: "Research could not be completed.",
+      sourceCount: 0,
+    };
   }
   throwIfAborted(signal);
 
@@ -176,10 +184,6 @@ export async function runDocumentPipeline(input: {
     researchSourceCount: research?.sourceCount,
     researchFindingCount: research?.findings.length,
   });
-
-  const plannerHistory = history
-    .filter(msg => msg.role === "user" || msg.role === "assistant")
-    .slice(-8);
 
   // Sanitize the user's PowerPoint preferences once at the pipeline boundary.
   // Every pptx goes through the canonical engine, so when no config was sent
@@ -209,7 +213,7 @@ export async function runDocumentPipeline(input: {
 
   const plan = await planDocument(
     userMessage,
-    plannerHistory,
+    planningHistory,
     format,
     research,
     {
@@ -254,7 +258,7 @@ export async function runDocumentPipeline(input: {
   // Pre-generate Python script so the client can show code immediately
   let earlyPythonCode: string | undefined;
   try {
-    earlyPythonCode = generatePythonScript(spec);
+    earlyPythonCode = generatePythonScript({ ...spec, sources: undefined, summary: undefined });
   } catch {}
 
   // ── Stage 5: File Generation ─────────────────────────────────────────
@@ -413,7 +417,16 @@ export function buildDocumentSpec(plan: Extract<DocumentPlan, { kind: "file" }>)
     const slides = coerceSlides(plan.content.slides);
     if (slides.length) spec.slides = slides;
   } else {
-    const blocks = coerceBlocks(plan.content.blocks);
+    const blocks = coerceBlocks(plan.content.blocks).filter(
+      block => block.type !== "pageBreak"
+    );
+    if (
+      blocks[0]?.type === "heading" &&
+      blocks[0].level === 1 &&
+      blocks[0].text.trim().toLocaleLowerCase() === title.toLocaleLowerCase()
+    ) {
+      blocks.shift();
+    }
     spec.blocks = blocks.length ? blocks : [{ type: "paragraph", text: plan.title || "" }];
   }
   // Carry over source references from the plan
@@ -441,7 +454,6 @@ export function buildDocumentSpec(plan: Extract<DocumentPlan, { kind: "file" }>)
       ];
     } else {
       const refBlocks: DocBlock[] = [
-        { type: "pageBreak" },
         { type: "heading", level: 2, text: "References" },
         ...plan.sources.map(
           source =>
@@ -606,10 +618,11 @@ export async function runPresentationOutline(input: {
   // Ground the outline in fresh research when useful (same research stage as the
   // one-shot pipeline, surfaced through identical progress events).
   let research: ResearchResult | undefined;
+  const planningHistory = compactDocumentHistory(history);
   try {
     research = await performResearch(
       userMessage,
-      history,
+      planningHistory,
       "pptx",
       researchStage => {
         switch (researchStage) {
@@ -631,7 +644,16 @@ export async function runPresentationOutline(input: {
   } catch (error) {
     throwIfAborted(signal);
     console.warn("[DocGen] Research failed; continuing without web research:", error);
-    research = undefined;
+    research = requiresCurrentDataResearch(userMessage)
+      ? {
+          needed: true,
+          query: userMessage,
+          sources: [],
+          findings: [],
+          summary: "Research could not be completed.",
+          sourceCount: 0,
+        }
+      : undefined;
   }
   throwIfAborted(signal);
 
@@ -654,7 +676,7 @@ export async function runPresentationOutline(input: {
 
   const outline = await planPresentationOutline({
     userMessage,
-    history,
+    history: planningHistory,
     presentationConfig,
     presentationStyle,
     researchContext,
@@ -677,6 +699,10 @@ export async function runPresentationOutline(input: {
 }
 
 function buildResearchContextText(research: ResearchResult): string {
+  if (!research.findings.length) {
+    return "Current or externally verifiable information was requested, but research returned no verified findings. Do not invent facts or claim that information is current; briefly state this limitation if it affects the answer.";
+  }
+
   const findingsText = research.findings
     .map(
       (f, i) =>
@@ -735,7 +761,7 @@ export async function runPresentationFromOutline(input: {
 
   let earlyPptPythonCode: string | undefined;
   try {
-    earlyPptPythonCode = generatePythonScript(spec);
+    earlyPptPythonCode = generatePythonScript({ ...spec, sources: undefined, summary: undefined });
   } catch {}
 
   onProgress({

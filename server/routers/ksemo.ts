@@ -698,7 +698,6 @@ export const fileGenerationRouter = router({
         history = conversationMessages
           .filter(m => m.role === "user" || m.role === "assistant")
           .filter(m => m.content.trim().length > 0)
-          .slice(-8)
           .map(m => ({
             role: m.role === "assistant" ? "assistant" as const : "user" as const,
             content: m.content,
