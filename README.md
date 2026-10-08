@@ -167,9 +167,6 @@ The application architecture and user journey are organized across five core int
 
 - In the Library, choose **Import from cloud**, connect Google Drive or OneDrive, search your files, and import individual supported documents (up to 25 MB) into KSEMO's private Library.
 - The integration requests read-only access. Imports are user-selected copies; disconnecting removes the saved OAuth grant.
-- Configure `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` (or the existing `VITE_GOOGLE_CLIENT_ID` / `VITE_GOOGLE_CLIENT_SECRET` pair) and register `https://<your-host>/api/cloud/google/callback` in the Google OAuth client. Enable the Google Drive API.
-- Configure `MICROSOFT_CLIENT_ID` and `MICROSOFT_CLIENT_SECRET` and register `https://<your-host>/api/cloud/microsoft/callback` as a Web redirect URI. Add delegated `Files.Read`, `User.Read`, and `offline_access` permissions.
-- Apply `supabase-schema/09-cloud-integrations.sql` to existing databases, or use the consolidated `supabase-schema/schema.sql` for a new database. Keep `JWT_SECRET` stable across deployments because it encrypts stored OAuth tokens.
 
 ## Architecture & Tech Stack
 
