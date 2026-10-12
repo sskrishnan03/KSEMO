@@ -4363,7 +4363,6 @@ export default function Home() {
       isGenerating={isGenerating}
       isRecording={voice.state === "recording"}
       isTranscribing={voice.state === "transcribing"}
-      recordingSeconds={voice.seconds}
       audioBars={voice.audioBars}
       audioLevel={voice.audioLevel}
       value={composerValue}

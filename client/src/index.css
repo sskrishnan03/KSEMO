@@ -661,7 +661,7 @@ html.ksemo-reduce-motion .ksemo-file-status-sweep {
   animation: ksemo-orb-roll 3s linear infinite;
 }
 
-/* A small, continuously moving five-bar waveform for the idle voice-chat
+/* A calm six-bar waveform that travels left to right on the idle voice-chat
    button, so the voice action reads as live audio instead of a static icon. */
 @keyframes ksemo-voice-ready-wave {
   0%,

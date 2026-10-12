@@ -122,54 +122,53 @@ function storeTag(tag: ComposerTag) {
 }
 
 export const DictateRecordingPill = memo(function DictateRecordingPill({
-  recordingSeconds,
-  audioBars,
   audioLevel = 0,
   onStop,
   onTranscribe,
 }: {
-  recordingSeconds: number;
-  audioBars?: number[];
   audioLevel?: number;
   onStop: () => void;
   onTranscribe: () => void;
 }) {
-  const bars =
-    audioBars && audioBars.length > 0
-      ? audioBars
-      : [
-          0.15, 0.35, 0.65, 0.85, 0.45, 0.95, 0.75, 0.35, 0.85, 0.55, 0.25,
-          0.45,
-        ];
+  const [waveHistory, setWaveHistory] = useState<number[]>(() =>
+    Array.from({ length: 32 }, () => 0)
+  );
+  const latestAudioLevelRef = useRef(audioLevel);
+  latestAudioLevelRef.current = audioLevel;
 
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      const level = latestAudioLevelRef.current;
+      setWaveHistory(current =>
+        level < 0.035
+          ? current.map(() => 0)
+          : [...current.slice(1), level]
+      );
+    }, 65);
+    return () => window.clearInterval(timer);
+  }, []);
   return (
     <div
-      className="flex min-w-0 items-center justify-between gap-1 overflow-hidden rounded-full border border-border bg-muted/80 backdrop-blur-xs px-2 py-1 shadow-sm animate-in fade-in zoom-in-95 duration-150 sm:min-w-[220px] sm:gap-2 sm:px-3 sm:py-1.5"
+      className="flex h-10 min-w-0 items-center justify-between gap-1 overflow-hidden rounded-full border border-border bg-muted/80 backdrop-blur-xs px-2 shadow-sm animate-in fade-in zoom-in-95 duration-150 sm:min-w-[220px] sm:gap-2 sm:px-3"
       role="region"
       aria-label="Dictation recording controls"
     >
       <div
-        className="flex h-6 items-center gap-0.5 sm:gap-1"
+        className="flex h-6 w-28 shrink-0 items-center justify-center gap-px"
         aria-hidden="true"
       >
-        {bars.map((val, index) => {
-          const height = Math.max(4, Math.min(22, Math.round(4 + val * 18)));
+        {waveHistory.map((level, index) => {
+          const amplitude = Math.max(0, Math.min(1, level * 2.2));
+          const height = amplitude < 0.03 ? 1.5 : 2 + amplitude * 18;
           return (
             <span
               key={index}
-              className={cn(
-                "w-0.5 rounded-full transition-all duration-75 ease-out sm:w-1",
-                val > 0.25 ? "bg-primary" : "bg-muted-foreground/50"
-              )}
+              className="w-0.5 rounded-full bg-foreground transition-[height] duration-75 ease-out"
               style={{ height: `${height}px` }}
             />
           );
         })}
       </div>
-      <span className="text-xs font-semibold tabular-nums text-foreground tracking-tight select-none sm:text-[13px]">
-        {String(Math.floor(recordingSeconds / 60)).padStart(2, "0")}:
-        {String(recordingSeconds % 60).padStart(2, "0")}
-      </span>
       <div className="flex items-center gap-1 sm:gap-1.5">
         <Tooltip>
           <TooltipTrigger asChild>
@@ -222,7 +221,6 @@ export const ChatComposer = memo(function ChatComposer({
   isGenerating,
   isRecording,
   isTranscribing,
-  recordingSeconds,
   value,
   onValueChange,
   onAttachment,
@@ -245,7 +243,6 @@ export const ChatComposer = memo(function ChatComposer({
   isEditingMessage = false,
   onSaveEdit,
   onCancelEdit,
-  audioBars,
   audioLevel,
   focusToken = 0,
   temporary = false,
@@ -276,7 +273,6 @@ export const ChatComposer = memo(function ChatComposer({
   isGenerating: boolean;
   isRecording: boolean;
   isTranscribing: boolean;
-  recordingSeconds: number;
   audioBars?: number[];
   audioLevel?: number;
   value: string;
@@ -1192,8 +1188,6 @@ export const ChatComposer = memo(function ChatComposer({
                       <>
                         {isRecording ? (
                           <DictateRecordingPill
-                            recordingSeconds={recordingSeconds}
-                            audioBars={audioBars}
                             audioLevel={audioLevel}
                             onStop={onCancelRecording}
                             onTranscribe={onVoice}
@@ -1286,8 +1280,6 @@ export const ChatComposer = memo(function ChatComposer({
                       <>
                         {isRecording ? (
                           <DictateRecordingPill
-                            recordingSeconds={recordingSeconds}
-                            audioBars={audioBars}
                             audioLevel={audioLevel}
                             onStop={onCancelRecording}
                             onTranscribe={onVoice}
