@@ -33,7 +33,6 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  FilePlus2,
   Loader2,
   MessageCircle,
   Mic,
@@ -47,6 +46,7 @@ import {
 import { CameraCaptureDialog } from "./CameraCaptureDialog";
 
 import { Library } from "reicon-react/icons/Library";
+import { FilePlus } from "reicon-react/icons/FilePlus";
 import React, {
   memo,
   useCallback,
@@ -1154,7 +1154,7 @@ export const ChatComposer = memo(function ChatComposer({
                       {!botActive && (
                         <DropdownMenuSub>
                           <DropdownMenuSubTrigger>
-                            <FilePlus2 className="mr-2 size-4" />
+                            <FilePlus size={16} className="mr-2" />
                             Create Files
                           </DropdownMenuSubTrigger>
                           <DropdownMenuSubContent

@@ -24,7 +24,6 @@ import {
   Ellipsis,
   ExternalLink,
   FileText,
-  Headset,
   HelpCircle,
   LogIn,
   LogOut,
@@ -36,6 +35,8 @@ import {
   X,
   LockKeyhole,
 } from "lucide-react";
+import { HelpSquare } from "reicon-react/icons/HelpSquare";
+import { ElementPlus } from "reicon-react/icons/ElementPlus";
 import { Library } from "reicon-react/icons/Library";
 import { Sidebar2 } from "reicon-react/icons/Sidebar2";
 import { ChatLine } from "reicon-react/icons/ChatLine";
@@ -143,6 +144,7 @@ export const ConversationSidebar = memo(function ConversationSidebar({
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   // Which locked action a guest last tapped, so the in-sidebar sign-in
   // container can name it. Null means the standing guest card is showing.
   const [lockedIntent, setLockedIntent] = useState<LockedIntent | null>(null);
@@ -216,10 +218,14 @@ export const ConversationSidebar = memo(function ConversationSidebar({
   const accountButton = (
     <button
       className={cn(
-        "group relative flex w-full items-center rounded-xl py-2 text-left transition-colors hover:bg-sidebar-accent focus-visible:ring-0 focus-visible:outline-none",
-        compact ? "justify-center" : "gap-2.5 px-2"
+        "group relative flex min-w-0 items-center rounded-lg py-2 text-left transition-colors hover:bg-sidebar-accent focus-visible:ring-0 focus-visible:outline-none",
+        compact
+          ? "w-full justify-center"
+          : "min-w-0 flex-1 gap-2.5 px-2"
       )}
-      aria-label="Open profile menu"
+      aria-label="Account menu"
+      aria-haspopup="menu"
+      aria-expanded={previewSupportOpen || accountMenuOpen}
     >
       <span className="flex size-7 shrink-0 items-center justify-center rounded-lg border border-border bg-card text-[11px] font-semibold">
         {user.name?.trim().charAt(0).toUpperCase() ?? "U"}
@@ -255,7 +261,7 @@ export const ConversationSidebar = memo(function ConversationSidebar({
           onToggleCollapsed();
         }}
         className={cn(
-          "group/sidebar fixed inset-y-0 left-0 z-50 flex flex-col border-r border-border bg-sidebar px-3 py-3 transition-[width,transform] duration-200 lg:static lg:translate-x-0",
+          "group/sidebar fixed inset-y-0 left-0 z-50 flex flex-col border-r border-border bg-sidebar px-3 pb-1 pt-3 transition-[width,transform] duration-200 lg:static lg:translate-x-0",
           compact
             ? "w-16 lg:cursor-ew-resize lg:[&_button]:cursor-pointer lg:[&_a]:cursor-pointer"
             : "w-[17.25rem]",
@@ -347,13 +353,6 @@ export const ConversationSidebar = memo(function ConversationSidebar({
               return;
             }
             onNew();
-          })}
-          {utility("Search", <Search className="size-4" />, () => {
-            if (locked) {
-              setLockedIntent("search");
-              return;
-            }
-            onSearch();
           })}
           {utility("Library", <Library size={16} />, () => {
             if (locked) {
@@ -512,9 +511,19 @@ export const ConversationSidebar = memo(function ConversationSidebar({
               </Button>
             </div>
           ))}
-        {!locked && (
-          <div className="mt-3 border-t border-border pt-3">
-            <DropdownMenu open={previewSupportOpen || undefined}>
+        <div className="mt-2">
+          {!compact && (
+            <div
+              aria-hidden="true"
+              className="mb-2 h-px w-full bg-border/70"
+            />
+          )}
+          <div className={cn(compact ? "" : "flex items-center justify-between gap-px")}>
+          {!locked && (
+            <DropdownMenu
+              open={previewSupportOpen || accountMenuOpen}
+              onOpenChange={setAccountMenuOpen}
+            >
               {compact ? (
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -563,23 +572,33 @@ export const ConversationSidebar = memo(function ConversationSidebar({
                 >
                   <Settings className="mr-2 size-4" /> Settings
                 </DropdownMenuItem>
-                {isMobile ? (
-                  <>
-                    <DropdownMenuItem
-                      onClick={() => onSupport("faq")}
-                      className="focus-visible:ring-0 focus-visible:outline-none"
-                    >
-                      <HelpCircle className="mr-2 size-4" />
-                      FAQ
-                      <ExternalLink className="ml-auto size-3.5 text-muted-foreground" />
-                    </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => onSupport("faq")}
+                  className="focus-visible:ring-0 focus-visible:outline-none"
+                >
+                  <HelpSquare size={16} className="mr-2" />
+                  Get help
+                  <ExternalLink className="ml-auto size-3.5 text-muted-foreground" />
+                </DropdownMenuItem>
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger className="focus-visible:ring-0 focus-visible:outline-none">
+                    <ElementPlus size={16} className="mr-2" />
+                    Learn more
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent
+                    sideOffset={6}
+                    collisionPadding={12}
+                    className={cn(
+                      "w-44 rounded-xl",
+                      isMobile && "max-h-[calc(100dvh-1.5rem)] overflow-y-auto"
+                    )}
+                  >
                     <DropdownMenuItem
                       onClick={() => onSupport("privacy")}
                       className="focus-visible:ring-0 focus-visible:outline-none"
                     >
                       <ShieldCheck className="mr-2 size-4" />
                       Privacy Policy
-                      <ExternalLink className="ml-auto size-3.5 text-muted-foreground" />
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={() => onSupport("terms")}
@@ -587,55 +606,43 @@ export const ConversationSidebar = memo(function ConversationSidebar({
                     >
                       <FileText className="mr-2 size-4" />
                       Terms of Service
-                      <ExternalLink className="ml-auto size-3.5 text-muted-foreground" />
                     </DropdownMenuItem>
-                  </>
-                ) : (
-                  <DropdownMenuSub open={previewSupportOpen || undefined}>
-                    <DropdownMenuSubTrigger className="focus-visible:ring-0 focus-visible:outline-none">
-                      <Headset className="mr-2 size-4" />
-                      Help &amp; Support
-                    </DropdownMenuSubTrigger>
-                    <DropdownMenuSubContent
-                      sideOffset={6}
-                      collisionPadding={12}
-                      className="max-h-[calc(100dvh-1.5rem)] w-52 overflow-y-auto rounded-xl"
-                    >
-                      <DropdownMenuItem
-                        onClick={() => onSupport("faq")}
-                        className="focus-visible:ring-0 focus-visible:outline-none"
-                      >
-                        <HelpCircle className="mr-2 size-4" />
-                        FAQ
-                        <ExternalLink className="ml-auto size-3.5 text-muted-foreground" />
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => onSupport("privacy")}
-                        className="focus-visible:ring-0 focus-visible:outline-none"
-                      >
-                        <ShieldCheck className="mr-2 size-4" />
-                        Privacy Policy
-                        <ExternalLink className="ml-auto size-3.5 text-muted-foreground" />
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => onSupport("terms")}
-                        className="focus-visible:ring-0 focus-visible:outline-none"
-                      >
-                        <FileText className="mr-2 size-4" />
-                        Terms of Service
-                        <ExternalLink className="ml-auto size-3.5 text-muted-foreground" />
-                      </DropdownMenuItem>
-                    </DropdownMenuSubContent>
-                  </DropdownMenuSub>
-                )}
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={onLogout} variant="destructive">
                   <LogOut className="mr-2 size-4" /> Sign out
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+          )}
+          {!compact && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => {
+                    if (locked) {
+                      setLockedIntent("search");
+                      return;
+                    }
+                    onSearch();
+                  }}
+                  aria-label="Search"
+                  className="group h-11 w-11 shrink-0 rounded-lg text-foreground/90 transition-[color,background-color,transform] duration-150 hover:bg-sidebar-accent hover:text-foreground active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <Search className="size-4 transition-transform duration-200 group-hover:scale-110 group-active:scale-95" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right" sideOffset={8} collisionPadding={12}>
+                Search
+              </TooltipContent>
+            </Tooltip>
+          )}
           </div>
-        )}
+        </div>
       </aside>
     </>
   );
@@ -697,12 +704,12 @@ const ConversationGroup = memo(function ConversationGroup({
       <button
         type="button"
         onClick={() => setExpanded(current => !current)}
-        className="group flex w-full items-center gap-1.5 px-2 py-1.5 text-left text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground cursor-pointer select-none"
+        className="group flex w-full items-center gap-1.5 px-2 py-1.5 text-left text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground cursor-pointer select-none"
         aria-expanded={expanded}
         data-disclosure-group={label.toLowerCase()}
       >
         {label}
-        <span className="max-lg:opacity-100 lg:opacity-0 lg:group-hover:opacity-100 lg:group-focus-visible:opacity-100 transition-opacity">
+        <span className="opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
           {expanded ? (
             <ChevronDown className="size-3.5" />
           ) : (
