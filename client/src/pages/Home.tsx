@@ -513,15 +513,9 @@ export default function Home() {
   }, [sidebarOpen, isMobile]);
   const [guestPromptOpen, setGuestPromptOpen] = useState(false);
   const [composerValue, setComposerValue] = useState("");
-  const [composerTag, setComposerTag] = useState<ComposerTag>(() => {
-    if (typeof window === "undefined") return "chat";
-    try {
-      const storage = window.sessionStorage ?? window.localStorage;
-      return storage.getItem("ksemo:composer-tag") === "bot" ? "bot" : "chat";
-    } catch {
-      return "chat";
-    }
-  });
+  // Voice chat is entered explicitly from the empty-composer waveform button;
+  // opening or refreshing the page always starts in ordinary chat.
+  const [composerTag, setComposerTag] = useState<ComposerTag>("chat");
   // Bot's auto-send has to reach the send pipeline, but useBotVoice is created
   // long before sendMessage's stable wrapper exists. This bridges the two.
   const botSendRef = useRef<((text: string) => void) | null>(null);
@@ -530,11 +524,7 @@ export default function Home() {
   );
   // Mirrors whether the bot voice session is open, for stable callbacks that
   // must decide on the fly whether a finished reply should be spoken aloud.
-  const botVoiceOpenRef = useRef(
-    typeof window !== "undefined" &&
-      (window.sessionStorage?.getItem("ksemo:composer-tag") ??
-        window.localStorage?.getItem("ksemo:composer-tag")) === "bot"
-  );
+  const botVoiceOpenRef = useRef(false);
   useEffect(() => {
     botVoiceOpenRef.current = composerTag === "bot";
   }, [composerTag]);

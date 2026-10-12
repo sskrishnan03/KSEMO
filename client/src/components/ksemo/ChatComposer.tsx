@@ -34,7 +34,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Loader2,
-  MessageCircle,
   Mic,
   Monitor,
   Paperclip,
@@ -85,38 +84,6 @@ const MODE_TOKEN_COLORS: Record<string, string> = {
   txt: "#0ea5e9",
 };
 
-/*
- * KSEMO's own bot mark for the Composer "Bot" mode — a simple, clean robot:
- * rounded head, antenna with a dot, two plain eye dots and a small smile.
- * Nothing extra; inherits pill colors via currentColor.
- */
-export const KseBotModeIcon = memo(function KseBotModeIcon({
-  className,
-}: {
-  className?: string;
-}) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className={className}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      focusable="false"
-    >
-      <rect x="3.5" y="5.5" width="17" height="15" rx="4.5" />
-      <path d="M12 5.5V3.6" />
-      <circle cx="12" cy="2.7" r="0.9" fill="currentColor" stroke="none" />
-      <circle cx="9" cy="11.8" r="1.3" fill="currentColor" stroke="none" />
-      <circle cx="15" cy="11.8" r="1.3" fill="currentColor" stroke="none" />
-      <path d="M9.6 16.4h4.8" />
-    </svg>
-  );
-});
-
 const MODE_TOKEN_LABELS: Record<string, string> = {
   pdf: "pdf",
   docx: "docx",
@@ -143,17 +110,6 @@ function formatVoiceName(name: string): string {
 const COMPOSER_TAG_KEY = "ksemo:composer-tag";
 
 export type ComposerTag = "chat" | "bot";
-
-function readStoredTag(): ComposerTag {
-  if (typeof window === "undefined") return "chat";
-  try {
-    const storage = window.sessionStorage ?? window.localStorage;
-    return storage.getItem(COMPOSER_TAG_KEY) === "bot" ? "bot" : "chat";
-  } catch {
-    // Private mode / blocked storage — a session-only default is fine.
-    return "chat";
-  }
-}
 
 function storeTag(tag: ComposerTag) {
   if (typeof window === "undefined") return;
@@ -188,7 +144,7 @@ export const DictateRecordingPill = memo(function DictateRecordingPill({
 
   return (
     <div
-      className="flex min-w-0 items-center justify-between gap-1.5 overflow-hidden rounded-full border border-border bg-muted/80 backdrop-blur-xs px-2.5 py-1 shadow-sm animate-in fade-in zoom-in-95 duration-150 sm:min-w-[250px] sm:gap-3 sm:px-4 sm:py-1.5"
+      className="flex min-w-0 items-center justify-between gap-1 overflow-hidden rounded-full border border-border bg-muted/80 backdrop-blur-xs px-2 py-1 shadow-sm animate-in fade-in zoom-in-95 duration-150 sm:min-w-[220px] sm:gap-2 sm:px-3 sm:py-1.5"
       role="region"
       aria-label="Dictation recording controls"
     >
@@ -388,7 +344,7 @@ export const ChatComposer = memo(function ChatComposer({
   const [expanded, setExpanded] = useState(false);
   const [canExpand, setCanExpand] = useState(false);
   const [activeTag, setActiveTag] = useState<ComposerTag>(
-    () => propActiveTag ?? readStoredTag()
+    () => propActiveTag ?? "chat"
   );
 
   const {
@@ -1064,6 +1020,7 @@ export const ChatComposer = memo(function ChatComposer({
             <div
               className={cn(
                 "flex w-full flex-wrap items-center justify-between gap-x-1.5 gap-y-1.5 pt-1",
+                isRecording && "flex-nowrap",
                 botActive && "py-0"
               )}
             >
@@ -1199,55 +1156,6 @@ export const ChatComposer = memo(function ChatComposer({
                     </DropdownMenuContent>
                   </DropdownMenu>
                 )}
-
-                {!isEditingMessage &&
-                  !guestMode &&
-                  !temporary &&
-                  !botActive && (
-                    <div
-                      className="animate-[ksemo-tag-pop_400ms_ease-out_both] relative flex h-8 w-20 shrink-0 items-center rounded-full border border-border bg-popover p-0.5 shadow-sm sm:w-[10.5rem]"
-                      role="group"
-                      aria-label="Composer mode"
-                    >
-                      <span
-                        aria-hidden="true"
-                        className={cn(
-                          "absolute top-0.5 bottom-0.5 w-[calc(50%-2px)] rounded-full bg-foreground text-background shadow-sm transition-[left] duration-300 ease-out",
-                          activeTag === "bot" ? "left-1/2" : "left-0.5"
-                        )}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => changeTag("chat")}
-                        aria-pressed={activeTag === "chat"}
-                        aria-label="Chat mode"
-                        className={cn(
-                          "relative z-10 flex h-full flex-1 items-center justify-center gap-1.5 rounded-full text-[13px] font-medium outline-none transition-colors duration-200",
-                          activeTag === "chat"
-                            ? "text-background"
-                            : "text-foreground hover:bg-accent/60 hover:text-foreground"
-                        )}
-                      >
-                        <MessageCircle className="size-4" />
-                        <span className="hidden sm:inline">Chat</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => changeTag("bot")}
-                        aria-pressed={activeTag === "bot"}
-                        aria-label="Bot mode"
-                        className={cn(
-                          "relative z-10 flex h-full flex-1 items-center justify-center gap-1.5 rounded-full text-[13px] font-medium outline-none transition-colors duration-200",
-                          activeTag === "bot"
-                            ? "text-background"
-                            : "text-foreground hover:bg-accent/60 hover:text-foreground"
-                        )}
-                      >
-                        <KseBotModeIcon className="size-[18px]" />
-                        <span className="hidden sm:inline">Bot</span>
-                      </button>
-                    </div>
-                  )}
 
                 {/* In Bot mode: BotVoiceOrb + dynamic status label */}
                 {botActive && (
@@ -1616,6 +1524,32 @@ export const ChatComposer = memo(function ChatComposer({
                         <TooltipContent side="bottom">
                           Transcribing…
                         </TooltipContent>
+                      </Tooltip>
+                    ) : !isRecording && !isTranscribing && !canSend &&
+                      !hideVoiceInput && !guestMode && !temporary && onBotVoice ? (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            type="button"
+                            onClick={() => changeTag("bot")}
+                            size="icon"
+                            className="size-10 rounded-full bg-foreground text-background transition-colors hover:bg-foreground/90"
+                            aria-label="Start voice chat"
+                          >
+                            <span
+                              className="ksemo-voice-ready-wave"
+                              aria-hidden="true"
+                            >
+                              <span />
+                              <span />
+                              <span />
+                              <span />
+                              <span />
+                              <span />
+                            </span>
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom">Voice chat</TooltipContent>
                       </Tooltip>
                     ) : !isRecording && !isTranscribing ? (
                       <Tooltip>
