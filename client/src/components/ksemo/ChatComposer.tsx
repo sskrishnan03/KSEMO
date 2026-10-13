@@ -370,9 +370,9 @@ export const ChatComposer = memo(function ChatComposer({
     activeMode && activeMode !== "chat"
       ? getCapabilityOption(activeMode)
       : null;
-  // Bot mode puts the orb outside the chat box. It stands down for the states
-  // that own the box outright — temporary chat has its own edge treatment, and
-  // edit mode has no mode toggle at all.
+  // Bot mode puts the orb outside the chat box. It stands down for temporary
+  // chat, which has its own theme, and for edit mode, which has no mode
+  // toggle at all.
   const botActive =
     activeTag === "bot" && !temporary && !guestMode && !isEditingMessage;
 
@@ -753,12 +753,7 @@ export const ChatComposer = memo(function ChatComposer({
       <div className="relative">
         <div
           className={cn(
-            "relative rounded-[20px] border border-border bg-popover p-1.5 shadow-sm text-popover-foreground transition-all duration-200",
-            // Temporary "incognito" mode: no hard border line at all; only a
-            // soft glow hugs the edge of the box. The glow adapts to the theme —
-            // dark in light mode so it stays visible, white in dark mode.
-            temporary &&
-              "border-transparent shadow-[0_0_12px_3px_rgba(0,0,0,0.16)] dark:shadow-[0_0_12px_3px_rgba(255,255,255,0.14)]"
+            "ksemo-composer-shell relative rounded-[20px] border border-border bg-popover p-1.5 shadow-sm text-popover-foreground transition-all duration-200"
           )}
         >
           {isDragActive && (
@@ -996,7 +991,7 @@ export const ChatComposer = memo(function ChatComposer({
                               ? activeMode
                               : "chat"
                     }
-                    className="pointer-events-none absolute left-2.5 top-[7px] text-[15px] leading-6 text-muted-foreground animate-[ksemo-placeholder-rise_800ms_ease-out]"
+                    className="ksemo-composer-placeholder pointer-events-none absolute left-2.5 top-[7px] text-[15px] leading-6 text-muted-foreground animate-[ksemo-placeholder-rise_800ms_ease-out]"
                     aria-hidden="true"
                   >
                     {isEditingMessage
@@ -1033,7 +1028,7 @@ export const ChatComposer = memo(function ChatComposer({
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="size-10 shrink-0 rounded-full bg-transparent text-foreground hover:bg-accent hover:text-foreground transition-colors"
+                            className="ksemo-composer-attach size-10 shrink-0 rounded-full bg-transparent text-foreground hover:bg-accent hover:text-foreground transition-colors"
                             aria-label={
                               toolsOpen && !libraryOpen
                                 ? "Close attachment options"
@@ -1221,7 +1216,7 @@ export const ChatComposer = memo(function ChatComposer({
                                 size="icon"
                                 onClick={onVoice}
                                 disabled={isTranscribing}
-                                className="size-10 rounded-full bg-transparent text-foreground hover:bg-accent hover:text-foreground transition-colors"
+                                className="ksemo-composer-dictate size-10 rounded-full bg-transparent text-foreground hover:bg-accent hover:text-foreground transition-colors"
                                 aria-label="Dictate"
                               >
                                 <Mic className="size-4.5" />
@@ -1313,7 +1308,7 @@ export const ChatComposer = memo(function ChatComposer({
                                 size="icon"
                                 onClick={onVoice}
                                 disabled={isTranscribing}
-                                className="size-10 rounded-full bg-transparent text-foreground hover:bg-accent hover:text-foreground transition-colors"
+                                className="ksemo-composer-dictate size-10 rounded-full bg-transparent text-foreground hover:bg-accent hover:text-foreground transition-colors"
                                 aria-label="Dictate"
                               >
                                 <Mic className="size-4.5" />
@@ -1551,9 +1546,9 @@ export const ChatComposer = memo(function ChatComposer({
                             disabled={isRecording || isTranscribing}
                             size="icon"
                             className={cn(
-                              "size-10 rounded-full transition-colors",
+                              "ksemo-composer-send size-10 rounded-full transition-colors",
                               canSend
-                                ? "bg-foreground text-background hover:bg-foreground/90"
+                                ? "ksemo-composer-send-ready bg-foreground text-background hover:bg-foreground/90"
                                 : "bg-muted text-muted-foreground hover:bg-accent"
                             )}
                             aria-label="Send message"

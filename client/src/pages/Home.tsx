@@ -4449,7 +4449,10 @@ export default function Home() {
 
   return (
     <div
-      className="flex h-dvh overflow-hidden bg-background"
+      className={cn(
+        "flex h-dvh overflow-hidden bg-background",
+        isTemporaryChat && "temp-mode"
+      )}
       style={
         isMobile && visualViewportHeight
           ? { height: visualViewportHeight }
@@ -4564,14 +4567,11 @@ export default function Home() {
                             });
                           }
                         }}
-                        className={cn(
-                          "size-10 rounded-xl text-foreground transition-colors",
-                          isTemporaryChat && "bg-foreground/10"
-                        )}
+                        className="ksemo-temp-toggle size-10 rounded-xl text-foreground transition-colors hover:bg-accent"
                       >
                         <TemporaryChatIcon
                           active={false}
-                          className="size-[26px]"
+                          className="ksemo-temp-toggle-icon size-[26px]"
                         />
                       </Button>
                     </TooltipTrigger>
@@ -5169,9 +5169,9 @@ const EmptyState = memo(function EmptyState({
             <div className="flex items-center justify-center gap-3 animate-in fade-in duration-200">
               <TemporaryChatIcon
                 active={temporary}
-                className="size-8 shrink-0 text-foreground"
+                className="ksemo-temp-greeting-icon size-8 shrink-0 text-foreground"
               />
-              <p className="text-[22px] font-bold tracking-[-0.04em] text-balance text-foreground sm:tracking-[-0.025em]">
+              <p className="ksemo-temp-greeting-title text-[22px] font-bold tracking-[-0.04em] text-balance text-foreground sm:tracking-[-0.025em]">
                 Temporary chat
               </p>
             </div>
@@ -5185,7 +5185,7 @@ const EmptyState = memo(function EmptyState({
       <div className="relative mx-auto w-full max-w-3xl">
         {composer}
         {temporary && (
-          <p className="pointer-events-none absolute inset-x-0 top-full mt-1 px-5 text-center text-[13px] font-medium leading-snug text-muted-foreground sm:px-0 animate-in fade-in duration-200">
+          <p className="pointer-events-none absolute inset-x-0 top-full mt-0.5 px-5 text-center text-[13px] font-medium leading-snug text-muted-foreground sm:px-0 animate-in fade-in duration-200">
             This conversation won't be saved to your chat history.
           </p>
         )}

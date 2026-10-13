@@ -21,6 +21,82 @@
   }
 }
 
+/* Temporary chat uses a clear spring-green accent against a charcoal surface. */
+.temp-mode {
+  --temp-accent: #b8e36b;
+  --temp-surface: #292b24;
+  --temp-placeholder: #c6d2aa;
+}
+
+.temp-mode .ksemo-composer-shell {
+  background-color: var(--temp-surface);
+  border: 1px dashed color-mix(in srgb, var(--temp-accent) 34%, transparent);
+  box-shadow: none;
+  transition:
+    color 0.25s ease,
+    background-color 0.25s ease,
+    border-color 0.25s ease,
+    box-shadow 0.25s ease;
+}
+
+.temp-mode .ksemo-user-message-bubble {
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--temp-accent) 34%, transparent);
+  transition: border-color 0.25s ease;
+}
+
+.temp-mode .ksemo-composer-placeholder {
+  color: var(--temp-placeholder);
+  transition: color 0.25s ease;
+}
+
+.temp-mode .ksemo-composer-attach,
+.temp-mode .ksemo-composer-dictate {
+  color: var(--temp-accent);
+  transition: color 0.25s ease;
+}
+
+.temp-mode .ksemo-composer-send {
+  background-color: #393c33;
+  color: #aab19b;
+  transition:
+    color 0.25s ease,
+    background-color 0.25s ease,
+    box-shadow 0.25s ease;
+}
+
+.temp-mode .ksemo-composer-send-ready,
+.temp-mode .ksemo-composer-send-ready:hover {
+  background-color: var(--temp-accent);
+  color: #202319;
+  transition:
+    color 0.25s ease,
+    background-color 0.25s ease,
+    box-shadow 0.25s ease;
+}
+
+.temp-mode .ksemo-temp-toggle,
+.temp-mode .ksemo-temp-toggle:hover,
+.temp-mode .ksemo-temp-toggle:focus-visible,
+.temp-mode .ksemo-temp-toggle:active {
+  background-color: transparent;
+}
+
+.temp-mode .ksemo-temp-toggle-icon {
+  color: var(--temp-accent);
+  transition: color 0.25s ease;
+}
+
+.temp-mode .ksemo-temp-toggle,
+.temp-mode .ksemo-temp-toggle:hover,
+.temp-mode .ksemo-temp-toggle:focus-visible,
+.temp-mode .ksemo-temp-toggle:active,
+.temp-mode .ksemo-temp-toggle-icon {
+  background-color: transparent;
+  color: var(--temp-accent);
+  transition: color 0.25s ease;
+}
+
 @theme {
   /* Mobile browsers in "Desktop site" mode report a ~980px viewport. Lower the
      lg breakpoint so that width renders the full desktop layout instead of
