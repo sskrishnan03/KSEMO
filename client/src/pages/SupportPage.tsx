@@ -19,6 +19,7 @@ import {
   ArrowUp,
   Bot,
   ChevronDown,
+  ChevronRight,
   FileText,
   HelpCircle,
   Search,
@@ -30,6 +31,200 @@ import {
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
 type SupportTopic = "faq" | "privacy" | "terms";
+
+export function FaqHelpDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [view, setView] = useState<"home" | "faq">("home");
+  const [chatStarted, setChatStarted] = useState(false);
+  const [chatSession, setChatSession] = useState(0);
+  useEffect(() => {
+    if (!open) return;
+    setView("home");
+    setChatStarted(false);
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [open, onClose]);
+
+  if (!open) return null;
+  return (
+    <div className="fixed right-2 top-2 bottom-2 z-[120] flex h-[calc(100dvh-1rem)] w-[min(calc(100vw-1rem),27rem)] flex-col overflow-hidden rounded-2xl border border-border bg-popover text-popover-foreground shadow-lg animate-in slide-in-from-right-3 fade-in duration-200">
+      <aside
+        role="dialog"
+        aria-labelledby="help-drawer-title"
+        className="flex min-h-0 flex-1 flex-col"
+      >
+        <header className="flex shrink-0 items-center justify-between border-b border-border/70 bg-muted/10 px-3.5 py-2.5">
+          {view === "faq" ? (
+            <Button type="button" variant="ghost" size="icon" onClick={() => setView("home")} aria-label="Back to help" className="size-9 rounded-lg">
+              <ArrowLeft className="size-4" />
+            </Button>
+          ) : chatStarted ? (
+            <Button type="button" variant="ghost" size="icon" onClick={() => { setChatStarted(false); setChatSession(session => session + 1); }} aria-label="Back to help" className="size-9 rounded-lg">
+              <ArrowLeft className="size-4" />
+            </Button>
+          ) : null}
+          <span className="ml-2 mr-auto text-base font-semibold tracking-tight">KSEMO</span>
+          <h2 id="help-drawer-title" className="sr-only">{view === "home" ? (chatStarted ? "Chat with help" : "Get help") : "Frequently asked questions"}</h2>
+          <Button type="button" variant="ghost" size="icon" onClick={onClose} aria-label="Close help" className="size-9 rounded-lg">
+            <X className="size-4" />
+          </Button>
+        </header>
+        {view === "home" ? (
+          <div className="flex min-h-0 flex-1 flex-col px-4 pb-2">
+            {!chatStarted && (
+              <div className="flex min-h-0 flex-1 flex-col justify-center py-5 text-center">
+                <HelpCircle className="mx-auto mb-2 size-6 text-muted-foreground" />
+                <h3 className="text-2xl font-semibold leading-tight tracking-[-0.025em]">How can we help?</h3>
+                <p className="mt-2 text-sm leading-5 text-muted-foreground">Search FAQs or ask KSEMO a question.</p>
+              </div>
+            )}
+            {!chatStarted && <button type="button" onClick={() => setView("faq")} className="mx-auto mb-2 flex w-full max-w-sm shrink-0 items-center gap-3 rounded-xl border border-border bg-card p-3.5 text-left transition-colors hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-foreground"><Search className="size-4.5" /></span>
+                <span className="min-w-0"><span className="block text-sm font-semibold">Frequently asked questions</span><span className="mt-0.5 block text-xs text-muted-foreground">Search common questions by topic</span></span>
+                <ChevronRight className="ml-auto size-4 text-muted-foreground" />
+            </button>}
+            <div className={cn("flex min-h-0 flex-col", chatStarted ? "flex-1" : "shrink-0")}>
+              <HelpChat key={chatSession} onStartChat={() => setChatStarted(true)} activeChat={chatStarted} />
+            </div>
+          </div>
+        ) : (
+          <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-2">
+            <FaqContent compact />
+          </div>
+        )}
+      </aside>
+    </div>
+  );
+}
+
+function HelpChat({ onStartChat, activeChat }: { onStartChat: () => void; activeChat: boolean }) {
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [messages, setMessages] = useState<Array<{ id: number; role: "user" | "assistant"; content: string; related?: FaqItem[] }>>([]);
+  const [thinking, setThinking] = useState(false);
+  const listRef = useRef<HTMLDivElement>(null);
+  const pickerRef = useRef<HTMLDivElement>(null);
+  const nextId = useRef(1);
+
+  useEffect(() => {
+    listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
+  }, [messages, thinking]);
+
+  useEffect(() => {
+    if (!suggestionsOpen) return;
+    function closeOnOutsideClick(event: PointerEvent) {
+      if (event.target instanceof Node && !pickerRef.current?.contains(event.target)) {
+        setSuggestionsOpen(false);
+      }
+    }
+    document.addEventListener("pointerdown", closeOnOutsideClick);
+    return () => document.removeEventListener("pointerdown", closeOnOutsideClick);
+  }, [suggestionsOpen]);
+
+  function send(questionDraft: string) {
+    const question = questionDraft.trim();
+    if (!question || thinking) return;
+    onStartChat();
+    setSuggestionsOpen(false);
+    setMessages(current => [...current, { id: nextId.current++, role: "user", content: question }]);
+    setThinking(true);
+    window.setTimeout(() => {
+      const reply = answerFromFaq(question);
+      const isHelpQuestion = !reply.answer.startsWith("Could you rephrase that?") &&
+        !reply.answer.startsWith("I could not find a confident answer");
+      const matchingSections = isHelpQuestion ? searchFaq(question) : [];
+      const suggestionPool = isHelpQuestion ? [
+        ...reply.related,
+        ...matchingSections.flatMap(section => section.items),
+        ...(matchingSections[0]?.category.items ?? []),
+        ...FAQ_CATEGORIES.flatMap(category => category.items),
+      ] : [];
+      const seen = new Set<string>([question.toLowerCase()]);
+      const related = suggestionPool.filter(item => {
+        const key = item.question.toLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      }).slice(0, 8);
+      setMessages(current => [...current, { id: nextId.current++, role: "assistant", content: reply.answer, related }]);
+      setThinking(false);
+    }, 350);
+    setDraft("");
+  }
+
+  function submitDraft(event?: React.FormEvent) {
+    event?.preventDefault();
+    send(draft);
+  }
+
+  const latestSuggestions = activeChat
+    ? [...messages].reverse().find(message => message.role === "assistant")?.related ?? []
+    : [];
+  const promptSuggestions = latestSuggestions.length
+    ? latestSuggestions.map(item => ({ key: item.id, question: item.question }))
+    : ASSISTANT_SUGGESTIONS.map((question, index) => ({ key: `suggestion-${index}`, question }));
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      {activeChat && <div ref={listRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto px-1 py-2.5" aria-live="polite">
+        {messages.map(message => (
+          <div key={message.id} className={cn("flex", message.role === "user" ? "justify-end" : "justify-start")}>
+            <div className={cn("max-w-[88%] whitespace-pre-line rounded-2xl px-3.5 py-2.5 text-[13px] leading-5", message.role === "user" ? "rounded-br-md bg-foreground text-background" : "rounded-bl-md bg-muted text-foreground")}>
+              {message.content}
+              {message.related && message.related.length > 0 && (
+                <div className="mt-2.5 space-y-1.5 border-t border-border/60 pt-2.5">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">Related questions</p>
+                  {message.related.map(item => (
+                    <button key={item.id} type="button" onClick={() => send(item.question)} className="block w-full whitespace-normal rounded-lg border border-border bg-background px-2.5 py-1.5 text-left text-xs text-muted-foreground transition-colors hover:text-foreground">
+                      {item.question}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+        {thinking && <div className="text-xs text-muted-foreground">Searching the help center…</div>}
+      </div>}
+      <div ref={pickerRef} className="relative shrink-0 px-1 pb-1 pt-1">
+        {suggestionsOpen && (
+          <div className="absolute inset-x-1 bottom-[calc(100%+0.5rem)] z-20 max-h-[min(22rem,60vh)] overflow-y-auto rounded-xl border border-border bg-popover p-1.5 text-popover-foreground shadow-xl">
+            <p className="px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">Suggested questions</p>
+            {promptSuggestions.map(item => (
+              <button key={item.key} type="button" disabled={thinking} onClick={() => send(item.question)} className="block w-full rounded-lg px-2.5 py-2 text-left text-xs leading-5 text-foreground transition-colors hover:bg-accent disabled:opacity-50">
+                {item.question}
+              </button>
+            ))}
+          </div>
+        )}
+        <form onSubmit={submitDraft} className="ksemo-composer-shell flex items-center gap-1.5 rounded-[20px] border border-border bg-popover p-1.5 text-popover-foreground shadow-sm transition-colors">
+          <Input
+            value={draft}
+            onChange={event => setDraft(event.target.value)}
+            onFocus={() => setSuggestionsOpen(true)}
+            placeholder={activeChat ? "Ask a KSEMO question…" : "Ask a question about KSEMO…"}
+            aria-label="Ask a question about KSEMO"
+            disabled={thinking}
+            className="h-10 min-w-0 flex-1 rounded-none border-0 bg-transparent px-2.5 text-[15px] shadow-none focus-visible:ring-0 dark:bg-transparent"
+          />
+          <Button
+            type={draft.trim() ? "submit" : "button"}
+            size="icon"
+            onClick={draft.trim() ? undefined : () => setSuggestionsOpen(open => !open)}
+            disabled={thinking}
+            aria-label={draft.trim() ? "Send question" : "Show suggested questions"}
+            aria-expanded={!draft.trim() ? suggestionsOpen : undefined}
+            className="size-10 shrink-0 rounded-full bg-foreground text-background transition-colors hover:bg-foreground/90"
+          >
+            {draft.trim() ? <ArrowUp className="size-4" /> : <ChevronDown className={cn("size-4 transition-transform", suggestionsOpen && "rotate-180")} />}
+          </Button>
+        </form>
+      </div>
+    </div>
+  );
+}
 
 const TOPIC_META: Record<
   SupportTopic,
@@ -326,7 +521,7 @@ function SupportSectionNav({ topic }: { topic: SupportTopic }) {
   );
 }
 
-function FaqContent() {
+function FaqContent({ compact = false }: { compact?: boolean }) {
   const [query, setQuery] = useState("");
   // One open question per category. When a category has not been interacted
   // with yet its first question stays open; picking another question closes
@@ -338,7 +533,7 @@ function FaqContent() {
 
   function isOpen(sectionId: string, itemId: string, isFirst: boolean) {
     const selected = openBySection[sectionId];
-    if (selected === undefined) return isFirst;
+    if (selected === undefined) return compact ? false : isFirst;
     return selected === itemId;
   }
 
@@ -351,14 +546,14 @@ function FaqContent() {
   }
 
   return (
-    <div className="mt-8">
-      <div className="relative">
+    <div className={cn(compact ? "mt-3" : "mt-8")}>
+      <div className={cn("relative", compact && "sticky top-0 z-10 bg-popover pb-2 pt-1")}>
         <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           value={query}
           onChange={event => setQuery(event.target.value)}
-          placeholder="Search questions, answers, and topics…"
-          className="h-11 rounded-xl pl-10 pr-9 text-[15px]"
+          placeholder={compact ? "Search FAQs…" : "Search questions, answers, and topics…"}
+          className={cn("rounded-xl pl-10 pr-9", compact ? "h-10 text-sm" : "h-11 text-[15px]")}
           aria-label="Search frequently asked questions"
         />
         {query && (
@@ -371,23 +566,25 @@ function FaqContent() {
           </button>
         )}
       </div>
-      <p className="mt-3 text-xs text-muted-foreground" role="status">
-        {query
-          ? `Showing results for “${query.trim()}”`
-          : "Click any question to see the answer"}
-      </p>
+      {!compact && (
+        <p className="mt-3 text-xs text-muted-foreground" role="status">
+          {query
+            ? `Showing results for “${query.trim()}”`
+            : "Click any question to see the answer"}
+        </p>
+      )}
 
       {sections.length ? (
         sections.map(section => (
           <section
             key={section.category.id}
-            className="mt-9"
+            className={cn(compact ? "mt-5" : "mt-9")}
             aria-labelledby={`faq-${section.category.id}`}
           >
             <div className="flex items-baseline gap-2.5">
               <h2
                 id={`faq-${section.category.id}`}
-                className="scroll-mt-20 text-lg font-semibold tracking-[-0.02em]"
+                className={cn("scroll-mt-20 font-semibold tracking-[-0.02em]", compact ? "px-1 text-base" : "text-lg")}
               >
                 {section.category.label}
               </h2>
@@ -397,7 +594,7 @@ function FaqContent() {
                 </span>
               )}
             </div>
-            <div className="mt-3 space-y-2.5">
+            <div className={cn(compact ? "mx-1 mt-2 space-y-1.5" : "mt-3 space-y-2.5")}>
               {section.items.map((item, index) => {
                 const expanded = isOpen(
                   section.category.id,
@@ -407,15 +604,15 @@ function FaqContent() {
                 return (
                   <article
                     key={item.id}
-                    className="overflow-hidden rounded-2xl border border-border bg-card"
+                    className={cn("overflow-hidden border border-border bg-card", compact ? "rounded-xl" : "rounded-2xl")}
                   >
                     <button
                       onClick={() => toggleItem(section.category.id, item.id)}
-                      className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left"
+                      className={cn("flex w-full items-center justify-between text-left", compact ? "gap-2.5 px-3 py-2.5" : "gap-4 px-5 py-4")}
                       aria-expanded={expanded}
                       aria-controls={`faq-answer-${item.id}`}
                     >
-                      <span className="text-[15px] font-medium leading-6">
+                      <span className={cn("font-medium leading-6", compact ? "text-[13px]" : "text-[15px]")}>
                         {item.question}
                       </span>
                       <ChevronDown
@@ -429,7 +626,7 @@ function FaqContent() {
                     {expanded && (
                       <div
                         id={`faq-answer-${item.id}`}
-                        className="border-t border-border px-5 py-4"
+                        className={cn("border-t border-border", compact ? "px-3 py-3" : "px-5 py-4")}
                       >
                         <p className="whitespace-pre-line text-sm leading-6 text-muted-foreground">
                           {item.answer}
@@ -443,14 +640,14 @@ function FaqContent() {
           </section>
         ))
       ) : (
-        <div className="mt-10 grid min-h-40 place-items-center rounded-2xl border border-dashed border-border bg-muted/20 p-8 text-center">
+        <div className={cn("mt-10 grid place-items-center rounded-2xl border border-dashed border-border bg-muted/20 text-center", compact ? "min-h-32 p-5" : "min-h-40 p-8")}>
           <div>
             <Search className="mx-auto size-6 text-muted-foreground" />
             <p className="mt-3 text-sm font-medium">
               No questions match “{query.trim()}”
             </p>
             <p className="mt-1 text-sm text-muted-foreground">
-              Try a different word, or ask the KSEMO Assistant in the corner.
+              Try a different word or clear your search to browse all questions.
             </p>
             <Button
               variant="outline"
@@ -463,10 +660,11 @@ function FaqContent() {
           </div>
         </div>
       )}
-      <p className="pt-8 text-sm text-muted-foreground">
-        Need more help? Ask the KSEMO Assistant at the bottom-right, or reach us
-        from Settings → Feedback.
-      </p>
+      {!compact && (
+        <p className="pt-8 text-sm text-muted-foreground">
+          Need more help? Reach us from Settings → Feedback.
+        </p>
+      )}
     </div>
   );
 }

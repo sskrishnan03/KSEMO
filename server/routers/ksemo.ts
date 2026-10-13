@@ -218,7 +218,15 @@ export const conversationRouter = router({
     .query(async ({ ctx, input }) => {
       const conversation = await requireConversation(input.id, ctx.user.id);
       const items = await listMessagesForConversation(conversation.id);
-      return { conversation, messages: items };
+      return {
+        conversation,
+        messages: await Promise.all(
+          items.map(async message => ({
+            ...message,
+            attachments: await listMessageFilesForUser(message.id, ctx.user.id),
+          }))
+        ),
+      };
     }),
   configurePublicShare: protectedProcedure
     .input(z.object({ id: conversationId, isPublic: z.boolean() }))

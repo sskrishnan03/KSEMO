@@ -80,6 +80,7 @@ import { PdfDrawer } from "../components/ksemo/PdfDrawer";
 import { CodeViewerPanel } from "../components/ksemo/CodeViewerPanel";
 import type { DocFormat } from "@/lib/docFormats";
 import { usePdfViewer } from "@/contexts/PdfViewerContext";
+import { FaqHelpDrawer } from "./SupportPage";
 import AuthStage from "./AuthStage";
 import { ConversationSidebar } from "../components/ksemo/ConversationSidebar";
 import {
@@ -460,6 +461,7 @@ export default function Home() {
     workspacePreview === "files" ? "library" : null;
   const utils = trpc.useUtils();
   const [sidebarOpen, setSidebarOpen] = useState(isSidebarOpenPreview);
+  const [helpDrawerOpen, setHelpDrawerOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     if (isCollapsedSidebarPreview) return true;
     try {
@@ -3324,18 +3326,18 @@ export default function Home() {
           .toLowerCase() || "ksemo-conversation";
       const file =
         format === "word"
-          ? createConversationWordFile(
+          ? await createConversationWordFile(
               exported.conversation.title,
               exported.messages
             )
-          : createConversationPdfFile(
+          : await createConversationPdfFile(
               exported.conversation.title,
               exported.messages
             );
       const url = URL.createObjectURL(file);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `${slug}.${format === "word" ? "doc" : "pdf"}`;
+      link.download = `${slug}.${format === "word" ? "docx" : "pdf"}`;
       link.click();
       URL.revokeObjectURL(url);
     } catch {}
@@ -4247,6 +4249,11 @@ export default function Home() {
 
   const stableOnSupport = usePersistFn((topic: "faq" | "privacy" | "terms") => {
     setSidebarOpen(false);
+    if (topic === "faq") {
+      setChatFilesOpen(false);
+      setHelpDrawerOpen(true);
+      return;
+    }
     setLocation(`/support/${topic}`);
   });
   const stableOnSearchSelect = usePersistFn((id: string) => {
@@ -4492,7 +4499,9 @@ export default function Home() {
           chatFilesOpen &&
             !activePrimaryWorkspace &&
             "transition-[margin] duration-300 ease-out",
-          chatFilesOpen && !activePrimaryWorkspace && "md:ml-6 md:mr-[25rem]"
+          chatFilesOpen &&
+            !activePrimaryWorkspace &&
+            "md:ml-6 md:mr-[25rem]"
         )}
       >
         {activePrimaryWorkspace === "library" ? (
@@ -4831,7 +4840,10 @@ export default function Home() {
               )}
             <ChatFilesDialog
               open={chatFilesOpen}
-              onOpenChange={setChatFilesOpen}
+              onOpenChange={open => {
+                if (open) setHelpDrawerOpen(false);
+                setChatFilesOpen(open);
+              }}
               files={chatFiles}
             />
 
@@ -5050,6 +5062,10 @@ export default function Home() {
           </>
         )}
         <PdfDrawer />
+        <FaqHelpDrawer
+          open={helpDrawerOpen}
+          onClose={() => setHelpDrawerOpen(false)}
+        />
         <CodeViewerPanel
           open={Boolean(showCode)}
           code={showCode?.code ?? ""}

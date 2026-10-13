@@ -98,6 +98,9 @@ importers:
       lucide-react:
         specifier: ^0.453.0
         version: 0.453.0(react@19.2.8)
+      marked:
+        specifier: ^16.4.2
+        version: 16.4.2
       mammoth:
         specifier: ^1.12.1
         version: 1.12.2
