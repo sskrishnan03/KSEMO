@@ -5165,27 +5165,15 @@ const EmptyState = memo(function EmptyState({
     <div className="mx-auto flex h-full w-full max-w-3xl flex-col px-0 pb-16 sm:px-5 sm:pb-4 lg:justify-center">
       <div className="flex min-h-0 flex-1 flex-col justify-center lg:flex-none">
         <div className="mb-4 px-5 text-center sm:mb-5 sm:px-0">
-          {temporary ? (
-            <div className="flex items-center justify-center gap-3 animate-in fade-in duration-200">
-              <TemporaryChatIcon
-                active={temporary}
-                className="ksemo-temp-greeting-icon size-8 shrink-0 text-foreground"
-              />
-              <p className="ksemo-temp-greeting-title text-[22px] font-bold tracking-[-0.04em] text-balance text-foreground sm:tracking-[-0.025em]">
-                Temporary chat
-              </p>
-            </div>
-          ) : (
-            <p className="text-[22px] font-bold tracking-[-0.04em] text-balance text-foreground sm:tracking-[-0.025em]">
-              {greeting}
-            </p>
-          )}
+          <p className="text-[22px] font-bold tracking-[-0.04em] text-balance text-foreground sm:tracking-[-0.025em]">
+            {greeting}
+          </p>
         </div>
       </div>
       <div className="relative mx-auto w-full max-w-3xl">
         {composer}
         {temporary && (
-          <p className="pointer-events-none absolute inset-x-0 top-full mt-0.5 px-5 text-center text-[13px] font-medium leading-snug text-muted-foreground sm:px-0 animate-in fade-in duration-200">
+          <p className="pointer-events-none absolute inset-x-0 top-full mt-[-8px] px-5 text-center text-[13px] font-medium leading-snug text-muted-foreground sm:px-0 animate-in fade-in duration-200">
             This conversation won't be saved to your chat history.
           </p>
         )}
