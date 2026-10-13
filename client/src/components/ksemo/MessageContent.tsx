@@ -98,6 +98,11 @@ type KsemoMessage = {
   };
 };
 
+function formatShortResponseDuration(durationMs: number): string {
+  const seconds = Math.max(1, Math.ceil(durationMs / 1000));
+  return `${seconds}s`;
+}
+
 function KsemoMarkdownLink({
   href,
   children,
@@ -431,6 +436,7 @@ export const MessageContent = memo(function MessageContent({
   onResume,
   onStop,
   isSpeaking,
+  responseStartedAt,
   isCurrentGeneration = false,
   isFileGenerating = false,
   hideTypingIndicator = false,
@@ -455,6 +461,7 @@ export const MessageContent = memo(function MessageContent({
   onResume?: () => void;
   onStop: () => void;
   isSpeaking: boolean;
+  responseStartedAt?: number;
   speechState?: "idle" | "buffering" | "playing" | "paused";
   isPreparingSpeech?: boolean;
   isCurrentGeneration?: boolean;
@@ -475,6 +482,7 @@ export const MessageContent = memo(function MessageContent({
 }) {
   const [copied, setCopied] = useState(false);
   const [actionsOpen, setActionsOpen] = useState(false);
+  const [responseDurationMs, setResponseDurationMs] = useState<number | null>(null);
   const reactionsStorageKey = `ksemo-reactions:${message.id}`;
   const [reactions, setReactions] = useState<string[]>(() => {
     try {
@@ -492,6 +500,22 @@ export const MessageContent = memo(function MessageContent({
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const [emojiSearch, setEmojiSearch] = useState("");
   const isMobile = useIsMobile();
+
+  useEffect(() => {
+    if (
+      message.role !== "assistant" ||
+      message.status !== "streaming" ||
+      responseStartedAt === undefined
+    ) {
+      setResponseDurationMs(null);
+      return;
+    }
+    const updateElapsed = () =>
+      setResponseDurationMs(Math.max(0, performance.now() - responseStartedAt));
+    updateElapsed();
+    const timer = window.setInterval(updateElapsed, 1000);
+    return () => window.clearInterval(timer);
+  }, [message.role, message.status, responseStartedAt]);
 
   useEffect(() => {
     try {
@@ -863,9 +887,12 @@ export const MessageContent = memo(function MessageContent({
                       !(message.attachments?.length && !isUser) && (
                         <div
                           aria-label="KSEMO is responding"
-                          className="inline-flex items-center"
+                          className="inline-flex items-center gap-2"
                         >
-                          <ThinkingIndicator />
+                          <ThinkingIndicator size={24} />
+                          <span className="text-sm font-medium text-muted-foreground">
+                            Working for {formatShortResponseDuration(responseDurationMs ?? 0)}
+                          </span>
                         </div>
                       )}
                   </>
@@ -1021,6 +1048,7 @@ export const MessageContent = memo(function MessageContent({
           )}
           {!isUser &&
             !isGeneratingFile &&
+            message.status !== "streaming" &&
             (message.content ||
               message.status === "failed" ||
               message.status === "cancelled" ||

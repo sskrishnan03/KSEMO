@@ -638,6 +638,7 @@ export default function Home() {
   const [streams, setStreams] = useState<
     Array<{
       turnId: number;
+      startedAt: number;
       conversationId: string | null;
       userMessageId: string | null;
       assistantMessageId: string | null;
@@ -2002,9 +2003,26 @@ export default function Home() {
       cancelAnimationFrame(deltaFlushRafRef.current);
       deltaFlushRafRef.current = 0;
     }
-    const deltas = pendingDeltasRef.current;
-    if (!deltas.size) return;
-    pendingDeltasRef.current = new Map();
+    const queuedDeltas = pendingDeltasRef.current;
+    if (!queuedDeltas.size) return;
+    const deltas = new Map<string, string>();
+    const remainingDeltas = new Map<string, string>();
+    let characterBudget = 2;
+    for (const [messageId, queuedText] of queuedDeltas) {
+      if (characterBudget <= 0) {
+        remainingDeltas.set(messageId, queuedText);
+        continue;
+      }
+      const characters = Array.from(queuedText);
+      const visibleCharacterCount = Math.min(characterBudget, characters.length);
+      const visibleText = characters.slice(0, visibleCharacterCount).join("");
+      if (visibleText) deltas.set(messageId, visibleText);
+      characterBudget -= visibleCharacterCount;
+      if (characters.length > visibleCharacterCount) {
+        remainingDeltas.set(messageId, characters.slice(visibleCharacterCount).join(""));
+      }
+    }
+    pendingDeltasRef.current = remainingDeltas;
     setChatMessages(current => {
       let changed = false;
       const next = current.map(message => {
@@ -2023,6 +2041,24 @@ export default function Home() {
       });
       return changed ? next : current;
     });
+    if (remainingDeltas.size && !deltaFlushRafRef.current) {
+      deltaFlushRafRef.current = requestAnimationFrame(() => {
+        deltaFlushRafRef.current = 0;
+        flushPendingDeltas();
+      });
+    }
+  }
+
+  async function drainPendingDeltas() {
+    while (pendingDeltasRef.current.size) {
+      if (!deltaFlushRafRef.current) {
+        deltaFlushRafRef.current = requestAnimationFrame(() => {
+          deltaFlushRafRef.current = 0;
+          flushPendingDeltas();
+        });
+      }
+      await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+    }
   }
 
   function handleMessagesScroll() {
@@ -2151,6 +2187,7 @@ export default function Home() {
     const turnSequence = ++generationSequenceRef.current;
     const streamEntry = {
       turnId: turnSequence,
+      startedAt: performance.now(),
       conversationId,
       userMessageId: null as string | null,
       assistantMessageId:
@@ -2654,11 +2691,12 @@ export default function Home() {
       clearInterval(watchdog);
     }
 
-    // The stream is finished for this conversation. Mark it inactive so the
-    // derived generating state for this conversation switches off, then
-    // finalize it. Streams in other conversations are left untouched. The
-    // entry itself is flipped immediately (not just in state) so seed/purge
-    // reads through streamsRef see the settled turn without waiting a render.
+    // Let the visible response finish revealing any queued characters before
+    // marking the stream complete, so the final answer never jumps ahead.
+    if (isViewingThisStream()) await drainPendingDeltas();
+
+    // The stream is finished for this conversation. Streams in other
+    // conversations are left untouched.
     streamEntry.active = false;
     setStreams(current =>
       current.map(stream =>
@@ -2686,9 +2724,6 @@ export default function Home() {
     // viewing it right now. If they switched away the server already owns the
     // truth and the seed/sync path will surface the finished response.
     if (isViewingThisStream()) {
-      // Drain any deltas still sitting in the rAF buffer so the final content
-      // below is complete and idempotent.
-      flushPendingDeltas();
       if (!completedConversation) {
         if (userStopped) {
           setChatMessages(current =>
@@ -4917,6 +4952,11 @@ export default function Home() {
                       <MessageContent
                         key={message.clientId ?? message.id}
                         message={message}
+                        responseStartedAt={
+                          isGenerating && generatingMessageId === message.id
+                            ? activeStream?.startedAt
+                            : undefined
+                        }
                         fileCreationNode={fileCreationNode}
                         isFileGenerating={Boolean(
                           activeFileGen && activeFileGen.status === "processing"
