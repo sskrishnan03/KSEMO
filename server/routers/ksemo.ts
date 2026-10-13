@@ -42,6 +42,7 @@ import { planPresentationOutline, regenerateSingleSlide, buildOutlineMetadata } 
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { typeAfterVoiceSession } from "../conversationTypes";
 import type { KsemoFile } from "../../supabase-schema/04-types";
+import { setInterruptedResponseOverride } from "../interruptedResponse";
 
 const conversationId = z.string().min(8).max(36);
 const preferenceInput = z.object({
@@ -476,6 +477,33 @@ export const feedbackRouter = router({
 });
 
 export const messageRouter = router({
+  saveInterrupted: protectedProcedure
+    .input(
+      z.object({
+        id: z.string().min(8).max(36),
+        content: z.string().max(1_000_000),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const existing = await getMessageForUser(input.id, ctx.user.id);
+      if (!existing)
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Message not found",
+        });
+      if (existing.role !== "assistant")
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Only assistant responses can be saved as interrupted.",
+        });
+
+      setInterruptedResponseOverride(input.id, input.content);
+      await updateMessage(input.id, {
+        content: input.content,
+        status: "cancelled",
+      });
+      return { success: true } as const;
+    }),
   remove: protectedProcedure
     .input(z.object({ id: z.string().min(8).max(36) }))
     .mutation(async ({ ctx, input }) => {

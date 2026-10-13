@@ -655,6 +655,52 @@ export async function updateMessage(
   if (error) throwDb("updateMessage", error);
 }
 
+/** Update only while a response is still streaming, so a later server-side
+ * cancellation write cannot overwrite a partial answer explicitly saved by
+ * the user after pressing Stop. */
+export async function updateStreamingMessageForUser(
+  id: string,
+  userId: number,
+  values: Partial<Pick<Message, "content" | "model" | "status" | "metadata">>
+): Promise<boolean> {
+  if (useMemoryFallback()) {
+    const existing = await inMemoryStore.getMessageForUser(id, userId);
+    if (!existing || existing.status !== "streaming") return false;
+    await inMemoryStore.updateMessage(id, values);
+    return true;
+  }
+
+  const update: Record<string, any> = { updated_at: nowIso() };
+  if (values.content !== undefined) update.content = values.content;
+  if (values.model !== undefined) update.model = values.model;
+  if (values.status !== undefined) update.status = values.status;
+  const wantsMetadata = values.metadata !== undefined;
+  if (wantsMetadata && metadataColumnSupported) {
+    update.metadata = values.metadata ?? null;
+  }
+
+  let result = await supabase
+    .from("messages")
+    .update(update)
+    .eq("id", id)
+    .eq("status", "streaming")
+    .select("id")
+    .maybeSingle();
+  if (result.error && wantsMetadata && isMissingMetadataColumn(result.error)) {
+    warnMetadataColumnMissing();
+    delete update.metadata;
+    result = await supabase
+      .from("messages")
+      .update(update)
+      .eq("id", id)
+      .eq("status", "streaming")
+      .select("id")
+      .maybeSingle();
+  }
+  if (result.error) throwDb("updateStreamingMessageForUser", result.error);
+  return Boolean(result.data);
+}
+
 export async function getMessageForUser(
   messageId: string,
   userId: number

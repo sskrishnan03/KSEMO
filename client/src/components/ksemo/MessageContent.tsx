@@ -103,6 +103,41 @@ function formatShortResponseDuration(durationMs: number): string {
   return `${seconds}s`;
 }
 
+function normalizeOrderedListMarkers(markdown: string) {
+  const counters = new Map<number, number>();
+  let fencedCode = false;
+  return markdown
+    .split("\n")
+    .map(line => {
+      const fence = line.match(/^\s*(`{3,}|~{3,})/);
+      if (fence) {
+        fencedCode = !fencedCode;
+        return line;
+      }
+      if (fencedCode) return line;
+
+      const listItem = line.match(/^(\s*)(\d{1,9})([.)])(\s+)/);
+      if (listItem && listItem[1].length < 4) {
+        const indent = listItem[1].length;
+        const previous = counters.get(indent);
+        const number = previous === undefined ? Number(listItem[2]) : previous + 1;
+        for (const level of counters.keys()) {
+          if (level > indent) counters.delete(level);
+        }
+        counters.set(indent, number);
+        return `${listItem[1]}${number}${listItem[3]}${listItem[4]}${line.slice(listItem[0].length)}`;
+      }
+
+      // Blank lines and nested unordered bullets can occur between numbered
+      // points. Keep the parent counter through those, but reset it at prose.
+      if (!line.trim() || /^\s*[-+*]\s+/.test(line)) return line;
+      if (line.match(/^\s+/) && counters.size) return line;
+      counters.clear();
+      return line;
+    })
+    .join("\n");
+}
+
 function KsemoMarkdownLink({
   href,
   children,
@@ -555,6 +590,7 @@ export const MessageContent = memo(function MessageContent({
     )
       ? ""
       : rawClean;
+  const renderContent = normalizeOrderedListMarkers(cleanContent);
 
   useEffect(() => {
     if (!previewFile) return;
@@ -806,7 +842,7 @@ export const MessageContent = memo(function MessageContent({
                       <>
                         {(() => {
                           const { first, rest } =
-                            splitFirstSentence(cleanContent);
+                          splitFirstSentence(renderContent);
                           return (
                             <>
                               {first ? (
@@ -849,14 +885,14 @@ export const MessageContent = memo(function MessageContent({
                         {message.botAction && (
                           <BotActionStatus action={message.botAction} />
                         )}
-                        {cleanContent && (
+                              {renderContent && (
                           <div className="ksemo-markdown prose prose-neutral max-w-none text-[15px] leading-6 dark:prose-invert">
                             <Streamdown
                               components={KSEMO_MARKDOWN_COMPONENTS}
                               rehypePlugins={STABLE_REHYPE_PLUGINS}
                               parseMarkdownIntoBlocksFn={singleMarkdownBlock}
                             >
-                              {cleanContent}
+                              {renderContent}
                             </Streamdown>
                           </div>
                         )}

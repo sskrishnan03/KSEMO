@@ -9,6 +9,7 @@ import {
   listMessageFilesForUser,
   listMessagesForConversation,
   removeFollowingAssistantDuplicatesForUser,
+  updateStreamingMessageForUser,
   updateConversationForUser,
   updateMessage,
   DatabaseUnavailableError,
@@ -45,6 +46,7 @@ import {
 } from "./conversationTitler";
 import { searchWeb } from "./docgen/research";
 import { UNIVERSAL_RESPONSE_INSTRUCTION } from "./universalResponsePrompt";
+import { takeInterruptedResponseOverride } from "./interruptedResponse";
 
 const BASE_SYSTEM_INSTRUCTION =
   "You are KSEMO, a thoughtful and reliable assistant. Be clear, accurate, respectful, and practical. Use Markdown when it improves readability. Never claim to have completed work you cannot verify. You can perform math, logic, code analysis, and general reasoning directly — do not refuse calculation or analysis questions. You are given the user's current local date and time at the start of every turn, so answer questions about the current time, date, or time of day straight from that value; never claim you lack a real-time clock or ask the user to supply the time. Also help with time-zone conversions, date math, and scheduling. Never introduce yourself, never state your name, and never refer to yourself as an AI assistant unless the user explicitly asks about you — always reply directly and naturally to whatever the user says.";
@@ -823,11 +825,17 @@ export function registerChatStream(app: Express) {
               preferences?.selectedModel ?? undefined,
               chatMessages,
               generationSignal,
-              delta =>
+              delta => {
+                // Keep the durable partial answer current throughout
+                // generation. If the client interrupts, runGeneration throws
+                // before returning its final string, so assigning only its
+                // return value would persist an empty cancelled response.
+                responseText += delta;
                 writeEvent(res, "assistant.delta", {
                   messageId: assistantMessageId,
                   delta,
-                })
+                });
+              }
             );
           } catch (error) {
             generationError = error;
@@ -850,11 +858,13 @@ export function registerChatStream(app: Express) {
               QUOTA_FALLBACK_MODEL,
               chatMessages,
               generationSignal,
-              delta =>
+              delta => {
+                responseText += delta;
                 writeEvent(res, "assistant.delta", {
                   messageId: assistantMessageId,
                   delta,
-                })
+                });
+              }
             );
             usedFallbackModel = true;
             generationError = null;
@@ -902,6 +912,9 @@ export function registerChatStream(app: Express) {
           });
         } else {
           const cancelled = controller.signal.aborted;
+          const cancelledContent = cancelled
+            ? (takeInterruptedResponseOverride(assistantMessageId) ?? responseText)
+            : responseText;
           let assistantMetadata: Record<string, unknown> | undefined;
           if (memoryUses.length > 0) {
             try {
@@ -921,16 +934,27 @@ export function registerChatStream(app: Express) {
               assistantMetadata = { memoryUses };
             }
           }
-          await updateMessage(assistantMessageId, {
+          const settledMessage = {
             content: cancelled
-              ? responseText
+              ? cancelledContent
               : responseText || "I’m sorry, I couldn’t generate a response.",
             model: usedFallbackModel
               ? QUOTA_FALLBACK_MODEL
               : (preferences?.selectedModel ?? null),
             status: cancelled ? "cancelled" : "completed",
             metadata: assistantMetadata,
-          });
+          } as const;
+          if (cancelled) {
+            // Conditional status update prevents a slower provider shutdown
+            // from replacing a partial answer the client has already saved.
+            await updateStreamingMessageForUser(
+              assistantMessageId,
+              user.id,
+              settledMessage
+            );
+          } else {
+            await updateMessage(assistantMessageId, settledMessage);
+          }
           terminalStatusWritten = true;
           if (!cancelled) {
             writeEvent(res, "assistant.completed", {

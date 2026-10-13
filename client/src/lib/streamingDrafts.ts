@@ -42,7 +42,16 @@ export function buildStreamingDrafts(
   if (options.isRegeneration && options.replaceAssistantMessageId)
     return messages.map(message =>
       message.id === options.replaceAssistantMessageId
-        ? { ...message, content: "", status: "streaming", createdAt: now }
+        ? {
+            ...message,
+            content: "",
+            status: "streaming",
+            createdAt: now,
+            // A regenerated answer is a fresh response. Don't carry a prior
+            // interrupted file/action state into its new streaming bubble.
+            fileGeneration: undefined,
+            botAction: undefined,
+          }
         : message
     );
   if (options.isRegeneration) return [...messages, assistant];

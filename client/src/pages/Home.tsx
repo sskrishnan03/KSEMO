@@ -646,9 +646,11 @@ export default function Home() {
       responseText: string;
       controller: AbortController;
       active: boolean;
+      stoppedByUser: boolean;
     }>
   >([]);
   const generationSequenceRef = useRef(0);
+  const stoppedStreamTurnIdsRef = useRef<Set<number>>(new Set());
   // Mirrors activeConversationId so the streaming callbacks (which capture a
   // stale closure) can check whether the user is still viewing the conversation
   // the stream belongs to.
@@ -682,6 +684,7 @@ export default function Home() {
   // Batches them into one state commit per animation frame instead of forcing a
   // full Home re-render for every token.
   const pendingDeltasRef = useRef<Map<string, string>>(new Map());
+  const visibleResponseTextRef = useRef<Map<string, string>>(new Map());
   const deltaFlushRafRef = useRef<number>(0);
   // chatMessages is the single source of truth for the open conversation.
   // Server data seeds it ONCE per conversation id (when it is opened) and is
@@ -2023,6 +2026,12 @@ export default function Home() {
       }
     }
     pendingDeltasRef.current = remainingDeltas;
+    for (const [messageId, delta] of deltas) {
+      visibleResponseTextRef.current.set(
+        messageId,
+        (visibleResponseTextRef.current.get(messageId) ?? "") + delta
+      );
+    }
     setChatMessages(current => {
       let changed = false;
       const next = current.map(message => {
@@ -2049,8 +2058,8 @@ export default function Home() {
     }
   }
 
-  async function drainPendingDeltas() {
-    while (pendingDeltasRef.current.size) {
+  async function drainPendingDeltas(shouldStop?: () => boolean) {
+    while (pendingDeltasRef.current.size && !shouldStop?.()) {
       if (!deltaFlushRafRef.current) {
         deltaFlushRafRef.current = requestAnimationFrame(() => {
           deltaFlushRafRef.current = 0;
@@ -2196,7 +2205,9 @@ export default function Home() {
       responseText: "",
       controller,
       active: true,
+      stoppedByUser: false,
     };
+    visibleResponseTextRef.current.set(streamEntry.assistantMessageId, "");
     setStreams(current => [...current, streamEntry]);
     // True when the user is still viewing the conversation this stream writes to.
     const isViewingThisStream = () =>
@@ -2300,9 +2311,20 @@ export default function Home() {
             // Whether the user is (still) looking at the conversation this new
             // server conversation belongs to before we re-point the stream.
             const wasViewing = isViewingThisStream();
+            const priorAssistantId = streamEntry.assistantMessageId;
             streamEntry.conversationId = conv.conversationId;
             streamEntry.userMessageId = conv.userMessageId;
             streamEntry.assistantMessageId = conv.assistantMessageId;
+            if (priorAssistantId !== conv.assistantMessageId) {
+              const visibleText = visibleResponseTextRef.current.get(
+                priorAssistantId
+              );
+              visibleResponseTextRef.current.delete(priorAssistantId);
+              visibleResponseTextRef.current.set(
+                conv.assistantMessageId,
+                visibleText ?? ""
+              );
+            }
             // Refresh the streams array so memoized consumers (e.g. the
             // sidebar's generating-id set) recompute with the newly assigned
             // conversation id.
@@ -2372,6 +2394,10 @@ export default function Home() {
 
               if (isBotVoiceMode) {
                 // In bot voice mode, words are displayed word-by-word synchronously as the bot speaks!
+                visibleResponseTextRef.current.set(
+                  messageId,
+                  (visibleResponseTextRef.current.get(messageId) ?? "") + delta
+                );
                 feedStreamingTts(responseText, messageId);
               } else {
                 const pending = pendingDeltasRef.current;
@@ -2690,10 +2716,53 @@ export default function Home() {
     } finally {
       clearInterval(watchdog);
     }
+    userStopped =
+      userStopped ||
+      streamEntry.stoppedByUser ||
+      stoppedStreamTurnIdsRef.current.has(turnSequence);
 
-    // Let the visible response finish revealing any queued characters before
-    // marking the stream complete, so the final answer never jumps ahead.
-    if (isViewingThisStream()) await drainPendingDeltas();
+    // On a user stop, freeze the answer at the text that has already reached
+    // the screen. The network may have delivered more deltas than the UI has
+    // revealed, so never drain that queue after an interruption.
+    if (userStopped && isViewingThisStream()) {
+      if (deltaFlushRafRef.current) {
+        cancelAnimationFrame(deltaFlushRafRef.current);
+        deltaFlushRafRef.current = 0;
+      }
+      if (streamEntry.assistantMessageId) {
+        pendingDeltasRef.current.delete(streamEntry.assistantMessageId);
+      }
+      // Keep any unrelated background stream's queued deltas moving.
+      if (pendingDeltasRef.current.size && !deltaFlushRafRef.current) {
+        deltaFlushRafRef.current = requestAnimationFrame(() => {
+          deltaFlushRafRef.current = 0;
+          flushPendingDeltas();
+        });
+      }
+    } else if (isViewingThisStream()) {
+      // A completed response should finish revealing queued characters before
+      // its status changes, so it does not jump ahead at the end.
+      await drainPendingDeltas(
+        () =>
+          streamEntry.stoppedByUser ||
+          stoppedStreamTurnIdsRef.current.has(turnSequence)
+      );
+      userStopped =
+        userStopped ||
+        streamEntry.stoppedByUser ||
+        stoppedStreamTurnIdsRef.current.has(turnSequence);
+    }
+
+    const stoppedVisibleResponse =
+      userStopped && streamEntry.assistantMessageId
+        ? (visibleResponseTextRef.current.get(
+            streamEntry.assistantMessageId
+          ) ?? "")
+        : "";
+    if (streamEntry.assistantMessageId) {
+      visibleResponseTextRef.current.delete(streamEntry.assistantMessageId);
+    }
+    stoppedStreamTurnIdsRef.current.delete(turnSequence);
 
     // The stream is finished for this conversation. Streams in other
     // conversations are left untouched.
@@ -2731,7 +2800,6 @@ export default function Home() {
               message.role === "assistant" && message.status === "streaming"
                 ? {
                     ...message,
-                    content: "",
                     status: "cancelled",
                     fileGeneration: message.fileGeneration
                       ? {
@@ -2797,7 +2865,9 @@ export default function Home() {
             message.role === "assistant" && message.status === "streaming"
               ? {
                   ...message,
-                  content: responseText || message.content,
+                  content: userStopped
+                    ? message.content
+                    : responseText || message.content,
                   status: finalStatus,
                   ...(userStopped && message.fileGeneration
                     ? {
@@ -2815,7 +2885,7 @@ export default function Home() {
       }
     }
 
-    if (completedConversation) {
+    if (completedConversation && !userStopped) {
       // Refresh the caching query for this conversation so that returning to it
       // shows the finished response immediately (server has already settled it).
       await syncConversationFromServer(completedConversation.conversationId);
@@ -2855,6 +2925,24 @@ export default function Home() {
         );
       } else if (botVoiceOpenRef.current) {
         botVoice.pauseListening();
+      }
+    }
+
+    if (completedConversation && userStopped && streamEntry.assistantMessageId) {
+      try {
+        // Persist exactly what reached the screen. This also registers an
+        // override with the stream handler in case the provider is still
+        // unwinding and has not yet written its cancelled status.
+        await utils.message.saveInterrupted.mutate({
+          id: streamEntry.assistantMessageId,
+          content: stoppedVisibleResponse,
+        });
+        void utils.conversation.get.invalidate({
+          id: completedConversation.conversationId,
+        });
+      } catch {
+        // The partial answer remains visible locally even if persistence is
+        // temporarily unavailable; the normal stream cleanup still applies.
       }
     }
   }
@@ -3252,6 +3340,11 @@ export default function Home() {
     const activeFileGeneration = fileGeneration;
     for (const stream of streamsRef.current) {
       if (stream.active && stream.conversationId === target) {
+        stream.stoppedByUser = true;
+        stoppedStreamTurnIdsRef.current.add(stream.turnId);
+        if (stream.assistantMessageId) {
+          pendingDeltasRef.current.delete(stream.assistantMessageId);
+        }
         stream.controller.abort();
         setStreams(current =>
           current.map(item =>
@@ -3259,6 +3352,16 @@ export default function Home() {
           )
         );
       }
+    }
+    if (deltaFlushRafRef.current) {
+      cancelAnimationFrame(deltaFlushRafRef.current);
+      deltaFlushRafRef.current = 0;
+    }
+    if (pendingDeltasRef.current.size && !deltaFlushRafRef.current) {
+      deltaFlushRafRef.current = requestAnimationFrame(() => {
+        deltaFlushRafRef.current = 0;
+        flushPendingDeltas();
+      });
     }
     if (activeFileGeneration) {
       settleInterruptedGeneration(
