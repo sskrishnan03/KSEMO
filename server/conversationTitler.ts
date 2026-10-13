@@ -19,24 +19,34 @@ export interface MessageLike {
 }
 
 /**
- * Prune and format messages for the titler prompt.
- * As recommended:
- * - Pass the first user query and first assistant response (contain ~90% of intent).
- * - If conversation is longer, also append the latest 2 exchanges.
- * - Truncate long message bodies to ~1000 characters to prevent token bloat.
+ * Format a representative view of the full conversation for title generation.
+ * Long threads are sampled evenly from beginning to end and each message is
+ * compacted so late topic changes can influence the title without an
+ * unbounded prompt.
  */
 export function formatConversationForTitler(
   messages: MessageLike[],
   fallbackUserPrompt?: string,
   fallbackAssistantResponse?: string
 ): string {
-  const textMessages = messages
+  const allTextMessages = messages
     .filter(m => (m.role === "user" || m.role === "assistant") && typeof m.content === "string")
     .map(m => ({
       role: m.role === "user" ? "User" : "Assistant",
-      content: (m.content as string).replace(/\s+/g, " ").trim().slice(0, 1000),
+      content: (m.content as string).replace(/\s+/g, " ").trim(),
     }))
     .filter(m => m.content.length > 0);
+
+  const sampleLimit = 60;
+  const textMessages =
+    allTextMessages.length <= sampleLimit
+      ? allTextMessages
+      : Array.from({ length: sampleLimit }, (_, index) => {
+          const sourceIndex = Math.round(
+            (index * (allTextMessages.length - 1)) / (sampleLimit - 1)
+          );
+          return allTextMessages[sourceIndex];
+        });
 
   if (textMessages.length === 0) {
     const parts: string[] = [];
@@ -49,18 +59,13 @@ export function formatConversationForTitler(
     return parts.join("\n\n");
   }
 
-  // If 4 or fewer messages, send all of them
-  if (textMessages.length <= 4) {
-    return textMessages.map(m => `${m.role}: ${m.content}`).join("\n\n");
-  }
-
-  // Token pruning for long conversations:
-  // First exchange (first user + first assistant) + latest exchange (last 2 messages)
-  const firstExchange = textMessages.slice(0, 2);
-  const latestExchange = textMessages.slice(-2);
-
-  const selected = [...firstExchange, ...latestExchange];
-  return selected.map(m => `${m.role}: ${m.content}`).join("\n\n");
+  const perMessageLimit = Math.max(
+    120,
+    Math.floor(12_000 / textMessages.length)
+  );
+  return textMessages
+    .map(m => `${m.role}: ${m.content.slice(0, perMessageLimit)}`)
+    .join("\n\n");
 }
 
 const MINOR_WORDS = new Set([

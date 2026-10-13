@@ -3342,8 +3342,30 @@ export default function Home() {
       if (stream.active && stream.conversationId === target) {
         stream.stoppedByUser = true;
         stoppedStreamTurnIdsRef.current.add(stream.turnId);
-        if (stream.assistantMessageId) {
-          pendingDeltasRef.current.delete(stream.assistantMessageId);
+        const assistantMessageId = stream.assistantMessageId;
+        const conversationId = stream.conversationId;
+        if (
+          assistantMessageId &&
+          conversationId &&
+          !assistantMessageId.startsWith("local-")
+        ) {
+          const displayedText =
+            visibleResponseTextRef.current.get(assistantMessageId) ?? "";
+          pendingDeltasRef.current.delete(assistantMessageId);
+          // Start persistence in the click handler itself. The stream reader
+          // may already be finished (while the UI is revealing text), and a
+          // quick page refresh must not cancel the partial-answer save.
+          void utils.message.saveInterrupted
+            .mutateAsync({
+              id: assistantMessageId,
+              content: displayedText,
+            })
+            .then(() =>
+              utils.conversation.get.invalidate({ id: conversationId })
+            )
+            .catch(error =>
+              console.error("Could not save the interrupted response", error)
+            );
         }
         stream.controller.abort();
         setStreams(current =>

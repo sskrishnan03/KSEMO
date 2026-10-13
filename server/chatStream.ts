@@ -944,17 +944,13 @@ export function registerChatStream(app: Express) {
             status: cancelled ? "cancelled" : "completed",
             metadata: assistantMetadata,
           } as const;
-          if (cancelled) {
-            // Conditional status update prevents a slower provider shutdown
-            // from replacing a partial answer the client has already saved.
-            await updateStreamingMessageForUser(
-              assistantMessageId,
-              user.id,
-              settledMessage
-            );
-          } else {
-            await updateMessage(assistantMessageId, settledMessage);
-          }
+          // Conditional status update prevents a slower provider shutdown or
+          // completion from replacing a partial answer the client has saved.
+          await updateStreamingMessageForUser(
+            assistantMessageId,
+            user.id,
+            settledMessage
+          );
           terminalStatusWritten = true;
           if (!cancelled) {
             writeEvent(res, "assistant.completed", {
@@ -967,23 +963,22 @@ export function registerChatStream(app: Express) {
               });
             }
 
-            // Generate intelligent title after first assistant response
-            // Only do this for new conversations (not regenerations)
-            if (
-              !body.regenerateAssistantMessageId &&
-              content &&
-              !ephemeralConversation
-            ) {
+            // Refresh the title from the conversation as it develops, so it
+            // reflects the discussion rather than only repeating the first
+            // user message.
+            if (content && !ephemeralConversation) {
               const messages = await listMessagesForConversation(
                 conversation.id
               );
               const userMessages = messages.filter(m => m.role === "user");
-              const assistantMessages = messages.filter(
-                m => m.role === "assistant"
+              const currentAnswerIsSaved = messages.some(
+                message =>
+                  message.id === assistantMessageId &&
+                  message.role === "assistant" &&
+                  message.status === "completed"
               );
 
-              // Only update title if this is the first assistant response
-              if (assistantMessages.length === 1 && userMessages.length > 0) {
+              if (currentAnswerIsSaved && userMessages.length > 0) {
                 const intelligentTitle = await resolveConversationTitle({
                   userContent: content,
                   assistantContent: responseText,
