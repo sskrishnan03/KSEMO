@@ -1227,7 +1227,9 @@ const LibraryGridCard = memo(function LibraryGridCard({
           className="flex min-w-0 flex-1 items-center gap-1.5"
           title={file.filename}
         >
-          <LibraryFormatIcon file={file} className="size-4 shrink-0" />
+          {isImageFile(file.filename, file.mimeType) && (
+            <LibraryFormatIcon file={file} className="size-4 shrink-0" />
+          )}
           <span className="block min-w-0 truncate text-xs font-medium text-foreground hover:underline">
             {file.filename}
           </span>
@@ -1499,7 +1501,9 @@ const LibraryListRow = memo(function LibraryListRow({
         className="min-w-0 flex-1"
       >
         <span className="flex min-w-0 items-start gap-1.5">
-          <LibraryFormatIcon file={file} className="size-4 shrink-0" />
+          {isImageFile(file.filename, file.mimeType) && (
+            <LibraryFormatIcon file={file} className="size-4 shrink-0" />
+          )}
           <span className="block min-w-0 truncate text-sm font-medium hover:underline">
             {file.filename}
           </span>
