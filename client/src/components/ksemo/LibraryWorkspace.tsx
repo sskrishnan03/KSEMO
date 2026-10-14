@@ -533,7 +533,7 @@ export function LibraryWorkspace({
           </h1>
         </header>
 
-        <section className="mt-3 flex min-w-0 items-center gap-2 overflow-x-auto py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:gap-3">
+        <section className="mt-3 flex min-w-0 flex-wrap items-center gap-2 overflow-visible py-1 sm:flex-nowrap sm:gap-3">
           {shareNotice && (
             <div
               role="status"
@@ -559,7 +559,7 @@ export function LibraryWorkspace({
             onChange={setFilter}
             options={LIBRARY_FILTERS}
           />
-          <div className="min-w-3 flex-1" aria-hidden="true" />
+          <div className="hidden min-w-3 flex-1 sm:block" aria-hidden="true" />
           <div ref={searchControlRef} className="flex shrink-0 items-center gap-2">
             {isSearchOpen && (
               <div className="relative w-40 shrink-0 sm:w-56">
@@ -606,7 +606,7 @@ export function LibraryWorkspace({
           />
           <Button
             size="sm"
-            className="h-10 shrink-0 rounded-xl bg-foreground text-background hover:bg-foreground/90"
+            className="order-first ml-auto h-10 shrink-0 rounded-xl bg-foreground text-background hover:bg-foreground/90 sm:order-last sm:ml-0"
             onClick={() => fileInputRef.current?.click()}
             disabled={uploadMutation.isPending}
           >
