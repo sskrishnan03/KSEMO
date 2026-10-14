@@ -2,12 +2,8 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Loading } from "@/components/ui/loading";
 import { trpc } from "@/lib/trpc";
 import { ConfirmDeleteDialog } from "./ConfirmDeleteDialog";
@@ -153,9 +149,9 @@ export function LibraryWorkspace({
     null
   );
   const [renameValue, setRenameValue] = useState("");
-  const [shareTarget, setShareTarget] = useState<LibraryWorkspaceFile | null>(
-    null
-  );
+  const [sharingFileId, setSharingFileId] = useState<string | null>(null);
+  const [shareNotice, setShareNotice] = useState<"success" | "error" | null>(null);
+  const shareNoticeTimerRef = useRef<number | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const { openPdf } = usePdfViewer();
   const [openedFile, setOpenedFile] = useState<LibraryWorkspaceFile | null>(
@@ -171,6 +167,11 @@ export function LibraryWorkspace({
   const initialOpenedRef = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const utils = trpc.useUtils();
+  useEffect(() => () => {
+    if (shareNoticeTimerRef.current !== null) {
+      window.clearTimeout(shareNoticeTimerRef.current);
+    }
+  }, []);
   const invalidateFiles = () => utils.workspace.files.list.invalidate();
   const filesQuery = trpc.workspace.files.list.useQuery();
   const openImage = useCallback((file: LibraryWorkspaceFile) => {
@@ -206,6 +207,7 @@ export function LibraryWorkspace({
     onSuccess: invalidateFiles,
     onError: () => {},
   });
+  const createShareLinkMutation = trpc.workspace.files.createShareLink.useMutation();
   const favoriteMutation = trpc.workspace.files.setFavorite.useMutation({
     // Optimistic: flip the star instantly, roll back only on failure.
     onMutate: async ({ id, isFavorite }) => {
@@ -345,10 +347,55 @@ export function LibraryWorkspace({
     }
   }
 
-  const requestShare = useCallback(
-    (file: LibraryWorkspaceFile) => setShareTarget(file),
-    []
-  );
+  const showShareNotice = useCallback((status: "success" | "error") => {
+    if (shareNoticeTimerRef.current !== null) {
+      window.clearTimeout(shareNoticeTimerRef.current);
+    }
+    setShareNotice(status);
+    shareNoticeTimerRef.current = window.setTimeout(() => {
+      setShareNotice(null);
+      shareNoticeTimerRef.current = null;
+    }, 4000);
+  }, []);
+  const dismissShareNotice = useCallback(() => {
+    if (shareNoticeTimerRef.current !== null) {
+      window.clearTimeout(shareNoticeTimerRef.current);
+      shareNoticeTimerRef.current = null;
+    }
+    setShareNotice(null);
+  }, []);
+  const requestShare = useCallback(async (file: LibraryWorkspaceFile) => {
+    if (sharingFileId) return;
+    setShareNotice(null);
+    setSharingFileId(file.id);
+    try {
+      const minimumLoading = new Promise(resolve => window.setTimeout(resolve, 500));
+      const { path } = await createShareLinkMutation.mutateAsync({ id: file.id });
+      const shareUrl = `${window.location.origin}${path}`;
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+      } catch {
+        const field = document.createElement("textarea");
+        field.value = shareUrl;
+        field.style.position = "fixed";
+        field.style.opacity = "0";
+        document.body.appendChild(field);
+        try {
+          field.select();
+          if (!document.execCommand("copy")) throw new Error("Clipboard copy failed");
+        } finally {
+          field.remove();
+        }
+      }
+      await minimumLoading;
+      showShareNotice("success");
+    } catch {
+      showShareNotice("error");
+    } finally {
+      setSharingFileId(null);
+      setOpenMenuFileId(null);
+    }
+  }, [sharingFileId, showShareNotice]);
 
   function selectVisibleFiles() {
     setSelectedIds(current => selectVisibleLibraryItems(current, files));
@@ -444,7 +491,7 @@ export function LibraryWorkspace({
         </div>
       )}
       <div className="mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col px-3.5 pt-4 sm:px-8 sm:pt-8">
-        <header className="flex flex-col gap-3 border-b border-border pb-4 sm:flex-row sm:items-start sm:justify-between">
+        <header className="relative flex flex-col gap-3 border-b border-border pb-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex w-full min-w-0 items-start justify-between gap-2 sm:gap-3">
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 sm:gap-3">
@@ -469,6 +516,25 @@ export function LibraryWorkspace({
               </p>
             </div>
             <div className="flex shrink-0 items-center gap-2 sm:hidden">
+              {shareNotice && (
+                <div
+                  role="status"
+                  aria-live="polite"
+                  className={cn(
+                    "flex min-w-0 max-w-[29vw] items-center gap-1 rounded-lg border px-2 py-1.5 text-white shadow-md",
+                    shareNotice === "success"
+                      ? "border-emerald-400/30 bg-emerald-700"
+                      : "border-rose-400/30 bg-rose-700"
+                  )}
+                >
+                  <span className="truncate text-[10px] font-semibold">
+                    {shareNotice === "success" ? "Link copied" : "Copy failed"}
+                  </span>
+                  <button type="button" onClick={dismissShareNotice} aria-label="Dismiss share message" className="flex size-5 shrink-0 items-center justify-center rounded text-white/80 hover:bg-white/15">
+                    <X className="size-3" />
+                  </button>
+                </div>
+              )}
               <Button
                 size="sm"
                 className="h-9 max-w-[38vw] whitespace-nowrap rounded-xl bg-foreground px-2.5 text-xs text-background hover:bg-foreground/90"
@@ -481,6 +547,25 @@ export function LibraryWorkspace({
             </div>
           </div>
           <div className="hidden shrink-0 flex-wrap items-center gap-2 sm:flex">
+            {shareNotice && (
+              <div
+                role="status"
+                aria-live="polite"
+                className={cn(
+                  "flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-white shadow-md",
+                  shareNotice === "success"
+                    ? "border-emerald-400/30 bg-emerald-700"
+                    : "border-rose-400/30 bg-rose-700"
+                )}
+              >
+                <span className="text-xs font-semibold">
+                  {shareNotice === "success" ? "Link copied" : "Copy failed"}
+                </span>
+                <button type="button" onClick={dismissShareNotice} aria-label="Dismiss share message" className="flex size-5 shrink-0 items-center justify-center rounded text-white/80 hover:bg-white/15">
+                  <X className="size-3" />
+                </button>
+              </div>
+            )}
             <Button
               size="sm"
               className="h-8 sm:h-9 rounded-xl bg-foreground text-xs sm:text-sm text-background hover:bg-foreground/90"
@@ -726,6 +811,7 @@ export function LibraryWorkspace({
                     onToggleFavorite={toggleFavorite}
                     onRename={requestRename}
                     onShare={requestShare}
+                    sharing={sharingFileId === file.id}
                     onDelete={requestDelete}
                     onOpenFile={openImage}
                   />
@@ -747,6 +833,7 @@ export function LibraryWorkspace({
                     onToggleFavorite={toggleFavorite}
                     onRename={requestRename}
                     onShare={requestShare}
+                    sharing={sharingFileId === file.id}
                     onDelete={requestDelete}
                     onOpenFile={openImage}
                   />
@@ -777,22 +864,6 @@ export function LibraryWorkspace({
               onCancel={() => setRenameTarget(null)}
               onSave={confirmRename}
               onValueChange={setRenameValue}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
-
-      <Dialog
-        open={Boolean(shareTarget)}
-        onOpenChange={open => {
-          if (!open) setShareTarget(null);
-        }}
-      >
-        <DialogContent className="rounded-2xl border-white/10 bg-[#1A1A1A] p-5 text-white sm:max-w-[440px]">
-          {shareTarget && (
-            <ShareFilePanel
-              file={shareTarget}
-              onClose={() => setShareTarget(null)}
             />
           )}
         </DialogContent>
@@ -1078,6 +1149,7 @@ const LibraryGridCard = memo(function LibraryGridCard({
   onToggleFavorite,
   onRename,
   onShare,
+  sharing,
   onDelete,
   onOpenFile,
 }: {
@@ -1090,6 +1162,7 @@ const LibraryGridCard = memo(function LibraryGridCard({
   onToggleFavorite: (file: LibraryWorkspaceFile) => void;
   onRename: (file: LibraryWorkspaceFile) => void;
   onShare: (file: LibraryWorkspaceFile) => void;
+  sharing: boolean;
   onDelete: (file: LibraryWorkspaceFile) => void;
   onOpenFile: (file: LibraryWorkspaceFile) => void;
 }) {
@@ -1168,7 +1241,7 @@ const LibraryGridCard = memo(function LibraryGridCard({
               type="button"
               onClick={event => event.stopPropagation()}
               className={cn(
-                "pointer-events-none flex size-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground opacity-0 transition-[opacity,color,background-color] group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100 hover:bg-accent hover:text-foreground",
+                "pointer-events-none flex size-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground opacity-0 transition-[opacity,color,background-color] group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100 hover:bg-accent hover:text-foreground max-lg:pointer-events-auto max-lg:opacity-100",
                 isMenuOpen && "pointer-events-auto opacity-100",
                 selectionMode && "pointer-events-none opacity-0"
               )}
@@ -1197,12 +1270,19 @@ const LibraryGridCard = memo(function LibraryGridCard({
               Rename
             </DropdownMenuItem>
             <DropdownMenuItem
-              onClick={event => {
+              onClick={event => event.stopPropagation()}
+              onSelect={event => {
                 event.stopPropagation();
+                event.preventDefault();
                 onShare(file);
               }}
+              aria-busy={sharing}
             >
-              <ShareIcon className="mr-2 size-4" />
+              {sharing ? (
+                <span className="loader loader-xs mr-2 text-current" aria-hidden="true" />
+              ) : (
+                <ShareIcon className="mr-2 size-4" />
+              )}
               Share
             </DropdownMenuItem>
             <DropdownMenuSeparator />
@@ -1251,7 +1331,7 @@ const LibraryGridCard = memo(function LibraryGridCard({
         </a>
         <div
           className={cn(
-            "pointer-events-none absolute bottom-2 left-2 flex max-w-[calc(100%-3.5rem)] items-center gap-1.5 text-xs text-white opacity-0 drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)] transition-opacity group-hover/preview:opacity-100 group-focus-within/preview:opacity-100",
+            "pointer-events-none absolute bottom-2 left-2 flex max-w-[calc(100%-3.5rem)] items-center gap-1.5 text-xs text-white opacity-0 drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)] transition-opacity group-hover/preview:opacity-100 group-focus-within/preview:opacity-100 max-lg:opacity-100",
             selectionMode && "invisible"
           )}
         >
@@ -1267,7 +1347,7 @@ const LibraryGridCard = memo(function LibraryGridCard({
             onToggle(file.id);
           }}
           className={cn(
-            "absolute bottom-3 right-2 rounded-full p-0 opacity-0 transition-opacity group-hover/preview:opacity-100 group-focus-within/preview:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            "absolute bottom-3 right-2 rounded-full p-0 opacity-0 transition-opacity group-hover/preview:opacity-100 group-focus-within/preview:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring max-lg:opacity-100",
             (selected || selectionMode) && "opacity-100"
           )}
           aria-label={`${selected ? "Deselect" : "Select"} ${file.filename}`}
@@ -1290,6 +1370,7 @@ const LibraryListRow = memo(function LibraryListRow({
   onToggleFavorite,
   onRename,
   onShare,
+  sharing,
   onDelete,
   onOpenFile,
 }: {
@@ -1302,6 +1383,7 @@ const LibraryListRow = memo(function LibraryListRow({
   onToggleFavorite: (file: LibraryWorkspaceFile) => void;
   onRename: (file: LibraryWorkspaceFile) => void;
   onShare: (file: LibraryWorkspaceFile) => void;
+  sharing: boolean;
   onDelete: (file: LibraryWorkspaceFile) => void;
   onOpenFile: (file: LibraryWorkspaceFile) => void;
 }) {
@@ -1441,7 +1523,7 @@ const LibraryListRow = memo(function LibraryListRow({
               type="button"
               onClick={event => event.stopPropagation()}
               className={cn(
-                "pointer-events-none flex size-8 items-center justify-center rounded-lg text-muted-foreground opacity-0 transition-[opacity,color,background-color] group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100 hover:bg-accent hover:text-foreground",
+                "pointer-events-none flex size-8 items-center justify-center rounded-lg text-muted-foreground opacity-0 transition-[opacity,color,background-color] group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100 hover:bg-accent hover:text-foreground max-lg:pointer-events-auto max-lg:opacity-100",
                 isMenuOpen && "pointer-events-auto opacity-100",
                 selectionMode && "pointer-events-none opacity-0"
               )}
@@ -1470,12 +1552,19 @@ const LibraryListRow = memo(function LibraryListRow({
               Rename
             </DropdownMenuItem>
             <DropdownMenuItem
-              onClick={event => {
+              onClick={event => event.stopPropagation()}
+              onSelect={event => {
                 event.stopPropagation();
+                event.preventDefault();
                 onShare(file);
               }}
+              aria-busy={sharing}
             >
-              <ShareIcon className="mr-2 size-4" />
+              {sharing ? (
+                <span className="loader loader-xs mr-2 text-current" aria-hidden="true" />
+              ) : (
+                <ShareIcon className="mr-2 size-4" />
+              )}
               Share
             </DropdownMenuItem>
             <DropdownMenuSeparator />
@@ -1628,107 +1717,6 @@ function RenameFilePanel({
         >
           {busy ? "Renaming…" : "Save"}
         </Button>
-      </div>
-    </div>
-  );
-}
-
-function ShareFilePanel({
-  file,
-  onClose,
-}: {
-  file: LibraryWorkspaceFile;
-  onClose: () => void;
-}) {
-  const [email, setEmail] = useState("");
-  const [copied, setCopied] = useState(false);
-  const shareUrl = file.url;
-  async function copyLink() {
-    try {
-      await navigator.clipboard.writeText(shareUrl);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // ignore copy failure
-    }
-  }
-  function emailLink() {
-    const subject = encodeURIComponent(`Share: ${file.filename}`);
-    const body = encodeURIComponent(`${file.filename}\n\n${shareUrl}`);
-    window.location.href = `mailto:${email.trim()}?subject=${subject}&body=${body}`;
-  }
-  return (
-    <div className="w-full min-w-0 space-y-3 rounded-xl bg-[#1A1A1A] py-1 text-white">
-      <DialogHeader className="text-left">
-        <DialogTitle className="text-[15px] font-semibold tracking-[-0.01em] text-white">
-          Share file
-        </DialogTitle>
-        <DialogDescription className="sr-only">
-          Share this file using its link or your email app.
-        </DialogDescription>
-      </DialogHeader>
-      <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3">
-        <div className="flex min-w-0 items-start gap-2">
-          <LibraryFormatIcon
-            file={file}
-            className="mt-0.5 size-5 shrink-0 text-white/60"
-          />
-          <div className="min-w-0 flex-1">
-            <p className="break-words text-sm font-medium leading-snug text-white">
-              {file.filename}
-            </p>
-            <p className="mt-1 text-xs text-white/50">
-              {formatBytes(file.sizeBytes)}
-            </p>
-          </div>
-          <span className="shrink-0 text-xs text-white/40">
-            {isImageFile(file.filename, file.mimeType) ? "Image" : "File"}
-          </span>
-        </div>
-      </div>
-      <div className="space-y-1.5">
-        <p className="text-[11px] font-medium text-white/40">Share link</p>
-        <div className="flex min-w-0 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5">
-          <a
-            href={shareUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="min-w-0 flex-1 truncate text-[13px] text-white/70 hover:text-white"
-          >
-            {shareUrl}
-          </a>
-          <Button
-            onClick={copyLink}
-            className="h-8 shrink-0 rounded-lg border-0 bg-white px-3 text-xs text-black hover:bg-white/90"
-          >
-            {copied ? "Copied" : "Copy link"}
-          </Button>
-        </div>
-      </div>
-      <div className="space-y-1.5">
-        <Label
-          htmlFor="share-file-email"
-          className="text-[11px] font-medium text-white/40"
-        >
-          Email
-        </Label>
-        <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2">
-          <Input
-            id="share-file-email"
-            value={email}
-            onChange={event => setEmail(event.target.value)}
-            placeholder="Email address…"
-            type="email"
-            className="h-8 min-w-0 border-0 bg-transparent px-0 text-sm text-white placeholder:text-white/40 focus-visible:ring-0"
-          />
-          <Button
-            onClick={emailLink}
-            className="h-8 shrink-0 rounded-lg border-0 bg-white px-3 text-xs text-black hover:bg-white/90"
-            disabled={!email.trim()}
-          >
-            Email
-          </Button>
-        </div>
       </div>
     </div>
   );

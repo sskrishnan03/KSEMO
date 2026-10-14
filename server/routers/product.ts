@@ -16,6 +16,7 @@ import {
 } from "../supabase-db";
 import type { KsemoFile } from "../../supabase-schema/04-types";
 import { EPHEMERAL_TITLE_PREFIX } from "../conversationTypes";
+import { createFileShareToken } from "../_core/fileShare";
 
 const entityId = z.string().min(8).max(36);
 const projectInput = z.object({
@@ -309,6 +310,14 @@ export const workspaceRouter = router({
       }),
   }),
   files: router({
+    createShareLink: protectedProcedure
+      .input(z.object({ id: entityId }))
+      .mutation(async ({ ctx, input }) => {
+        const file = await getFileForUser(input.id, ctx.user.id);
+        if (!file)
+          throw new TRPCError({ code: "NOT_FOUND", message: "File not found." });
+        return { path: `/shared-file/${createFileShareToken(file.id)}` };
+      }),
     list: protectedProcedure.query(async ({ ctx }) => {
       const files = await listFilesForUser(ctx.user.id);
       return files.map(row => ({

@@ -1,8 +1,9 @@
 import type { Express, Request, Response } from "express";
 import fs from "fs";
-import { resolveStoragePath } from "../storage";
+import { resolveStoragePath, storageDownload } from "../storage";
 import { supabase, isSupabaseConfigured, getFileForUser } from "../supabase-db";
 import { sdk } from "./sdk";
+import { readFileShareToken } from "./fileShare";
 
 const BUCKET_NAME = process.env.SUPABASE_STORAGE_BUCKET || "ksemo-files";
 
@@ -24,6 +25,40 @@ const MIME_TYPES: Record<string, string> = {
 };
 
 export function registerStorageProxy(app: Express) {
+  app.get("/shared-file/:token", async (req: Request, res: Response) => {
+    const fileId = readFileShareToken(String(req.params.token || ""));
+    if (!fileId) {
+      res.status(404).send("Shared file not found");
+      return;
+    }
+    try {
+      const file = await getFileForUser(fileId);
+      if (!file) {
+        res.status(404).send("Shared file not found");
+        return;
+      }
+      const { data } = await storageDownload(file.storageKey);
+      if (!data) {
+        res.status(404).send("Shared file not found");
+        return;
+      }
+      const contentType = file.mimeType || "application/octet-stream";
+      const safeAscii = file.filename.replace(/[^\x20-\x7E]/g, "_").replace(/["\\]/g, "_");
+      res.set({
+        "Content-Type": contentType,
+        "Content-Length": String(data.length),
+        "Content-Disposition": `inline; filename="${safeAscii}"; filename*=UTF-8''${encodeURIComponent(file.filename)}`,
+        "Cache-Control": "private, no-store",
+        "X-Content-Type-Options": "nosniff",
+        "Content-Security-Policy": "sandbox; default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'",
+      });
+      res.send(data);
+    } catch (error) {
+      console.error("[storage] Shared file delivery failed:", error);
+      res.status(500).send("Unable to open shared file");
+    }
+  });
+
   app.use("/ksemo-storage", async (req: Request, res: Response) => {
     const rawPath = (req.path || req.url.split("?")[0]).replace(/^\/+/, "");
     const key = decodeURIComponent(rawPath);
