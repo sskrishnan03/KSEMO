@@ -4963,7 +4963,7 @@ export default function Home() {
                           <DropdownMenuContent
                             align="end"
                             sideOffset={6}
-                            className="w-56 rounded-xl lg:hidden"
+                            className="w-48 rounded-xl lg:hidden"
                           >
                             <DropdownMenuLabel className="whitespace-normal break-words text-foreground">
                               {activeConversation?.title || "New Chat"}
@@ -4999,12 +4999,6 @@ export default function Home() {
                             >
                               <Archive className="mr-2 size-4" />
                               Archive
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onSelect={() => setChatFilesOpen(true)}
-                            >
-                              <WinrarIcon className="mr-2 size-4" />
-                              View files
                             </DropdownMenuItem>
                             <DropdownMenuSub>
                               <DropdownMenuSubTrigger
@@ -5066,6 +5060,12 @@ export default function Home() {
                             >
                               <ShareIcon className="mr-2 size-4" />
                               Share
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onSelect={() => setChatFilesOpen(true)}
+                            >
+                              <WinrarIcon className="mr-2 size-4" />
+                              View files
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
