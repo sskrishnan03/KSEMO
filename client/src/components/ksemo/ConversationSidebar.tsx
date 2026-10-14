@@ -398,6 +398,7 @@ export const ConversationSidebar = memo(function ConversationSidebar({
                 <ConversationGroup
                   label="Pinned"
                   conversations={pinned}
+                  onNew={onNew}
                   activeConversationId={activeConversationId}
                   generatingConversationIds={generatingConversationIds}
                   openMenuId={openMenuId}
@@ -421,6 +422,7 @@ export const ConversationSidebar = memo(function ConversationSidebar({
               <ConversationGroup
                 label="Conversations"
                 conversations={recent}
+                onNew={onNew}
                 activeConversationId={activeConversationId}
                 generatingConversationIds={generatingConversationIds}
                 openMenuId={openMenuId}
@@ -651,6 +653,7 @@ export const ConversationSidebar = memo(function ConversationSidebar({
 const ConversationGroup = memo(function ConversationGroup({
   label,
   conversations,
+  onNew,
   activeConversationId,
   generatingConversationIds,
   onSelect,
@@ -673,6 +676,7 @@ const ConversationGroup = memo(function ConversationGroup({
 }: {
   label: string;
   conversations: Conversation[];
+  onNew: () => void;
   activeConversationId: string | null;
   generatingConversationIds?: ReadonlySet<string>;
   onSelect: (id: string) => void;
@@ -700,23 +704,37 @@ const ConversationGroup = memo(function ConversationGroup({
     openMenuId !== undefined ? openMenuId : localOpenMenuId;
   const handleMenuOpenChange = onMenuOpenChange ?? setLocalOpenMenuId;
   return (
-    <section className="mb-5">
-      <button
-        type="button"
-        onClick={() => setExpanded(current => !current)}
-        className="group flex w-full items-center gap-1.5 px-2 py-1.5 text-left text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground cursor-pointer select-none"
-        aria-expanded={expanded}
-        data-disclosure-group={label.toLowerCase()}
-      >
-        {label}
-        <span className="opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
-          {expanded ? (
-            <ChevronDown className="size-3.5" />
-          ) : (
-            <ChevronRight className="size-3.5" />
-          )}
-        </span>
-      </button>
+    <section className="group/conversation-list mb-5">
+      <div className="group/conversation-heading flex items-center">
+        <button
+          type="button"
+          onClick={() => setExpanded(current => !current)}
+          className="group flex min-w-0 flex-1 items-center gap-1.5 px-2 py-1.5 text-left text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground cursor-pointer select-none"
+          aria-expanded={expanded}
+          data-disclosure-group={label.toLowerCase()}
+        >
+          {label}
+          <span className="shrink-0 opacity-0 transition-opacity group-hover/conversation-list:opacity-100 group-focus-within/conversation-list:opacity-100 max-lg:opacity-100">
+            {expanded ? (
+              <ChevronDown className="size-3.5" />
+            ) : (
+              <ChevronRight className="size-3.5" />
+            )}
+          </span>
+        </button>
+        {label === "Conversations" && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={onNew}
+            className="mr-1 size-6 aspect-square shrink-0 !rounded-md text-muted-foreground opacity-0 transition-[opacity,background-color,color,box-shadow] duration-150 hover:!rounded-md hover:bg-sidebar-accent hover:text-foreground hover:ring-1 hover:ring-sidebar-border/70 focus-visible:!rounded-md focus-visible:bg-sidebar-accent focus-visible:text-foreground focus-visible:ring-2 focus-visible:ring-ring active:!rounded-md group-hover/conversation-heading:opacity-100 group-focus-within/conversation-heading:opacity-100 max-lg:!opacity-100"
+            aria-label="New chat"
+          >
+            <SquarePen className="size-3.5" />
+          </Button>
+        )}
+      </div>
       {expanded && (
         <div className="mt-0.5 space-y-0.5">
           {conversations.map(conversation => {
@@ -784,6 +802,7 @@ const ConversationGroup = memo(function ConversationGroup({
                       onExport={onExport}
                       onDelete={onDelete}
                       isMobile={isMobile}
+                      isRowActive={isRowActive || isHovered}
                     />
                   </>
                 )}
@@ -857,6 +876,7 @@ export const ConversationActionsMenu = memo(function ConversationActionsMenu({
   onExport,
   onDelete,
   isMobile: isMobileProp,
+  isRowActive = false,
 }: {
   conversation: Conversation;
   isMenuOpen: boolean;
@@ -868,6 +888,7 @@ export const ConversationActionsMenu = memo(function ConversationActionsMenu({
   onExport: (conversation: Conversation, format: "pdf" | "word") => void;
   onDelete: (conversation: Conversation) => void;
   isMobile?: boolean;
+  isRowActive?: boolean;
 }) {
   const isMobileDetected = useIsMobile(960);
   const isMobile = isMobileProp ?? isMobileDetected;
@@ -882,6 +903,7 @@ export const ConversationActionsMenu = memo(function ConversationActionsMenu({
             "size-8 shrink-0 rounded-md text-muted-foreground ml-0 mr-1.5",
             "transition-[opacity,background-color,color] duration-150",
             "max-lg:opacity-100 lg:opacity-0 lg:group-hover:opacity-100 group-hover:text-foreground",
+            isRowActive && "lg:opacity-100",
             "hover:bg-accent hover:text-foreground",
             "data-[state=open]:bg-accent data-[state=open]:opacity-100"
           )}

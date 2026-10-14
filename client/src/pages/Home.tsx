@@ -4760,7 +4760,9 @@ export default function Home() {
             {/* Chat action menu has no place in a temporary chat, so the
                 three-dots button is hidden there entirely. */}
             {!guestMode &&
-              (visibleMessages.length > 0 || Boolean(shareTarget)) &&
+              (Boolean(activeConversationId) ||
+                visibleMessages.length > 0 ||
+                Boolean(shareTarget)) &&
               !isTemporaryChat && (
                 <div className="pointer-events-none absolute inset-x-0 top-0 z-20 h-13">
                   <ShareConversationDialog
@@ -4823,10 +4825,10 @@ export default function Home() {
                             Share
                           </span>
                         </Button>}
-                        {!chatFilesOpen && <div className="pointer-events-auto absolute left-14 right-24 top-2 hidden lg:block lg:left-4">
-                          <div className="inline-flex h-9 max-w-full items-center gap-1">
+                        <div className="pointer-events-auto absolute left-14 right-24 top-2 hidden lg:block lg:left-4">
+                          <div className="inline-flex min-h-9 max-w-full items-center gap-1">
                               <span
-                                className="max-w-[calc(100%-1.5rem)] truncate text-sm font-medium text-foreground"
+                                className="min-w-0 max-w-[calc(100%-2rem)] whitespace-normal break-words text-sm font-semibold leading-4 text-foreground"
                               >
                               {activeConversation?.title || "New Chat"}
                             </span>
@@ -4834,7 +4836,7 @@ export default function Home() {
                           <DropdownMenuTrigger asChild>
                             <button
                               type="button"
-                              className="flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent/70 hover:text-foreground data-[state=open]:bg-accent/70 data-[state=open]:text-foreground active:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                              className="flex size-7 shrink-0 items-center justify-center rounded-md text-foreground transition-colors hover:bg-accent/70 data-[state=open]:bg-accent/70 active:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                               aria-label={`Conversation options for ${activeConversation?.title || "New Chat"}`}
                             >
                               <ChevronDown className="size-4" />
@@ -4949,7 +4951,7 @@ export default function Home() {
                           </DropdownMenuContent>
                           </DropdownMenu>
                           </div>
-                        </div>}
+                        </div>
                         {!chatFilesOpen && <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <button
