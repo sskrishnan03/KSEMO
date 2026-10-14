@@ -461,6 +461,8 @@ export default function Home() {
   const inlineWorkspaceSection: "library" | null =
     workspacePreview === "files" ? "library" : null;
   const utils = trpc.useUtils();
+  const saveInterruptedMutation =
+    trpc.message.saveInterrupted.useMutation();
   const [sidebarOpen, setSidebarOpen] = useState(isSidebarOpenPreview);
   const [helpDrawerOpen, setHelpDrawerOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
@@ -2904,7 +2906,7 @@ export default function Home() {
         // Persist exactly what reached the screen. This also registers an
         // override with the stream handler in case the provider is still
         // unwinding and has not yet written its cancelled status.
-        await utils.message.saveInterrupted.mutate({
+        await saveInterruptedMutation.mutateAsync({
           id: streamEntry.assistantMessageId,
           content: stoppedVisibleResponse,
         });
@@ -3326,7 +3328,7 @@ export default function Home() {
           // Start persistence in the click handler itself. The stream reader
           // may already be finished (while the UI is revealing text), and a
           // quick page refresh must not cancel the partial-answer save.
-          void utils.message.saveInterrupted
+          void saveInterruptedMutation
             .mutateAsync({
               id: assistantMessageId,
               content: displayedText,
@@ -4820,7 +4822,7 @@ export default function Home() {
                             Share
                           </span>
                         </Button>}
-                        <div className="pointer-events-auto absolute left-14 right-24 top-2 lg:left-4">
+                        {!chatFilesOpen && <div className="pointer-events-auto absolute left-14 right-24 top-2 lg:left-4">
                           <div className="inline-flex h-9 max-w-full items-center gap-1">
                               <span
                                 ref={conversationTitleRef}
@@ -4948,7 +4950,7 @@ export default function Home() {
                           </DropdownMenuContent>
                           </DropdownMenu>
                           </div>
-                        </div>
+                        </div>}
                       </div>
                     }
                   />
