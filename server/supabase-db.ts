@@ -1248,6 +1248,7 @@ function dbFileToKsemoFile(row: any): KsemoFile {
     mimeType: row.mime_type,
     sizeBytes: Number(row.size_bytes),
     contentText: row.content_text ?? null,
+    isFavorite: Boolean(row.is_favorite),
     status: row.status === "failed" ? "failed" : "ready",
     createdAt: new Date(row.created_at),
     updatedAt: new Date(row.updated_at),
@@ -1320,6 +1321,8 @@ export async function updateFileForUser(
   if (values.filename !== undefined) update.filename = values.filename;
   if (values.contentText !== undefined)
     update.content_text = values.contentText;
+  if (values.isFavorite !== undefined)
+    update.is_favorite = values.isFavorite;
   if (values.status !== undefined) update.status = values.status;
   if (values.sizeBytes !== undefined) update.size_bytes = values.sizeBytes;
   const { error } = await supabase

@@ -53,6 +53,7 @@ import {
 } from "@/components/ui/tooltip";
 import { ShareIcon, Trash6Icon } from "./icons";
 import { downloadFile } from "@/lib/downloadFile";
+import { toast } from "sonner";
 import React, {
   memo,
   useCallback,
@@ -137,6 +138,8 @@ export function LibraryWorkspace({
   onOpenSidebar?: () => void;
 }) {
   const [query, setQuery] = useState("");
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const searchControlRef = useRef<HTMLDivElement>(null);
   const [filter, setFilter] = useState<LibraryFilter>("all");
   const [view, setView] = useState<LibraryView>("grid");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
@@ -172,6 +175,26 @@ export function LibraryWorkspace({
       window.clearTimeout(shareNoticeTimerRef.current);
     }
   }, []);
+  useEffect(() => {
+    if (!isSearchOpen) return;
+    const closeOnOutsideClick = (event: PointerEvent) => {
+      if (
+        event.target instanceof Node &&
+        !searchControlRef.current?.contains(event.target)
+      ) {
+        setIsSearchOpen(false);
+      }
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setIsSearchOpen(false);
+    };
+    document.addEventListener("pointerdown", closeOnOutsideClick);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsideClick);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [isSearchOpen]);
   const invalidateFiles = () => utils.workspace.files.list.invalidate();
   const filesQuery = trpc.workspace.files.list.useQuery();
   const openImage = useCallback((file: LibraryWorkspaceFile) => {
@@ -223,6 +246,7 @@ export function LibraryWorkspace({
     onError: (_error, _variables, context) => {
       if (context?.previous)
         utils.workspace.files.list.setData(undefined, context.previous);
+      toast.error(_error.message || "Couldn't update favorite status.");
     },
     onSettled: () => utils.workspace.files.list.invalidate(),
   });
@@ -491,131 +515,104 @@ export function LibraryWorkspace({
         </div>
       )}
       <div className="mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col px-3.5 pt-4 sm:px-8 sm:pt-8">
-        <header className="relative flex flex-col gap-3 border-b border-border pb-4 sm:flex-row sm:items-start sm:justify-between">
-          <div className="flex w-full min-w-0 items-start justify-between gap-2 sm:gap-3">
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2 sm:gap-3">
-                {onOpenSidebar && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={onOpenSidebar}
-                    className="size-10 shrink-0 rounded-lg border-0 bg-transparent p-0 text-foreground/90 shadow-none transition-colors hover:bg-accent/80 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring active:bg-accent lg:hidden"
-                    aria-label="Open conversations"
-                    title="Open sidebar"
-                  >
-                    <Sidebar2 size={20} strokeWidth={2} className="size-5" />
-                  </Button>
-                )}
-                <h1 className="text-2xl font-semibold tracking-[-0.03em]">
-                  Library
-                </h1>
-              </div>
-              <p className="mt-1 max-w-xl break-words text-xs sm:text-sm text-muted-foreground">
-                Your private space for files and images you can chat about.
-              </p>
-            </div>
-            <div className="flex shrink-0 items-center gap-2 sm:hidden">
-              {shareNotice && (
-                <div
-                  role="status"
-                  aria-live="polite"
-                  className={cn(
-                    "flex min-w-0 max-w-[29vw] items-center gap-1 rounded-lg border px-2 py-1.5 text-white shadow-md",
-                    shareNotice === "success"
-                      ? "border-emerald-400/30 bg-emerald-700"
-                      : "border-rose-400/30 bg-rose-700"
-                  )}
-                >
-                  <span className="truncate text-[10px] font-semibold">
-                    {shareNotice === "success" ? "Link copied" : "Copy failed"}
-                  </span>
-                  <button type="button" onClick={dismissShareNotice} aria-label="Dismiss share message" className="flex size-5 shrink-0 items-center justify-center rounded text-white/80 hover:bg-white/15">
-                    <X className="size-3" />
-                  </button>
-                </div>
+        <header className="flex min-w-0 items-center gap-2">
+          {onOpenSidebar && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onOpenSidebar}
+              className="size-10 shrink-0 rounded-lg border-0 bg-transparent p-0 text-foreground/90 shadow-none transition-colors hover:bg-accent/80 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring active:bg-accent lg:hidden"
+              aria-label="Open conversations"
+              title="Open sidebar"
+            >
+              <Sidebar2 size={20} strokeWidth={2} className="size-5" />
+            </Button>
+          )}
+          <h1 className="text-2xl font-semibold tracking-[-0.03em]">
+            Library
+          </h1>
+        </header>
+
+        <section className="mt-3 flex min-w-0 items-center gap-2 overflow-x-auto py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:gap-3">
+          {shareNotice && (
+            <div
+              role="status"
+              aria-live="polite"
+              className={cn(
+                "flex shrink-0 items-center gap-1 rounded-lg border px-2 py-1.5 text-white shadow-md",
+                shareNotice === "success"
+                  ? "border-emerald-400/30 bg-emerald-700"
+                  : "border-rose-400/30 bg-rose-700"
               )}
-              <Button
-                size="sm"
-                className="h-9 max-w-[38vw] whitespace-nowrap rounded-xl bg-foreground px-2.5 text-xs text-background hover:bg-foreground/90"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploadMutation.isPending}
-              >
-                <Upload className="mr-1.5 size-3.5 shrink-0" />
-                {uploadMutation.isPending ? "Uploading…" : "Upload files"}
-              </Button>
+            >
+              <span className="text-xs font-semibold">
+                {shareNotice === "success" ? "Link copied" : "Copy failed"}
+              </span>
+              <button type="button" onClick={dismissShareNotice} aria-label="Dismiss share message" className="flex size-5 shrink-0 items-center justify-center rounded text-white/80 hover:bg-white/15">
+                <X className="size-3" />
+              </button>
             </div>
-          </div>
-          <div className="hidden shrink-0 flex-wrap items-center gap-2 sm:flex">
-            {shareNotice && (
-              <div
-                role="status"
-                aria-live="polite"
-                className={cn(
-                  "flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-white shadow-md",
-                  shareNotice === "success"
-                    ? "border-emerald-400/30 bg-emerald-700"
-                    : "border-rose-400/30 bg-rose-700"
+          )}
+          <SegmentedTags
+            description="Filter Library"
+            value={filter}
+            onChange={setFilter}
+            options={LIBRARY_FILTERS}
+          />
+          <div className="min-w-3 flex-1" aria-hidden="true" />
+          <div ref={searchControlRef} className="flex shrink-0 items-center gap-2">
+            {isSearchOpen && (
+              <div className="relative w-40 shrink-0 sm:w-56">
+                <Input
+                  autoFocus
+                  value={query}
+                  onChange={event => setQuery(event.target.value)}
+                  className={cn(
+                    "h-10 rounded-xl",
+                    query && "pr-8"
+                  )}
+                  placeholder="Search your Library"
+                  aria-label="Search your Library"
+                />
+                {query && (
+                  <button
+                    type="button"
+                    onClick={() => setQuery("")}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground transition-colors hover:text-foreground"
+                    aria-label="Clear search query"
+                  >
+                    <X className="size-4" />
+                  </button>
                 )}
-              >
-                <span className="text-xs font-semibold">
-                  {shareNotice === "success" ? "Link copied" : "Copy failed"}
-                </span>
-                <button type="button" onClick={dismissShareNotice} aria-label="Dismiss share message" className="flex size-5 shrink-0 items-center justify-center rounded text-white/80 hover:bg-white/15">
-                  <X className="size-3" />
-                </button>
               </div>
             )}
             <Button
-              size="sm"
-              className="h-8 sm:h-9 rounded-xl bg-foreground text-xs sm:text-sm text-background hover:bg-foreground/90"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploadMutation.isPending}
+              type="button"
+              variant="outline"
+              size="icon"
+              className="size-10 shrink-0 rounded-full text-foreground transition-colors hover:border-neutral-700 hover:bg-neutral-800 active:bg-neutral-700"
+              onClick={() => setIsSearchOpen(open => !open)}
+              aria-label={isSearchOpen ? "Close Library search" : "Search Library"}
+              aria-expanded={isSearchOpen}
             >
-              <Upload className="mr-1.5 sm:mr-2 size-3.5 sm:size-4" />
-              {uploadMutation.isPending ? "Uploading…" : "Upload files"}
+              <Search className="size-4" />
             </Button>
           </div>
-        </header>
-
-        <section className="mt-3.5 sm:mt-6 flex flex-col gap-2.5 xl:flex-row xl:items-center xl:justify-between">
-          <div className="relative w-full xl:max-w-md">
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={query}
-              onChange={event => setQuery(event.target.value)}
-              className={cn(
-                "h-9 sm:h-10 rounded-xl pl-9 text-xs sm:text-sm",
-                query && "pr-9"
-              )}
-              placeholder="Search your Library"
-              aria-label="Search your Library"
-            />
-            {query && (
-              <button
-                type="button"
-                onClick={() => setQuery("")}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground transition-colors hover:text-foreground"
-                aria-label="Clear search query"
-              >
-                <X className="size-3.5 sm:size-4" />
-              </button>
-            )}
-          </div>
-          <div className="flex items-center justify-between gap-1.5 sm:gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            <SegmentedTags
-              description="Filter Library"
-              value={filter}
-              onChange={setFilter}
-              options={LIBRARY_FILTERS}
-            />
-            <SegmentedTags
-              description="Library view"
-              value={view}
-              onChange={setView}
-              options={LIBRARY_VIEWS}
-            />
-          </div>
+          <SegmentedTags
+            description="Library view"
+            value={view}
+            onChange={setView}
+            options={LIBRARY_VIEWS}
+          />
+          <Button
+            size="sm"
+            className="h-10 shrink-0 rounded-xl bg-foreground text-background hover:bg-foreground/90"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploadMutation.isPending}
+          >
+            <Upload className="mr-1.5 size-4" />
+            {uploadMutation.isPending ? "Uploading…" : "Upload files"}
+          </Button>
         </section>
 
         {selectedFiles.length > 0 && (

@@ -56,21 +56,17 @@ function safeFilename(name: string) {
 
 const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
 
-// Favorites rely on the optional is_favorite column added by
-// supabase-schema/06-library-lite.sql; chat-with-file relies on content_text
-// from the same migration. Both degrade gracefully when it hasn't run yet.
-let liteSchemaChecked = false;
+// Favorites rely on the optional is_favorite column. Chat-with-file relies on
+// content_text. These checks let older Supabase installations fail clearly.
 let liteSchemaReady = false;
 
 async function ensureLiteSchema(): Promise<boolean> {
-  if (!liteSchemaChecked) {
-    const { error } = await supabase
-      .from("files")
-      .select("is_favorite,content_text")
-      .limit(1);
-    liteSchemaReady = !error;
-    liteSchemaChecked = true;
-  }
+  if (!isSupabaseConfigured || liteSchemaReady) return true;
+  const { error } = await supabase
+    .from("files")
+    .select("is_favorite")
+    .limit(1);
+  liteSchemaReady = !error;
   return liteSchemaReady;
 }
 
@@ -333,7 +329,7 @@ export const workspaceRouter = router({
           row.status === "failed" ? ("failed" as const) : ("ready" as const),
         createdAt: row.createdAt ? new Date(row.createdAt) : new Date(),
         updatedAt: row.updatedAt ? new Date(row.updatedAt) : new Date(),
-        isFavorite: false,
+        isFavorite: Boolean(row.isFavorite),
       }));
     }),
     setFavorite: protectedProcedure
@@ -343,19 +339,21 @@ export const workspaceRouter = router({
           throw new TRPCError({
             code: "PRECONDITION_FAILED",
             message:
-              "Favorites aren't set up yet. Run supabase-schema/06-library-lite.sql in your Supabase SQL editor, then reload.",
+              "Favorites aren't set up yet. Apply supabase-schema/10-library-favorites.sql to your database, then try again.",
           });
-        const { error } = await supabase
-          .from("files")
-          .update({ is_favorite: input.isFavorite })
-          .eq("id", input.id)
-          .eq("user_id", ctx.user.id);
-
-        if (error)
+        const file = await getFileForUser(input.id, ctx.user.id);
+        if (!file)
+          throw new TRPCError({ code: "NOT_FOUND", message: "File not found." });
+        try {
+          await updateFileForUser(input.id, ctx.user.id, {
+            isFavorite: input.isFavorite,
+          });
+        } catch {
           throw new TRPCError({
             code: "INTERNAL_SERVER_ERROR",
-            message: "Failed to update file",
+            message: "Failed to update file favorite status.",
           });
+        }
         return { success: true } as const;
       }),
     rename: protectedProcedure

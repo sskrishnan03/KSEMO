@@ -1089,6 +1089,7 @@ class InMemoryStore {
       sizeBytes: input.sizeBytes,
       status: input.status || "ready",
       contentText: input.contentText ?? null,
+      isFavorite: input.isFavorite ?? false,
       createdAt: input.createdAt instanceof Date ? input.createdAt : new Date(),
       updatedAt: input.updatedAt instanceof Date ? input.updatedAt : new Date(),
     };

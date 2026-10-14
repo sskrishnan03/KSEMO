@@ -460,7 +460,7 @@ export function SearchWorkspace({
   return (
     <main className="flex min-h-0 flex-1 flex-col bg-background">
       <div className="mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col px-5 pt-6 sm:px-8 sm:pt-8">
-        <header className="flex flex-col gap-4 border-b border-border pb-5 sm:flex-row sm:items-start sm:justify-between">
+        <header className="flex flex-col gap-4 pb-1 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex w-full items-start gap-3">
             <div>
               <div className="flex items-center gap-2">
@@ -480,14 +480,11 @@ export function SearchWorkspace({
                   Search
                 </h1>
               </div>
-              <p className="mt-1.5 max-w-xl text-sm text-muted-foreground">
-                Find anything across your conversations and messages.
-              </p>
             </div>
           </div>
         </header>
 
-        <section className="mt-6 flex items-center gap-2">
+        <section className="mt-2.5 flex items-center gap-2 sm:mt-3">
           <div className="relative min-w-0 flex-1 max-w-md">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input

@@ -1,4 +1,5 @@
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { Toaster } from "@/components/ui/sonner";
 import NotFound from "@/pages/NotFound";
 import AuthStage from "@/pages/AuthStage";
 import { Route, Switch } from "wouter";
@@ -48,6 +49,7 @@ function App() {
         <TooltipProvider>
           <PdfViewerProvider>
             <Router />
+            <Toaster />
           </PdfViewerProvider>
         </TooltipProvider>
       </ThemeProvider>

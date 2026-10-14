@@ -190,6 +190,7 @@ export type KsemoFile = {
   mimeType: string;
   sizeBytes: number;
   contentText: string | null;
+  isFavorite?: boolean;
   status: "ready" | "failed";
   createdAt: Date;
   updatedAt: Date;
