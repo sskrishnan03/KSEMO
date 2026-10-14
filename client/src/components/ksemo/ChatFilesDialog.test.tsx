@@ -25,8 +25,8 @@ describe("ChatFilesDialog", () => {
     );
     expect(markup).toContain("Files in this chat");
     expect(markup).toContain("No files in this chat");
-    expect(markup).toContain("fixed right-2 top-2");
-    expect(markup).toContain("h-[calc(100dvh-1.75rem)]");
+    expect(markup).toContain("fixed inset-x-2 bottom-2");
+    expect(markup).toContain("slide-in-from-bottom-8");
     expect(markup).not.toContain("0 files");
   });
 

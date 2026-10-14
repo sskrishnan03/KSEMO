@@ -56,7 +56,8 @@ export const ChatFilesDialog = memo(function ChatFilesDialog({
     <div
       role="dialog"
       aria-label="Files in this chat"
-      className="fixed right-2 top-2 bottom-5 z-50 flex h-[calc(100dvh-1.75rem)] w-[min(calc(100vw-1rem),23rem)] flex-col overflow-hidden rounded-2xl border border-border bg-popover/95 text-popover-foreground shadow-lg backdrop-blur-md"
+      aria-modal="true"
+      className="fixed inset-x-2 bottom-2 z-50 mx-auto flex h-[min(70dvh,36rem)] max-w-3xl flex-col overflow-hidden rounded-2xl border border-border bg-popover/95 text-popover-foreground shadow-lg backdrop-blur-md animate-in slide-in-from-bottom-8 fade-in duration-200"
     >
       <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border/80 px-3.5 py-2.5 bg-muted/20">
         <div className="flex items-center gap-2.5 min-w-0">

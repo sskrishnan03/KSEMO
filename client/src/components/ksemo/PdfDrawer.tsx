@@ -3643,7 +3643,7 @@ export const PdfDrawer = memo(function PdfDrawer() {
       className={cn(
         "absolute inset-0 z-40 flex flex-col bg-background text-foreground",
         "border-l border-border/80 shadow-2xl overflow-hidden",
-        "animate-in slide-in-from-right duration-300 ease-out"
+        "animate-in slide-in-from-bottom duration-300 ease-out"
       )}
     >
       {/* Top Header */}

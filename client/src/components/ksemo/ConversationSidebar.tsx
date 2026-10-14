@@ -772,6 +772,18 @@ const ConversationGroup = memo(function ConversationGroup({
                       onSelect={onSelect}
                       isRowHovered={isHovered || isMenuOpen}
                     />
+                    {conversation.isPinned && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => onPin(conversation)}
+                        className="mr-0 size-8 shrink-0 rounded-md text-muted-foreground ml-0 transition-[opacity,background-color,color] duration-150 max-lg:opacity-100 lg:opacity-0 lg:group-hover:opacity-100 group-hover:text-foreground hover:bg-accent hover:text-foreground"
+                        aria-label={`Unpin ${conversation.title}`}
+                      >
+                        <UnpinTackIcon className="size-4" />
+                      </Button>
+                    )}
                     {/*
                       Only chats still responding in the background get an
                       indicator; the chat being viewed never shows one here.
@@ -802,7 +814,7 @@ const ConversationGroup = memo(function ConversationGroup({
                       onExport={onExport}
                       onDelete={onDelete}
                       isMobile={isMobile}
-                      isRowActive={isRowActive || isHovered}
+                      isRowActive={isHovered || isMenuOpen}
                     />
                   </>
                 )}

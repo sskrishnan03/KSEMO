@@ -4628,15 +4628,7 @@ export default function Home() {
       />
 
       <main
-        className={cn(
-          "relative flex min-w-0 flex-1 flex-col",
-          chatFilesOpen &&
-            !activePrimaryWorkspace &&
-            "transition-[margin] duration-300 ease-out",
-          chatFilesOpen &&
-            !activePrimaryWorkspace &&
-            "md:ml-6 md:mr-[25rem]"
-        )}
+        className="relative flex min-w-0 flex-1 flex-col"
       >
         {activePrimaryWorkspace === "library" ? (
           <LibraryWorkspace
