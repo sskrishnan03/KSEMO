@@ -37,6 +37,7 @@ import {
   Star,
   Upload,
   X,
+  ChevronDown,
 } from "lucide-react";
 import { Sidebar2 } from "reicon-react/icons/Sidebar2";
 import {
@@ -178,12 +179,14 @@ export function LibraryWorkspace({
   useEffect(() => {
     if (!isSearchOpen) return;
     const closeOnOutsideClick = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (searchControlRef.current?.contains(target)) return;
       if (
-        event.target instanceof Node &&
-        !searchControlRef.current?.contains(event.target)
-      ) {
-        setIsSearchOpen(false);
-      }
+        target instanceof Element &&
+        target.closest("[data-library-search-filter]")
+      ) return;
+      setIsSearchOpen(false);
     };
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") setIsSearchOpen(false);
@@ -533,6 +536,15 @@ export function LibraryWorkspace({
               Library
             </h1>
           </div>
+          <SegmentedTags
+            description="Library view"
+            value={view}
+            onChange={setView}
+            options={LIBRARY_VIEWS}
+            iconsOnlyOnMobile
+            compactOnMobile
+            className="sm:hidden"
+          />
           <Button
             size="sm"
             className="h-9 shrink-0 rounded-xl bg-foreground px-3 text-background hover:bg-foreground/90 sm:hidden"
@@ -564,12 +576,50 @@ export function LibraryWorkspace({
               </button>
             </div>
           )}
-          <SegmentedTags
-            description="Filter Library"
-            value={filter}
-            onChange={setFilter}
-            options={LIBRARY_FILTERS}
-          />
+          <div className="hidden sm:block">
+            <SegmentedTags
+              description="Filter Library"
+              value={filter}
+              onChange={setFilter}
+              options={LIBRARY_FILTERS}
+            />
+          </div>
+          {isSearchOpen ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-9 shrink-0 rounded-xl px-3 text-xs sm:hidden"
+                  aria-label="Filter Library"
+                  data-library-search-filter
+                >
+                  {LIBRARY_FILTERS.find(option => option.value === filter)?.label}
+                  <ChevronDown className="ml-1.5 size-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" data-library-search-filter>
+                {LIBRARY_FILTERS.map(option => (
+                  <DropdownMenuItem
+                    key={option.value}
+                    onSelect={() => setFilter(option.value)}
+                  >
+                    {option.label}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <div className="sm:hidden">
+              <SegmentedTags
+                description="Filter Library"
+                value={filter}
+                onChange={setFilter}
+                options={LIBRARY_FILTERS}
+                comfortableOnMobile
+              />
+            </div>
+          )}
           <div className="hidden min-w-3 flex-1 sm:block" aria-hidden="true" />
           <div ref={searchControlRef} className="flex shrink-0 items-center gap-2">
             {isSearchOpen && (
@@ -615,6 +665,7 @@ export function LibraryWorkspace({
             onChange={setView}
             options={LIBRARY_VIEWS}
             iconsOnlyOnMobile
+            className="hidden sm:flex"
           />
           <div className="relative order-first ml-auto hidden shrink-0 sm:order-last sm:ml-0 sm:block">
             {shareNotice && (
@@ -981,12 +1032,18 @@ function SegmentedTags<T extends string>({
   onChange,
   description,
   iconsOnlyOnMobile = false,
+  compactOnMobile = false,
+  comfortableOnMobile = false,
+  className,
 }: {
   options: readonly { value: T; label: string; icon?: React.ReactNode }[];
   value: T;
   onChange: (value: T) => void;
   description: string;
   iconsOnlyOnMobile?: boolean;
+  compactOnMobile?: boolean;
+  comfortableOnMobile?: boolean;
+  className?: string;
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
   const [thumb, setThumb] = useState<{ left: number; width: number } | null>(
@@ -1029,7 +1086,10 @@ function SegmentedTags<T extends string>({
   return (
     <div
       ref={trackRef}
-      className="animate-[ksemo-tag-pop_400ms_ease-out_both] relative flex shrink-0 items-center rounded-xl border border-border bg-card p-0.5 sm:p-1"
+      className={cn(
+        "animate-[ksemo-tag-pop_400ms_ease-out_both] relative flex shrink-0 items-center rounded-xl border border-border bg-card p-0.5 sm:p-1",
+        className
+      )}
       role="group"
       aria-label={description}
     >
@@ -1051,7 +1111,12 @@ function SegmentedTags<T extends string>({
             onClick={() => onChange(option.value)}
             aria-pressed={active}
             className={cn(
-              "relative z-10 flex items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-1 text-xs font-medium outline-none transition-colors duration-200 sm:px-3 sm:py-1.5 sm:text-sm",
+              "relative z-10 flex items-center justify-center gap-1.5 whitespace-nowrap rounded-lg text-xs font-medium outline-none transition-colors duration-200 sm:px-3 sm:py-1.5 sm:text-sm",
+              compactOnMobile
+                ? "size-8 px-0 py-0 sm:size-auto"
+                : comfortableOnMobile
+                  ? "px-2.5 py-1.5"
+                  : "px-2.5 py-1",
               active
                 ? "text-background"
                 : "text-muted-foreground hover:bg-accent hover:text-foreground"
