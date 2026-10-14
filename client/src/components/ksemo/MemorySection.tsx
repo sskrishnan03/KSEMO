@@ -4,6 +4,7 @@ import { trpc } from "@/lib/trpc";
 import { useState } from "react";
 import { Loader2, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 export function MemorySection() {
   const utils = trpc.useUtils();
@@ -16,21 +17,30 @@ export function MemorySection() {
   const [optimisticEnabled, setOptimisticEnabled] = useState<boolean | null>(
     null
   );
+  const [optimisticSensitiveEnabled, setOptimisticSensitiveEnabled] =
+    useState<boolean | null>(null);
 
   const settingsMutation = trpc.memory.settings.update.useMutation({
-    onError: () => {
+    onError: error => {
       setOptimisticEnabled(null);
+      setOptimisticSensitiveEnabled(null);
+      toast.error(error.message || "Memory settings couldn't be saved");
     },
     onSettled: () => {
       setOptimisticEnabled(null);
+      setOptimisticSensitiveEnabled(null);
       utils.memory.settings.get.invalidate();
       utils.memory.list.invalidate();
     },
   });
   const editMemory = trpc.memory.update.useMutation({
+    onError: error => toast.error(error.message || "Memory couldn't be updated"),
+    onSuccess: () => toast.success("Memory updated"),
     onSettled: () => utils.memory.list.invalidate(),
   });
   const removeMemory = trpc.memory.remove.useMutation({
+    onError: error => toast.error(error.message || "Memory couldn't be deleted"),
+    onSuccess: () => toast.success("Memory deleted"),
     onSettled: () => utils.memory.list.invalidate(),
   });
 
@@ -48,9 +58,11 @@ export function MemorySection() {
     );
   }
 
-  // No settings row yet means the user is starting fresh — memory is off.
+  // Missing settings use the app's enabled-by-default general-memory behavior.
   const memoryEnabled =
-    optimisticEnabled ?? settingsQuery.data?.memoryEnabled ?? false;
+    optimisticEnabled ?? settingsQuery.data?.memoryEnabled ?? true;
+  const sensitiveMemoryEnabled =
+    optimisticSensitiveEnabled ?? settingsQuery.data?.sensitiveMemoryEnabled ?? false;
   const memoryCount = memoriesQuery.data?.length ?? 0;
   const settingsBusy = settingsMutation.isPending;
 
@@ -124,7 +136,7 @@ export function MemorySection() {
           {!memoryEnabled
             ? "New conversations are not analyzed and existing memories are not used in your replies. Turn on Memory to start remembering."
             : memoryCount === 0
-              ? "After your next conversation, KSEMO will remember the important facts automatically and use them in future replies."
+              ? "KSEMO keeps your chat history and uses relevant earlier messages in future replies. Sensitive details are left out unless you allow them below."
               : "These memories are used automatically when they are relevant to a conversation. Turn Memory off at any time to stop saving and using them."}
         </p>
       </div>
@@ -138,65 +150,74 @@ export function MemorySection() {
           </p>
         </div>
         <Switch
-          checked={settingsQuery.data?.sensitiveMemoryEnabled ?? false}
+          checked={sensitiveMemoryEnabled}
           disabled={settingsBusy}
-          onCheckedChange={sensitiveMemoryEnabled =>
-            settingsMutation.mutate({ sensitiveMemoryEnabled })
-          }
+          onCheckedChange={next => {
+            setOptimisticSensitiveEnabled(next);
+            settingsMutation.mutate({ sensitiveMemoryEnabled: next });
+          }}
           aria-label="Allow sensitive memories"
         />
       </div>
 
-      {memoryEnabled && memoryCount > 0 && (
-        <div className="overflow-hidden rounded-2xl border border-border bg-card divide-y divide-border">
-          {(memoriesQuery.data ?? []).map(memory => (
-            <div key={memory.id} className="flex items-start gap-3 px-4 py-3">
-              <div className="min-w-0 flex-1">
-                <p className="text-sm leading-5">{memory.content}</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {memory.category}
-                </p>
-                {memory.sourceConversationId && (
-                  <a
-                    href={`/c/${memory.sourceConversationId}`}
-                    className="mt-1 inline-block text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
-                  >
-                    View source conversation
-                  </a>
-                )}
+      {memoryCount > 0 && (
+        <div className="space-y-2">
+          {!memoryEnabled && (
+            <p className="text-xs text-muted-foreground">
+              Memory use is paused. You can still review, edit, or delete saved
+              items.
+            </p>
+          )}
+          <div className="overflow-hidden rounded-2xl border border-border bg-card divide-y divide-border">
+            {(memoriesQuery.data ?? []).map(memory => (
+              <div key={memory.id} className="flex items-start gap-3 px-4 py-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm leading-5">{memory.content}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {memory.category}
+                  </p>
+                  {memory.sourceConversationId && (
+                    <a
+                      href={`/c/${memory.sourceConversationId}`}
+                      className="mt-1 inline-block text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
+                    >
+                      View source conversation
+                    </a>
+                  )}
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Edit memory"
+                  onClick={() => {
+                    const content = window.prompt(
+                      "Edit saved memory",
+                      memory.content
+                    );
+                    if (content?.trim())
+                      editMemory.mutate({
+                        id: memory.id,
+                        content: content.trim(),
+                        category: memory.category,
+                      });
+                  }}
+                >
+                  <Pencil className="size-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Delete memory"
+                  onClick={() => {
+                    if (window.confirm("Delete this saved memory?"))
+                      removeMemory.mutate({ id: memory.id });
+                  }}
+                >
+                  <Trash2 className="size-4" />
+                </Button>
               </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                aria-label="Edit memory"
-                onClick={() => {
-                  const content = window.prompt(
-                    "Edit saved memory",
-                    memory.content
-                  );
-                  if (content?.trim())
-                    editMemory.mutate({
-                      id: memory.id,
-                      content: content.trim(),
-                      category: memory.category,
-                    });
-                }}
-              >
-                <Pencil className="size-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                aria-label="Delete memory"
-                onClick={() => {
-                  if (window.confirm("Delete this saved memory?"))
-                    removeMemory.mutate({ id: memory.id });
-                }}
-              >
-                <Trash2 className="size-4" />
-              </Button>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       )}
     </div>

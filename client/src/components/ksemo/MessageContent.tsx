@@ -943,8 +943,8 @@ export const MessageContent = memo(function MessageContent({
                 {!isUser && (message.memoryUses?.length ?? 0) > 0 && (
                   <details className="mt-2 max-w-xl rounded-lg border border-border/70 px-3 py-2 text-xs text-muted-foreground">
                     <summary className="cursor-pointer select-none">
-                      Personalized using {message.memoryUses!.length} saved{" "}
-                      {message.memoryUses!.length === 1 ? "memory" : "memories"}
+                      Used {message.memoryUses!.length} saved context{" "}
+                      {message.memoryUses!.length === 1 ? "item" : "items"}
                     </summary>
                     <ul className="mt-2 space-y-1.5">
                       {message.memoryUses!.map(memory => (

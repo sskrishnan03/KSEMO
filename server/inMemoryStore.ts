@@ -980,6 +980,13 @@ class InMemoryStore {
     let saved = 0;
     const now = new Date();
     for (const fact of facts) {
+      const normalizedContent = String(fact.content || "").trim().toLocaleLowerCase();
+      const existing = Array.from(this.memories.values()).find(memory =>
+        memory.userId === userId &&
+        memory.sourceConversationId === (conversationId || null) &&
+        memory.content.trim().toLocaleLowerCase() === normalizedContent
+      );
+      if (existing) continue;
       const id = crypto.randomUUID();
       this.memories.set(id, {
         id,

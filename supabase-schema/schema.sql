@@ -76,13 +76,13 @@ CREATE TABLE user_preferences (
 
 -- ============================================
 -- MEMORY SETTINGS TABLE
--- Single row per user. Defaults are all OFF: memory is opt-in and is never
--- generated or retrieved until the user enables it.
+-- Single row per user. General conversation memory is enabled by default;
+-- sensitive memory remains explicitly opt-in.
 -- ============================================
 CREATE TABLE memory_settings (
     user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-    memory_enabled BOOLEAN NOT NULL DEFAULT FALSE,
-    generate_from_chats BOOLEAN NOT NULL DEFAULT FALSE,
+    memory_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    generate_from_chats BOOLEAN NOT NULL DEFAULT TRUE,
     sensitive_memory_enabled BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()

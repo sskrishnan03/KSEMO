@@ -20,8 +20,8 @@ export const memoryRouter = router({
       const settings = await getMemorySettings(ctx.user.id);
       return (settings ?? {
         userId: ctx.user.id,
-        memoryEnabled: false,
-        generateFromChats: false,
+        memoryEnabled: true,
+        generateFromChats: true,
         sensitiveMemoryEnabled: false,
         createdAt: new Date(),
         updatedAt: new Date(),

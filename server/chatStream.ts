@@ -480,14 +480,26 @@ export function registerChatStream(app: Express) {
           getUserPreferences(user.id)
         );
         const memoryContext = await retryPreparation("memory context", () =>
-          buildUserMemoryContextWithSources(user.id, content ?? "")
+          buildUserMemoryContextWithSources(
+            user.id,
+            content ?? "",
+            conversation.id
+          )
         );
-        const memoryUses = (memoryContext?.memories ?? []).map(memory => ({
-          id: memory.id,
-          content: memory.content,
-          category: memory.category,
-          sourceConversationId: memory.sourceConversationId,
-        }));
+        const memoryUses = [
+          ...(memoryContext?.memories ?? []).map(memory => ({
+            id: memory.id,
+            content: memory.content,
+            category: memory.category,
+            sourceConversationId: memory.sourceConversationId,
+          })),
+          ...(memoryContext?.recalledMessages ?? []).map(message => ({
+            id: message.id,
+            content: message.content,
+            category: "chat",
+            sourceConversationId: message.conversationId,
+          })),
+        ];
         if (memoryUses.length) {
           writeEvent(res, "memory.used", {
             messageId: assistantMessageId,

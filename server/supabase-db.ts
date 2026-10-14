@@ -1066,7 +1066,13 @@ export async function upsertMemorySettings(
   } else {
     const { error } = await supabase
       .from("memory_settings")
-      .insert({ user_id: userId, ...row });
+      .insert({
+        user_id: userId,
+        memory_enabled: settings.memoryEnabled ?? true,
+        generate_from_chats: settings.generateFromChats ?? true,
+        sensitive_memory_enabled: settings.sensitiveMemoryEnabled ?? false,
+        ...row,
+      });
     if (error) throwDb("upsertMemorySettings.insert", error);
   }
 
@@ -1115,7 +1121,26 @@ export async function saveUserMemoryFacts(
   }
 
   if (facts.length === 0) return 0;
-  const rows = facts.map(fact => ({
+  let newFacts = facts;
+  if (conversationId) {
+    const { data: existing, error: existingError } = await supabase
+      .from("conversation_memories")
+      .select("content")
+      .eq("user_id", userId)
+      .eq("conversation_id", conversationId);
+    if (existingError) throwDb("saveUserMemoryFacts.findExisting", existingError);
+    const seen = new Set(
+      (existing || []).map((row: any) => String(row.content || "").trim().toLocaleLowerCase())
+    );
+    newFacts = facts.filter(fact => {
+      const key = String(fact.content || "").trim().toLocaleLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
+  if (newFacts.length === 0) return 0;
+  const rows = newFacts.map(fact => ({
     user_id: userId,
     conversation_id: conversationId ?? null,
     content: fact.content || "",

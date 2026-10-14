@@ -16,7 +16,7 @@ export async function memorizeConversation(
 ): Promise<void> {
   try {
     const settings = await getMemorySettings(userId);
-    if (!settings?.memoryEnabled) return;
+    if (settings?.memoryEnabled === false) return;
 
     const conversation = await getConversationForUser(conversationId, userId);
     if (!conversation) return;
@@ -26,12 +26,13 @@ export async function memorizeConversation(
 
     const { candidates } = extractMemoryCandidates(
       [{ id: conversation.id, title: conversation.title, messages }],
-      { includeSensitive: true }
+      { includeSensitive: settings.sensitiveMemoryEnabled }
     );
 
     const facts: MemoryFactToSave[] = candidates.map(candidate => ({
       content: candidate.content,
       category: candidate.category,
+      isSensitive: candidate.sensitive,
     }));
     if (facts.length === 0) return;
 
