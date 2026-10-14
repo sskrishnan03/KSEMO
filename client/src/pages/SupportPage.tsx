@@ -199,7 +199,7 @@ function HelpChat({ onStartChat, activeChat }: { onStartChat: () => void; active
             ))}
           </div>
         )}
-        <form onSubmit={submitDraft} className="ksemo-composer-shell flex items-center gap-1.5 rounded-[20px] border border-border bg-popover p-1.5 text-popover-foreground shadow-sm transition-colors">
+        <form onSubmit={submitDraft} className="ksemo-composer-shell ksemo-help-composer-shell flex items-center gap-1.5 rounded-[20px] border border-border bg-popover p-1.5 text-popover-foreground shadow-sm transition-colors">
           <Input
             value={draft}
             onChange={event => setDraft(event.target.value)}

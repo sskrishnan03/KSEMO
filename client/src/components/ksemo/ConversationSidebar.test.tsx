@@ -248,11 +248,11 @@ describe("KSEMO conversation sidebar disclosure", () => {
     expect(markup).toContain("bg-[oklch(0.95_0.003_80)]");
   });
 
-  it("keeps the rest of the signed-out sidebar intact alongside the sign-in block", () => {
+  it("hides the bottom account and search controls while signed out", () => {
     const markup = renderLockedSidebar();
     expect(markup).toContain('aria-label="Conversations"');
     expect(markup).toContain("New chat");
-    expect(markup).toContain("Search");
+    expect(markup).not.toContain('aria-label="Search"');
     expect(markup).toContain("Library");
   });
 

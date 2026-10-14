@@ -364,8 +364,14 @@ export const workspaceRouter = router({
             message: "File not found.",
           });
 
+        const extensionStart = existing.filename.lastIndexOf(".");
+        const extension =
+          extensionStart > 0 && extensionStart < existing.filename.length - 1
+            ? existing.filename.slice(extensionStart)
+            : "";
+        const filename = `${input.filename.trim().slice(0, 255 - extension.length)}${extension}`;
         await updateFileForUser(input.id, ctx.user.id, {
-          filename: input.filename,
+          filename,
         });
         return { success: true } as const;
       }),

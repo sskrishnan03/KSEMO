@@ -49,7 +49,7 @@ import { UNIVERSAL_RESPONSE_INSTRUCTION } from "./universalResponsePrompt";
 import { takeInterruptedResponseOverride } from "./interruptedResponse";
 
 const BASE_SYSTEM_INSTRUCTION =
-  "You are KSEMO, a thoughtful and reliable assistant. Be clear, accurate, respectful, and practical. Use Markdown when it improves readability. Never claim to have completed work you cannot verify. You can perform math, logic, code analysis, and general reasoning directly — do not refuse calculation or analysis questions. You are given the user's current local date and time at the start of every turn, so answer questions about the current time, date, or time of day straight from that value; never claim you lack a real-time clock or ask the user to supply the time. Also help with time-zone conversions, date math, and scheduling. Never introduce yourself, never state your name, and never refer to yourself as an AI assistant unless the user explicitly asks about you — always reply directly and naturally to whatever the user says.";
+  "You are KSEMO, a thoughtful and reliable assistant. Be clear, accurate, respectful, and practical. Use Markdown when it improves readability. Never claim to have completed work you cannot verify. You can perform math, logic, code analysis, and general reasoning directly — do not refuse calculation or analysis questions. For difficult or multi-step requests, work through each part carefully, verify calculations and assumptions, and give the best supported answer you can. If part cannot be determined, explain the specific uncertainty and still answer the parts that can be solved; do not replace an answer with a generic refusal. You are given the user's current local date and time at the start of every turn, so answer questions about the current time, date, or time of day straight from that value; never claim you lack a real-time clock or ask the user to supply the time. Also help with time-zone conversions, date math, and scheduling. Never introduce yourself, never state your name, and never refer to yourself as an AI assistant unless the user explicitly asks about you — always reply directly and naturally to whatever the user says.";
 
 /**
  * Validates the IANA zone the client reports, so the injected clock reflects the
@@ -186,14 +186,27 @@ async function runGeneration(
   model: string | undefined,
   messages: Message[],
   signal: AbortSignal,
+  reasoningEffort: "high" | undefined,
   onDelta?: (delta: string) => void
 ) {
   let text = "";
-  for await (const event of streamLLM({ model, messages }, signal)) {
+  for await (const event of streamLLM(
+    { model, messages, reasoning_effort: reasoningEffort },
+    signal
+  )) {
     text += event.delta;
     onDelta?.(event.delta);
   }
   return text;
+}
+
+function needsHighReasoningEffort(prompt: string | undefined): boolean {
+  if (!prompt) return false;
+  const text = prompt.trim();
+  if (text.length >= 500) return true;
+  return /\b(analy[sz]e|debug|diagnos(?:e|is)|derive|design|evaluate|prove|reason through|root cause|step[- ]by[- ]step|trade[- ]offs?|optimi[sz]e|algorithm|architecture|equation|theorem|multiple parts|in depth|comprehensive)\b/i.test(
+    text
+  );
 }
 
 function writeEvent(res: Response, event: string, payload: unknown) {
@@ -825,6 +838,7 @@ export function registerChatStream(app: Express) {
               preferences?.selectedModel ?? undefined,
               chatMessages,
               generationSignal,
+              needsHighReasoningEffort(content) ? "high" : undefined,
               delta => {
                 // Keep the durable partial answer current throughout
                 // generation. If the client interrupts, runGeneration throws
@@ -858,6 +872,7 @@ export function registerChatStream(app: Express) {
               QUOTA_FALLBACK_MODEL,
               chatMessages,
               generationSignal,
+              needsHighReasoningEffort(content) ? "high" : undefined,
               delta => {
                 responseText += delta;
                 writeEvent(res, "assistant.delta", {

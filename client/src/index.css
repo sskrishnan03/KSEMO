@@ -28,7 +28,7 @@
   --temp-placeholder: #c6d2aa;
 }
 
-.temp-mode .ksemo-composer-shell {
+.temp-mode .ksemo-composer-shell:not(.ksemo-help-composer-shell) {
   background-color: var(--temp-surface);
   border: 1px dashed color-mix(in srgb, var(--temp-accent) 34%, transparent);
   box-shadow: none;

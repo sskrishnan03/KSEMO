@@ -16,16 +16,19 @@ import { ImageLightbox } from "@/components/ui/image-lightbox";
 import { isImageFile } from "@/lib/fileKinds";
 import { usePdfViewer, isViewableDocument } from "@/contexts/PdfViewerContext";
 import {
-  fileVisualFor,
+  extensionOfFilename,
   guessMimeType,
   isSupportedUpload,
 } from "@/lib/fileIcons";
+import { getCapabilityOption } from "@/lib/capabilities";
+import { Gallery3 } from "reicon-react/icons/Gallery3";
 import { format, isToday, isYesterday, isThisYear } from "date-fns";
 import { cn } from "@/lib/utils";
 import {
   Check,
   CheckCircle2,
   Download,
+  File,
   FolderOpen,
   Grid2X2,
   Library,
@@ -53,7 +56,6 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { ShareIcon, Trash6Icon } from "./icons";
-import { CloudDriveImport } from "./CloudDriveImport";
 import { downloadFile } from "@/lib/downloadFile";
 import React, {
   memo,
@@ -77,6 +79,17 @@ export type LibraryWorkspaceFile = {
   createdAt?: Date;
   isFavorite?: boolean;
 };
+
+function splitLibraryFilename(filename: string) {
+  const extensionStart = filename.lastIndexOf(".");
+  if (extensionStart <= 0 || extensionStart === filename.length - 1) {
+    return { name: filename, extension: "" };
+  }
+  return {
+    name: filename.slice(0, extensionStart),
+    extension: filename.slice(extensionStart),
+  };
+}
 
 const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
 
@@ -103,14 +116,6 @@ export function selectVisibleLibraryItems(
   files: LibraryWorkspaceFile[]
 ) {
   return new Set(Array.from(selectedIds).concat(files.map(file => file.id)));
-}
-
-function bytesLabel(bytes: number) {
-  return bytes < 1024
-    ? `${bytes} B`
-    : bytes < 1024 * 1024
-      ? `${Math.round(bytes / 1024)} KB`
-      : `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 async function fileToBase64(file: File) {
@@ -147,6 +152,7 @@ export function LibraryWorkspace({
   const [renameTarget, setRenameTarget] = useState<LibraryWorkspaceFile | null>(
     null
   );
+  const [renameValue, setRenameValue] = useState("");
   const [shareTarget, setShareTarget] = useState<LibraryWorkspaceFile | null>(
     null
   );
@@ -294,6 +300,7 @@ export function LibraryWorkspace({
   }
 
   const toggleFile = useCallback((id: string) => {
+    setOpenMenuFileId(null);
     setSelectedIds(current => {
       const next = new Set(current);
       if (next.has(id)) next.delete(id);
@@ -317,18 +324,20 @@ export function LibraryWorkspace({
   );
 
   const requestRename = useCallback(
-    (file: LibraryWorkspaceFile) => setRenameTarget(file),
+    (file: LibraryWorkspaceFile) => {
+      setRenameTarget(file);
+      setRenameValue(splitLibraryFilename(file.filename).name);
+    },
     []
   );
 
   async function confirmRename() {
     if (!renameTarget) return;
-    const newName = renameTarget.filename.trim();
-    if (!newName) return;
+    if (!renameValue.trim()) return;
     try {
       await renameMutation.mutateAsync({
         id: renameTarget.id,
-        filename: newName,
+        filename: renameValue.trim(),
       });
       setRenameTarget(null);
     } catch {
@@ -460,7 +469,6 @@ export function LibraryWorkspace({
               </p>
             </div>
             <div className="flex items-center gap-2 sm:hidden">
-              <CloudDriveImport />
               <Button
                 size="sm"
                 className="h-8 rounded-xl bg-foreground text-xs text-background hover:bg-foreground/90"
@@ -473,7 +481,6 @@ export function LibraryWorkspace({
             </div>
           </div>
           <div className="hidden shrink-0 flex-wrap items-center gap-2 sm:flex">
-            <CloudDriveImport />
             <Button
               size="sm"
               className="h-8 sm:h-9 rounded-xl bg-foreground text-xs sm:text-sm text-background hover:bg-foreground/90"
@@ -699,12 +706,7 @@ export function LibraryWorkspace({
           </>
         )}
 
-        <div
-          className={cn(
-            "mt-4 sm:mt-5 min-h-0 flex-1 overflow-y-auto pb-10",
-            selectedFiles.length > 0 && "pb-24 sm:pb-10"
-          )}
-        >
+        <div className="mt-4 sm:mt-5 min-h-0 flex-1 overflow-y-auto pb-10">
           {filesQuery.isLoading ? (
             <Loading className="min-h-64" />
           ) : files.length ? (
@@ -715,6 +717,7 @@ export function LibraryWorkspace({
                     key={file.id}
                     file={file}
                     selected={selectedIds.has(file.id)}
+                    selectionMode={selectedFiles.length > 0}
                     isMenuOpen={openMenuFileId === file.id}
                     onMenuOpenChange={open =>
                       setOpenMenuFileId(open ? file.id : null)
@@ -735,6 +738,7 @@ export function LibraryWorkspace({
                     key={file.id}
                     file={file}
                     selected={selectedIds.has(file.id)}
+                    selectionMode={selectedFiles.length > 0}
                     isMenuOpen={openMenuFileId === file.id}
                     onMenuOpenChange={open =>
                       setOpenMenuFileId(open ? file.id : null)
@@ -768,14 +772,11 @@ export function LibraryWorkspace({
           {renameTarget && (
             <RenameFilePanel
               file={renameTarget}
+              name={renameValue}
               busy={renameMutation.isPending}
               onCancel={() => setRenameTarget(null)}
               onSave={confirmRename}
-              onValueChange={filename =>
-                setRenameTarget(current =>
-                  current ? { ...current, filename } : current
-                )
-              }
+              onValueChange={setRenameValue}
             />
           )}
         </DialogContent>
@@ -787,7 +788,7 @@ export function LibraryWorkspace({
           if (!open) setShareTarget(null);
         }}
       >
-        <DialogContent className="rounded-2xl sm:max-w-md">
+        <DialogContent className="rounded-2xl border-white/10 bg-[#1A1A1A] p-5 text-white sm:max-w-[440px]">
           {shareTarget && (
             <ShareFilePanel
               file={shareTarget}
@@ -1012,8 +1013,7 @@ function FilePreview({
   file: LibraryWorkspaceFile;
   compact?: boolean;
 }) {
-  const image = file.mimeType?.startsWith("image/");
-  const visual = fileVisualFor(file.filename, file.mimeType);
+  const image = isImageFile(file.filename, file.mimeType);
   if (image)
     return (
       <img
@@ -1026,17 +1026,52 @@ function FilePreview({
       />
     );
   if (compact)
-    return <visual.Icon className={cn("size-10 shrink-0", visual.className)} />;
+    return <LibraryFormatIcon file={file} className="size-10 shrink-0" />;
   return (
     <span className="flex size-full items-center justify-center bg-muted/45">
-      <visual.Icon className={cn("size-12", visual.className)} />
+      <LibraryFormatIcon file={file} className="size-12" />
     </span>
   );
+}
+
+function LibraryFormatIcon({
+  file,
+  className,
+}: {
+  file: LibraryWorkspaceFile;
+  className: string;
+}) {
+  if (isImageFile(file.filename, file.mimeType)) {
+    return <Gallery3 className={className} />;
+  }
+
+  const extension = extensionOfFilename(file.filename);
+  const mode =
+    extension === "pdf"
+      ? "pdf"
+      : ["doc", "docx"].includes(extension)
+        ? "docx"
+        : ["xls", "xlsx", "csv", "tsv"].includes(extension)
+          ? "xlsx"
+          : ["ppt", "pptx"].includes(extension)
+            ? "pptx"
+            : ["txt", "log", "md", "markdown"].includes(extension)
+              ? "txt"
+              : null;
+
+  if (mode) {
+    const option = getCapabilityOption(mode);
+    const Icon = option.icon;
+    return <Icon className={className} />;
+  }
+
+  return <File className={className} />;
 }
 
 const LibraryGridCard = memo(function LibraryGridCard({
   file,
   selected,
+  selectionMode,
   isMenuOpen = false,
   onMenuOpenChange,
   onToggle,
@@ -1048,6 +1083,7 @@ const LibraryGridCard = memo(function LibraryGridCard({
 }: {
   file: LibraryWorkspaceFile;
   selected: boolean;
+  selectionMode: boolean;
   isMenuOpen?: boolean;
   onMenuOpenChange?: (open: boolean) => void;
   onToggle: (id: string) => void;
@@ -1060,6 +1096,28 @@ const LibraryGridCard = memo(function LibraryGridCard({
   const isFavorite = Boolean(file.isFavorite);
   const { openPdf } = usePdfViewer();
   const isPdfFile = isViewableDocument(file.filename, file.mimeType);
+  const handleOpenFile = (event: React.MouseEvent<HTMLAnchorElement>) => {
+    event.stopPropagation();
+    if (selectionMode) {
+      event.preventDefault();
+      onToggle(file.id);
+      return;
+    }
+    if (isImageFile(file.filename, file.mimeType)) {
+      event.preventDefault();
+      onOpenFile(file);
+      return;
+    }
+    if (isPdfFile) {
+      event.preventDefault();
+      openPdf({
+        url: file.url,
+        filename: file.filename,
+        sizeBytes: file.sizeBytes,
+        id: file.id,
+      });
+    }
+  };
   const selectWithKeyboard = (event: React.KeyboardEvent<HTMLElement>) => {
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
@@ -1079,129 +1137,7 @@ const LibraryGridCard = memo(function LibraryGridCard({
         selected ? "border-muted-foreground/50" : "border-border"
       )}
     >
-      <button
-        type="button"
-        onClick={event => {
-          event.stopPropagation();
-          onToggle(file.id);
-        }}
-        className={cn(
-          "pointer-events-none absolute left-2.5 top-2.5 z-10 rounded-full p-0.5 transition-[opacity,transform] duration-150 group-hover:pointer-events-auto group-hover:scale-100 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:scale-100 group-focus-within:opacity-100 group-active:pointer-events-auto group-active:scale-100 group-active:opacity-100 focus-visible:pointer-events-auto focus-visible:scale-100 focus-visible:opacity-100 max-lg:pointer-events-auto max-lg:scale-100 max-lg:opacity-100",
-          selected || isMenuOpen
-            ? "scale-100 opacity-100"
-            : "scale-90 opacity-0"
-        )}
-        aria-label={`${selected ? "Deselect" : "Select"} ${file.filename}`}
-        aria-pressed={selected}
-      >
-        <SelectionCircle selected={selected} />
-      </button>
-      {!selected && (
-        <div
-          className={cn(
-            "pointer-events-none absolute right-2.5 top-2.5 z-10 scale-90 opacity-0 transition-[opacity,transform] duration-150 group-hover:pointer-events-auto group-hover:scale-100 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:scale-100 group-focus-within:opacity-100 group-active:pointer-events-auto group-active:scale-100 group-active:opacity-100 focus-visible:pointer-events-auto focus-visible:scale-100 focus-visible:opacity-100 max-lg:pointer-events-auto max-lg:scale-100 max-lg:opacity-100",
-            isMenuOpen && "pointer-events-auto scale-100 opacity-100"
-          )}
-        >
-          <DropdownMenu open={isMenuOpen} onOpenChange={onMenuOpenChange}>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                onClick={event => event.stopPropagation()}
-                className="flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                aria-label={`More options for ${file.filename}`}
-              >
-                <MoreVertical className="size-4" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-44">
-              <DropdownMenuItem
-                onClick={event => {
-                  event.stopPropagation();
-                  void downloadFile(file.url, file.filename);
-                }}
-              >
-                <Download className="mr-2 size-4" />
-                Download
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={event => {
-                  event.stopPropagation();
-                  onRename(file);
-                }}
-              >
-                <Pencil className="mr-2 size-4" />
-                Rename
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={event => {
-                  event.stopPropagation();
-                  onShare(file);
-                }}
-              >
-                <ShareIcon className="mr-2 size-4" />
-                Share
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={event => {
-                  event.stopPropagation();
-                  onToggleFavorite(file);
-                }}
-              >
-                <Star
-                  className={cn("mr-2 size-4", isFavorite && "fill-current")}
-                />
-                {isFavorite ? "Remove from favorites" : "Add to favorites"}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={event => {
-                  event.stopPropagation();
-                  onDelete(file);
-                }}
-                variant="destructive"
-              >
-                <Trash6Icon className="mr-2 size-4" />
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      )}
-      <a
-        href={file.url}
-        target={
-          isPdfFile || isImageFile(file.filename, file.mimeType)
-            ? undefined
-            : "_blank"
-        }
-        rel={
-          isPdfFile || isImageFile(file.filename, file.mimeType)
-            ? undefined
-            : "noreferrer"
-        }
-        onClick={event => {
-          event.stopPropagation();
-          if (isImageFile(file.filename, file.mimeType)) {
-            event.preventDefault();
-            onOpenFile(file);
-            return;
-          }
-          if (isPdfFile) {
-            event.preventDefault();
-            openPdf({
-              url: file.url,
-              filename: file.filename,
-              sizeBytes: file.sizeBytes,
-              id: file.id,
-            });
-          }
-        }}
-        className="block aspect-[4/3] bg-muted"
-      >
-        <FilePreview file={file} />
-      </a>
-      <div className="p-3">
+      <div className="flex min-w-0 items-center gap-2 px-2 py-1.5">
         <a
           href={file.url}
           target={
@@ -1214,32 +1150,131 @@ const LibraryGridCard = memo(function LibraryGridCard({
               ? undefined
               : "noreferrer"
           }
+          onClick={handleOpenFile}
+          className="flex min-w-0 flex-1 items-center gap-1.5"
+          title={file.filename}
+        >
+          <LibraryFormatIcon file={file} className="size-4 shrink-0" />
+          <span className="block min-w-0 truncate text-xs font-medium text-foreground hover:underline">
+            {file.filename}
+          </span>
+        </a>
+        {selectionMode ? (
+          <span className="size-8 shrink-0" aria-hidden="true" />
+        ) : (
+        <DropdownMenu open={isMenuOpen} onOpenChange={onMenuOpenChange}>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              onClick={event => event.stopPropagation()}
+              className={cn(
+                "pointer-events-none flex size-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground opacity-0 transition-[opacity,color,background-color] group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100 hover:bg-accent hover:text-foreground",
+                isMenuOpen && "pointer-events-auto opacity-100",
+                selectionMode && "pointer-events-none opacity-0"
+              )}
+              aria-label={`More options for ${file.filename}`}
+            >
+              <MoreVertical className="size-4" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-44">
+            <DropdownMenuItem
+              onClick={event => {
+                event.stopPropagation();
+                void downloadFile(file.url, file.filename);
+              }}
+            >
+              <Download className="mr-2 size-4" />
+              Download
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={event => {
+                event.stopPropagation();
+                onRename(file);
+              }}
+            >
+              <Pencil className="mr-2 size-4" />
+              Rename
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={event => {
+                event.stopPropagation();
+                onShare(file);
+              }}
+            >
+              <ShareIcon className="mr-2 size-4" />
+              Share
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={event => {
+                event.stopPropagation();
+                onToggleFavorite(file);
+              }}
+            >
+              <Star
+                className={cn("mr-2 size-4", isFavorite && "fill-current")}
+              />
+              {isFavorite ? "Remove from favorites" : "Add to favorites"}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={event => {
+                event.stopPropagation();
+                onDelete(file);
+              }}
+              variant="destructive"
+            >
+              <Trash6Icon className="mr-2 size-4" />
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        )}
+      </div>
+      <div className="group/preview relative">
+        <a
+          href={file.url}
+          target={
+            isPdfFile || isImageFile(file.filename, file.mimeType)
+              ? undefined
+              : "_blank"
+          }
+          rel={
+            isPdfFile || isImageFile(file.filename, file.mimeType)
+              ? undefined
+              : "noreferrer"
+          }
+          onClick={handleOpenFile}
+          className="block aspect-[4/3] bg-muted"
+        >
+          <FilePreview file={file} />
+        </a>
+        <div
+          className={cn(
+            "pointer-events-none absolute bottom-2 left-2 flex max-w-[calc(100%-3.5rem)] items-center gap-1.5 text-xs text-white opacity-0 drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)] transition-opacity group-hover/preview:opacity-100 group-focus-within/preview:opacity-100",
+            selectionMode && "invisible"
+          )}
+        >
+          {file.createdAt && <span>{formatDateLabel(file.createdAt)}</span>}
+          {isFavorite && (
+            <Star className="size-3 shrink-0" />
+          )}
+        </div>
+        <button
+          type="button"
           onClick={event => {
             event.stopPropagation();
-            if (isImageFile(file.filename, file.mimeType)) {
-              event.preventDefault();
-              onOpenFile(file);
-              return;
-            }
-            if (isPdfFile) {
-              event.preventDefault();
-              openPdf({
-                url: file.url,
-                filename: file.filename,
-                sizeBytes: file.sizeBytes,
-                id: file.id,
-              });
-            }
+            onToggle(file.id);
           }}
-          className="block"
+          className={cn(
+            "absolute bottom-3 right-2 rounded-full p-0 opacity-0 transition-opacity group-hover/preview:opacity-100 group-focus-within/preview:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            (selected || selectionMode) && "opacity-100"
+          )}
+          aria-label={`${selected ? "Deselect" : "Select"} ${file.filename}`}
+          aria-pressed={selected}
         >
-          <p className="truncate text-sm font-medium hover:underline">
-            {file.filename}
-          </p>
-          <p className="mt-0.5 text-[11px] text-muted-foreground">
-            {formatDateLabel(file.createdAt)}
-          </p>
-        </a>
+          <SelectionCircle selected={selected} />
+        </button>
       </div>
     </article>
   );
@@ -1248,6 +1283,7 @@ const LibraryGridCard = memo(function LibraryGridCard({
 const LibraryListRow = memo(function LibraryListRow({
   file,
   selected,
+  selectionMode,
   isMenuOpen = false,
   onMenuOpenChange,
   onToggle,
@@ -1259,6 +1295,7 @@ const LibraryListRow = memo(function LibraryListRow({
 }: {
   file: LibraryWorkspaceFile;
   selected: boolean;
+  selectionMode: boolean;
   isMenuOpen?: boolean;
   onMenuOpenChange?: (open: boolean) => void;
   onToggle: (id: string) => void;
@@ -1297,10 +1334,8 @@ const LibraryListRow = memo(function LibraryListRow({
           onToggle(file.id);
         }}
         className={cn(
-          "pointer-events-none rounded-full p-0.5 transition-[opacity,transform] duration-150 group-hover:pointer-events-auto group-hover:scale-100 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:scale-100 group-focus-within:opacity-100 group-active:pointer-events-auto group-active:scale-100 group-active:opacity-100 focus-visible:pointer-events-auto focus-visible:scale-100 focus-visible:opacity-100 max-lg:pointer-events-auto max-lg:scale-100 max-lg:opacity-100",
-          selected || isMenuOpen
-            ? "scale-100 opacity-100"
-            : "scale-90 opacity-0"
+          "pointer-events-none rounded-full p-0.5 transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 group-active:pointer-events-auto group-active:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100 max-lg:pointer-events-auto max-lg:opacity-100",
+          selected || isMenuOpen || selectionMode ? "opacity-100" : "opacity-0"
         )}
         aria-label={`${selected ? "Deselect" : "Select"} ${file.filename}`}
         aria-pressed={selected}
@@ -1321,6 +1356,11 @@ const LibraryListRow = memo(function LibraryListRow({
         }
         onClick={event => {
           event.stopPropagation();
+          if (selectionMode) {
+            event.preventDefault();
+            onToggle(file.id);
+            return;
+          }
           if (isImageFile(file.filename, file.mimeType)) {
             event.preventDefault();
             onOpenFile(file);
@@ -1354,6 +1394,11 @@ const LibraryListRow = memo(function LibraryListRow({
         }
         onClick={event => {
           event.stopPropagation();
+          if (selectionMode) {
+            event.preventDefault();
+            onToggle(file.id);
+            return;
+          }
           if (isImageFile(file.filename, file.mimeType)) {
             event.preventDefault();
             onOpenFile(file);
@@ -1371,85 +1416,94 @@ const LibraryListRow = memo(function LibraryListRow({
         }}
         className="min-w-0 flex-1"
       >
-        <p className="truncate text-sm font-medium hover:underline">
-          {file.filename}
-        </p>
-        <p className="mt-0.5 text-xs text-muted-foreground">
+        <span className="flex min-w-0 items-start gap-1.5">
+          <LibraryFormatIcon file={file} className="size-4 shrink-0" />
+          <span className="block min-w-0 truncate text-sm font-medium hover:underline">
+            {file.filename}
+          </span>
+        </span>
+        <p
+          className={cn(
+            "mt-0.5 text-xs text-muted-foreground",
+            selectionMode && "invisible"
+          )}
+        >
           {formatDateLabel(file.createdAt)}
         </p>
       </a>
-      {!selected && (
-        <div
-          className={cn(
-            "pointer-events-none scale-90 opacity-0 transition-[opacity,transform] duration-150 group-hover:pointer-events-auto group-hover:scale-100 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:scale-100 group-focus-within:opacity-100 group-active:pointer-events-auto group-active:scale-100 group-active:opacity-100 focus-visible:pointer-events-auto focus-visible:scale-100 focus-visible:opacity-100 max-lg:pointer-events-auto max-lg:scale-100 max-lg:opacity-100",
-            isMenuOpen && "pointer-events-auto scale-100 opacity-100"
-          )}
-        >
-          <DropdownMenu open={isMenuOpen} onOpenChange={onMenuOpenChange}>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                onClick={event => event.stopPropagation()}
-                className="flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                aria-label={`More options for ${file.filename}`}
-              >
-                <MoreVertical className="size-4" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-44">
-              <DropdownMenuItem
-                onClick={event => {
-                  event.stopPropagation();
-                  void downloadFile(file.url, file.filename);
-                }}
-              >
-                <Download className="mr-2 size-4" />
-                Download
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={event => {
-                  event.stopPropagation();
-                  onRename(file);
-                }}
-              >
-                <Pencil className="mr-2 size-4" />
-                Rename
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={event => {
-                  event.stopPropagation();
-                  onShare(file);
-                }}
-              >
-                <ShareIcon className="mr-2 size-4" />
-                Share
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={event => {
-                  event.stopPropagation();
-                  onToggleFavorite(file);
-                }}
-              >
-                <Star
-                  className={cn("mr-2 size-4", isFavorite && "fill-current")}
-                />
-                {isFavorite ? "Remove from favorites" : "Add to favorites"}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={event => {
-                  event.stopPropagation();
-                  onDelete(file);
-                }}
-                variant="destructive"
-              >
-                <Trash6Icon className="mr-2 size-4" />
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      )}
+      <div className="shrink-0">
+        {selectionMode ? (
+          <span className="size-8" aria-hidden="true" />
+        ) : (
+        <DropdownMenu open={isMenuOpen} onOpenChange={onMenuOpenChange}>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              onClick={event => event.stopPropagation()}
+              className={cn(
+                "pointer-events-none flex size-8 items-center justify-center rounded-lg text-muted-foreground opacity-0 transition-[opacity,color,background-color] group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100 hover:bg-accent hover:text-foreground",
+                isMenuOpen && "pointer-events-auto opacity-100",
+                selectionMode && "pointer-events-none opacity-0"
+              )}
+              aria-label={`More options for ${file.filename}`}
+            >
+              <MoreVertical className="size-4" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-44">
+            <DropdownMenuItem
+              onClick={event => {
+                event.stopPropagation();
+                void downloadFile(file.url, file.filename);
+              }}
+            >
+              <Download className="mr-2 size-4" />
+              Download
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={event => {
+                event.stopPropagation();
+                onRename(file);
+              }}
+            >
+              <Pencil className="mr-2 size-4" />
+              Rename
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={event => {
+                event.stopPropagation();
+                onShare(file);
+              }}
+            >
+              <ShareIcon className="mr-2 size-4" />
+              Share
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={event => {
+                event.stopPropagation();
+                onToggleFavorite(file);
+              }}
+            >
+              <Star
+                className={cn("mr-2 size-4", isFavorite && "fill-current")}
+              />
+              {isFavorite ? "Remove from favorites" : "Add to favorites"}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={event => {
+                event.stopPropagation();
+                onDelete(file);
+              }}
+              variant="destructive"
+            >
+              <Trash6Icon className="mr-2 size-4" />
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        )}
+      </div>
     </article>
   );
 });
@@ -1464,24 +1518,71 @@ function formatDateLabel(date: Date | undefined): string {
 
 function RenameFilePanel({
   file,
+  name,
   busy,
   onCancel,
   onSave,
   onValueChange,
 }: {
   file: LibraryWorkspaceFile;
+  name: string;
   busy: boolean;
   onCancel: () => void;
   onSave: () => void;
   onValueChange: (value: string) => void;
 }) {
+  const extension = splitLibraryFilename(file.filename).extension;
+  const displayedFilename = `${name}${extension}`;
   const handleFocus = (event: React.FocusEvent<HTMLInputElement>) => {
     const input = event.currentTarget;
     requestAnimationFrame(() => {
-      const end = input.value.length;
+      const end = name.length;
       input.setSelectionRange(end, end);
       input.scrollLeft = input.scrollWidth;
     });
+  };
+  const clampSelectionToName = (
+    event: React.MouseEvent<HTMLInputElement>
+  ) => {
+    if (!extension) return;
+    const input = event.currentTarget;
+    requestAnimationFrame(() => {
+      const start = Math.min(input.selectionStart ?? name.length, name.length);
+      const end = Math.min(input.selectionEnd ?? start, name.length);
+      input.setSelectionRange(start, end);
+    });
+  };
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!extension) return;
+    const input = event.currentTarget;
+    const start = input.selectionStart ?? 0;
+    const end = input.selectionEnd ?? start;
+    if (start > name.length || end > name.length) {
+      input.setSelectionRange(name.length, name.length);
+    }
+    if (
+      (event.key === "ArrowRight" && start >= name.length) ||
+      event.key === "End" ||
+      (event.key === "Delete" && start >= name.length)
+    ) {
+      event.preventDefault();
+    }
+  };
+  const handleNameChange = (value: string) => {
+    if (!extension) {
+      onValueChange(value);
+      return;
+    }
+    const lowerValue = value.toLowerCase();
+    const lowerExtension = extension.toLowerCase();
+    if (lowerValue.endsWith(lowerExtension)) {
+      onValueChange(value.slice(0, -extension.length));
+      return;
+    }
+    const typedExtensionStart = value.lastIndexOf(".");
+    onValueChange(
+      typedExtensionStart > 0 ? value.slice(0, typedExtensionStart) : value
+    );
   };
   return (
     <div className="py-1">
@@ -1490,19 +1591,22 @@ function RenameFilePanel({
           Rename file
         </h2>
         <p className="text-sm leading-relaxed text-muted-foreground">
-          Give this file a new name. Its format will stay the same.
+          Rename the file while keeping its extension unchanged.
         </p>
       </div>
       <div className="mt-4">
         <Input
           autoFocus
-          value={file.filename}
-          onChange={event => onValueChange(event.target.value)}
+          value={displayedFilename}
+          onChange={event => handleNameChange(event.target.value)}
           onFocus={handleFocus}
+          onClick={clampSelectionToName}
+          onMouseUp={clampSelectionToName}
           onKeyDown={event => {
+            handleKeyDown(event);
             if (event.key === "Enter") {
               event.preventDefault();
-              if (file.filename.trim()) onSave();
+              if (name.trim()) onSave();
             }
           }}
           aria-label="New file name"
@@ -1519,7 +1623,7 @@ function RenameFilePanel({
         </Button>
         <Button
           onClick={onSave}
-          disabled={!file.filename.trim() || busy}
+          disabled={!name.trim() || busy}
           className="h-9 rounded-lg bg-foreground px-5 text-background hover:bg-foreground/90"
         >
           {busy ? "Renaming…" : "Save"}
@@ -1537,10 +1641,13 @@ function ShareFilePanel({
   onClose: () => void;
 }) {
   const [email, setEmail] = useState("");
+  const [copied, setCopied] = useState(false);
   const shareUrl = file.url;
   async function copyLink() {
     try {
       await navigator.clipboard.writeText(shareUrl);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
     } catch {
       // ignore copy failure
     }
@@ -1551,53 +1658,72 @@ function ShareFilePanel({
     window.location.href = `mailto:${email.trim()}?subject=${subject}&body=${body}`;
   }
   return (
-    <div className="space-y-4 py-2">
+    <div className="w-full min-w-0 space-y-3 rounded-xl bg-[#1A1A1A] py-1 text-white">
       <DialogHeader className="text-left">
-        <DialogTitle className="text-xl font-semibold tracking-[-0.02em]">
+        <DialogTitle className="text-[15px] font-semibold tracking-[-0.01em] text-white">
           Share file
         </DialogTitle>
-        <DialogDescription>
-          Send “{file.filename}” to anyone by sharing its link.
+        <DialogDescription className="sr-only">
+          Share this file using its link or your email app.
         </DialogDescription>
       </DialogHeader>
-      <div className="rounded-xl border border-border bg-muted/60 p-3">
-        <p className="text-sm font-medium">File link</p>
-        <p className="mt-1 text-xs leading-5 text-muted-foreground">
-          Anyone with this link can open the file. Only you can delete or rename
-          it.
-        </p>
-        <div className="mt-3 flex gap-2">
-          <Input
-            value={shareUrl}
-            readOnly
-            className="h-9 min-w-0 rounded-lg text-xs"
-            aria-label="File link"
+      <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3">
+        <div className="flex min-w-0 items-start gap-2">
+          <LibraryFormatIcon
+            file={file}
+            className="mt-0.5 size-5 shrink-0 text-white/60"
           />
-          <Button onClick={copyLink} className="h-9 shrink-0 rounded-lg">
-            Copy link
+          <div className="min-w-0 flex-1">
+            <p className="break-words text-sm font-medium leading-snug text-white">
+              {file.filename}
+            </p>
+            <p className="mt-1 text-xs text-white/50">
+              {formatBytes(file.sizeBytes)}
+            </p>
+          </div>
+          <span className="shrink-0 text-xs text-white/40">
+            {isImageFile(file.filename, file.mimeType) ? "Image" : "File"}
+          </span>
+        </div>
+      </div>
+      <div className="space-y-1.5">
+        <p className="text-[11px] font-medium text-white/40">Share link</p>
+        <div className="flex min-w-0 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5">
+          <a
+            href={shareUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="min-w-0 flex-1 truncate text-[13px] text-white/70 hover:text-white"
+          >
+            {shareUrl}
+          </a>
+          <Button
+            onClick={copyLink}
+            className="h-8 shrink-0 rounded-lg border-0 bg-white px-3 text-xs text-black hover:bg-white/90"
+          >
+            {copied ? "Copied" : "Copy link"}
           </Button>
         </div>
       </div>
-      <div className="rounded-xl border border-border p-3">
-        <Label htmlFor="share-file-email" className="text-sm">
+      <div className="space-y-1.5">
+        <Label
+          htmlFor="share-file-email"
+          className="text-[11px] font-medium text-white/40"
+        >
           Email
         </Label>
-        <p className="mt-1 text-xs leading-5 text-muted-foreground">
-          Open your email app with the link included. Sending remains under your
-          control.
-        </p>
-        <div className="mt-3 flex gap-2">
+        <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2">
           <Input
             id="share-file-email"
             value={email}
             onChange={event => setEmail(event.target.value)}
-            placeholder="recipient@example.com"
+            placeholder="Email address…"
             type="email"
-            className="h-9 rounded-lg"
+            className="h-8 min-w-0 border-0 bg-transparent px-0 text-sm text-white placeholder:text-white/40 focus-visible:ring-0"
           />
           <Button
             onClick={emailLink}
-            className="h-9 shrink-0 rounded-lg"
+            className="h-8 shrink-0 rounded-lg border-0 bg-white px-3 text-xs text-black hover:bg-white/90"
             disabled={!email.trim()}
           >
             Email
@@ -1606,4 +1732,16 @@ function ShareFilePanel({
       </div>
     </div>
   );
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  const units = ["KB", "MB", "GB"];
+  let value = bytes / 1024;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit += 1;
+  }
+  return `${value.toFixed(value >= 10 ? 0 : 1)} ${units[unit]}`;
 }

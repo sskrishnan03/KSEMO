@@ -1133,7 +1133,9 @@ export const ChatComposer = memo(function ChatComposer({
                                     setToolsOpen(false);
                                   }}
                                 >
-                                  <Icon className="mr-2 size-5" />
+                                  <Icon
+                                    className="mr-2 size-5 shrink-0"
+                                  />
                                   {option.title}
                                   {isActive && (
                                     <Check className="ml-auto size-4 text-foreground" />
@@ -1604,7 +1606,9 @@ export const ChatComposer = memo(function ChatComposer({
                           : "hover:bg-accent hover:text-accent-foreground"
                       )}
                     >
-                      <Icon className="mr-2 size-5 text-muted-foreground" />
+                      <Icon
+                        className="mr-2 size-5 shrink-0"
+                      />
                       {option.title}
                       {isActive && (
                         <Check className="ml-auto size-4 text-foreground" />

@@ -68,6 +68,7 @@ export type InvokeParams = {
   response_format?: ResponseFormat;
   model?: string;
   temperature?: number;
+  reasoning_effort?: "minimal" | "low" | "medium" | "high";
   thinking?: Record<string, unknown>;
   reasoning?: Record<string, unknown>;
   signal?: AbortSignal;
@@ -649,6 +650,22 @@ export async function* streamLLM(
   for (let index = 0; index < targets.length; index++) {
     const target = targets[index];
     let yieldedDelta = false;
+    const requestPayload: Record<string, unknown> = {
+      ...payload,
+      ...(target.model ? { model: target.model } : {}),
+    };
+    // Gemini's OpenAI-compatible endpoint supports reasoning_effort. Keep this
+    // Gemini-only so alternate OpenAI-compatible providers receive their usual
+    // request shape.
+    if (
+      params.reasoning_effort &&
+      target.url.includes("generativelanguage.googleapis.com") &&
+      /^models\/gemini-|^gemini-/.test(
+        target.model || params.model || DEFAULT_LLM_MODEL
+      )
+    ) {
+      requestPayload.reasoning_effort = params.reasoning_effort;
+    }
     try {
       const response = await fetchWithBackoff(target.url, {
         method: "POST",
@@ -658,9 +675,7 @@ export async function* streamLLM(
           accept: "text/event-stream",
         },
         signal,
-        body: JSON.stringify(
-          target.model ? { ...payload, model: target.model } : payload
-        ),
+        body: JSON.stringify(requestPayload),
       });
       if (!response.ok || !response.body) {
         const body = await response.text().catch(() => "");

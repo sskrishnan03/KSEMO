@@ -511,7 +511,8 @@ export const ConversationSidebar = memo(function ConversationSidebar({
               </Button>
             </div>
           ))}
-        <div className="mt-2">
+        {!locked && (
+          <div className="mt-2">
           {!compact && (
             <div
               aria-hidden="true"
@@ -519,8 +520,7 @@ export const ConversationSidebar = memo(function ConversationSidebar({
             />
           )}
           <div className={cn(compact ? "" : "flex items-center justify-between gap-px")}>
-          {!locked && (
-            <DropdownMenu
+          <DropdownMenu
               open={previewSupportOpen || accountMenuOpen}
               onOpenChange={setAccountMenuOpen}
             >
@@ -614,8 +614,7 @@ export const ConversationSidebar = memo(function ConversationSidebar({
                   <LogOut className="mr-2 size-4" /> Sign out
                 </DropdownMenuItem>
               </DropdownMenuContent>
-            </DropdownMenu>
-          )}
+          </DropdownMenu>
           {!compact && (
             <Tooltip>
               <TooltipTrigger asChild>
@@ -642,7 +641,8 @@ export const ConversationSidebar = memo(function ConversationSidebar({
             </Tooltip>
           )}
           </div>
-        </div>
+          </div>
+        )}
       </aside>
     </>
   );
