@@ -778,10 +778,10 @@ const ConversationGroup = memo(function ConversationGroup({
                         variant="ghost"
                         size="icon"
                         onClick={() => onPin(conversation)}
-                        className="mr-0 size-8 shrink-0 rounded-md text-muted-foreground ml-0 transition-[opacity,background-color,color] duration-150 max-lg:opacity-100 lg:opacity-0 lg:group-hover:opacity-100 group-hover:text-foreground hover:bg-accent hover:text-foreground"
+                        className="mr-0 size-8 shrink-0 rounded-md text-muted-foreground ml-0 transition-[opacity,background-color,color] duration-150 max-lg:opacity-100 lg:opacity-0 lg:group-hover:opacity-100 group-hover:text-muted-foreground hover:bg-accent hover:text-muted-foreground"
                         aria-label={`Unpin ${conversation.title}`}
                       >
-                        <UnpinTackIcon className="size-4" />
+                        <UnpinTackIcon className="size-4 text-muted-foreground" />
                       </Button>
                     )}
                     {/*

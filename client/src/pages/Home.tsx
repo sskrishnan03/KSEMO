@@ -462,8 +462,7 @@ export default function Home() {
   const inlineWorkspaceSection: "library" | null =
     workspacePreview === "files" ? "library" : null;
   const utils = trpc.useUtils();
-  const saveInterruptedMutation =
-    trpc.message.saveInterrupted.useMutation();
+  const saveInterruptedMutation = trpc.message.saveInterrupted.useMutation();
   const [sidebarOpen, setSidebarOpen] = useState(isSidebarOpenPreview);
   const [helpDrawerOpen, setHelpDrawerOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
@@ -1991,12 +1990,18 @@ export default function Home() {
         continue;
       }
       const characters = Array.from(queuedText);
-      const visibleCharacterCount = Math.min(characterBudget, characters.length);
+      const visibleCharacterCount = Math.min(
+        characterBudget,
+        characters.length
+      );
       const visibleText = characters.slice(0, visibleCharacterCount).join("");
       if (visibleText) deltas.set(messageId, visibleText);
       characterBudget -= visibleCharacterCount;
       if (characters.length > visibleCharacterCount) {
-        remainingDeltas.set(messageId, characters.slice(visibleCharacterCount).join(""));
+        remainingDeltas.set(
+          messageId,
+          characters.slice(visibleCharacterCount).join("")
+        );
       }
     }
     pendingDeltasRef.current = remainingDeltas;
@@ -2040,7 +2045,9 @@ export default function Home() {
           flushPendingDeltas();
         });
       }
-      await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+      await new Promise<void>(resolve =>
+        requestAnimationFrame(() => resolve())
+      );
     }
   }
 
@@ -2290,9 +2297,8 @@ export default function Home() {
             streamEntry.userMessageId = conv.userMessageId;
             streamEntry.assistantMessageId = conv.assistantMessageId;
             if (priorAssistantId !== conv.assistantMessageId) {
-              const visibleText = visibleResponseTextRef.current.get(
-                priorAssistantId
-              );
+              const visibleText =
+                visibleResponseTextRef.current.get(priorAssistantId);
               visibleResponseTextRef.current.delete(priorAssistantId);
               visibleResponseTextRef.current.set(
                 conv.assistantMessageId,
@@ -2541,12 +2547,14 @@ export default function Home() {
             }
           } else if (eventName === "file.error") {
             lastProgressAt = Date.now();
+            const errorMessage = str(data.message);
             setFileGeneration(current => ({
               messageId: str(data.messageId),
               stage: "error",
               format: current?.format || "",
               status: "error",
               createdAt: current?.createdAt ?? Date.now(),
+              message: errorMessage,
             }));
             if (isViewingThisStream()) {
               const errorMsgId = str(data.messageId);
@@ -2559,6 +2567,7 @@ export default function Home() {
                           stage: "error",
                           format: fileGeneration?.format || "",
                           status: "error" as const,
+                          message: errorMessage,
                         },
                       }
                     : message
@@ -2729,9 +2738,8 @@ export default function Home() {
 
     const stoppedVisibleResponse =
       userStopped && streamEntry.assistantMessageId
-        ? (visibleResponseTextRef.current.get(
-            streamEntry.assistantMessageId
-          ) ?? "")
+        ? (visibleResponseTextRef.current.get(streamEntry.assistantMessageId) ??
+          "")
         : "";
     if (streamEntry.assistantMessageId) {
       visibleResponseTextRef.current.delete(streamEntry.assistantMessageId);
@@ -2902,7 +2910,11 @@ export default function Home() {
       }
     }
 
-    if (completedConversation && userStopped && streamEntry.assistantMessageId) {
+    if (
+      completedConversation &&
+      userStopped &&
+      streamEntry.assistantMessageId
+    ) {
       try {
         // Persist exactly what reached the screen. This also registers an
         // override with the stream handler in case the provider is still
@@ -4627,9 +4639,7 @@ export default function Home() {
         locked={guestMode}
       />
 
-      <main
-        className="relative flex min-w-0 flex-1 flex-col"
-      >
+      <main className="relative flex min-w-0 flex-1 flex-col">
         {activePrimaryWorkspace === "library" ? (
           <LibraryWorkspace
             onClose={stableCloseWorkspace}
@@ -4788,298 +4798,310 @@ export default function Home() {
                     sideOffset={6}
                     anchor={
                       <div className="contents">
-                        {!chatFilesOpen && <Button
-                          variant="ghost"
-                          size="sm"
-                          className="pointer-events-auto absolute right-2 top-2 hidden h-8 rounded-lg border border-border/50 bg-muted/70 px-3 text-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground lg:flex"
-                          aria-label="Share chat"
-                          disabled={!activeConversationId}
-                          onClick={() => {
-                            if (activeConversationId) {
-                              stableOnShareConversation(
-                                activeConversation
-                                  ? {
-                                      id: activeConversationId,
-                                      title: activeConversation.title,
-                                      isPublic: activeConversation.isPublic,
-                                      shareToken: activeConversation.shareToken,
-                                    }
-                                  : {
-                                      id: activeConversationId,
-                                      title: "this conversation",
-                                    }
-                              );
-                            }
-                          }}
-                        >
-                          <span className="inline-flex items-center gap-1.5 text-sm font-medium">
-                            <ShareIcon className="size-4" />
-                            Share
-                          </span>
-                        </Button>}
+                        {!chatFilesOpen && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="pointer-events-auto absolute right-2 top-2 hidden h-8 rounded-lg border border-border/50 bg-muted/70 px-3 text-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground lg:flex"
+                            aria-label="Share chat"
+                            disabled={!activeConversationId}
+                            onClick={() => {
+                              if (activeConversationId) {
+                                stableOnShareConversation(
+                                  activeConversation
+                                    ? {
+                                        id: activeConversationId,
+                                        title: activeConversation.title,
+                                        isPublic: activeConversation.isPublic,
+                                        shareToken:
+                                          activeConversation.shareToken,
+                                      }
+                                    : {
+                                        id: activeConversationId,
+                                        title: "this conversation",
+                                      }
+                                );
+                              }
+                            }}
+                          >
+                            <span className="inline-flex items-center gap-1.5 text-sm font-medium">
+                              <ShareIcon className="size-4" />
+                              Share
+                            </span>
+                          </Button>
+                        )}
                         <div className="pointer-events-auto absolute left-14 right-24 top-2 hidden lg:block lg:left-4">
                           <div className="inline-flex min-h-9 max-w-full items-center gap-1">
-                              <span
-                                className="min-w-0 max-w-[calc(100%-2rem)] whitespace-normal break-words text-sm font-semibold leading-4 text-foreground"
-                              >
+                            <span className="min-w-0 max-w-[calc(100%-2rem)] whitespace-normal break-words text-sm font-semibold leading-4 text-foreground">
                               {activeConversation?.title || "New Chat"}
                             </span>
-                          <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <button
-                              type="button"
-                              className="flex size-7 shrink-0 items-center justify-center rounded-md text-foreground transition-colors hover:bg-accent/70 data-[state=open]:bg-accent/70 active:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                              aria-label={`Conversation options for ${activeConversation?.title || "New Chat"}`}
-                            >
-                              <ChevronDown className="size-4" />
-                            </button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent
-                            align="end"
-                            sideOffset={6}
-                            className="w-40 rounded-xl"
-                          >
-                            {/* Best order: Pin, Archive, Export, View files, Delete */}
-                            <DropdownMenuItem
-                              disabled={!activeConversationId}
-                              onSelect={() => {
-                                if (activeConversationId) {
-                                  const pinned =
-                                    activeConversation?.isPinned ?? false;
-                                  stableOnPin({
-                                    id: activeConversationId,
-                                    isPinned: pinned,
-                                  });
-                                }
-                              }}
-                            >
-                              {activeConversation?.isPinned ? (
-                                <UnpinTackIcon className="mr-2 size-4" />
-                              ) : (
-                                <PinTackIcon className="mr-2 size-4" />
-                              )}
-                              {activeConversation?.isPinned ? "Unpin" : "Pin"}
-                            </DropdownMenuItem>
-
-                            <DropdownMenuItem
-                              disabled={!activeConversationId}
-                              onSelect={() => {
-                                if (activeConversationId) {
-                                  stableOnArchive({ id: activeConversationId });
-                                  newChat();
-                                  toast.success("Chat archived");
-                                }
-                              }}
-                            >
-                              <Archive className="mr-2 size-4" />
-                              Archive
-                            </DropdownMenuItem>
-
-                            <DropdownMenuSub>
-                              <DropdownMenuSubTrigger
-                                disabled={!activeConversationId}
-                              >
-                                <Download className="mr-2 size-4" />
-                                Export
-                              </DropdownMenuSubTrigger>
-                              <DropdownMenuSubContent
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <button
+                                  type="button"
+                                  className="flex size-7 shrink-0 items-center justify-center rounded-md text-foreground transition-colors hover:bg-accent/70 data-[state=open]:bg-accent/70 active:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                  aria-label={`Conversation options for ${activeConversation?.title || "New Chat"}`}
+                                >
+                                  <ChevronDown className="size-4" />
+                                </button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent
+                                align="end"
                                 sideOffset={6}
-                                collisionPadding={12}
-                                className="w-28 min-w-0 rounded-xl p-1"
+                                className="w-40 rounded-xl"
                               >
+                                {/* Best order: Pin, Archive, Export, View files, Delete */}
                                 <DropdownMenuItem
+                                  disabled={!activeConversationId}
                                   onSelect={() => {
                                     if (activeConversationId) {
-                                      void exportConversation(
-                                        activeConversationId,
-                                        "pdf"
-                                      );
+                                      const pinned =
+                                        activeConversation?.isPinned ?? false;
+                                      stableOnPin({
+                                        id: activeConversationId,
+                                        isPinned: pinned,
+                                      });
                                     }
                                   }}
                                 >
-                                  <FilePdf className="mr-2 size-5 shrink-0" />
-                                  <span>PDF</span>
+                                  {activeConversation?.isPinned ? (
+                                    <UnpinTackIcon className="mr-2 size-4" />
+                                  ) : (
+                                    <PinTackIcon className="mr-2 size-4" />
+                                  )}
+                                  {activeConversation?.isPinned
+                                    ? "Unpin"
+                                    : "Pin"}
                                 </DropdownMenuItem>
+
                                 <DropdownMenuItem
+                                  disabled={!activeConversationId}
                                   onSelect={() => {
                                     if (activeConversationId) {
-                                      void exportConversation(
-                                        activeConversationId,
-                                        "word"
-                                      );
+                                      stableOnArchive({
+                                        id: activeConversationId,
+                                      });
+                                      newChat();
+                                      toast.success("Chat archived");
                                     }
                                   }}
                                 >
-                                  <DocumentText className="mr-2 size-5 shrink-0" />
-                                  <span>Word</span>
+                                  <Archive className="mr-2 size-4" />
+                                  Archive
                                 </DropdownMenuItem>
-                              </DropdownMenuSubContent>
-                            </DropdownMenuSub>
 
-                            <DropdownMenuItem
-                              onSelect={() => setChatFilesOpen(true)}
-                            >
-                              <WinrarIcon className="mr-2 size-4" />
-                              View files
-                            </DropdownMenuItem>
+                                <DropdownMenuSub>
+                                  <DropdownMenuSubTrigger
+                                    disabled={!activeConversationId}
+                                  >
+                                    <Download className="mr-2 size-4" />
+                                    Export
+                                  </DropdownMenuSubTrigger>
+                                  <DropdownMenuSubContent
+                                    sideOffset={6}
+                                    collisionPadding={12}
+                                    className="w-28 min-w-0 rounded-xl p-1"
+                                  >
+                                    <DropdownMenuItem
+                                      onSelect={() => {
+                                        if (activeConversationId) {
+                                          void exportConversation(
+                                            activeConversationId,
+                                            "pdf"
+                                          );
+                                        }
+                                      }}
+                                    >
+                                      <FilePdf className="mr-2 size-5 shrink-0" />
+                                      <span>PDF</span>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      onSelect={() => {
+                                        if (activeConversationId) {
+                                          void exportConversation(
+                                            activeConversationId,
+                                            "word"
+                                          );
+                                        }
+                                      }}
+                                    >
+                                      <DocumentText className="mr-2 size-5 shrink-0" />
+                                      <span>Word</span>
+                                    </DropdownMenuItem>
+                                  </DropdownMenuSubContent>
+                                </DropdownMenuSub>
 
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              disabled={!activeConversationId}
-                              variant="destructive"
-                              onSelect={() => {
-                                if (activeConversationId)
-                                  stableOnDelete({
-                                    id: activeConversationId,
-                                    title:
-                                      activeConversation?.title ??
-                                      "this conversation",
-                                  });
-                              }}
-                            >
-                              <Trash6Icon className="mr-2 size-4" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                          </DropdownMenu>
+                                <DropdownMenuItem
+                                  onSelect={() => setChatFilesOpen(true)}
+                                >
+                                  <WinrarIcon className="mr-2 size-4" />
+                                  View files
+                                </DropdownMenuItem>
+
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  disabled={!activeConversationId}
+                                  variant="destructive"
+                                  onSelect={() => {
+                                    if (activeConversationId)
+                                      stableOnDelete({
+                                        id: activeConversationId,
+                                        title:
+                                          activeConversation?.title ??
+                                          "this conversation",
+                                      });
+                                  }}
+                                >
+                                  <Trash6Icon className="mr-2 size-4" />
+                                  Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </div>
                         </div>
-                        {!chatFilesOpen && <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <button
-                              type="button"
-                              className="pointer-events-auto absolute right-2 top-2 flex size-9 items-center justify-center rounded-lg text-foreground transition-colors hover:bg-accent/70 active:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:hidden"
-                              aria-label={`More options for ${activeConversation?.title || "New Chat"}`}
+                        {!chatFilesOpen && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <button
+                                type="button"
+                                className="pointer-events-auto absolute right-2 top-2 flex size-9 items-center justify-center rounded-lg text-foreground transition-colors hover:bg-accent/70 active:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:hidden"
+                                aria-label={`More options for ${activeConversation?.title || "New Chat"}`}
+                              >
+                                <MoreHorizontal className="size-5" />
+                              </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent
+                              align="end"
+                              sideOffset={6}
+                              className="w-[188px] rounded-xl lg:hidden"
                             >
-                              <MoreHorizontal className="size-5" />
-                            </button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent
-                            align="end"
-                            sideOffset={6}
-                            className="w-[188px] rounded-xl lg:hidden"
-                          >
-                            <DropdownMenuLabel className="whitespace-normal break-words text-foreground">
-                              {activeConversation?.title || "New Chat"}
-                            </DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              disabled={!activeConversationId}
-                              onSelect={() => {
-                                if (activeConversationId) {
-                                  stableOnPin({
-                                    id: activeConversationId,
-                                    isPinned: activeConversation?.isPinned ?? false,
-                                  });
-                                }
-                              }}
-                            >
-                              {activeConversation?.isPinned ? (
-                                <UnpinTackIcon className="mr-2 size-4" />
-                              ) : (
-                                <PinTackIcon className="mr-2 size-4" />
-                              )}
-                              {activeConversation?.isPinned ? "Unpin" : "Pin"}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              disabled={!activeConversationId}
-                              onSelect={() => {
-                                if (activeConversationId) {
-                                  stableOnArchive({ id: activeConversationId });
-                                  newChat();
-                                  toast.success("Chat archived");
-                                }
-                              }}
-                            >
-                              <Archive className="mr-2 size-4" />
-                              Archive
-                            </DropdownMenuItem>
-                            <DropdownMenuSub>
-                              <DropdownMenuSubTrigger
+                              <DropdownMenuLabel className="whitespace-normal break-words text-foreground">
+                                {activeConversation?.title || "New Chat"}
+                              </DropdownMenuLabel>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
                                 disabled={!activeConversationId}
+                                onSelect={() => {
+                                  if (activeConversationId) {
+                                    stableOnPin({
+                                      id: activeConversationId,
+                                      isPinned:
+                                        activeConversation?.isPinned ?? false,
+                                    });
+                                  }
+                                }}
                               >
-                                <Download className="mr-2 size-4" />
-                                Export
-                              </DropdownMenuSubTrigger>
-                              <DropdownMenuSubContent
-                                sideOffset={6}
-                                collisionPadding={12}
-                                className="w-28 min-w-0 rounded-xl p-1"
+                                {activeConversation?.isPinned ? (
+                                  <UnpinTackIcon className="mr-2 size-4" />
+                                ) : (
+                                  <PinTackIcon className="mr-2 size-4" />
+                                )}
+                                {activeConversation?.isPinned ? "Unpin" : "Pin"}
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                disabled={!activeConversationId}
+                                onSelect={() => {
+                                  if (activeConversationId) {
+                                    stableOnArchive({
+                                      id: activeConversationId,
+                                    });
+                                    newChat();
+                                    toast.success("Chat archived");
+                                  }
+                                }}
                               >
-                                <DropdownMenuItem
-                                  onSelect={() => {
-                                    if (activeConversationId)
-                                      void exportConversation(
-                                        activeConversationId,
-                                        "pdf"
-                                      );
-                                  }}
+                                <Archive className="mr-2 size-4" />
+                                Archive
+                              </DropdownMenuItem>
+                              <DropdownMenuSub>
+                                <DropdownMenuSubTrigger
+                                  disabled={!activeConversationId}
                                 >
-                                  <FilePdf className="mr-2 size-5 shrink-0" />
-                                  <span>PDF</span>
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onSelect={() => {
-                                    if (activeConversationId)
-                                      void exportConversation(
-                                        activeConversationId,
-                                        "word"
-                                      );
-                                  }}
+                                  <Download className="mr-2 size-4" />
+                                  Export
+                                </DropdownMenuSubTrigger>
+                                <DropdownMenuSubContent
+                                  sideOffset={6}
+                                  collisionPadding={12}
+                                  className="w-28 min-w-0 rounded-xl p-1"
                                 >
-                                  <DocumentText className="mr-2 size-5 shrink-0" />
-                                  <span>Word</span>
-                                </DropdownMenuItem>
-                              </DropdownMenuSubContent>
-                            </DropdownMenuSub>
-                            <DropdownMenuItem
-                              disabled={!activeConversationId}
-                              onSelect={() => {
-                                if (activeConversationId) {
-                                  stableOnShareConversation(
-                                    activeConversation
-                                      ? {
-                                          id: activeConversationId,
-                                          title: activeConversation.title,
-                                          isPublic: activeConversation.isPublic,
-                                          shareToken: activeConversation.shareToken,
-                                        }
-                                      : {
-                                          id: activeConversationId,
-                                          title: "this conversation",
-                                        }
-                                  );
-                                }
-                              }}
-                            >
-                              <ShareIcon className="mr-2 size-4" />
-                              Share
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onSelect={() => setChatFilesOpen(true)}
-                            >
-                              <WinrarIcon className="mr-2 size-4" />
-                              View files
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              disabled={!activeConversationId}
-                              variant="destructive"
-                              onSelect={() => {
-                                if (activeConversationId)
-                                  stableOnDelete({
-                                    id: activeConversationId,
-                                    title:
-                                      activeConversation?.title ??
-                                      "this conversation",
-                                  });
-                              }}
-                            >
-                              <Trash6Icon className="mr-2 size-4" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>}
+                                  <DropdownMenuItem
+                                    onSelect={() => {
+                                      if (activeConversationId)
+                                        void exportConversation(
+                                          activeConversationId,
+                                          "pdf"
+                                        );
+                                    }}
+                                  >
+                                    <FilePdf className="mr-2 size-5 shrink-0" />
+                                    <span>PDF</span>
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onSelect={() => {
+                                      if (activeConversationId)
+                                        void exportConversation(
+                                          activeConversationId,
+                                          "word"
+                                        );
+                                    }}
+                                  >
+                                    <DocumentText className="mr-2 size-5 shrink-0" />
+                                    <span>Word</span>
+                                  </DropdownMenuItem>
+                                </DropdownMenuSubContent>
+                              </DropdownMenuSub>
+                              <DropdownMenuItem
+                                disabled={!activeConversationId}
+                                onSelect={() => {
+                                  if (activeConversationId) {
+                                    stableOnShareConversation(
+                                      activeConversation
+                                        ? {
+                                            id: activeConversationId,
+                                            title: activeConversation.title,
+                                            isPublic:
+                                              activeConversation.isPublic,
+                                            shareToken:
+                                              activeConversation.shareToken,
+                                          }
+                                        : {
+                                            id: activeConversationId,
+                                            title: "this conversation",
+                                          }
+                                    );
+                                  }
+                                }}
+                              >
+                                <ShareIcon className="mr-2 size-4" />
+                                Share
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onSelect={() => setChatFilesOpen(true)}
+                              >
+                                <WinrarIcon className="mr-2 size-4" />
+                                View files
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                disabled={!activeConversationId}
+                                variant="destructive"
+                                onSelect={() => {
+                                  if (activeConversationId)
+                                    stableOnDelete({
+                                      id: activeConversationId,
+                                      title:
+                                        activeConversation?.title ??
+                                        "this conversation",
+                                    });
+                                }}
+                              >
+                                <Trash6Icon className="mr-2 size-4" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
                       </div>
                     }
                   />
@@ -5151,7 +5173,7 @@ export default function Home() {
                           researchSourceCount={
                             activeFileGen.researchSourceCount
                           }
-                          onRetry={() => regenerateMessage(message)}
+                          errorMessage={activeFileGen.message}
                           code={activeFileGen.code}
                           onOpenCode={(code, filename) =>
                             setShowCode({ code, filename })

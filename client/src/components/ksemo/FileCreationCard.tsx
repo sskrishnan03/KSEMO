@@ -1,6 +1,6 @@
 import type { DocFormat } from "@/lib/docFormats";
 import { getCapabilityOption } from "@/lib/capabilities";
-import { Check, ChevronRight, Code2, Eye, RotateCw } from "lucide-react";
+import { Check, ChevronRight, Code2, Eye } from "lucide-react";
 import React, {
   memo,
   useCallback,
@@ -237,7 +237,7 @@ export type FileCreationCardProps = {
   fileUrl?: string;
   fileSizeBytes?: number;
   fileId?: string;
-  onRetry?: () => void;
+  errorMessage?: string;
   researchSourceCount?: number;
   sources?: FileSource[];
   metrics?: FileMetrics;
@@ -259,7 +259,7 @@ export const FileCreationCard = memo(function FileCreationCard({
   fileUrl,
   fileSizeBytes,
   fileId,
-  onRetry,
+  errorMessage,
   researchSourceCount,
   defaultExpanded = false,
   initialShowReady = false,
@@ -386,24 +386,10 @@ export const FileCreationCard = memo(function FileCreationCard({
               Document creation could not be completed
             </p>
             <p className="mt-0.5 text-[11px] text-muted-foreground">
-              Something went wrong while generating the {config.short}.
+              {errorMessage ||
+                `Something went wrong while generating the ${config.short}.`}
             </p>
           </div>
-          {onRetry && (
-            <button
-              type="button"
-              onClick={onRetry}
-              className={cn(
-                "inline-flex shrink-0 items-center gap-1.5 rounded-xl",
-                "border border-border/70 bg-card px-3 py-1.5",
-                "text-[11.5px] font-medium text-foreground shadow-sm",
-                "transition-all duration-150 hover:bg-muted active:scale-[0.98]"
-              )}
-            >
-              <RotateCw className="size-3" />
-              Try again
-            </button>
-          )}
         </div>
       </div>
     );
@@ -418,21 +404,6 @@ export const FileCreationCard = memo(function FileCreationCard({
           <span className="whitespace-nowrap text-[13px] font-medium text-foreground">
             Creation stopped
           </span>
-          {onRetry && (
-            <button
-              type="button"
-              onClick={onRetry}
-              className={cn(
-                "inline-flex shrink-0 items-center gap-1.5 rounded-lg",
-                "border border-border/70 bg-card px-2.5 py-1",
-                "text-xs font-medium text-foreground shadow-sm",
-                "transition-all duration-150 hover:bg-muted active:scale-[0.98]"
-              )}
-            >
-              <RotateCw className="size-3.5" />
-              Try again
-            </button>
-          )}
         </div>
       </div>
     );

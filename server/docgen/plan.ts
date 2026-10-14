@@ -30,7 +30,10 @@ function buildResearchContextBlock(research?: ResearchResult): string {
 
   if (research.findings.length === 0) {
     const sourceNotes = research.sources
-      .map(source => `${source.title} — ${source.url}${source.snippet ? `\n${source.snippet}` : ""}`)
+      .map(
+        source =>
+          `${source.title} — ${source.url}${source.snippet ? `\n${source.snippet}` : ""}`
+      )
       .join("\n\n");
     return `
 CURRENT-FACT RESEARCH STATUS:
@@ -47,7 +50,10 @@ Do not invent current facts, dates, statistics, rankings, or citations. Avoid cl
     .join("\n\n");
 
   const sourcesText = research.sources
-    .map((s, i) => `${i + 1}. ${s.title} — ${s.url}${s.publisher ? ` (${s.publisher})` : ""}`)
+    .map(
+      (s, i) =>
+        `${i + 1}. ${s.title} — ${s.url}${s.publisher ? ` (${s.publisher})` : ""}`
+    )
     .join("\n");
 
   return `
@@ -88,9 +94,12 @@ export function parseUserLengthIntent(message: string): LengthIntent {
   const targetSheets = sheetMatch ? parseInt(sheetMatch[1], 10) : undefined;
 
   return {
-    targetPages: targetPages && targetPages > 0 ? Math.min(targetPages, 50) : undefined,
-    targetSlides: targetSlides && targetSlides > 0 ? Math.min(targetSlides, 40) : undefined,
-    targetSheets: targetSheets && targetSheets > 0 ? Math.min(targetSheets, 20) : undefined,
+    targetPages:
+      targetPages && targetPages > 0 ? Math.min(targetPages, 50) : undefined,
+    targetSlides:
+      targetSlides && targetSlides > 0 ? Math.min(targetSlides, 40) : undefined,
+    targetSheets:
+      targetSheets && targetSheets > 0 ? Math.min(targetSheets, 20) : undefined,
     isExtensive,
   };
 }
@@ -118,25 +127,26 @@ export function compactDocumentHistory(history: Message[]): Message[] {
     };
 
     const content = message.content;
-    const compactContent: Message["content"] = typeof content === "string"
-      ? compactText(content)
-      : Array.isArray(content)
-        ? content.map(part => {
-          if (typeof part === "string") return compactText(part);
-          if ("text" in part && typeof part.text === "string") {
-            return { ...part, text: compactText(part.text) };
-          }
-          return {
-            type: "text" as const,
-            text: "[An earlier image or file attachment was present in the conversation.]",
-          };
-        })
-        : "text" in content && typeof content.text === "string"
-          ? { ...content, text: compactText(content.text) }
-          : {
-              type: "text" as const,
-              text: "[An earlier image or file attachment was present in the conversation.]",
-            };
+    const compactContent: Message["content"] =
+      typeof content === "string"
+        ? compactText(content)
+        : Array.isArray(content)
+          ? content.map(part => {
+              if (typeof part === "string") return compactText(part);
+              if ("text" in part && typeof part.text === "string") {
+                return { ...part, text: compactText(part.text) };
+              }
+              return {
+                type: "text" as const,
+                text: "[An earlier image or file attachment was present in the conversation.]",
+              };
+            })
+          : "text" in content && typeof content.text === "string"
+            ? { ...content, text: compactText(content.text) }
+            : {
+                type: "text" as const,
+                text: "[An earlier image or file attachment was present in the conversation.]",
+              };
     compacted.push({ ...message, content: compactContent });
   }
 
@@ -237,11 +247,12 @@ CRITICAL PROHIBITION: NEVER write page numbers (e.g. "Page 1", "Slide 1", "1 of 
     }
   }
 
-  const structureExample = format === "xlsx"
-    ? `"content":{"sheets":[{"name":"Sheet name","table":true,"rows":[["Column A","Column B"],["Value","Value"]]}]}`
-    : format === "pptx"
-      ? `"content":{"slides":[{"title":"Key point","bullets":["Specific supporting detail"]}]}`
-      : `"content":{"blocks":[{"type":"heading","level":1,"text":"Section title"},{"type":"paragraph","text":"Relevant, supported content."},{"type":"bulletList","items":["Specific point"]}]}`;
+  const structureExample =
+    format === "xlsx"
+      ? `"content":{"sheets":[{"name":"Sheet name","table":true,"rows":[["Column A","Column B"],["Value","Value"]]}]}`
+      : format === "pptx"
+        ? `"content":{"slides":[{"title":"Key point","bullets":["Specific supporting detail"]}]}`
+        : `"content":{"blocks":[{"type":"heading","level":1,"text":"Section title"},{"type":"paragraph","text":"Relevant, supported content."},{"type":"bulletList","items":["Specific point"]}]}`;
   return `You are KSEMO's document-planning engine. The current date is ${currentDate}. Create a useful artifact that answers the user's latest request precisely.
 Produce only content that serves the requested artifact. The user selected ${formatUpper}; return createFile=true and format="${format}".
 The latest request and relevant earlier conversation are supplied as separate messages. Follow the latest request; use earlier turns only when it refers to them. Do not answer an older request again by default.
@@ -324,18 +335,36 @@ Produce substantive, authentic slides reflecting this design archetype. If "AUTO
 
       const raw = result.choices?.[0]?.message?.content;
       const text = Array.isArray(raw)
-        ? raw.map(p => (typeof p === "object" ? (p as { text?: string }).text ?? "" : String(p))).join("")
+        ? raw
+            .map(p =>
+              typeof p === "object"
+                ? ((p as { text?: string }).text ?? "")
+                : String(p)
+            )
+            .join("")
         : String(raw ?? "");
 
       const parsed = parsePlanJson(text);
       if (!parsed) {
         throw new Error("The planner returned invalid document data.");
       }
-      return buildPlanFromParsed(parsed, forced, userMessage, research, history);
+      return buildPlanFromParsed(
+        parsed,
+        forced,
+        userMessage,
+        research,
+        history
+      );
     } catch (error) {
       if (opts?.signal?.aborted) throw error;
-      console.error(`[DocGen] planning call with forced ${forced} failed.`, error);
-      throw new Error("I couldn't build a reliable document from this request. Please try again.");
+      console.error(
+        `[DocGen] planning call with forced ${forced} failed.`,
+        error
+      );
+      throw new Error(
+        "The document planner could not create a valid plan. Please simplify the request or choose another format.",
+        { cause: error }
+      );
     }
   }
 
@@ -360,7 +389,13 @@ Produce substantive, authentic slides reflecting this design archetype. If "AUTO
     });
     const raw = result.choices?.[0]?.message?.content;
     const text = Array.isArray(raw)
-      ? raw.map(p => (typeof p === "object" ? (p as { text?: string }).text ?? "" : String(p))).join("")
+      ? raw
+          .map(p =>
+            typeof p === "object"
+              ? ((p as { text?: string }).text ?? "")
+              : String(p)
+          )
+          .join("")
       : String(raw ?? "");
     const parsed = parsePlanJson(text);
     if (!parsed) return { kind: "none" };
@@ -383,10 +418,16 @@ function buildPlanFromParsed(
   research?: ResearchResult,
   history?: Message[]
 ): DocumentPlan & { kind: "file" } {
-  const title = String(parsed.title ?? cleanTitleFromMessage(userMessage, history)).slice(0, 160);
-  const filename = String(parsed.filename ?? sanitizeTitle(title)).slice(0, 120);
+  const title = String(
+    parsed.title ?? cleanTitleFromMessage(userMessage, history)
+  ).slice(0, 160);
+  const filename = String(parsed.filename ?? sanitizeTitle(title)).slice(
+    0,
+    120
+  );
   const summary = String(
-    parsed.summary ?? `I created your ${format.toUpperCase()} document: "${title}".`
+    parsed.summary ??
+      `I created your ${format.toUpperCase()} document: "${title}".`
   );
 
   let content: { blocks?: unknown[]; sheets?: unknown[]; slides?: unknown[] };
@@ -395,9 +436,15 @@ function buildPlanFromParsed(
     content = { blocks: parsed.content };
   } else {
     content = {
-      blocks: Array.isArray(parsed.content?.blocks) ? parsed.content.blocks : undefined,
-      sheets: Array.isArray(parsed.content?.sheets) ? parsed.content.sheets : undefined,
-      slides: Array.isArray(parsed.content?.slides) ? parsed.content.slides : undefined,
+      blocks: Array.isArray(parsed.content?.blocks)
+        ? parsed.content.blocks
+        : undefined,
+      sheets: Array.isArray(parsed.content?.sheets)
+        ? parsed.content.sheets
+        : undefined,
+      slides: Array.isArray(parsed.content?.slides)
+        ? parsed.content.slides
+        : undefined,
     };
   }
 
@@ -406,7 +453,11 @@ function buildPlanFromParsed(
     throw new Error("The planner did not provide spreadsheet content.");
   } else if (format === "pptx" && (!content.slides || !content.slides.length)) {
     throw new Error("The planner did not provide presentation content.");
-  } else if (format !== "xlsx" && format !== "pptx" && (!content.blocks || !content.blocks.length)) {
+  } else if (
+    format !== "xlsx" &&
+    format !== "pptx" &&
+    (!content.blocks || !content.blocks.length)
+  ) {
     throw new Error("The planner did not provide document content.");
   }
 
@@ -418,12 +469,19 @@ function buildPlanFromParsed(
         s &&
         typeof s === "object" &&
         typeof (s as any).url === "string" &&
-        isUserProvidedOrResearchedUrl((s as any).url, userMessage, history, research)
+        isUserProvidedOrResearchedUrl(
+          (s as any).url,
+          userMessage,
+          history,
+          research
+        )
       ) {
         sources.push({
           title: String((s as any).title || "Source"),
           url: String((s as any).url),
-          publisher: (s as any).publisher ? String((s as any).publisher) : undefined,
+          publisher: (s as any).publisher
+            ? String((s as any).publisher)
+            : undefined,
         });
       }
     }
@@ -458,14 +516,17 @@ function isUserProvidedOrResearchedUrl(
   research?: ResearchResult
 ): boolean {
   const normalizedUrl = url.replace(/[),.;\]]+$/, "");
-  if (research?.sources.some(source => source.url === normalizedUrl)) return true;
+  if (research?.sources.some(source => source.url === normalizedUrl))
+    return true;
   const userText = [
     userMessage,
     ...(history ?? [])
       .filter(message => message.role === "user")
       .flatMap(message => {
         if (typeof message.content === "string") return [message.content];
-        const parts = Array.isArray(message.content) ? message.content : [message.content];
+        const parts = Array.isArray(message.content)
+          ? message.content
+          : [message.content];
         return parts.flatMap(part =>
           typeof part === "string"
             ? [part]
@@ -480,10 +541,22 @@ function isUserProvidedOrResearchedUrl(
 
 function cleanTitleFromMessage(message: string, history?: Message[]): string {
   const cleaned = message
-    .replace(/^\/?(pdf|docx|word|xlsx|excel|pptx|powerpoint|ppt|txt|text)\s*[:\s-]?/i, "")
-    .replace(/^(can you\s+)?(i\s+want|i\s+need|give\s+me|can\s+you\s+give\s+me|can\s+you\s+provide|please\s+)?(this|that|it)?\s*(in|into|to|as\s+a|as)?\s*(pdf|word|docx|excel|xlsx|powerpoint|pptx|text|txt)?\s*/i, "")
-    .replace(/^(create|generate|write|make|build|give me|can you make|please make)\s+(a|an|the)?\s*/i, "")
-    .replace(/(pdf|word document|docx|excel|spreadsheet|xlsx|powerpoint|presentation|pptx|text file|txt|file)\s*/gi, "")
+    .replace(
+      /^\/?(pdf|docx|word|xlsx|excel|pptx|powerpoint|ppt|txt|text)\s*[:\s-]?/i,
+      ""
+    )
+    .replace(
+      /^(can you\s+)?(i\s+want|i\s+need|give\s+me|can\s+you\s+give\s+me|can\s+you\s+provide|please\s+)?(this|that|it)?\s*(in|into|to|as\s+a|as)?\s*(pdf|word|docx|excel|xlsx|powerpoint|pptx|text|txt)?\s*/i,
+      ""
+    )
+    .replace(
+      /^(create|generate|write|make|build|give me|can you make|please make)\s+(a|an|the)?\s*/i,
+      ""
+    )
+    .replace(
+      /(pdf|word document|docx|excel|spreadsheet|xlsx|powerpoint|presentation|pptx|text file|txt|file)\s*/gi,
+      ""
+    )
     .replace(/[^\w\s-]/g, "")
     .trim();
 
@@ -491,7 +564,9 @@ function cleanTitleFromMessage(message: string, history?: Message[]): string {
   // derive the title from the previous user turn in history if available.
   if (!cleaned || /^(this|that|it|everything|the above)$/i.test(cleaned)) {
     if (history && history.length > 0) {
-      const priorUser = [...history].reverse().find(m => m.role === "user" && m.content);
+      const priorUser = [...history]
+        .reverse()
+        .find(m => m.role === "user" && m.content);
       if (priorUser && typeof priorUser.content === "string") {
         const priorTitle = cleanTitleFromMessage(priorUser.content);
         if (priorTitle && priorTitle !== "Comprehensive Document") {
@@ -543,7 +618,9 @@ function parsePlanJson(text: string): Record<string, any> | null {
     if (start >= 0 && end > start) {
       try {
         const candidate = JSON.parse(cleaned.slice(start, end + 1));
-        return typeof candidate === "object" && candidate !== null ? candidate : null;
+        return typeof candidate === "object" && candidate !== null
+          ? candidate
+          : null;
       } catch {
         return null;
       }

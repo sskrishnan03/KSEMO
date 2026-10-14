@@ -189,30 +189,26 @@ describe("FileCreationCard", () => {
   });
 
   describe("Error State", () => {
-    it("renders friendly error message and retry button when onRetry provided", () => {
-      const onRetry = vi.fn();
+    it("renders a friendly error message without a retry action", () => {
       const markup = renderCard({
         stage: "error",
         format: "xlsx",
-        onRetry,
       });
 
       expect(markup).toContain("Document creation could not be completed");
-      expect(markup).toContain("Try again");
+      expect(markup).not.toContain("Try again");
     });
   });
 
   describe("Interrupted State", () => {
-    it("renders a clean stopped card with retry when onRetry provided", () => {
-      const onRetry = vi.fn();
+    it("renders a clean stopped card without a retry action", () => {
       const markup = renderCard({
         stage: "interrupted",
         format: "docx",
-        onRetry,
       });
 
-      expect(markup).toContain("Document creation was stopped");
-      expect(markup).toContain("Try again");
+      expect(markup).toContain("Creation stopped");
+      expect(markup).not.toContain("Try again");
       expect(markup).not.toContain('data-testid="file-creation-drafting"');
       expect(markup).not.toContain('data-testid="file-creation-completed"');
     });
@@ -229,7 +225,9 @@ describe("FileCreationCard", () => {
       });
 
       // Layout: file card original width + code container with small two-lines gap
-      expect(markup).toContain("flex flex-col md:flex-row items-stretch gap-1 sm:gap-1.5");
+      expect(markup).toContain(
+        "flex flex-col md:flex-row items-stretch gap-1 sm:gap-1.5"
+      );
       expect(markup).toContain('data-testid="file-creation-completed"');
       expect(markup).toContain("md:w-[460px]");
       expect(markup).toContain("h-[302px]");

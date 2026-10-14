@@ -12,17 +12,44 @@ import {
   deleteFileForUser,
 } from "../supabase-db";
 import { generateDocument, type GeneratedArtifact } from "./generate";
-import type { DocBlock, DocumentSpec, DocFormat, SourceReference } from "./spec";
-import { DEFAULT_PRESENTATION_CONFIG, normalizeStyleId, type PptVisualStyle, type PptConcreteStyle } from "@shared/presentation";
+import type {
+  DocBlock,
+  DocumentSpec,
+  DocFormat,
+  SourceReference,
+} from "./spec";
+import {
+  DEFAULT_PRESENTATION_CONFIG,
+  normalizeStyleId,
+  type PptVisualStyle,
+  type PptConcreteStyle,
+} from "@shared/presentation";
 import { pickAutoTheme } from "@shared/pptThemes";
-import { sanitizePresentationConfig, sanitizeStyleName } from "./presentation/config";
-import { sanitizeFilename, FORMAT_MIME, coerceBlocks, coerceSheets, coerceSlides } from "./spec";
+import {
+  sanitizePresentationConfig,
+  sanitizeStyleName,
+} from "./presentation/config";
+import {
+  sanitizeFilename,
+  FORMAT_MIME,
+  coerceBlocks,
+  coerceSheets,
+  coerceSlides,
+} from "./spec";
 import type { DocumentPlan } from "./plan";
 import { compactDocumentHistory, planDocument } from "./plan";
-import { performResearch, requiresCurrentDataResearch, type ResearchResult } from "./research";
+import {
+  performResearch,
+  requiresCurrentDataResearch,
+  type ResearchResult,
+} from "./research";
 import { validateDocument, type QualityReport } from "./quality";
 import type { Message } from "../_core/llm";
-import { planPresentationOutline, outlineToSlideDefinitions, type OutlineProgressStage } from "./presentation/outline";
+import {
+  planPresentationOutline,
+  outlineToSlideDefinitions,
+  type OutlineProgressStage,
+} from "./presentation/outline";
 import type { PptOutlinePlan } from "../../shared/presentationOutline";
 import { generatePythonScript } from "./pythonGenerator";
 
@@ -125,14 +152,22 @@ export async function runDocumentPipeline(input: {
   throwIfAborted(signal);
 
   // ── Stage 1: Analyzing ────────────────────────────────────────────────
-  onProgress({ stage: "analyzing", format, message: "Analyzing prompt & scope" });
+  onProgress({
+    stage: "analyzing",
+    format,
+    message: "Analyzing prompt & scope",
+  });
   await paceStage(450, signal);
 
   // ── Stage 2: Planning & Research ──────────────────────────────────────
   let research: ResearchResult | undefined;
   const planningHistory = compactDocumentHistory(history);
 
-  onProgress({ stage: "planning", format, message: "Planning document architecture" });
+  onProgress({
+    stage: "planning",
+    format,
+    message: "Planning document architecture",
+  });
   await paceStage(350, signal);
 
   try {
@@ -140,26 +175,45 @@ export async function runDocumentPipeline(input: {
       userMessage,
       planningHistory,
       format,
-      (researchStage) => {
+      researchStage => {
         switch (researchStage) {
           case "searching":
-            onProgress({ stage: "researching", format, message: "Searching verified sources" });
+            onProgress({
+              stage: "researching",
+              format,
+              message: "Searching verified sources",
+            });
             break;
           case "fetching":
-            onProgress({ stage: "searching", format, message: "Gathering authoritative content" });
+            onProgress({
+              stage: "searching",
+              format,
+              message: "Gathering authoritative content",
+            });
             break;
           case "analyzing_sources":
-            onProgress({ stage: "analyzing_sources", format, message: "Synthesizing research insights" });
+            onProgress({
+              stage: "analyzing_sources",
+              format,
+              message: "Synthesizing research insights",
+            });
             break;
           default:
-            onProgress({ stage: "researching", format, message: "Researching topic" });
+            onProgress({
+              stage: "researching",
+              format,
+              message: "Researching topic",
+            });
         }
       },
       signal
     );
   } catch (error) {
     throwIfAborted(signal);
-    console.warn("[DocGen] Research failed; continuing without web research:", error);
+    console.warn(
+      "[DocGen] Research failed; continuing without web research:",
+      error
+    );
     research = {
       needed: requiresCurrentDataResearch(userMessage),
       query: userMessage,
@@ -172,7 +226,9 @@ export async function runDocumentPipeline(input: {
   throwIfAborted(signal);
 
   if (research.needed && research.sourceCount > 0) {
-    console.log(`[DocGen] Research complete: ${research.sourceCount} sources, ${research.findings.length} findings`);
+    console.log(
+      `[DocGen] Research complete: ${research.sourceCount} sources, ${research.findings.length} findings`
+    );
   }
   await paceStage(300, signal);
 
@@ -192,7 +248,9 @@ export async function runDocumentPipeline(input: {
   let pptxConfig: import("@shared/presentation").PresentationConfig | undefined;
 
   if (format === "pptx") {
-    pptxConfig = sanitizePresentationConfig(presentationConfig ?? DEFAULT_PRESENTATION_CONFIG);
+    pptxConfig = sanitizePresentationConfig(
+      presentationConfig ?? DEFAULT_PRESENTATION_CONFIG
+    );
 
     let selectedStyle: PptVisualStyle = "auto";
     if (presentationStyle && presentationStyle !== "auto") {
@@ -208,7 +266,9 @@ export async function runDocumentPipeline(input: {
     }
 
     pptxConfig.visualStyle = lockedStyle;
-    console.log(`[PPT Pipeline] Style selected: "${selectedStyle}" -> Authoritatively locked to: "${lockedStyle}"`);
+    console.log(
+      `[PPT Pipeline] Style selected: "${selectedStyle}" -> Authoritatively locked to: "${lockedStyle}"`
+    );
   }
 
   const plan = await planDocument(
@@ -218,7 +278,9 @@ export async function runDocumentPipeline(input: {
     research,
     {
       slideTarget:
-        pptxConfig && pptxConfig.slides !== "auto" ? pptxConfig.slides : undefined,
+        pptxConfig && pptxConfig.slides !== "auto"
+          ? pptxConfig.slides
+          : undefined,
       visualStyle: lockedStyle,
       signal,
     }
@@ -226,7 +288,9 @@ export async function runDocumentPipeline(input: {
   throwIfAborted(signal);
 
   if (plan.kind !== "file") {
-    throw new Error("Document planner could not produce a file plan for this request.");
+    throw new Error(
+      "Document planner could not produce a file plan for this request."
+    );
   }
 
   // ── Stage 4: Document Design (Spec Building) ─────────────────────────
@@ -258,7 +322,11 @@ export async function runDocumentPipeline(input: {
   // Pre-generate Python script so the client can show code immediately
   let earlyPythonCode: string | undefined;
   try {
-    earlyPythonCode = generatePythonScript({ ...spec, sources: undefined, summary: undefined });
+    earlyPythonCode = generatePythonScript({
+      ...spec,
+      sources: undefined,
+      summary: undefined,
+    });
   } catch {}
 
   // ── Stage 5: File Generation ─────────────────────────────────────────
@@ -329,7 +397,9 @@ function countWordsFromBlocks(blocks: DocBlock[]): number {
     }
     if ("items" in block && Array.isArray((block as any).items)) {
       count += (block as any).items
-        .map((it: any) => (typeof it === "string" ? it : `${it.label || ""} ${it.value || ""}`))
+        .map((it: any) =>
+          typeof it === "string" ? it : `${it.label || ""} ${it.value || ""}`
+        )
         .join(" ")
         .split(/\s+/)
         .filter(Boolean).length;
@@ -392,7 +462,9 @@ async function computeFileMetrics(
  * Converts an AI-produced DocumentPlan into a validated DocumentSpec that the
  * deterministic generators can safely consume.
  */
-export function buildDocumentSpec(plan: Extract<DocumentPlan, { kind: "file" }>): DocumentSpec {
+export function buildDocumentSpec(
+  plan: Extract<DocumentPlan, { kind: "file" }>
+): DocumentSpec {
   const filename = sanitizeFilename(plan.format, plan.filename || plan.title);
   const cleanTitleFromFilename = filename
     .replace(/\.\w+$/, "")
@@ -427,7 +499,9 @@ export function buildDocumentSpec(plan: Extract<DocumentPlan, { kind: "file" }>)
     ) {
       blocks.shift();
     }
-    spec.blocks = blocks.length ? blocks : [{ type: "paragraph", text: plan.title || "" }];
+    spec.blocks = blocks.length
+      ? blocks
+      : [{ type: "paragraph", text: plan.title || "" }];
   }
   // Carry over source references from the plan
   if (plan.sources && plan.sources.length > 0) {
@@ -483,7 +557,12 @@ export async function generateAndDeliverFile(input: {
   summary?: string;
   generated?: GeneratedArtifact;
   sources?: Array<{ title: string; url: string; publisher?: string }>;
-  metrics?: { pages?: number; sheets?: number; slides?: number; words?: number };
+  metrics?: {
+    pages?: number;
+    sheets?: number;
+    slides?: number;
+    words?: number;
+  };
   signal?: AbortSignal;
 }): Promise<GeneratedFileResult> {
   const {
@@ -521,22 +600,34 @@ export async function generateAndDeliverFile(input: {
   }
 
   // Create the file record (Supabase or inMemoryStore)
-  await createFileForUser({
-    id: fileId,
-    userId,
-    projectId: null,
-    filename,
-    mimeType,
-    sizeBytes: buffer.length,
-    storageKey: saved.key,
-    url: saved.url,
-    contentText: metadataJson,
-    status: "ready",
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  }).catch(err => {
-    console.warn("[DocGen] file creation warning:", err);
-  });
+  try {
+    await createFileForUser({
+      id: fileId,
+      userId,
+      projectId: null,
+      filename,
+      mimeType,
+      sizeBytes: buffer.length,
+      storageKey: saved.key,
+      url: saved.url,
+      contentText: metadataJson,
+      status: "ready",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+  } catch (error) {
+    // Don't report a generated file as successful when it could not be saved.
+    await storageDelete(saved.key).catch(cleanupError => {
+      console.warn(
+        "[DocGen] failed to clean up unsaved generated file:",
+        cleanupError
+      );
+    });
+    throw new Error(
+      "The file was generated but could not be saved to your workspace.",
+      { cause: error }
+    );
+  }
   if (signal?.aborted) {
     await deleteFileForUser(fileId, userId).catch(() => false);
     await storageDelete(saved.key);
@@ -550,11 +641,25 @@ export async function generateAndDeliverFile(input: {
       messageId: assistantMessageId,
       userId,
     });
-    if (!attached) {
-      console.warn("[DocGen] generated file could not be attached to message");
-    }
+    if (!attached)
+      throw new Error("The generated file could not be attached to the chat.");
   } catch (attErr) {
-    console.warn("[DocGen] attachFileToMessageForUser error:", attErr);
+    await deleteFileForUser(fileId, userId).catch(cleanupError => {
+      console.warn(
+        "[DocGen] failed to clean up unattached file record:",
+        cleanupError
+      );
+    });
+    await storageDelete(saved.key).catch(cleanupError => {
+      console.warn(
+        "[DocGen] failed to clean up unattached file storage:",
+        cleanupError
+      );
+    });
+    throw new Error(
+      "The file was generated but could not be attached to the chat.",
+      { cause: attErr }
+    );
   }
   if (signal?.aborted) {
     await deleteFileForUser(fileId, userId).catch(() => false);
@@ -609,10 +714,18 @@ export async function runPresentationOutline(input: {
     presentationStyle,
   } = input;
 
-  onProgress({ stage: "analyzing", format: "pptx", message: "Analyzing prompt & scope" });
+  onProgress({
+    stage: "analyzing",
+    format: "pptx",
+    message: "Analyzing prompt & scope",
+  });
   await paceStage(450, signal);
 
-  onProgress({ stage: "planning", format: "pptx", message: "Planning presentation structure" });
+  onProgress({
+    stage: "planning",
+    format: "pptx",
+    message: "Planning presentation structure",
+  });
   await paceStage(300, signal);
 
   // Ground the outline in fresh research when useful (same research stage as the
@@ -627,23 +740,42 @@ export async function runPresentationOutline(input: {
       researchStage => {
         switch (researchStage) {
           case "searching":
-            onProgress({ stage: "researching", format: "pptx", message: "Searching verified sources" });
+            onProgress({
+              stage: "researching",
+              format: "pptx",
+              message: "Searching verified sources",
+            });
             break;
           case "fetching":
-            onProgress({ stage: "searching", format: "pptx", message: "Gathering authoritative content" });
+            onProgress({
+              stage: "searching",
+              format: "pptx",
+              message: "Gathering authoritative content",
+            });
             break;
           case "analyzing_sources":
-            onProgress({ stage: "analyzing_sources", format: "pptx", message: "Synthesizing research insights" });
+            onProgress({
+              stage: "analyzing_sources",
+              format: "pptx",
+              message: "Synthesizing research insights",
+            });
             break;
           default:
-            onProgress({ stage: "researching", format: "pptx", message: "Researching topic" });
+            onProgress({
+              stage: "researching",
+              format: "pptx",
+              message: "Researching topic",
+            });
         }
       },
       signal
     );
   } catch (error) {
     throwIfAborted(signal);
-    console.warn("[DocGen] Research failed; continuing without web research:", error);
+    console.warn(
+      "[DocGen] Research failed; continuing without web research:",
+      error
+    );
     research = requiresCurrentDataResearch(userMessage)
       ? {
           needed: true,
@@ -658,7 +790,9 @@ export async function runPresentationOutline(input: {
   throwIfAborted(signal);
 
   if (research?.needed && (research.sourceCount ?? 0) > 0) {
-    console.log(`[DocGen] Outline research complete: ${research.sourceCount} sources`);
+    console.log(
+      `[DocGen] Outline research complete: ${research.sourceCount} sources`
+    );
   }
   await paceStage(300, signal);
 
@@ -738,15 +872,29 @@ export async function runPresentationFromOutline(input: {
   onProgress: PipelineProgressCallback;
   signal?: AbortSignal;
 }): Promise<GeneratedFileResult> {
-  const { userId, assistantMessageId, conversationId, outline, onProgress, signal } = input;
+  const {
+    userId,
+    assistantMessageId,
+    conversationId,
+    outline,
+    onProgress,
+    signal,
+  } = input;
 
   throwIfAborted(signal);
 
-  onProgress({ stage: "designing", format: "pptx", message: "Formatting layout & typography" });
+  onProgress({
+    stage: "designing",
+    format: "pptx",
+    message: "Formatting layout & typography",
+  });
   await paceStage(450, signal);
   throwIfAborted(signal);
 
-  const slideDefinitions = outlineToSlideDefinitions(outline.slides, outline.title);
+  const slideDefinitions = outlineToSlideDefinitions(
+    outline.slides,
+    outline.title
+  );
   const spec: DocumentSpec = {
     format: "pptx",
     filename: outline.filename,
@@ -761,7 +909,11 @@ export async function runPresentationFromOutline(input: {
 
   let earlyPptPythonCode: string | undefined;
   try {
-    earlyPptPythonCode = generatePythonScript({ ...spec, sources: undefined, summary: undefined });
+    earlyPptPythonCode = generatePythonScript({
+      ...spec,
+      sources: undefined,
+      summary: undefined,
+    });
   } catch {}
 
   onProgress({
@@ -776,13 +928,20 @@ export async function runPresentationFromOutline(input: {
 
   const metrics = { slides: slideDefinitions.length };
 
-  onProgress({ stage: "validating", format: "pptx", message: "Validating deck integrity" });
+  onProgress({
+    stage: "validating",
+    format: "pptx",
+    message: "Validating deck integrity",
+  });
   const qualityReport = validateDocument(spec, generated.buffer);
   await paceStage(350, signal);
   throwIfAborted(signal);
 
   if (!qualityReport.passed) {
-    console.warn("[DocGen] Presentation quality check found issues:", qualityReport.issues);
+    console.warn(
+      "[DocGen] Presentation quality check found issues:",
+      qualityReport.issues
+    );
   }
 
   const result = await generateAndDeliverFile({
