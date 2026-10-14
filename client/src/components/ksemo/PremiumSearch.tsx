@@ -19,7 +19,7 @@ import {
   Search,
   X,
 } from "lucide-react";
-import { Layout } from "reicon-react/icons/Layout";
+import { Sidebar2 } from "reicon-react/icons/Sidebar2";
 import { PinTackIcon } from "./icons";
 import { memo, useEffect, useMemo, useState } from "react";
 import {
@@ -473,11 +473,7 @@ export function SearchWorkspace({
                     aria-label="Open conversations"
                     title="Open sidebar"
                   >
-                    <Layout
-                      size={20}
-                      strokeWidth={2}
-                      className="size-5"
-                    />
+                    <Sidebar2 size={20} strokeWidth={2} className="size-5" />
                   </Button>
                 )}
                 <h1 className="text-2xl font-semibold tracking-[-0.03em]">

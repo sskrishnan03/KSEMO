@@ -42,7 +42,7 @@ import {
   Upload,
   X,
 } from "lucide-react";
-import { Layout } from "reicon-react/icons/Layout";
+import { Sidebar2 } from "reicon-react/icons/Sidebar2";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -445,8 +445,8 @@ export function LibraryWorkspace({
       )}
       <div className="mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col px-3.5 pt-4 sm:px-8 sm:pt-8">
         <header className="flex flex-col gap-3 border-b border-border pb-4 sm:flex-row sm:items-start sm:justify-between">
-          <div className="flex w-full items-start justify-between gap-3">
-            <div>
+          <div className="flex w-full min-w-0 items-start justify-between gap-2 sm:gap-3">
+            <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 sm:gap-3">
                 {onOpenSidebar && (
                   <Button
@@ -457,25 +457,25 @@ export function LibraryWorkspace({
                     aria-label="Open conversations"
                     title="Open sidebar"
                   >
-                    <Layout size={20} strokeWidth={2} className="size-5" />
+                    <Sidebar2 size={20} strokeWidth={2} className="size-5" />
                   </Button>
                 )}
                 <h1 className="text-2xl font-semibold tracking-[-0.03em]">
                   Library
                 </h1>
               </div>
-              <p className="mt-1 max-w-xl text-xs sm:text-sm text-muted-foreground">
+              <p className="mt-1 max-w-xl break-words text-xs sm:text-sm text-muted-foreground">
                 Your private space for files and images you can chat about.
               </p>
             </div>
-            <div className="flex items-center gap-2 sm:hidden">
+            <div className="flex shrink-0 items-center gap-2 sm:hidden">
               <Button
                 size="sm"
-                className="h-8 rounded-xl bg-foreground text-xs text-background hover:bg-foreground/90"
+                className="h-9 max-w-[38vw] whitespace-nowrap rounded-xl bg-foreground px-2.5 text-xs text-background hover:bg-foreground/90"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploadMutation.isPending}
               >
-                <Upload className="mr-1.5 size-3.5" />
+                <Upload className="mr-1.5 size-3.5 shrink-0" />
                 {uploadMutation.isPending ? "Uploading…" : "Upload files"}
               </Button>
             </div>
