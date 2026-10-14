@@ -621,15 +621,23 @@ export function LibraryWorkspace({
             </div>
           )}
           <div className="hidden min-w-3 flex-1 sm:block" aria-hidden="true" />
-          <div ref={searchControlRef} className="flex shrink-0 items-center gap-2">
+          <div
+            ref={searchControlRef}
+            className={cn(
+              "flex items-center gap-2",
+              isSearchOpen
+                ? "min-w-0 flex-1 sm:flex-none sm:shrink-0"
+                : "shrink-0"
+            )}
+          >
             {isSearchOpen && (
-              <div className="relative w-24 shrink-0 sm:w-56">
+              <div className="relative min-w-0 flex-1 sm:w-56 sm:flex-none">
                 <Input
                   autoFocus
                   value={query}
                   onChange={event => setQuery(event.target.value)}
                   className={cn(
-                    "h-10 rounded-xl",
+                    "h-10 w-full rounded-xl",
                     query && "pr-8"
                   )}
                   placeholder="Search Library"
