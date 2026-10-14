@@ -32,6 +32,7 @@ import {
   Archive,
   ArrowDown,
   ChevronDown,
+  CheckCircle2,
   Download,
   MoreHorizontal,
   LogIn,
@@ -623,6 +624,14 @@ export default function Home() {
     shareToken: string | null;
   } | null>(null);
   const [shareEmail, setShareEmail] = useState("");
+  const [sharingConversationId, setSharingConversationId] = useState<string | null>(null);
+  const [shareNotice, setShareNotice] = useState<"success" | "error" | null>(null);
+  const shareNoticeTimerRef = useRef<number | null>(null);
+  useEffect(() => () => {
+    if (shareNoticeTimerRef.current !== null) {
+      window.clearTimeout(shareNoticeTimerRef.current);
+    }
+  }, []);
   const [renameTarget, setRenameTarget] = useState<{
     id: string;
     title: string;
@@ -3498,6 +3507,25 @@ export default function Home() {
     return createPublicConversationUrl(window.location.origin, token);
   }
 
+  function showShareNotice(status: "success" | "error") {
+    if (shareNoticeTimerRef.current !== null) {
+      window.clearTimeout(shareNoticeTimerRef.current);
+    }
+    setShareNotice(status);
+    shareNoticeTimerRef.current = window.setTimeout(() => {
+      setShareNotice(null);
+      shareNoticeTimerRef.current = null;
+    }, 4000);
+  }
+
+  function dismissShareNotice() {
+    if (shareNoticeTimerRef.current !== null) {
+      window.clearTimeout(shareNoticeTimerRef.current);
+      shareNoticeTimerRef.current = null;
+    }
+    setShareNotice(null);
+  }
+
   async function copyConversationShareLink() {
     toast.success("Link copied to clipboard");
   }
@@ -3510,24 +3538,39 @@ export default function Home() {
     window.location.href = `mailto:${encodeURIComponent(shareEmail.trim())}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   }
 
-  function openShareDialog(conversation: {
+  async function openShareDialog(conversation: {
     id: string;
     title: string;
     isPublic?: boolean;
     shareToken?: string | null;
   }) {
-    setShareTarget({
-      id: conversation.id,
-      title: conversation.title,
-      isPublic: Boolean(conversation.isPublic),
-      shareToken: conversation.shareToken ?? null,
-    });
-    setShareEmail("");
-    if (!conversation.shareToken) {
-      publicShareMutation.mutate({
-        id: conversation.id,
-        isPublic: Boolean(conversation.isPublic),
-      });
+    if (!conversation.id || sharingConversationId) return;
+    setSharingConversationId(conversation.id);
+    try {
+      const minimumLoading = new Promise(resolve => window.setTimeout(resolve, 500));
+      const result = conversation.isPublic && conversation.shareToken
+        ? { shareToken: conversation.shareToken }
+        : await publicShareMutation.mutateAsync({ id: conversation.id, isPublic: true });
+      if (!result.shareToken) throw new Error("Missing share token");
+      await minimumLoading;
+      const url = conversationShareUrl(result.shareToken);
+      try {
+        await navigator.clipboard.writeText(url);
+      } catch {
+        const field = document.createElement("textarea");
+        field.value = url;
+        field.style.position = "fixed";
+        field.style.opacity = "0";
+        document.body.appendChild(field);
+        field.select();
+        document.execCommand("copy");
+        field.remove();
+      }
+      showShareNotice("success");
+    } catch {
+      showShareNotice("error");
+    } finally {
+      setSharingConversationId(null);
     }
   }
 
@@ -4322,15 +4365,7 @@ export default function Home() {
       title: string;
       isPublic?: boolean;
       shareToken?: string | null;
-    }) => {
-      setShareTarget({
-        id: conversation.id,
-        title: conversation.title,
-        isPublic: Boolean(conversation.isPublic),
-        shareToken: conversation.shareToken ?? null,
-      });
-      setShareEmail("");
-    }
+    }) => void openShareDialog(conversation)
   );
   const stableOnExport = usePersistFn(
     (conversation: { id: string }, format: "pdf" | "word") =>
@@ -4781,8 +4816,33 @@ export default function Home() {
                 Boolean(shareTarget)) &&
               !isTemporaryChat && (
                 <div className="pointer-events-none absolute inset-x-0 top-0 z-20 h-13">
+                  {shareNotice && (
+                    <div
+                      role="status"
+                      aria-live="polite"
+                      className={cn(
+                        "pointer-events-auto absolute right-2 top-11 flex w-max max-w-[calc(100vw-1rem)] translate-x-0 items-center gap-2 rounded-lg border px-3 py-2 text-white shadow-lg shadow-black/20 animate-in fade-in slide-in-from-top-1 duration-200",
+                        shareNotice === "success"
+                          ? "border-emerald-400/30 bg-emerald-700"
+                          : "border-rose-400/30 bg-rose-700"
+                      )}
+                    >
+                      <CheckCircle2 className="size-4 shrink-0" aria-hidden="true" />
+                      <p className="whitespace-nowrap text-xs font-semibold">
+                        {shareNotice === "success" ? "Link copied" : "Could not copy link"}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={dismissShareNotice}
+                        aria-label="Dismiss share message"
+                        className="flex size-7 shrink-0 items-center justify-center rounded-md text-white/80 transition-colors hover:bg-white/15 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
+                      >
+                        <X className="size-4" />
+                      </button>
+                    </div>
+                  )}
                   <ShareConversationDialog
-                    open={Boolean(shareTarget) || isSharePreview}
+                    open={false}
                     onOpenChange={stableShareOnOpenChange}
                     title={
                       shareTarget?.title ??
@@ -4818,7 +4878,7 @@ export default function Home() {
                             size="sm"
                             className="pointer-events-auto absolute right-2 top-2 hidden h-8 rounded-lg border border-border/50 bg-muted/70 px-3 text-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground lg:flex"
                             aria-label="Share chat"
-                            disabled={!activeConversationId}
+                            disabled={!activeConversationId || sharingConversationId === activeConversationId}
                             onClick={() => {
                               if (activeConversationId) {
                                 stableOnShareConversation(
@@ -4839,7 +4899,15 @@ export default function Home() {
                             }}
                           >
                             <span className="inline-flex items-center gap-1.5 text-sm font-medium">
-                              <ShareIcon className="size-4" />
+                              {sharingConversationId === activeConversationId ? (
+                                <span
+                                  className="loader loader-xs text-current"
+                                  role="status"
+                                  aria-label="Creating share link"
+                                />
+                              ) : (
+                                <ShareIcon className="size-4" />
+                              )}
                               Share
                             </span>
                           </Button>

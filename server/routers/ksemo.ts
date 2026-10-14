@@ -233,12 +233,16 @@ export const conversationRouter = router({
     .input(z.object({ id: conversationId, isPublic: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
       const conversation = await requireConversation(input.id, ctx.user.id);
-      const shareToken =
-        conversation.shareToken ||
-        Array.from(crypto.getRandomValues(new Uint8Array(18)))
-          .map(b => b.toString(36).padStart(2, "0"))
-          .join("")
-          .slice(0, 24);
+      // Reuse a token only while a link is already active. Re-sharing after a
+      // revoke gets a new token so previously copied URLs stay invalid.
+      const shareToken = input.isPublic
+        ? conversation.isPublic && conversation.shareToken
+          ? conversation.shareToken
+          : Array.from(crypto.getRandomValues(new Uint8Array(18)))
+              .map(b => b.toString(36).padStart(2, "0"))
+              .join("")
+              .slice(0, 24)
+        : conversation.shareToken;
       const updated = await updateConversationForUser(input.id, ctx.user.id, {
         isPublic: input.isPublic,
         shareToken: shareToken,

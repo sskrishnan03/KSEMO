@@ -1,134 +1,42 @@
-import React, { memo, useState, useEffect, useCallback, useRef } from "react";
+import React, { memo, useCallback, useEffect, useRef, useState } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import {
   Dialog,
-  DialogPortal,
-  DialogOverlay,
-  DialogTitle,
   DialogDescription,
+  DialogOverlay,
+  DialogPortal,
+  DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import {
-  ArrowUp,
   Check,
+  ChevronRight,
   Copy,
-  ExternalLink,
-  Globe,
-  Lock,
-  Mail,
-  Users,
+  Link2,
+  LockKeyhole,
+  Share2,
   X,
 } from "lucide-react";
 import { ChatLine } from "reicon-react/icons/ChatLine";
 import { cn } from "@/lib/utils";
-import { createPrivateConversationUrl } from "@/lib/ksemoInteraction";
 
 export interface SharePreviewMessage {
   id: string;
   role: "user" | "assistant" | "system" | "tool" | string;
   content: string;
-  attachments?: Array<{
-    id: string;
-    filename: string;
-    mimeType?: string;
-  }>;
+  attachments?: Array<{ id: string; filename: string; mimeType?: string }>;
 }
 
-export type ShareAccessMode = "public" | "private" | "restricted";
-
-interface SegmentOption<T extends string> {
-  value: T;
-  label: string;
-  description?: string;
-  icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
-}
-
-function AccessModeSelector({
-  value,
-  onChange,
-  options,
-  disabled,
-  "aria-label": ariaLabel,
-}: {
-  value: ShareAccessMode;
-  onChange: (value: ShareAccessMode) => void;
-  options: SegmentOption<ShareAccessMode>[];
-  disabled?: boolean;
-  "aria-label"?: string;
-}) {
-  return (
-    <div
-      role="radiogroup"
-      aria-label={ariaLabel}
-      className="animate-[ksemo-tag-pop_400ms_ease-out_both] space-y-1 rounded-2xl border border-white/10 bg-white/[0.04] p-1.5"
-    >
-      {options.map(option => {
-        const Icon = option.icon;
-        const active = value === option.value;
-        return (
-          <button
-            key={option.value}
-            type="button"
-            role="radio"
-            aria-checked={active}
-            disabled={disabled}
-            onClick={() => onChange(option.value)}
-            className={cn(
-              "flex w-full items-center justify-between rounded-xl px-3 py-2 text-left transition-colors",
-              active ? "bg-white/[0.08]" : "hover:bg-white/[0.05]",
-              disabled && "cursor-not-allowed opacity-50"
-            )}
-          >
-            <div className="flex min-w-0 items-center gap-2.5">
-              <Icon className="size-4 shrink-0 text-white/70" />
-              <div className="flex min-w-0 flex-col">
-                <span className="truncate text-sm font-medium text-white">
-                  {option.label}
-                </span>
-                {option.description && (
-                  <span className="truncate text-xs text-white/50">
-                    {option.description}
-                  </span>
-                )}
-              </div>
-            </div>
-            {active && (
-              <Check className="size-4 shrink-0 text-white" strokeWidth={2.5} />
-            )}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-export const ShareConversationDialog = memo(function ShareConversationDialog({
-  open,
-  onOpenChange,
-  title,
-  shareUrl,
-  conversationId,
-  email,
-  onEmailChange,
-  onCopy,
-  onEmail,
-  onSetPublic,
-  enabled,
-  isPublic,
-  messages,
-  anchor,
-  trigger,
-  className,
-}: {
+type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: string;
   shareUrl: string;
   conversationId?: string;
-  email: string;
-  onEmailChange: (value: string) => void;
+  email?: string;
+  onEmailChange?: (value: string) => void;
   onCopy: () => void;
-  onEmail: () => void;
+  onEmail?: () => void;
   onSetPublic: (isPublic: boolean) => void;
   enabled: boolean;
   isPublic: boolean;
@@ -137,16 +45,22 @@ export const ShareConversationDialog = memo(function ShareConversationDialog({
   trigger?: React.ReactNode;
   sideOffset?: number;
   className?: string;
-}) {
+};
+type PanelProps = Omit<Props, "open" | "onOpenChange"> & { onCancel?: () => void };
+
+export const ShareConversationDialog = memo(function ShareConversationDialog(
+  props: Props
+) {
+  const { open, onOpenChange, title, className } = props;
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      {anchor}
-      {trigger}
+      {props.anchor}
+      {props.trigger}
       <DialogPortal>
-        <DialogOverlay className="bg-black/50" />
+        <DialogOverlay className="bg-black/55 backdrop-blur-[2px]" />
         <DialogPrimitive.Content
           className={cn(
-            "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-[80] grid w-[calc(100vw-2rem)] max-w-[440px] translate-x-[-50%] translate-y-[-50%] rounded-2xl border border-white/10 bg-[#1A1A1A] p-5 text-white shadow-2xl outline-none duration-200",
+            "fixed left-1/2 top-1/2 z-[80] max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-[680px] -translate-x-1/2 -translate-y-1/2 overflow-y-auto bg-transparent p-0 text-popover-foreground shadow-none outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95 duration-200",
             className
           )}
         >
@@ -154,22 +68,9 @@ export const ShareConversationDialog = memo(function ShareConversationDialog({
             Share: {title?.trim() || "Untitled Conversation"}
           </DialogTitle>
           <DialogDescription className="sr-only">
-            Adjust access control and sharing permissions for this conversation.
+            Create and manage a link to this conversation.
           </DialogDescription>
-          <ShareConversationPanel
-            title={title}
-            shareUrl={shareUrl}
-            conversationId={conversationId}
-            email={email}
-            onEmailChange={onEmailChange}
-            onCopy={onCopy}
-            onEmail={onEmail}
-            onSetPublic={onSetPublic}
-            onCancel={() => onOpenChange(false)}
-            enabled={enabled}
-            isPublic={isPublic}
-            messages={messages}
-          />
+          <ShareConversationPanel {...props} onCancel={() => onOpenChange(false)} />
         </DialogPrimitive.Content>
       </DialogPortal>
     </Dialog>
@@ -177,279 +78,167 @@ export const ShareConversationDialog = memo(function ShareConversationDialog({
 });
 
 export function ShareConversationPanel({
-  title = "this conversation",
+  title,
   shareUrl,
-  conversationId,
-  email,
-  onEmailChange,
   onCopy,
-  onEmail,
   onSetPublic,
   onCancel,
   enabled,
   isPublic,
-}: {
-  title?: string;
-  shareUrl: string;
-  conversationId?: string;
-  email: string;
-  onEmailChange: (value: string) => void;
-  onCopy: () => void;
-  onEmail: () => void;
-  onSetPublic: (isPublic: boolean) => void;
-  onCancel?: () => void;
-  enabled: boolean;
-  isPublic: boolean;
-  messages?: SharePreviewMessage[];
-}) {
-  const [copyState, setCopyState] = useState<"idle" | "loading" | "copied">(
-    "idle"
-  );
-  const [accessMode, setAccessMode] = useState<ShareAccessMode>(() =>
-    isPublic ? "public" : "private"
-  );
-  const timersRef = useRef<number[]>([]);
+  messages = [],
+}: PanelProps) {
+  const [copyState, setCopyState] = useState<"idle" | "copied">("idle");
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const resetTimer = useRef<number | undefined>(undefined);
+  const conversationTitle = title?.trim() || "Untitled conversation";
+  const hasLink = Boolean(shareUrl && isPublic);
 
-  const conversationTitle = title?.trim() || "Untitled Conversation";
-  const origin =
-    typeof window !== "undefined" ? window.location.origin : "https://ksemo.ai";
-  const publicUrl = shareUrl || `${origin}/share/preview`;
-  const privateUrl = conversationId
-    ? createPrivateConversationUrl(origin, conversationId)
-    : `${origin}/?conversation=private`;
+  useEffect(() => () => window.clearTimeout(resetTimer.current), []);
 
-  const currentLink = accessMode === "private" ? privateUrl : publicUrl;
-
-  useEffect(() => {
-    setAccessMode(prev =>
-      isPublic ? (prev === "private" ? "public" : prev) : "private"
-    );
-  }, [isPublic]);
-
-  const clearTimers = useCallback(() => {
-    timersRef.current.forEach(id => window.clearTimeout(id));
-    timersRef.current = [];
-  }, []);
-
-  useEffect(() => {
-    return () => clearTimers();
-  }, [clearTimers]);
-
-  const handleCopy = useCallback(async () => {
-    if (copyState !== "idle") return;
-    clearTimers();
-    setCopyState("loading");
-
+  const copyLink = useCallback(async () => {
+    if (!hasLink || !enabled) return;
     try {
-      if (typeof navigator !== "undefined" && navigator.clipboard) {
-        await navigator.clipboard.writeText(currentLink);
-      }
+      await navigator.clipboard?.writeText(shareUrl);
     } catch {
-      // Fallback
+      // The app's existing copy handler still provides its normal feedback.
     }
+    onCopy();
+    setCopyState("copied");
+    window.clearTimeout(resetTimer.current);
+    resetTimer.current = window.setTimeout(() => setCopyState("idle"), 2200);
+  }, [enabled, hasLink, onCopy, shareUrl]);
 
-    const loadTimer = window.setTimeout(() => {
-      onCopy();
-      setCopyState("copied");
+  const primaryAction = useCallback(() => {
+    if (!enabled) return;
+    if (hasLink) void copyLink();
+    else onSetPublic(true);
+  }, [copyLink, enabled, hasLink, onSetPublic]);
 
-      const resetTimer = window.setTimeout(() => {
-        setCopyState("idle");
-      }, 2500);
-      timersRef.current.push(resetTimer);
-    }, 400);
+  const revokeLink = useCallback(() => {
+    if (!enabled || !hasLink) return;
+    onSetPublic(false);
+    setMoreOpen(false);
+  }, [enabled, hasLink, onSetPublic]);
 
-    timersRef.current.push(loadTimer);
-  }, [clearTimers, copyState, currentLink, onCopy]);
+  const previewLink = useCallback(() => {
+    if (hasLink) window.open(shareUrl, "_blank", "noopener,noreferrer");
+    else setPreviewOpen(true);
+  }, [hasLink, shareUrl]);
 
-  const handleAccessMode = useCallback(
-    (mode: ShareAccessMode) => {
-      setAccessMode(mode);
-      onSetPublic(mode !== "private");
-    },
-    [onSetPublic]
-  );
-
-  const handleOpenLink = useCallback(() => {
-    if (typeof window === "undefined") return;
-    window.open(currentLink, "_blank", "noopener,noreferrer");
-  }, [currentLink]);
-
-  const handleEmail = useCallback(() => {
-    if (!isPublic && accessMode !== "restricted") {
-      onSetPublic(true);
-    }
-    onEmail();
-  }, [accessMode, isPublic, onEmail, onSetPublic]);
+  const previewMessages = messages.filter(message => message.role !== "system" && message.role !== "tool");
 
   return (
-    <div className="w-full max-w-full min-w-0 space-y-3 box-border">
-      {/* ── Header: "Share conversation" on the left, clean white X close on the top right ── */}
-      <div className="flex items-start justify-between gap-2">
-        <h2 className="text-[15px] font-semibold tracking-[-0.01em] text-white">
-          Share conversation
-        </h2>
-        {onCancel && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={onCancel}
-            aria-label="Close share dialog"
-            className="size-6 -mt-0.5 -mr-0.5 shrink-0 cursor-pointer rounded-md border-0 bg-transparent text-white/60 shadow-none transition-colors hover:bg-white/10 hover:text-white"
-          >
-            <X className="size-4" />
-          </Button>
-        )}
-      </div>
-
-      {/* ── Conversation title tile ── */}
-      <div
-        role="region"
-        aria-label="Shared conversation details"
-        className="select-none rounded-xl border border-white/10 bg-white/[0.04] p-2.5"
+    <div className="share-conversation-shell relative isolate mx-auto w-full text-foreground">
+      <svg
+        aria-hidden="true"
+        className="share-conversation-shape pointer-events-none absolute inset-0 -z-10 hidden h-full w-full md:block"
+        viewBox="0 0 680 460"
+        preserveAspectRatio="none"
       >
-        <div className="flex items-start gap-2">
-          <ChatLine 
-            aria-hidden="true" 
-            className="size-[20px] shrink-0 text-white/60 transition-colors mt-0.5" 
-          />
-          <div className="flex-1 min-w-0">
-            <p
-              data-testid="share-conversation-title"
-              className="line-clamp-2 break-words text-sm font-medium leading-snug text-white"
+        <path
+          d="M44 1 H636 C660 1 679 20 679 44 V190 C679 218 659 239 632 239 H585 C555 239 540 255 540 284 V416 C540 440 521 459 497 459 H183 C159 459 140 440 140 416 V284 C140 255 125 239 95 239 H48 C21 239 1 218 1 190 V44 C1 20 20 1 44 1 Z"
+          className="fill-popover stroke-border"
+          strokeWidth="1.5"
+        />
+      </svg>
+
+      <div className="relative z-10 rounded-[26px] border border-border bg-popover shadow-2xl md:rounded-none md:border-0 md:bg-transparent md:shadow-none">
+        <header className="flex items-start justify-between gap-4 px-5 pb-5 pt-5 sm:px-7 sm:pt-7 md:px-8 md:pb-5 md:pt-7">
+          <div className="flex min-w-0 items-start gap-3.5">
+            <Share2 className="mt-1 size-6 shrink-0 text-foreground" strokeWidth={1.8} />
+            <div className="min-w-0">
+              <h2 className="text-lg font-semibold tracking-tight sm:text-xl">Share conversation</h2>
+              <p className="mt-1 text-sm text-muted-foreground">Share this conversation with others</p>
+            </div>
+          </div>
+          {onCancel && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label="Close share dialog"
+              onClick={onCancel}
+              className="-mr-2 -mt-1 size-9 shrink-0 rounded-xl text-muted-foreground hover:bg-accent hover:text-foreground"
             >
+              <X className="size-5" />
+            </Button>
+          )}
+        </header>
+
+        <div className="px-5 pb-6 sm:px-7 md:px-8 md:pb-0">
+          <div className="flex min-h-[88px] min-w-0 items-center gap-3 rounded-2xl border border-border bg-muted/35 px-4 py-3">
+            <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-muted text-foreground">
+              <ChatLine aria-hidden="true" className="size-5" />
+            </span>
+            <p className="min-w-0 flex-1 line-clamp-2 break-words text-sm font-medium leading-5 sm:text-base">
               {conversationTitle}
             </p>
+            <span className="inline-flex shrink-0 items-center gap-2 rounded-full border border-border bg-background/60 px-3 py-2 text-xs font-medium text-muted-foreground sm:text-sm">
+              <ChatLine aria-hidden="true" className="size-4" />
+              Conversation
+            </span>
           </div>
-          <span
-            data-testid="share-conversation-badge"
-            className="text-xs font-normal text-white/40 shrink-0"
-          >
-            Conversation
-          </span>
         </div>
-      </div>
 
-      {/* ── Combined container: access mode + email like search results ── */}
-      <div className="space-y-1.5">
-        <p className="text-[11px] font-medium text-white/40">Sharing permissions</p>
-        <div className="rounded-xl border border-white/10 bg-white/[0.04] divide-y divide-white/10">
-        {/* Access mode options */}
-        <button
-          type="button"
-          onClick={() => handleAccessMode("public")}
-          className={cn(
-            "flex w-full items-center justify-between px-3 py-2.5 text-left transition-colors first:rounded-t-xl",
-            accessMode === "public" ? "bg-white/[0.08]" : "hover:bg-white/[0.05]"
-          )}
-        >
-          <div className="flex min-w-0 items-center gap-2.5">
-            <Globe className="size-4 shrink-0 text-white/70" />
-            <div className="flex min-w-0 flex-col">
-              <span className="truncate text-sm font-medium text-white">Public</span>
-              <span className="truncate text-xs text-white/50">Anyone with the link</span>
+        <main className="mx-auto space-y-3 px-5 pb-5 sm:px-7 md:w-[min(100%,400px)] md:px-0 md:pb-7 md:pt-5">
+          <p className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Share link</p>
+          <div className="flex min-w-0 items-center gap-3 rounded-2xl border border-border bg-muted/30 p-3.5">
+            <Link2 className="size-5 shrink-0 text-muted-foreground" />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium">Conversation link</p>
+              {hasLink ? (
+                <a href={shareUrl} target="_blank" rel="noopener noreferrer" className="mt-0.5 block truncate text-xs text-muted-foreground hover:text-foreground">
+                  {shareUrl}
+                </a>
+              ) : (
+                <p className="mt-0.5 truncate text-xs text-muted-foreground">Create a link when you’re ready to share</p>
+              )}
             </div>
-          </div>
-          {accessMode === "public" && (
-            <Check className="size-4 shrink-0 text-white" strokeWidth={2.5} />
-          )}
-        </button>
-
-        <button
-          type="button"
-          onClick={() => handleAccessMode("private")}
-          className={cn(
-            "flex w-full items-center justify-between px-3 py-2.5 text-left transition-colors",
-            accessMode === "private" ? "bg-white/[0.08]" : "hover:bg-white/[0.05]"
-          )}
-        >
-          <div className="flex min-w-0 items-center gap-2.5">
-            <Lock className="size-4 shrink-0 text-white/70" />
-            <div className="flex min-w-0 flex-col">
-              <span className="truncate text-sm font-medium text-white">Private</span>
-              <span className="truncate text-xs text-white/50">Only you have access</span>
-            </div>
-          </div>
-          {accessMode === "private" && (
-            <Check className="size-4 shrink-0 text-white" strokeWidth={2.5} />
-          )}
-        </button>
-
-        {/* Share via email section */}
-        <div className="px-3 py-2.5 last:rounded-b-xl flex items-center gap-2">
-          <Mail className="size-4 text-white/50 shrink-0 pointer-events-none" />
-          <input
-            id="share-email-input"
-            value={email}
-            onChange={e => onEmailChange(e.target.value)}
-            placeholder="Email address…"
-            type="email"
-            className="flex-1 min-w-0 h-8 bg-transparent text-sm font-normal text-white placeholder:text-white/40 outline-none border-0"
-            onKeyDown={e => {
-              if (e.key === "Enter" && email.trim() && enabled) {
-                e.preventDefault();
-                handleEmail();
-              }
-            }}
-          />
-          <Button
-            type="button"
-            onClick={handleEmail}
-            disabled={!email.trim() || !enabled}
-            aria-label="Send email"
-            className="h-8 shrink-0 cursor-pointer rounded-lg border-0 bg-white px-2.5 text-black shadow-none transition-all hover:bg-white/90 active:scale-[0.98]"
-          >
-            <ArrowUp className="size-4 shrink-0" strokeWidth={2.5} />
-          </Button>
-        </div>
-        </div>
-      </div>
-
-      {/* ── Share link section: separate below ── */}
-      <div className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 flex items-center justify-between gap-2">
-          <a
-            href={currentLink}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex-1 text-[13px] font-normal text-white/70 hover:text-white transition-colors overflow-hidden text-nowrap"
-          >
-            {currentLink}
-          </a>
-          <Button
-            type="button"
-            onClick={handleCopy}
-            disabled={!enabled || copyState === "loading"}
-            className="h-8 shrink-0 cursor-pointer rounded-lg border-0 bg-white px-3 text-[12px] font-medium text-black shadow-sm transition-all hover:bg-white/90 hover:shadow-md active:scale-[0.97] disabled:cursor-wait"
-          >
-            {copyState === "loading" ? (
-              <>
-                <span
-                  className="loader loader-sm shrink-0"
-                  style={{
-                    width: 10,
-                    height: 10,
-                    ["--b" as any]: "2px",
-                    background:
-                      "conic-gradient(#0000 10%, currentColor) content-box",
-                  }}
-                  aria-hidden
-                />
-                <span className="truncate ml-1">Copying…</span>
-              </>
-            ) : (
-              <>
-                {copyState === "copied" ? (
-                  <Check className="size-3 shrink-0" strokeWidth={2.5} />
-                ) : (
-                  <Copy className="size-3 shrink-0" />
-                )}
-                <span className="truncate ml-1">
-                  {copyState === "copied" ? "Copied" : "Copy link"}
-                </span>
-              </>
+            {hasLink && (
+              <Button type="button" variant="secondary" onClick={() => void copyLink()} disabled={!enabled} className="h-9 shrink-0 gap-2 rounded-full px-3 text-sm">
+                {copyState === "copied" ? <Check className="size-4" /> : <Copy className="size-4" />}
+                {copyState === "copied" ? "Copied" : "Copy link"}
+              </Button>
             )}
-          </Button>
-        </div>
+          </div>
+
+          <div className="overflow-hidden rounded-2xl border border-border bg-muted/25">
+            <div className="flex min-h-[62px] items-center justify-between gap-2 px-3 py-2">
+              <Button type="button" variant="ghost" onClick={() => setMoreOpen(value => !value)} aria-expanded={moreOpen} className="h-10 gap-2 rounded-xl px-2.5 text-muted-foreground hover:text-foreground">
+                <span className="flex size-8 items-center justify-center rounded-lg bg-muted text-foreground"><LockKeyhole className="size-4" /></span>
+                More options
+                <ChevronRight className={cn("size-4 transition-transform duration-200", moreOpen && "rotate-90")} />
+              </Button>
+              <Button type="button" onClick={primaryAction} disabled={!enabled} className="h-10 gap-2 rounded-full px-5 font-semibold shadow-sm">
+                {hasLink ? <Copy className="size-4" /> : <Share2 className="size-4" />}
+                {hasLink ? (copyState === "copied" ? "Copied" : "Copy link") : "Share"}
+              </Button>
+            </div>
+            {moreOpen && (
+              <div className="space-y-1 border-t border-border p-2 animate-in slide-in-from-top-1 fade-in duration-150">
+                <button type="button" onClick={previewLink} className="flex min-h-11 w-full items-center justify-between rounded-xl px-3 text-left text-sm text-foreground transition-colors hover:bg-accent">
+                  <span>Preview shared conversation</span><ChevronRight className="size-4 text-muted-foreground" />
+                </button>
+                {hasLink && (
+                  <button type="button" disabled={!enabled} onClick={revokeLink} className="flex min-h-11 w-full items-center justify-between rounded-xl px-3 text-left text-sm text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-50">
+                    <span>Revoke shared link</span><X className="size-4" />
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        </main>
+
+        {previewOpen && !hasLink && (
+          <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/45 p-4" onClick={() => setPreviewOpen(false)}>
+            <div role="dialog" aria-modal="true" aria-label="Conversation preview" onClick={event => event.stopPropagation()} className="max-h-[70dvh] w-full max-w-md overflow-y-auto rounded-2xl border border-border bg-popover p-5 shadow-2xl">
+              <div className="mb-4 flex items-center justify-between gap-3"><h3 className="font-semibold">{conversationTitle}</h3><Button type="button" variant="ghost" size="icon" aria-label="Close preview" onClick={() => setPreviewOpen(false)} className="size-8 rounded-lg"><X className="size-4" /></Button></div>
+              <div className="space-y-3">{previewMessages.length ? previewMessages.map(message => <div key={message.id} className="rounded-xl bg-muted/50 p-3 text-sm"><p className="mb-1 text-xs font-medium capitalize text-muted-foreground">{message.role}</p><p className="whitespace-pre-wrap break-words">{message.content}</p>{message.attachments?.map(file => <p key={file.id} className="mt-2 truncate text-xs text-muted-foreground">{file.filename}</p>)}</div>) : <p className="text-sm text-muted-foreground">No messages to preview.</p>}</div>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
