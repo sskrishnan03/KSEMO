@@ -3681,7 +3681,7 @@ export const PdfDrawer = memo(function PdfDrawer() {
         </div>
 
         {/* Right Side: Edit (text only), Download, then Cancel (only icons, with hover) */}
-        <div className="flex shrink-0 items-center gap-1.5">
+        <div className="flex shrink-0 items-center gap-1">
           {/* Edit Text Button (Text Documents Only, NOT code) */}
           {!isCodeDoc &&
             isTextDoc &&

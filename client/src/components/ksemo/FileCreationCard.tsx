@@ -1,6 +1,6 @@
 import type { DocFormat } from "@/lib/docFormats";
 import { getCapabilityOption } from "@/lib/capabilities";
-import { Check, ChevronRight, Code2, Eye } from "lucide-react";
+import { Check, Eye } from "lucide-react";
 import React, {
   memo,
   useCallback,
@@ -16,7 +16,6 @@ import {
 import { cn } from "@/lib/utils";
 import {
   KsemoCodeBlock,
-  CodeSurface,
   stripShebang,
 } from "@/components/ksemo/code-block";
 import {
@@ -279,11 +278,6 @@ export const FileCreationCard = memo(function FileCreationCard({
     return stripShebang(code || "");
   }, [code]);
 
-  const codePreviewLines = useMemo(() => {
-    if (!cleanCode) return "";
-    return cleanCode.split("\n").slice(0, 16).join("\n");
-  }, [cleanCode]);
-
   const codeLineCount = useMemo(() => {
     if (!cleanCode) return 0;
     return cleanCode.split("\n").length;
@@ -345,7 +339,7 @@ export const FileCreationCard = memo(function FileCreationCard({
   const handleOpenCode = useCallback(() => {
     if (!cleanCode) return;
     if (onOpenCode) {
-      onOpenCode(cleanCode, `${cleanBaseName}.${config.ext}`);
+      onOpenCode(cleanCode, `${cleanBaseName}.py`);
       return;
     }
     const codeDataUrl = `data:text/x-python;charset=utf-8,${encodeURIComponent(cleanCode)}`;
@@ -356,7 +350,7 @@ export const FileCreationCard = memo(function FileCreationCard({
       mimeType: "text/x-python",
       isCode: true,
     });
-  }, [cleanCode, cleanBaseName, config.ext, openPdf, onOpenCode]);
+  }, [cleanCode, cleanBaseName, openPdf, onOpenCode]);
 
   useEffect(() => {
     if (
@@ -460,15 +454,15 @@ export const FileCreationCard = memo(function FileCreationCard({
     <div
       className={cn(
         "my-2 w-full max-w-full",
-        code
-          ? "flex flex-col md:flex-row items-stretch gap-1 sm:gap-1.5"
-          : "max-w-[440px] sm:max-w-[480px]"
+        code ? "max-w-[460px]" : "max-w-[440px] sm:max-w-[480px]"
       )}
     >
       {/* ── Left Container: File Card (Original Size, 302px height) ── */}
       <div
         data-testid="file-creation-completed"
-        className="w-full md:w-[460px] h-[302px] max-h-[302px] shrink-0 select-none animate-in fade-in-0 slide-in-from-bottom-2 zoom-in-95 duration-300 ease-out"
+        className={cn(
+          "h-[302px] max-h-[302px] min-w-0 w-full shrink-0 select-none animate-in fade-in-0 slide-in-from-bottom-2 zoom-in-95 duration-300 ease-out md:w-[460px]"
+        )}
       >
         <div className="h-full flex flex-col overflow-hidden rounded-2xl border border-border/70 bg-card/70 shadow-sm backdrop-blur-sm dark:bg-card/60">
           {/* Dark preview frame: hover reveals "Preview" with identical subtle blur overlay */}
@@ -536,71 +530,6 @@ export const FileCreationCard = memo(function FileCreationCard({
         </div>
       </div>
 
-      {/* ── Desktop Right Container: Code container in sidebar color, exact same height as file container ── */}
-      {code && (
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={handleOpenCode}
-          onKeyDown={e => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              handleOpenCode();
-            }
-          }}
-          data-testid="file-code-container"
-          aria-label="Show code"
-          className="group/code relative hidden md:flex flex-1 min-w-[140px] h-[302px] max-h-[302px] flex-col overflow-hidden rounded-2xl border border-sidebar-border bg-sidebar p-3 shadow-sm cursor-pointer select-none transition-colors duration-100 hover:border-border hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-        >
-          {/* Colorful code snippet: starts from line 1, filling exact height with zero dead space */}
-          <div className="relative z-0 flex-1 overflow-hidden pointer-events-none select-none [&_.ksemo-code-body_pre]:p-0! [&_.ksemo-code-body_pre]:bg-transparent!">
-            <CodeSurface code={codePreviewLines} rawLanguage="python" />
-          </div>
-
-          {/* Hover overlay with exact same subtle blur effect & matching button pill */}
-          <div
-            data-testid="show-code-container-btn"
-            className="absolute inset-0 z-20 flex items-center justify-center bg-black/20 dark:bg-black/35 backdrop-blur-[1px] opacity-0 transition-opacity duration-150 group-hover/code:opacity-100"
-          >
-            <span className="inline-flex items-center gap-1.5 rounded-xl border border-border/80 bg-card/95 px-3.5 py-1.5 text-xs font-semibold text-foreground shadow-sm transition-transform duration-150 group-hover/code:scale-105 select-none">
-              <Code2 className="size-3.5 text-foreground" />
-              Show Code
-            </span>
-          </div>
-        </div>
-      )}
-
-      {/* ── Mobile Code Container: Simple, sleek & unique Show Code bar for mobile & phone ── */}
-      {code && (
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={handleOpenCode}
-          onKeyDown={e => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              handleOpenCode();
-            }
-          }}
-          data-testid="file-code-container-mobile"
-          aria-label="Show code"
-          className="group/code-mobile flex md:hidden w-full items-center justify-between gap-3 h-[48px] rounded-2xl border border-sidebar-border bg-sidebar px-3.5 shadow-xs cursor-pointer select-none active:scale-[0.98] transition-all duration-150 hover:border-border"
-        >
-          <div className="flex items-center gap-2.5">
-            <div className="size-7 rounded-lg border border-sidebar-border bg-card flex items-center justify-center shadow-2xs">
-              <Code2 className="size-3.5 text-foreground" />
-            </div>
-            <span className="text-[13px] font-semibold text-foreground">
-              Show Code
-            </span>
-          </div>
-
-          <span className="inline-flex items-center gap-1 text-[12px] font-medium text-muted-foreground group-hover/code-mobile:text-foreground transition-colors">
-            Python
-            <ChevronRight className="size-3.5 text-muted-foreground/80" />
-          </span>
-        </div>
-      )}
     </div>
   );
 });

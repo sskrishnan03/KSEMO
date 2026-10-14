@@ -215,7 +215,7 @@ describe("FileCreationCard", () => {
   });
 
   describe("Python Code Inspection", () => {
-    it("renders file container and code container with identical h-[302px] height, matching subtle blur, and Show Code", () => {
+    it("renders the file preview without a separate code control", () => {
       const markup = renderCard({
         stage: "completed",
         format: "pdf",
@@ -224,18 +224,12 @@ describe("FileCreationCard", () => {
         code: "#!/usr/bin/env python3\nimport reportlab\nprint('Generated PDF')",
       });
 
-      // Layout: file card original width + code container with small two-lines gap
-      expect(markup).toContain(
-        "flex flex-col md:flex-row items-stretch gap-1 sm:gap-1.5"
-      );
+      // Python code is opened from the assistant message action row.
+      expect(markup).toContain("max-w-[460px]");
       expect(markup).toContain('data-testid="file-creation-completed"');
       expect(markup).toContain("md:w-[460px]");
       expect(markup).toContain("h-[302px]");
-      expect(markup).toContain('data-testid="file-code-container"');
-
-      // Both file card and code container have identical height (h-[302px])
-      const matchHeights = markup.match(/h-\[302px\]/g);
-      expect(matchHeights?.length).toBeGreaterThanOrEqual(2);
+      expect(markup).not.toContain('data-testid="file-code-container"');
 
       // Left container: document preview with hover Preview overlay, title, NO Open button
       expect(markup).toContain("report.pdf");
@@ -246,11 +240,11 @@ describe("FileCreationCard", () => {
       expect(markup).not.toContain("lucide-external-link");
       expect(markup).not.toContain("Open");
 
-      // Right container: sidebar theme color, CodeSurface code preview, Show Code on hover, no outside Python tag, no green colors, NO tooltip title
-      expect(markup).toContain("bg-sidebar");
-      expect(markup).toContain("import reportlab");
-      expect(markup).toContain("ksemo-code-body");
-      expect(markup).toContain("Show Code");
+      // The Python source is opened in the document viewer instead of being
+      // rewritten or rendered as a second code preview in the card.
+      expect(markup).not.toContain('aria-label="Open generated Python code"');
+      expect(markup).not.toContain("Show Code");
+      expect(markup).not.toContain("import reportlab");
       expect(markup).not.toContain('title="Click to view code"');
       expect(markup).not.toContain("text-emerald-400");
       expect(markup).not.toContain("text-emerald-500");
@@ -277,10 +271,10 @@ describe("FileCreationCard", () => {
       expect(markup).not.toContain('data-testid="file-code-modal"');
       expect(markup).not.toContain('data-testid="file-code-expanded"');
 
-      // Both containers present side-by-side with exact same height
+      // The file preview remains available; the code action lives in the message toolbar.
       expect(markup).toContain('data-testid="file-preview-stage"');
-      expect(markup).toContain('data-testid="file-code-container"');
-      expect(markup).toContain("Show Code");
+      expect(markup).not.toContain('data-testid="file-code-container"');
+      expect(markup).not.toContain('aria-label="Open generated Python code"');
 
       // Verify preview icon is distinct from external-link
       expect(markup).toContain("lucide-eye");
@@ -290,7 +284,7 @@ describe("FileCreationCard", () => {
       expect(markup).not.toContain("#!/usr/bin/env");
     });
 
-    it("renders distinct responsive code containers for desktop (side-by-side) and mobile (compact touch card)", () => {
+    it("keeps the file card free of a duplicate code control at every screen size", () => {
       const markup = renderCard({
         stage: "completed",
         format: "pdf",
@@ -299,15 +293,9 @@ describe("FileCreationCard", () => {
         code: "import reportlab\nprint('Generated PDF')",
       });
 
-      // Desktop container: hidden on mobile, flex on md+
-      expect(markup).toContain('data-testid="file-code-container"');
-      expect(markup).toContain("hidden md:flex");
-
-      // Mobile container: flex on mobile, hidden on md+, simple and unique without different filename or line counts
-      expect(markup).toContain('data-testid="file-code-container-mobile"');
-      expect(markup).toContain("flex md:hidden");
-      expect(markup).toContain("Show Code");
-      expect(markup).toContain("Python");
+      expect(markup).not.toContain('data-testid="file-code-container"');
+      expect(markup).not.toContain('data-testid="file-code-container-mobile"');
+      expect(markup).not.toContain('aria-label="Open generated Python code"');
       expect(markup).not.toContain("report.py");
       expect(markup).not.toContain("lines");
     });

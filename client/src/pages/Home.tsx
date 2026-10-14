@@ -609,8 +609,13 @@ export default function Home() {
   const [showCode, setShowCode] = useState<{
     code: string;
     filename?: string;
+    messageId: string;
   } | null>(null);
   const activePrimaryWorkspace = primaryWorkspace;
+  useEffect(() => {
+    setChatFilesOpen(false);
+    setShowCode(null);
+  }, [activeConversationId, activePrimaryWorkspace]);
   const [shareTarget, setShareTarget] = useState<{
     id: string;
     title: string;
@@ -4639,7 +4644,9 @@ export default function Home() {
         locked={guestMode}
       />
 
-      <main className="relative flex min-w-0 flex-1 flex-col">
+      <main
+        className="relative flex min-w-0 flex-1 flex-col lg:flex-row"
+      >
         {activePrimaryWorkspace === "library" ? (
           <LibraryWorkspace
             onClose={stableCloseWorkspace}
@@ -4654,7 +4661,14 @@ export default function Home() {
             onSelectConversation={stableOnSearchSelect}
           />
         ) : (
-          <>
+          <div
+            className={cn(
+              "relative flex min-h-0 min-w-0 flex-1 flex-col transition-[width] duration-300 ease-out lg:flex-none",
+              chatFilesOpen
+                ? "lg:w-[calc(100%-min(24rem,32vw)-1rem)]"
+                : "lg:w-full"
+            )}
+          >
             {/* Shared chat navbar with the same short fade at every width */}
             <div
               aria-hidden="true"
@@ -5107,15 +5121,6 @@ export default function Home() {
                   />
                 </div>
               )}
-            <ChatFilesDialog
-              open={chatFilesOpen}
-              onOpenChange={open => {
-                if (open) setHelpDrawerOpen(false);
-                setChatFilesOpen(open);
-              }}
-              files={chatFiles}
-            />
-
             <section
               ref={messagesContainerRef}
               onScroll={handleMessagesScroll}
@@ -5175,9 +5180,6 @@ export default function Home() {
                           }
                           errorMessage={activeFileGen.message}
                           code={activeFileGen.code}
-                          onOpenCode={(code, filename) =>
-                            setShowCode({ code, filename })
-                          }
                         />
                       </div>
                     ) : null;
@@ -5186,6 +5188,19 @@ export default function Home() {
                       <MessageContent
                         key={message.clientId ?? message.id}
                         message={message}
+                        generatedCode={
+                          activeFileGen?.status === "created"
+                            ? activeFileGen.code
+                            : undefined
+                        }
+                        onOpenCode={(code, filename) => {
+                          setChatFilesOpen(false);
+                          setShowCode(current =>
+                            current?.messageId === message.id
+                              ? null
+                              : { code, filename, messageId: message.id }
+                          );
+                        }}
                         responseStartedAt={
                           isGenerating && generatingMessageId === message.id
                             ? activeStream?.startedAt
@@ -5333,18 +5348,29 @@ export default function Home() {
                 </div>
               </div>
             )}
-          </>
+            <CodeViewerPanel
+              open={Boolean(showCode)}
+              code={showCode?.code ?? ""}
+              filename={showCode?.filename}
+              onClose={() => setShowCode(null)}
+            />
+          </div>
         )}
         <PdfDrawer />
         <FaqHelpDrawer
           open={helpDrawerOpen}
           onClose={() => setHelpDrawerOpen(false)}
         />
-        <CodeViewerPanel
-          open={Boolean(showCode)}
-          code={showCode?.code ?? ""}
-          filename={showCode?.filename}
-          onClose={() => setShowCode(null)}
+        <ChatFilesDialog
+          open={chatFilesOpen}
+          onOpenChange={open => {
+            if (open) {
+              setHelpDrawerOpen(false);
+              setShowCode(null);
+            }
+            setChatFilesOpen(open);
+          }}
+          files={chatFiles}
         />
       </main>
 

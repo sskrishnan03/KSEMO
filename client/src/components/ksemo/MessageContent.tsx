@@ -24,6 +24,7 @@ import { ThinkingIndicator } from "@/components/ui/thinking-indicator";
 import {
   Check,
   ChevronDown,
+  Code2,
   Copy,
   Download,
   ExternalLink,
@@ -488,9 +489,13 @@ export const MessageContent = memo(function MessageContent({
   onSaveEdit,
   onCancelEdit,
   fileCreationNode,
+  generatedCode,
+  onOpenCode,
 }: {
   message: KsemoMessage;
   fileCreationNode?: React.ReactNode;
+  generatedCode?: string;
+  onOpenCode?: (code: string, filename?: string) => void;
   onSpeak: (text: string, messageId: string) => void;
   onPause?: () => void;
   onResume?: () => void;
@@ -628,7 +633,8 @@ export const MessageContent = memo(function MessageContent({
     label: string,
     icon: React.ReactNode,
     click: () => void,
-    active?: boolean
+    active?: boolean,
+    codeTrigger = false
   ) => (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -642,6 +648,7 @@ export const MessageContent = memo(function MessageContent({
           )}
           onClick={click}
           aria-label={label}
+          data-code-trigger={codeTrigger ? "true" : undefined}
         >
           {icon}
         </Button>
@@ -1336,6 +1343,12 @@ export const MessageContent = memo(function MessageContent({
                     </DropdownMenu>
                   </div>
                 )}
+                {generatedCode && onOpenCode &&
+                  action("Code", <Code2 className="size-4" />, () => {
+                    const attachmentName = message.attachments?.[0]?.filename;
+                    const baseName = attachmentName?.replace(/\.[^.]+$/, "");
+                    onOpenCode(generatedCode, `${baseName || "generated-code"}.py`);
+                  }, false, true)}
               </div>
             )}
         </div>

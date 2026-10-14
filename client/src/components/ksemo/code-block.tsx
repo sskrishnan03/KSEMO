@@ -120,7 +120,15 @@ function LanguageIcon() {
   );
 }
 
-export function CopyCodeButton({ code }: { code: string }) {
+export function CopyCodeButton({
+  code,
+  buttonClassName,
+  iconClassName,
+}: {
+  code: string;
+  buttonClassName?: string;
+  iconClassName?: string;
+}) {
   const [copied, setCopied] = useState(false);
   const timerRef = useRef<number | null>(null);
 
@@ -166,6 +174,7 @@ export function CopyCodeButton({ code }: { code: string }) {
           size="icon"
           className={cn(
             "size-7 rounded-md transition-colors",
+            buttonClassName,
             copied
               ? "text-foreground bg-accent/60"
               : "text-muted-foreground hover:bg-accent hover:text-foreground"
@@ -175,9 +184,9 @@ export function CopyCodeButton({ code }: { code: string }) {
           aria-label={label}
         >
           {copied ? (
-            <Check className="size-3.5" aria-hidden />
+            <Check className={cn("size-3.5", iconClassName)} aria-hidden />
           ) : (
-            <Copy className="size-3.5" aria-hidden />
+            <Copy className={cn("size-3.5", iconClassName)} aria-hidden />
           )}
         </Button>
       </TooltipTrigger>
@@ -189,9 +198,13 @@ export function CopyCodeButton({ code }: { code: string }) {
 export function DownloadCodeButton({
   code,
   rawLanguage,
+  buttonClassName,
+  iconClassName,
 }: {
   code: string;
   rawLanguage?: string;
+  buttonClassName?: string;
+  iconClassName?: string;
 }) {
   const download = useCallback(() => {
     if (!code) return;
@@ -217,12 +230,15 @@ export function DownloadCodeButton({
           type="button"
           variant="ghost"
           size="icon"
-          className="size-7 rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+          className={cn(
+            "size-7 rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
+            buttonClassName
+          )}
           onClick={download}
           disabled={!code}
           aria-label="Download code"
         >
-          <Download className="size-3.5" aria-hidden />
+          <Download className={cn("size-3.5", iconClassName)} aria-hidden />
         </Button>
       </TooltipTrigger>
       <TooltipContent side="bottom">

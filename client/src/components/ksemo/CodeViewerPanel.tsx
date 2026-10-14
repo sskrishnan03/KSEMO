@@ -32,20 +32,18 @@ export const CodeViewerPanel = memo(function CodeViewerPanel({
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();
     };
-    const onPointerDown = (event: MouseEvent) => {
-      if (
-        panelRef.current &&
-        !panelRef.current.contains(event.target as Node)
-      ) {
-        onClose();
-      }
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target as Element | null;
+      if (target?.closest("[data-code-trigger]") || panelRef.current?.contains(target))
+        return;
+      onClose();
     };
     window.addEventListener("keydown", onKey);
-    const timer = setTimeout(() => {
+    const timer = window.setTimeout(() => {
       window.addEventListener("pointerdown", onPointerDown);
     }, 50);
     return () => {
-      clearTimeout(timer);
+      window.clearTimeout(timer);
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("pointerdown", onPointerDown);
     };
@@ -59,30 +57,41 @@ export const CodeViewerPanel = memo(function CodeViewerPanel({
     <div
       ref={panelRef}
       role="dialog"
-      aria-label="Code"
-      className="ksemo-code-panel-enter fixed inset-x-2 bottom-2 z-50 mx-auto flex h-[min(70dvh,36rem)] max-w-3xl flex-col overflow-hidden rounded-2xl border border-border bg-popover/95 text-popover-foreground shadow-lg backdrop-blur-md animate-in slide-in-from-bottom-8 fade-in duration-200"
+      aria-modal="false"
+      aria-label="Generated Python code"
+      data-testid="generated-code-card"
+      className="ksemo-code-panel-enter absolute bottom-[calc(8.25rem+env(safe-area-inset-bottom))] left-1/2 z-40 flex h-[60dvh] min-h-56 max-h-[calc(100%-9.75rem)] w-[calc(100%-2rem)] max-w-[45.5rem] -translate-x-1/2 flex-col overflow-hidden rounded-2xl border border-border bg-popover text-popover-foreground shadow-xl animate-in slide-in-from-bottom-4 fade-in duration-200"
     >
-      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border/80 px-3.5 py-2.5 bg-muted/20">
-        <div className="flex items-center gap-2.5 min-w-0">
+      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border/80 bg-muted/20 px-3.5 py-2.5">
+        <div className="flex min-w-0 items-center gap-2.5">
           <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-foreground">
             <Code2 className="size-4" />
           </span>
-          <p className="text-[15px] font-semibold leading-tight text-foreground truncate">
-            Python
+          <p className="truncate text-[15px] font-semibold leading-tight text-foreground">
+            {filename || "Python"}
           </p>
         </div>
-        <div className="flex shrink-0 items-center gap-1.5">
-          <DownloadCodeButton code={clean} rawLanguage="python" />
-          <CopyCodeButton code={clean} />
+        <div className="flex shrink-0 items-center gap-1">
+          <DownloadCodeButton
+            code={clean}
+            rawLanguage="python"
+            buttonClassName="size-8 rounded-md"
+            iconClassName="size-[15px]"
+          />
+          <CopyCodeButton
+            code={clean}
+            buttonClassName="size-8 rounded-md"
+            iconClassName="size-[15px]"
+          />
           <Tooltip>
             <TooltipTrigger asChild>
               <button
                 type="button"
                 onClick={onClose}
-                className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                className="flex size-8 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
                 aria-label="Close"
               >
-                <X className="size-3.5" />
+                  <X className="size-[15px]" />
               </button>
             </TooltipTrigger>
             <TooltipContent side="bottom">Close</TooltipContent>
