@@ -438,12 +438,10 @@ const computeBackoffDelay = (
   return Math.min(Math.max(jittered, retryAfterMs ?? 0), RETRY_MAX_DELAY_MS);
 };
 
-// Statuses that cannot succeed on retry (bad key, bad request, missing model,
-// or a provider overloaded with a 5xx "high demand"/unavailable response);
-// surface them immediately so the caller can fall through to the next provider
-// instead of sitting on a blank screen while the retry ladder grinds. 429 is
-// handled separately below (it retries once, then surfaces quickly).
-const NON_RETRYABLE_STATUSES = new Set([400, 401, 403, 404, 500, 502, 503, 504]);
+// Statuses that cannot succeed on retry (bad key, bad request, or missing
+// model). Transient 5xx responses retry with backoff; 429 retries once, then
+// surfaces quickly because daily quota limits will not recover within seconds.
+const NON_RETRYABLE_STATUSES = new Set([400, 401, 403, 404]);
 
 // Retries non-2xx responses and network errors with exponential backoff, then
 // returns the final Response so callers keep their existing error handling.
@@ -499,7 +497,7 @@ export const DEFAULT_LLM_MODEL = "models/gemini-2.5-flash";
 
 // Separate free-tier quota bucket on the primary provider; used automatically
 // when the requested model is unavailable or rate-limited.
-const PRIMARY_FREE_FALLBACK_MODEL = "models/gemini-3.5-flash";
+const PRIMARY_FREE_FALLBACK_MODEL = "models/gemini-3.5-flash-lite";
 
 /**
  * Gemini's OpenAI-compatible endpoint can be unavailable while the native
@@ -544,6 +542,13 @@ async function* generateGeminiNative(
   if (maxOutputTokens) generationConfig.maxOutputTokens = maxOutputTokens;
   if (typeof params.temperature === "number")
     generationConfig.temperature = params.temperature;
+  const responseFormat = normalizeResponseFormat(params);
+  if (responseFormat?.type === "json_object") {
+    generationConfig.responseMimeType = "application/json";
+  } else if (responseFormat?.type === "json_schema") {
+    generationConfig.responseMimeType = "application/json";
+    generationConfig.responseSchema = responseFormat.json_schema.schema;
+  }
   const payload: Record<string, unknown> = { contents, generationConfig };
   if (systemParts.length) payload.systemInstruction = { parts: systemParts };
   if (params.thinking) payload.thinkingConfig = params.thinking;
@@ -566,9 +571,12 @@ async function* generateGeminiNative(
   }
 
   const parsed = (await response.json()) as {
-    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+    candidates?: Array<{
+      content?: { parts?: Array<{ text?: string; thought?: boolean }> };
+    }>;
   };
   const text = (parsed.candidates?.[0]?.content?.parts ?? [])
+    .filter(part => !part.thought)
     .map(part => part.text ?? "")
     .join("");
   if (!text) throw new Error("Gemini native API returned no answer text");
@@ -683,6 +691,48 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
       return await attemptInvoke(target);
     } catch (error) {
       lastError = error;
+      const geminiKey = process.env.GEMINI_API_KEY?.trim();
+      const requestedModel = target.model || model || DEFAULT_LLM_MODEL;
+      if (
+        !tools?.length &&
+        geminiKey &&
+        target.apiKey === geminiKey &&
+        target.url.includes("generativelanguage.googleapis.com") &&
+        /^models\/gemini-|^gemini-/.test(requestedModel)
+      ) {
+        try {
+          let content = "";
+          for await (const event of generateGeminiNative(
+            params,
+            geminiKey,
+            requestedModel,
+            signal
+          )) {
+            content += event.delta;
+          }
+          return {
+            id: `gemini-native-${Date.now()}`,
+            created: Math.floor(Date.now() / 1000),
+            model: requestedModel,
+            choices: [
+              {
+                index: 0,
+                message: { role: "assistant", content },
+                finish_reason: "stop",
+              },
+            ],
+          };
+        } catch (nativeError) {
+          lastError = nativeError;
+          if (signal?.aborted) throw nativeError;
+          console.warn(
+            "Gemini compatibility and native API calls both failed",
+            nativeError instanceof Error
+              ? nativeError.message.slice(0, 300)
+              : "unknown native API error"
+          );
+        }
+      }
       if (index === targets.length - 1) break;
       console.warn(
         `LLM invoke failed via ${target.name}; retrying with ${targets[index + 1].name}`
@@ -803,8 +853,7 @@ export async function* streamLLM(
     } catch (error) {
       lastError = error;
       // Never restart a partially streamed answer on another provider; text would duplicate.
-      if (yieldedDelta || signal?.aborted || index === targets.length - 1)
-        throw error;
+      if (yieldedDelta || signal?.aborted) throw error;
       const geminiKey = process.env.GEMINI_API_KEY?.trim();
       const requestedModel =
         target.model || params.model || DEFAULT_LLM_MODEL;
@@ -821,10 +870,15 @@ export async function* streamLLM(
           lastError = nativeError;
           if (signal?.aborted) throw nativeError;
           console.warn(
-            "Gemini compatibility and native streams both failed; trying the next configured model target"
+            "Gemini compatibility and native API failed; trying the next configured model target",
+            nativeError instanceof Error
+              ? nativeError.message.slice(0, 300)
+              : "unknown native API error"
           );
         }
       }
+      if (index === targets.length - 1)
+        throw lastError instanceof Error ? lastError : error;
       console.warn(
         `LLM stream failed via ${target.name}; retrying with ${targets[index + 1].name}`
       );
