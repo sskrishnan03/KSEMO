@@ -539,7 +539,7 @@ export function LibraryWorkspace({
               role="status"
               aria-live="polite"
               className={cn(
-                "flex shrink-0 items-center gap-1 rounded-lg border px-2 py-1.5 text-white shadow-md",
+                "flex shrink-0 items-center gap-1 rounded-lg border px-2 py-1.5 text-white shadow-md sm:hidden",
                 shareNotice === "success"
                   ? "border-emerald-400/30 bg-emerald-700"
                   : "border-rose-400/30 bg-rose-700"
@@ -604,15 +604,36 @@ export function LibraryWorkspace({
             onChange={setView}
             options={LIBRARY_VIEWS}
           />
-          <Button
-            size="sm"
-            className="order-first ml-auto h-10 shrink-0 rounded-xl bg-foreground text-background hover:bg-foreground/90 sm:order-last sm:ml-0"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploadMutation.isPending}
-          >
-            <Upload className="mr-1.5 size-4" />
-            {uploadMutation.isPending ? "Uploading…" : "Upload files"}
-          </Button>
+          <div className="relative order-first ml-auto shrink-0 sm:order-last sm:ml-0">
+            {shareNotice && (
+              <div
+                role="status"
+                aria-live="polite"
+                className={cn(
+                  "absolute bottom-full right-0 mb-2 hidden items-center gap-1.5 whitespace-nowrap rounded-lg border px-2.5 py-1.5 text-white shadow-md sm:flex",
+                  shareNotice === "success"
+                    ? "border-emerald-400/30 bg-emerald-700"
+                    : "border-rose-400/30 bg-rose-700"
+                )}
+              >
+                <span className="text-xs font-semibold">
+                  {shareNotice === "success" ? "Link copied" : "Copy failed"}
+                </span>
+                <button type="button" onClick={dismissShareNotice} aria-label="Dismiss share message" className="flex size-5 shrink-0 items-center justify-center rounded text-white/80 hover:bg-white/15">
+                  <X className="size-3" />
+                </button>
+              </div>
+            )}
+            <Button
+              size="sm"
+              className="h-10 rounded-xl bg-foreground text-background hover:bg-foreground/90"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploadMutation.isPending}
+            >
+              <Upload className="mr-1.5 size-4" />
+              {uploadMutation.isPending ? "Uploading…" : "Upload files"}
+            </Button>
+          </div>
         </section>
 
         {selectedFiles.length > 0 && (
