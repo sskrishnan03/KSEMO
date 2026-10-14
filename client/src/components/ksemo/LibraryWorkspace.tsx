@@ -516,21 +516,32 @@ export function LibraryWorkspace({
       )}
       <div className="mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col px-3.5 pt-4 sm:px-8 sm:pt-8">
         <header className="flex min-w-0 items-center gap-2">
-          {onOpenSidebar && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onOpenSidebar}
-              className="size-10 shrink-0 rounded-lg border-0 bg-transparent p-0 text-foreground/90 shadow-none transition-colors hover:bg-accent/80 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring active:bg-accent lg:hidden"
-              aria-label="Open conversations"
-              title="Open sidebar"
-            >
-              <Sidebar2 size={20} strokeWidth={2} className="size-5" />
-            </Button>
-          )}
-          <h1 className="text-2xl font-semibold tracking-[-0.03em]">
-            Library
-          </h1>
+          <div className="flex min-w-0 flex-1 items-center gap-2">
+            {onOpenSidebar && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onOpenSidebar}
+                className="size-10 shrink-0 rounded-lg border-0 bg-transparent p-0 text-foreground/90 shadow-none transition-colors hover:bg-accent/80 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring active:bg-accent lg:hidden"
+                aria-label="Open conversations"
+                title="Open sidebar"
+              >
+                <Sidebar2 size={20} strokeWidth={2} className="size-5" />
+              </Button>
+            )}
+            <h1 className="text-2xl font-semibold tracking-[-0.03em]">
+              Library
+            </h1>
+          </div>
+          <Button
+            size="sm"
+            className="h-9 shrink-0 rounded-xl bg-foreground px-3 text-background hover:bg-foreground/90 sm:hidden"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploadMutation.isPending}
+          >
+            <Upload className="mr-1.5 size-4" />
+            {uploadMutation.isPending ? "Uploading…" : "Upload files"}
+          </Button>
         </header>
 
         <section className="mt-3 flex min-w-0 flex-wrap items-center gap-2 overflow-visible py-1 sm:flex-nowrap sm:gap-3">
@@ -562,7 +573,7 @@ export function LibraryWorkspace({
           <div className="hidden min-w-3 flex-1 sm:block" aria-hidden="true" />
           <div ref={searchControlRef} className="flex shrink-0 items-center gap-2">
             {isSearchOpen && (
-              <div className="relative w-40 shrink-0 sm:w-56">
+              <div className="relative w-24 shrink-0 sm:w-56">
                 <Input
                   autoFocus
                   value={query}
@@ -571,7 +582,7 @@ export function LibraryWorkspace({
                     "h-10 rounded-xl",
                     query && "pr-8"
                   )}
-                  placeholder="Search your Library"
+                  placeholder="Search Library"
                   aria-label="Search your Library"
                 />
                 {query && (
@@ -590,7 +601,7 @@ export function LibraryWorkspace({
               type="button"
               variant="outline"
               size="icon"
-              className="size-10 shrink-0 rounded-full text-foreground transition-colors hover:border-neutral-700 hover:bg-neutral-800 active:bg-neutral-700"
+              className="size-9 shrink-0 rounded-full text-foreground transition-colors hover:border-neutral-700 hover:bg-neutral-800 active:bg-neutral-700 sm:size-10"
               onClick={() => setIsSearchOpen(open => !open)}
               aria-label={isSearchOpen ? "Close Library search" : "Search Library"}
               aria-expanded={isSearchOpen}
@@ -603,8 +614,9 @@ export function LibraryWorkspace({
             value={view}
             onChange={setView}
             options={LIBRARY_VIEWS}
+            iconsOnlyOnMobile
           />
-          <div className="relative order-first ml-auto shrink-0 sm:order-last sm:ml-0">
+          <div className="relative order-first ml-auto hidden shrink-0 sm:order-last sm:ml-0 sm:block">
             {shareNotice && (
               <div
                 role="status"
@@ -968,11 +980,13 @@ function SegmentedTags<T extends string>({
   value,
   onChange,
   description,
+  iconsOnlyOnMobile = false,
 }: {
   options: readonly { value: T; label: string; icon?: React.ReactNode }[];
   value: T;
   onChange: (value: T) => void;
   description: string;
+  iconsOnlyOnMobile?: boolean;
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
   const [thumb, setThumb] = useState<{ left: number; width: number } | null>(
@@ -1044,7 +1058,9 @@ function SegmentedTags<T extends string>({
             )}
           >
             {option.icon}
-            {option.label}
+            <span className={iconsOnlyOnMobile ? "sr-only sm:not-sr-only" : undefined}>
+              {option.label}
+            </span>
           </button>
         );
       })}
