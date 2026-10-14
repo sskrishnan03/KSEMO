@@ -5436,7 +5436,7 @@ const EmptyState = memo(function EmptyState({
   temporary?: boolean;
 }) {
   return (
-    <div className="mx-auto flex h-full w-full max-w-3xl flex-col px-0 pb-16 sm:px-5 sm:pb-4 lg:justify-center">
+    <div className="mx-auto flex h-full w-full max-w-3xl flex-col px-0 pb-16 sm:px-5 sm:pb-4 lg:justify-center lg:pt-12">
       <div className="flex min-h-0 flex-1 flex-col justify-center lg:flex-none">
         <div className="mb-4 px-5 text-center sm:mb-5 sm:px-0">
           <p className="text-[22px] font-bold tracking-[-0.04em] text-balance text-foreground sm:tracking-[-0.025em]">

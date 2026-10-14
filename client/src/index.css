@@ -39,6 +39,18 @@
     box-shadow 0.25s ease;
 }
 
+.temp-mode .ksemo-composer-fade {
+  background-image: linear-gradient(to top, var(--temp-surface), transparent);
+}
+
+/* The help drawer is separate from the temporary chat composer. Keep its
+   input surface on the normal project palette while a temp chat is active. */
+.temp-mode .ksemo-help-composer-shell {
+  background-color: var(--popover);
+  border: 1px solid var(--border);
+  box-shadow: var(--tw-shadow, 0 1px 2px 0 rgb(0 0 0 / 0.05));
+}
+
 .temp-mode .ksemo-user-message-bubble {
   border-style: dashed;
   border-color: color-mix(in srgb, var(--temp-accent) 34%, transparent);

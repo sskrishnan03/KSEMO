@@ -34,7 +34,9 @@ import {
   ChevronLeft,
   ChevronRight,
   Loader2,
+  Maximize2,
   Mic,
+  Minimize2,
   Monitor,
   Paperclip,
   Plus,
@@ -71,7 +73,7 @@ const BOT_PLACEHOLDER = "Speak or type whatever you want...";
 const TEMP_PLACEHOLDER = "Start a temporary conversation...";
 
 const COMPACT_INPUT_MAX_HEIGHT = 192;
-const EXPANDED_INPUT_MAX_HEIGHT = 320;
+const EXPANDED_INPUT_MAX_HEIGHT = 512;
 const MIN_INPUT_HEIGHT = 40;
 
 const MENU_TITLE = "Attach";
@@ -943,14 +945,16 @@ export const ChatComposer = memo(function ChatComposer({
                   }}
                   className={cn(
                     "min-h-10 min-w-0 flex-1 overflow-y-auto whitespace-pre-wrap break-words border-0 !bg-transparent pl-2.5 py-1 text-[15px] leading-6 md:text-[15px] shadow-none focus-visible:ring-0 outline-none dark:!bg-transparent",
-                    expanded ? "max-h-80" : "max-h-48",
+                    expanded
+                      ? "max-h-[min(calc(100dvh-18rem),32rem)]"
+                      : "max-h-48",
                     canExpand ? "pr-10" : "pr-1"
                   )}
                   style={{ minHeight: `${MIN_INPUT_HEIGHT}px` }}
                 />
                 {canExpand && (
                   <div
-                    className="pointer-events-none absolute inset-x-0 -bottom-1 h-9 bg-gradient-to-t from-popover to-transparent"
+                    className="ksemo-composer-fade pointer-events-none absolute inset-x-0 -bottom-1 h-9 bg-gradient-to-t from-popover to-transparent"
                     aria-hidden="true"
                   />
                 )}
@@ -959,18 +963,16 @@ export const ChatComposer = memo(function ChatComposer({
                     <TooltipTrigger asChild>
                       <button
                         type="button"
-                        tabIndex={-1}
                         onClick={() => setExpanded(current => !current)}
-                        className="absolute right-1.5 top-1.5 z-10 flex size-8 items-center justify-center rounded-full bg-transparent text-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-0 focus-visible:outline-none"
+                        className="absolute right-1.5 top-1.5 z-10 flex size-8 items-center justify-center rounded-md bg-transparent text-foreground transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                         aria-label={expanded ? "Collapse" : "Expand"}
                         aria-pressed={expanded}
                       >
-                        <ChevronDown
-                          className={cn(
-                            "size-5 transition-transform duration-200",
-                            expanded ? "rotate-180" : ""
-                          )}
-                        />
+                        {expanded ? (
+                          <Minimize2 className="size-4" />
+                        ) : (
+                          <Maximize2 className="size-4" />
+                        )}
                       </button>
                     </TooltipTrigger>
                     <TooltipContent side="bottom">
