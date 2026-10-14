@@ -30,9 +30,9 @@ import { cn } from "@/lib/utils";
 import {
   Archive,
   ArrowDown,
+  ChevronDown,
   Download,
   LogIn,
-  MoreHorizontal,
   Pause,
   Play,
   UserPlus,
@@ -417,6 +417,7 @@ function isSameTabReload(): boolean {
 }
 
 export default function Home() {
+  const conversationTitleRef = useRef<HTMLSpanElement>(null);
   const isMobile = useIsMobile();
   const visualViewportHeight = useVisualViewportHeight();
   const { user, loading, authUnavailable, refresh, logout } = useAuth();
@@ -831,36 +832,6 @@ export default function Home() {
     activeQuery.data?.conversation,
     conversationQuery.data,
   ]);
-  const conversationFormattedDate = useMemo(() => {
-    const raw =
-      (
-        activeConversation as {
-          updatedAt?: string | Date;
-          createdAt?: string | Date;
-        } | null
-      )?.updatedAt ||
-      (
-        activeConversation as {
-          updatedAt?: string | Date;
-          createdAt?: string | Date;
-        } | null
-      )?.createdAt ||
-      (chatMessages.length > 0
-        ? (chatMessages[0] as unknown as { createdAt?: string | Date })
-            .createdAt
-        : null);
-    const d = raw ? new Date(raw) : new Date();
-    if (isNaN(d.getTime())) {
-      return new Intl.DateTimeFormat("en-US", {
-        month: "short",
-        day: "numeric",
-      }).format(new Date());
-    }
-    return new Intl.DateTimeFormat("en-US", {
-      month: "short",
-      day: "numeric",
-    }).format(d);
-  }, [activeConversation, chatMessages]);
   const preferencesQuery = trpc.preferences.get.useQuery(undefined, {
     enabled: Boolean(user),
   });
@@ -4679,10 +4650,10 @@ export default function Home() {
           />
         ) : (
           <>
-            {/* Mobile-only Navbar with subtle fade below it */}
+            {/* Shared chat navbar with the same short fade at every width */}
             <div
               aria-hidden="true"
-              className="pointer-events-none absolute inset-x-0 top-0 z-10 h-13 border-b border-border/30 bg-background/80 backdrop-blur-md lg:hidden"
+              className="pointer-events-none absolute inset-x-0 top-0 z-10 h-12 bg-background backdrop-blur-md"
             >
               <div className="pointer-events-none absolute inset-x-0 top-full h-4 bg-gradient-to-b from-background to-transparent" />
             </div>
@@ -4787,9 +4758,8 @@ export default function Home() {
                 three-dots button is hidden there entirely. */}
             {!guestMode &&
               (visibleMessages.length > 0 || Boolean(shareTarget)) &&
-              !isTemporaryChat &&
-              !chatFilesOpen && (
-                <div className="absolute right-2 top-2 z-20">
+              !isTemporaryChat && (
+                <div className="pointer-events-none absolute inset-x-0 top-0 z-20 h-13">
                   <ShareConversationDialog
                     open={Boolean(shareTarget) || isSharePreview}
                     onOpenChange={stableShareOnOpenChange}
@@ -4820,11 +4790,11 @@ export default function Home() {
                     messages={shareDialogMessages}
                     sideOffset={6}
                     anchor={
-                      <div className="inline-flex items-center rounded-lg border border-border/40 bg-card shadow-xs">
-                        <Button
+                      <div className="contents">
+                        {!chatFilesOpen && <Button
                           variant="ghost"
                           size="sm"
-                          className="h-9 rounded-none rounded-l-lg border-0 bg-transparent px-3 text-foreground/80 hover:bg-accent hover:text-foreground transition-colors shadow-none"
+                          className="pointer-events-auto absolute right-2 top-2 h-8 rounded-lg border border-border/50 bg-muted/70 px-3 text-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground"
                           aria-label="Share chat"
                           disabled={!activeConversationId}
                           onClick={() => {
@@ -4849,47 +4819,31 @@ export default function Home() {
                             <ShareIcon className="size-4" />
                             Share
                           </span>
-                        </Button>
-                        <div
-                          className="h-4.5 w-px bg-border/40 shrink-0"
-                          aria-hidden="true"
-                        />
-                        <DropdownMenu>
+                        </Button>}
+                        <div className="pointer-events-auto absolute left-14 right-24 top-2 lg:left-4">
+                          <div className="inline-flex h-9 max-w-full items-center gap-1">
+                              <span
+                                ref={conversationTitleRef}
+                                className="max-w-[calc(100%-1.5rem)] truncate text-sm font-medium text-foreground"
+                              >
+                              {activeConversation?.title || "New Chat"}
+                            </span>
+                          <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="size-9 rounded-none rounded-r-lg border-0 bg-transparent text-foreground/80 hover:bg-accent hover:text-foreground transition-colors shadow-none"
-                              aria-label="Chat actions"
+                            <button
+                              type="button"
+                              className="flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent/70 hover:text-foreground data-[state=open]:bg-accent/70 data-[state=open]:text-foreground active:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                              aria-label={`Conversation options for ${activeConversation?.title || "New Chat"}`}
                             >
-                              <MoreHorizontal
-                                className="size-4.5"
-                                strokeWidth={2.75}
-                                fill="currentColor"
-                              />
-                            </Button>
+                              <ChevronDown className="size-4" />
+                            </button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent
-                            align="end"
+                            align="start"
+                            alignOffset={-(conversationTitleRef.current?.offsetWidth ?? 0) - 12}
                             sideOffset={6}
                             className="w-44 rounded-xl"
                           >
-                            {/* Conversation title and date/month */}
-                            <div className="px-2.5 pt-1.5 pb-1 select-none">
-                              <p className="text-[12.5px] font-semibold text-foreground break-words leading-tight">
-                                {activeConversation?.title || "New Chat"}
-                              </p>
-                              <div className="mt-1 flex items-center justify-between text-[11.5px] font-medium text-muted-foreground/80 leading-none">
-                                <span className="whitespace-nowrap">
-                                  Latest activity
-                                </span>
-                                <span className="whitespace-nowrap">
-                                  {conversationFormattedDate}
-                                </span>
-                              </div>
-                            </div>
-                            <DropdownMenuSeparator className="my-1" />
-
                             {/* Best order: Pin, Rename, Archive, View files, Export, Delete */}
                             <DropdownMenuItem
                               disabled={!activeConversationId}
@@ -4992,7 +4946,9 @@ export default function Home() {
                               Delete
                             </DropdownMenuItem>
                           </DropdownMenuContent>
-                        </DropdownMenu>
+                          </DropdownMenu>
+                          </div>
+                        </div>
                       </div>
                     }
                   />
@@ -5021,7 +4977,7 @@ export default function Home() {
               {visibleMessages.length ? (
                 <div
                   ref={messagesBodyRef}
-                  className="mx-auto max-w-3xl space-y-5 px-4 pb-3 pt-16 sm:px-6 sm:pb-4 lg:pt-5"
+                  className="mx-auto max-w-3xl space-y-5 px-4 pb-3 pt-16 sm:px-6 sm:pb-4 lg:pt-16"
                 >
                   {visibleMessages.map(message => {
                     const activeFileGen =

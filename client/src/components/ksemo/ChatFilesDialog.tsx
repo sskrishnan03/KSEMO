@@ -60,9 +60,7 @@ export const ChatFilesDialog = memo(function ChatFilesDialog({
     >
       <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border/80 px-3.5 py-2.5 bg-muted/20">
         <div className="flex items-center gap-2.5 min-w-0">
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-foreground">
-            <WinrarIcon className="size-4" />
-          </span>
+          <WinrarIcon className="size-4 shrink-0 text-foreground" />
           <p className="text-[15px] font-semibold leading-tight text-foreground truncate">
             Files in this chat
           </p>
