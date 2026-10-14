@@ -57,7 +57,7 @@ export const ChatFilesDialog = memo(function ChatFilesDialog({
       role="dialog"
       aria-label="Files in this chat"
       aria-modal="true"
-      className="fixed inset-0 z-50 mx-auto flex h-dvh w-full max-w-none flex-col overflow-hidden rounded-none border-0 bg-popover text-popover-foreground shadow-lg animate-in slide-in-from-bottom-8 fade-in duration-300 ease-out lg:relative lg:inset-auto lg:z-30 lg:my-4 lg:mr-4 lg:h-[calc(100%-2rem)] lg:min-h-0 lg:w-[min(24rem,32vw)] lg:max-w-none lg:shrink-0 lg:translate-y-0 lg:rounded-2xl lg:border lg:bg-popover lg:shadow-lg lg:backdrop-blur-md lg:slide-in-from-bottom-0 lg:slide-in-from-right-8"
+      className="fixed inset-4 z-50 mx-auto flex h-auto w-auto max-w-none flex-col overflow-hidden rounded-2xl border border-border bg-popover/95 text-popover-foreground shadow-lg backdrop-blur-md animate-in slide-in-from-bottom-8 fade-in duration-300 ease-out lg:relative lg:inset-auto lg:z-30 lg:my-4 lg:mr-4 lg:h-[calc(100%-2rem)] lg:min-h-0 lg:w-[min(24rem,32vw)] lg:max-w-none lg:shrink-0 lg:translate-y-0 lg:rounded-2xl lg:border lg:bg-popover lg:shadow-lg lg:backdrop-blur-md lg:slide-in-from-bottom-0 lg:slide-in-from-right-8"
     >
       <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border/80 px-3.5 py-2.5 bg-muted/20">
         <div className="flex items-center gap-2.5 min-w-0">
