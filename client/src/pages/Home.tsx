@@ -417,7 +417,6 @@ function isSameTabReload(): boolean {
 }
 
 export default function Home() {
-  const conversationTitleRef = useRef<HTMLSpanElement>(null);
   const isMobile = useIsMobile();
   const visualViewportHeight = useVisualViewportHeight();
   const { user, loading, authUnavailable, refresh, logout } = useAuth();
@@ -4825,7 +4824,6 @@ export default function Home() {
                         {!chatFilesOpen && <div className="pointer-events-auto absolute left-14 right-24 top-2 lg:left-4">
                           <div className="inline-flex h-9 max-w-full items-center gap-1">
                               <span
-                                ref={conversationTitleRef}
                                 className="max-w-[calc(100%-1.5rem)] truncate text-sm font-medium text-foreground"
                               >
                               {activeConversation?.title || "New Chat"}
@@ -4841,12 +4839,11 @@ export default function Home() {
                             </button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent
-                            align="start"
-                            alignOffset={-(conversationTitleRef.current?.offsetWidth ?? 0) - 12}
+                            align="end"
                             sideOffset={6}
-                            className="w-44 rounded-xl"
+                            className="w-40 rounded-xl"
                           >
-                            {/* Best order: Pin, Rename, Archive, View files, Export, Delete */}
+                            {/* Best order: Pin, Archive, Export, View files, Delete */}
                             <DropdownMenuItem
                               disabled={!activeConversationId}
                               onSelect={() => {
@@ -4880,13 +4877,6 @@ export default function Home() {
                             >
                               <Archive className="mr-2 size-4" />
                               Archive
-                            </DropdownMenuItem>
-
-                            <DropdownMenuItem
-                              onSelect={() => setChatFilesOpen(true)}
-                            >
-                              <WinrarIcon className="mr-2 size-4" />
-                              View files
                             </DropdownMenuItem>
 
                             <DropdownMenuSub>
@@ -4929,6 +4919,13 @@ export default function Home() {
                                 </DropdownMenuItem>
                               </DropdownMenuSubContent>
                             </DropdownMenuSub>
+
+                            <DropdownMenuItem
+                              onSelect={() => setChatFilesOpen(true)}
+                            >
+                              <WinrarIcon className="mr-2 size-4" />
+                              View files
+                            </DropdownMenuItem>
 
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
