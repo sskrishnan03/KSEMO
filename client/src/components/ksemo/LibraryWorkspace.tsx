@@ -562,7 +562,7 @@ export function LibraryWorkspace({
               role="status"
               aria-live="polite"
               className={cn(
-                "flex shrink-0 items-center gap-1 rounded-lg border px-2 py-1.5 text-white shadow-md sm:hidden",
+                "fixed right-3 top-[max(env(safe-area-inset-top),0.75rem)] z-[100] flex items-center gap-1 rounded-lg border px-2 py-1.5 text-white shadow-lg sm:hidden",
                 shareNotice === "success"
                   ? "border-emerald-400/30 bg-emerald-700"
                   : "border-rose-400/30 bg-rose-700"
