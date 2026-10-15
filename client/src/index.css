@@ -109,6 +109,43 @@
   transition: color 0.25s ease;
 }
 
+.temp-mode .ksemo-dictation-pill {
+  background-color: var(--temp-surface);
+  border-color: color-mix(in srgb, var(--temp-accent) 34%, transparent);
+  border-style: dashed;
+  color: var(--foreground);
+}
+
+.temp-mode .ksemo-dictation-stop {
+  background-color: color-mix(
+    in srgb,
+    var(--temp-accent) 12%,
+    var(--temp-surface)
+  );
+  color: var(--temp-accent);
+}
+
+.temp-mode .ksemo-dictation-stop:hover {
+  background-color: color-mix(
+    in srgb,
+    var(--temp-accent) 24%,
+    var(--temp-surface)
+  );
+}
+
+.temp-mode .ksemo-dictation-transcribe,
+.temp-mode .ksemo-dictation-transcribe:hover,
+.temp-mode .ksemo-dictation-transcribe:focus-visible {
+  background-color: var(--temp-accent);
+  color: #202319;
+}
+
+.temp-mode .ksemo-response-stop,
+.temp-mode .ksemo-response-stop:hover {
+  background-color: var(--temp-accent);
+  color: #202319;
+}
+
 @theme {
   /* Mobile browsers in "Desktop site" mode report a ~980px viewport. Lower the
      lg breakpoint so that width renders the full desktop layout instead of

@@ -157,7 +157,7 @@ export const DictateRecordingPill = memo(function DictateRecordingPill({
   }, []);
   return (
     <div
-      className="flex h-10 w-[200px] max-w-[50vw] shrink-0 min-w-0 items-center gap-1 overflow-hidden rounded-full border border-border bg-muted text-popover-foreground backdrop-blur-xs py-0 pl-2 pr-0.5 shadow-sm animate-in fade-in zoom-in-95 duration-150 sm:gap-2 sm:pl-3 sm:pr-0.5"
+      className="ksemo-dictation-pill flex h-10 w-[200px] max-w-[50vw] shrink-0 min-w-0 items-center gap-1 overflow-hidden rounded-full border border-border bg-muted text-popover-foreground backdrop-blur-xs py-0 pl-2 pr-0.5 shadow-sm animate-in fade-in zoom-in-95 duration-150 sm:gap-2 sm:pl-3 sm:pr-0.5"
       role="region"
       aria-label="Dictation recording controls"
     >
@@ -188,7 +188,7 @@ export const DictateRecordingPill = memo(function DictateRecordingPill({
               variant="ghost"
               size="icon"
               onClick={onStop}
-              className="size-8 !rounded-lg bg-background/80 text-foreground shadow-xs hover:bg-destructive/10 hover:text-destructive transition-colors"
+              className="ksemo-dictation-stop size-8 !rounded-lg bg-background/80 text-foreground shadow-xs hover:bg-destructive/10 hover:text-destructive transition-colors"
               aria-label="Stop"
             >
               <Square className="size-2.5 fill-current" />
@@ -202,7 +202,7 @@ export const DictateRecordingPill = memo(function DictateRecordingPill({
               type="button"
               size="icon"
               onClick={onTranscribe}
-              className="size-8 !rounded-lg bg-white text-black shadow-sm hover:bg-white/90 transition-colors"
+              className="ksemo-dictation-transcribe size-8 !rounded-lg bg-white text-black shadow-sm hover:bg-white/90 transition-colors"
               aria-label="Transcribe"
             >
               <Check className="size-4 stroke-[2.5]" />
@@ -1491,7 +1491,7 @@ export const ChatComposer = memo(function ChatComposer({
                           <Button
                             onClick={onCancel}
                             size="icon"
-                            className="size-10 rounded-full bg-foreground text-background hover:bg-foreground/90 transition-colors"
+                            className="ksemo-response-stop size-10 rounded-full bg-foreground text-background hover:bg-foreground/90 transition-colors"
                             aria-label={
                               isBotSpeaking
                                 ? "Stop speaking"
