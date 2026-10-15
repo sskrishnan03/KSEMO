@@ -14,6 +14,8 @@ import {
   getConversationById,
   getConversationByShareToken,
   getPublicConversationByToken,
+  createSharedAnswerForUser,
+  getSharedAnswerByToken,
   getMessageForUser,
   listMessageVersionsForUser,
   listMessageFilesForUser,
@@ -66,6 +68,31 @@ function requireConversation(id: string, userId: number) {
 }
 
 export const conversationRouter = router({
+  createSharedAnswer: protectedProcedure
+    .input(z.object({ content: z.string().trim().min(1).max(64_000) }))
+    .mutation(async ({ ctx, input }) => {
+      const token = Buffer.from(crypto.getRandomValues(new Uint8Array(18))).toString(
+        "base64url"
+      );
+      await createSharedAnswerForUser({
+        token,
+        userId: ctx.user.id,
+        content: input.content,
+      });
+      return { token };
+    }),
+  getSharedAnswer: publicProcedure
+    .input(z.object({ token: z.string().min(16).max(64) }))
+    .query(async ({ input }) => {
+      const answer = await getSharedAnswerByToken(input.token);
+      if (!answer) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Shared answer not found.",
+        });
+      }
+      return answer;
+    }),
   list: protectedProcedure
     .input(
       z

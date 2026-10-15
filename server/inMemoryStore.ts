@@ -109,6 +109,7 @@ interface StoreSnapshot {
   voiceSessions: Array<[string, VoiceSession]>;
   tasks: Array<[string, Task]>;
   taskActivities: Array<[string, TaskActivity[]]>;
+  sharedAnswers?: Array<[string, { userId: number; content: string; createdAt: Date }]>;
   nextUserId: number;
 }
 
@@ -150,6 +151,10 @@ class InMemoryStore {
   voiceSessions = new Map<string, VoiceSession>();
   tasks = new Map<string, Task>();
   taskActivities = new Map<string, TaskActivity[]>();
+  sharedAnswers = new Map<
+    string,
+    { userId: number; content: string; createdAt: Date }
+  >();
 
   private nextUserId = 1;
   private saveTimer: NodeJS.Timeout | null = null;
@@ -225,6 +230,7 @@ class InMemoryStore {
       voiceSessions: Array.from(this.voiceSessions.entries()),
       tasks: Array.from(this.tasks.entries()),
       taskActivities: Array.from(this.taskActivities.entries()),
+      sharedAnswers: Array.from(this.sharedAnswers.entries()),
       nextUserId: this.nextUserId,
     };
   }
@@ -259,6 +265,8 @@ class InMemoryStore {
     for (const [key, value] of snapshot.tasks || []) this.tasks.set(key, value);
     for (const [key, value] of snapshot.taskActivities || [])
       this.taskActivities.set(key, value);
+    for (const [key, value] of snapshot.sharedAnswers || [])
+      this.sharedAnswers.set(key, value);
     this.nextUserId = Math.max(1, Number(snapshot.nextUserId) || 0);
 
     // Rebuild identity indexes directly from users so a stale filename cannot

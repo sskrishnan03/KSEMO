@@ -44,6 +44,7 @@ import {
   X,
 } from "lucide-react";
 import { Sidebar2 } from "reicon-react/icons/Sidebar2";
+import { ChatLine } from "reicon-react/icons/ChatLine";
 import {
   ShareIcon,
   TemporaryChatIcon,
@@ -422,13 +423,21 @@ function isSameTabReload(): boolean {
   return false;
 }
 
-export default function Home() {
+export default function Home({
+  sharedAnswer: sharedAnswerOverride,
+  sharedAnswerToken,
+}: {
+  sharedAnswer?: string;
+  sharedAnswerToken?: string;
+  params?: Record<string, string | undefined>;
+} = {}) {
   const isMobile = useIsMobile();
   const visualViewportHeight = useVisualViewportHeight();
   const { user, loading, authUnavailable, refresh, logout } = useAuth();
   const { closePdf, isOpen: isDocumentOpen } = usePdfViewer();
   const [, setLocation] = useLocation();
   const [, cParams] = useRoute("/c/:id");
+  const [isSharedAnswerRoute] = useRoute("/share-answer");
   const searchParams = useMemo(
     () => new URLSearchParams(window.location.search),
     []
@@ -463,6 +472,17 @@ export default function Home() {
     import.meta.env.DEV && searchParams.has("profileSupportPreview");
   const sharedConversationId = searchParams.get("conversation");
   const targetConversationId = cParams?.id || sharedConversationId;
+  const answerFromRoute = useMemo(() => {
+    if (!isSharedAnswerRoute || typeof window === "undefined") return "";
+    try {
+      return decodeURIComponent(window.location.hash.slice(1));
+    } catch {
+      return window.location.hash.slice(1);
+    }
+  }, [isSharedAnswerRoute]);
+  const sharedAnswer = sharedAnswerOverride ?? answerFromRoute;
+  const isSharedAnswerPage =
+    isSharedAnswerRoute || sharedAnswerOverride !== undefined;
   const inlineWorkspaceSection: "library" | null =
     workspacePreview === "files" ? "library" : null;
   const utils = trpc.useUtils();
@@ -486,7 +506,32 @@ export default function Home() {
   // the current temporary session so they can be purged when it ends.
   const isTemporaryChatRef = useRef(false);
   const temporaryConversationIdsRef = useRef<Set<string>>(new Set());
-  const [chatMessages, setChatMessages] = useState<KsemoMessage[]>([]);
+  const [chatMessages, setChatMessages] = useState<KsemoMessage[]>(() =>
+    sharedAnswer
+      ? [
+          {
+            id: "shared-answer",
+            role: "assistant",
+            content: sharedAnswer,
+            status: "completed",
+          },
+        ]
+      : []
+  );
+  const [sharedAnswerContinued, setSharedAnswerContinued] = useState(() => {
+    if (!sharedAnswerToken || typeof window === "undefined") return false;
+    try {
+      const continuedInUrl =
+        new URLSearchParams(window.location.search).get("continue") === "1";
+      const continuedInStorage =
+        window.localStorage.getItem(
+          `ksemo:shared-answer-continued:${sharedAnswerToken}`
+        ) === "true";
+      return continuedInUrl || continuedInStorage;
+    } catch {
+      return false;
+    }
+  });
   // Good/bad response ratings for the open conversation, keyed by message id.
   // The ref mirror lets the stable toggle callback read the current rating
   // without being re-created on every render.
@@ -629,6 +674,7 @@ export default function Home() {
   const [shareEmail, setShareEmail] = useState("");
   const [sharingConversationId, setSharingConversationId] = useState<string | null>(null);
   const [shareNotice, setShareNotice] = useState<"success" | "error" | null>(null);
+  const [shareNoticeText, setShareNoticeText] = useState("");
   const shareNoticeTimerRef = useRef<number | null>(null);
   useEffect(() => () => {
     if (shareNoticeTimerRef.current !== null) {
@@ -884,7 +930,21 @@ export default function Home() {
     seededConversationIdRef.current = null;
     setSeededConversationId(null);
     initialSelectionUserIdRef.current = null;
-    setChatMessages([]);
+    // A public shared-answer link is rendered in guest mode. Keep its seeded
+    // response when the signed-out session cleanup runs; clearing it here
+    // leaves the shared-answer shell looking like an empty New Chat.
+    setChatMessages(
+      isSharedAnswerPage && sharedAnswer
+        ? [
+            {
+              id: "shared-answer",
+              role: "assistant",
+              content: sharedAnswer,
+              status: "completed",
+            },
+          ]
+        : []
+    );
     setActiveConversationId(null);
     activeConversationIdRef.current = null;
     setAttachmentNotices([]);
@@ -893,7 +953,7 @@ export default function Home() {
     temporaryConversationIdsRef.current.clear();
     setGuestPromptOpen(false);
     setSettingsOpen(false);
-  }, [user]);
+  }, [user, isSharedAnswerPage, sharedAnswer]);
 
   // Mirror guest mode into the global flag so main.tsx can suppress the
   // auto-redirect-to-login that 401 responses would otherwise trigger.
@@ -933,6 +993,8 @@ export default function Home() {
       },
       onError: () => {},
     });
+  const sharedAnswerMutation =
+    trpc.conversation.createSharedAnswer.useMutation();
   const permanentDeleteMutation = trpc.conversation.remove.useMutation({
     onSuccess: () => {
       utils.conversation.list.invalidate();
@@ -1884,6 +1946,11 @@ export default function Home() {
     if (!user?.id || !conversationQuery.data) return;
     const userId = String(user.id);
     if (initialSelectionUserIdRef.current === userId) return;
+    if (isSharedAnswerPage) {
+      initialSelectionUserIdRef.current = userId;
+      requestComposerFocus();
+      return;
+    }
     if (
       activeConversationId &&
       conversationQuery.data.some(item => item.id === activeConversationId)
@@ -1922,6 +1989,7 @@ export default function Home() {
     requestComposerFocus();
   }, [
     user?.id,
+    isSharedAnswerPage,
     targetConversationId,
     activeConversationId,
     conversationQuery.data,
@@ -2250,6 +2318,9 @@ export default function Home() {
         },
         body: JSON.stringify({
           conversationId: conversationId ?? undefined,
+          ...(isSharedAnswerPage && !conversationId && sharedAnswer
+            ? { sharedAnswerContext: sharedAnswer }
+            : {}),
           content,
           timeZone: currentTimeZone(),
           regenerateAssistantMessageId: options.regenerateAssistantMessageId,
@@ -2389,12 +2460,7 @@ export default function Home() {
             if (isViewingThisStream()) {
               // Stream words aloud in real-time as sentences arrive (Bot voice turns only)
               const isBotVoiceMode =
-                isVoiceTurn ||
-                botVoiceOpenRef.current ||
-                (typeof window !== "undefined" &&
-                  (window.sessionStorage?.getItem("ksemo:composer-tag") ??
-                    window.localStorage?.getItem("ksemo:composer-tag")) ===
-                    "bot");
+                isVoiceTurn || botVoiceOpenRef.current;
 
               if (isBotVoiceMode) {
                 // In bot voice mode, words are displayed word-by-word synchronously as the bot speaks!
@@ -2416,6 +2482,32 @@ export default function Home() {
             }
           } else if (eventName === "assistant.completed") {
             lastProgressAt = Date.now();
+            // The server emits this as soon as the answer has been saved, but
+            // it may keep the stream open while refreshing the chat title.
+            // Settle the visible response now so its actions don't wait for
+            // that unrelated work or for the slow character-by-character
+            // reveal queue to drain.
+            const completedMessageId =
+              str(data.messageId) || streamEntry.assistantMessageId;
+            if (
+              completedMessageId &&
+              isViewingThisStream() &&
+              !isVoiceTurn &&
+              !botVoiceOpenRef.current
+            ) {
+              pendingDeltasRef.current.delete(completedMessageId);
+              setChatMessages(current =>
+                current.map(message =>
+                  message.id === completedMessageId
+                    ? {
+                        ...message,
+                        content: responseText || message.content,
+                        status: "completed",
+                      }
+                    : message
+                )
+              );
+            }
           } else if (eventName === "memory.used") {
             const usedMessageId = str(data.messageId);
             const memoryUses = Array.isArray(data.memories)
@@ -2859,11 +2951,7 @@ export default function Home() {
       }
 
       const isBotVoiceMode =
-        isVoiceTurn ||
-        botVoiceOpenRef.current ||
-        (typeof window !== "undefined" &&
-          (window.sessionStorage?.getItem("ksemo:composer-tag") ??
-            window.localStorage?.getItem("ksemo:composer-tag")) === "bot");
+        isVoiceTurn || botVoiceOpenRef.current;
 
       if (!isBotVoiceMode) {
         setChatMessages(current =>
@@ -2912,11 +3000,7 @@ export default function Home() {
       // quietly and swap the frozen drafting card to the standard file card
       // once the file lands (or show a clean stopped card if it never does).
       const isBotVoiceMode =
-        isVoiceTurn ||
-        botVoiceOpenRef.current ||
-        (typeof window !== "undefined" &&
-          (window.sessionStorage?.getItem("ksemo:composer-tag") ??
-            window.localStorage?.getItem("ksemo:composer-tag")) === "bot");
+        isVoiceTurn || botVoiceOpenRef.current;
 
       if (
         isBotVoiceMode &&
@@ -3526,11 +3610,14 @@ export default function Home() {
     return createPublicConversationUrl(window.location.origin, token);
   }
 
-  function showShareNotice(status: "success" | "error") {
+  function showShareNotice(status: "success" | "error", message?: string) {
     if (shareNoticeTimerRef.current !== null) {
       window.clearTimeout(shareNoticeTimerRef.current);
     }
     setShareNotice(status);
+    setShareNoticeText(
+      message ?? (status === "success" ? "Link copied" : "Could not copy link")
+    );
     shareNoticeTimerRef.current = window.setTimeout(() => {
       setShareNotice(null);
       shareNoticeTimerRef.current = null;
@@ -3546,7 +3633,9 @@ export default function Home() {
   }
 
   async function copyConversationShareLink() {
-    toast.success("Link copied to clipboard");
+    toast.success(
+      "Chat link copied. Anyone with the link can view this conversation."
+    );
   }
 
   function openEmailShare() {
@@ -3585,18 +3674,50 @@ export default function Home() {
         document.execCommand("copy");
         field.remove();
       }
-      showShareNotice("success");
+      showShareNotice(
+        "success",
+        "Chat link copied. Anyone with the link can view this conversation."
+      );
     } catch {
-      showShareNotice("error");
+      showShareNotice("error", "Could not copy the chat link. Please try again.");
     } finally {
       setSharingConversationId(null);
     }
   }
 
   async function shareMessage(_message: KsemoMessage) {
-    const conversation = activeQuery.data?.conversation;
-    if (!conversation?.id) return;
-    openShareDialog(conversation);
+    const answer = _message.content.trim();
+    if (!answer) return;
+
+    const minimumLoading = new Promise(resolve => window.setTimeout(resolve, 500));
+    try {
+      const result = await sharedAnswerMutation.mutateAsync({ content: answer });
+      const answerUrl = new URL(
+        `/share-answer/${encodeURIComponent(result.token)}`,
+        window.location.origin
+      );
+      try {
+        await navigator.clipboard.writeText(answerUrl.toString());
+      } catch {
+        const field = document.createElement("textarea");
+        field.value = answerUrl.toString();
+        field.style.position = "fixed";
+        field.style.opacity = "0";
+        document.body.appendChild(field);
+        field.select();
+        const copied = document.execCommand("copy");
+        field.remove();
+        if (!copied) throw new Error("Clipboard copy failed");
+      }
+      await minimumLoading;
+      showShareNotice(
+        "success",
+        "Answer link copied. Anyone with the link can view this response."
+      );
+    } catch {
+      await minimumLoading;
+      showShareNotice("error", "Could not copy the answer link. Please try again.");
+    }
   }
 
   function deleteMessage(message: KsemoMessage) {
@@ -4331,6 +4452,11 @@ export default function Home() {
   });
   const stableBotVoiceStop = usePersistFn(() => {
     botVoiceOpenRef.current = false;
+    setComposerTag("chat");
+    try {
+      window.sessionStorage?.setItem("ksemo:composer-tag", "chat");
+      window.localStorage?.setItem("ksemo:composer-tag", "chat");
+    } catch {}
     resetStreamingTts();
     stopGeneration();
     botVoice.cancel();
@@ -4908,10 +5034,11 @@ export default function Home() {
             {/* Chat action menu has no place in a temporary chat, so the
                 three-dots button is hidden there entirely. */}
             {!guestMode &&
-              (Boolean(activeConversationId) ||
+              (((Boolean(activeConversationId) ||
                 visibleMessages.length > 0 ||
                 Boolean(shareTarget)) &&
-              !isTemporaryChat && (
+                !isTemporaryChat) ||
+                Boolean(shareNotice)) && (
                 <div className="pointer-events-none absolute inset-x-0 top-0 z-20 h-13">
                   {shareNotice && (
                     <div
@@ -4925,8 +5052,8 @@ export default function Home() {
                       )}
                     >
                       <CheckCircle2 className="size-4 shrink-0" aria-hidden="true" />
-                      <p className="whitespace-nowrap text-xs font-semibold">
-                        {shareNotice === "success" ? "Link copied" : "Could not copy link"}
+                      <p className="max-w-[min(20rem,calc(100vw-5rem))] whitespace-normal text-xs font-semibold">
+                        {shareNoticeText}
                       </p>
                       <button
                         type="button"
@@ -5003,7 +5130,7 @@ export default function Home() {
                                   aria-label="Creating share link"
                                 />
                               ) : (
-                                <ShareIcon className="size-4" />
+                                <ShareIcon className="size-[17px]" />
                               )}
                               Share
                             </span>
@@ -5252,7 +5379,7 @@ export default function Home() {
                                   }
                                 }}
                               >
-                                <ShareIcon className="mr-2 size-4" />
+                                <ShareIcon className="mr-2 size-[17px]" />
                                 Share
                               </DropdownMenuItem>
                               <DropdownMenuItem
@@ -5307,7 +5434,7 @@ export default function Home() {
                       : "pb-3 sm:pb-4"
                   )}
                 >
-                  {visibleMessages.map(message => {
+                  {visibleMessages.map((message, messageIndex) => {
                     const activeFileGen =
                       fileGeneration && fileGeneration.messageId === message.id
                         ? fileGeneration
@@ -5355,8 +5482,8 @@ export default function Home() {
                     ) : null;
 
                     return (
+                      <Fragment key={message.clientId ?? message.id}>
                       <MessageContent
-                        key={message.clientId ?? message.id}
                         message={message}
                         generatedCode={
                           activeFileGen?.status === "created"
@@ -5410,7 +5537,33 @@ export default function Home() {
                         onDelete={guestMode ? undefined : stableDeleteMessage}
                         onFeedback={guestMode ? undefined : stableOnFeedback}
                         feedback={messageFeedback[message.id] ?? null}
+                        sharedAnswerPreview={
+                          isSharedAnswerPage &&
+                          !sharedAnswerContinued &&
+                          message.role === "assistant" &&
+                          message.content === sharedAnswer
+                        }
                       />
+                      {isSharedAnswerPage &&
+                        sharedAnswerContinued &&
+                        messageIndex ===
+                          visibleMessages.findIndex(
+                            item =>
+                              item.role === "assistant" &&
+                              item.content === sharedAnswer
+                          ) && (
+                          <div
+                            role="note"
+                            className="mt-1 flex items-center justify-center gap-2 py-0.5 text-center text-xs text-muted-foreground"
+                          >
+                            <ChatLine
+                              className="size-3.5 shrink-0"
+                              aria-hidden="true"
+                            />
+                            <span>This is a shared KSEMO answer — continue the conversation below.</span>
+                          </div>
+                        )}
+                      </Fragment>
                     );
                   })}
                   <div ref={messagesEndRef} />
@@ -5512,7 +5665,40 @@ export default function Home() {
                       </button>
                     </div>
                   )}
-                  {composerElement}
+                  {isSharedAnswerPage &&
+                  sharedAnswer &&
+                  !sharedAnswerContinued &&
+                  !activeConversationId ? (
+                    <div className="flex justify-center px-4 pb-4">
+                      <Button
+                        type="button"
+                        onClick={() => {
+                          setSharedAnswerContinued(true);
+                          if (sharedAnswerToken) {
+                            try {
+                              window.localStorage.setItem(
+                                `ksemo:shared-answer-continued:${sharedAnswerToken}`,
+                                "true"
+                              );
+                            } catch {}
+                            const url = new URL(window.location.href);
+                            url.searchParams.set("continue", "1");
+                            window.history.replaceState(
+                              window.history.state,
+                              "",
+                              url.pathname + url.search + url.hash
+                            );
+                          }
+                          requestComposerFocus();
+                        }}
+                        className="h-11 rounded-xl bg-foreground px-5 text-sm font-medium text-background shadow-sm hover:bg-foreground/90"
+                      >
+                        Continue conversation
+                      </Button>
+                    </div>
+                  ) : (
+                    composerElement
+                  )}
                 </div>
               </div>
             )}

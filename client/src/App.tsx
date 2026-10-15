@@ -10,6 +10,7 @@ import Home from "./pages/Home";
 import ResetPassword from "@/pages/ResetPassword";
 import ChangePassword from "@/pages/ChangePassword";
 import SharedConversation from "./pages/SharedConversation";
+import SharedAnswer from "./pages/SharedAnswer";
 import { FaqPage, PrivacyPage, TermsPage } from "./pages/SupportPage";
 
 function Router() {
@@ -18,6 +19,8 @@ function Router() {
     <Switch>
       <Route path={"/"} component={Home} />
       <Route path={"/c/:id"} component={Home} />
+      <Route path={"/share-answer/:token"} component={SharedAnswer} />
+      <Route path={"/share-answer"} component={SharedAnswer} />
       <Route path={"/share/:token"} component={SharedConversation} />
       <Route path={"/support/faq"} component={FaqPage} />
       <Route path={"/support/privacy"} component={PrivacyPage} />

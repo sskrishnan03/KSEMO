@@ -14,7 +14,8 @@ import {
   guessMimeType,
   isSupportedUpload,
 } from "@/lib/fileIcons";
-import { Link2, Upload } from "lucide-react";
+import { Upload } from "lucide-react";
+import { Link2 } from "reicon-react";
 import { Trash6Icon } from "./icons";
 import React, {
   memo,
@@ -261,7 +262,7 @@ export const WorkspacePanel = memo(function WorkspacePanel({
                           }
                           aria-label={`Attach ${file.filename} to active conversation`}
                         >
-                          <Link2 className="size-4" />
+                          <Link2 size={16} className="size-4" />
                         </Button>
                       )}
                       <Button

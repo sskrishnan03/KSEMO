@@ -420,6 +420,44 @@ export async function updateConversationForUser(
   return data ? dbToConversation(data) : undefined;
 }
 
+export async function createSharedAnswerForUser(input: {
+  token: string;
+  userId: number;
+  content: string;
+}): Promise<void> {
+  if (useMemoryFallback()) {
+    inMemoryStore.sharedAnswers.set(input.token, {
+      userId: input.userId,
+      content: input.content,
+      createdAt: new Date(),
+    });
+    inMemoryStore.requestPersist();
+    return;
+  }
+  const { error } = await supabase.from("shared_answers").insert({
+    share_token: input.token,
+    user_id: input.userId,
+    content: input.content,
+  });
+  if (error) throwDb("createSharedAnswerForUser", error);
+}
+
+export async function getSharedAnswerByToken(
+  token: string
+): Promise<{ content: string } | null> {
+  if (useMemoryFallback()) {
+    const answer = inMemoryStore.sharedAnswers.get(token);
+    return answer ? { content: answer.content } : null;
+  }
+  const { data, error } = await supabase
+    .from("shared_answers")
+    .select("content")
+    .eq("share_token", token)
+    .maybeSingle();
+  if (error && !isNotFound(error)) throwDb("getSharedAnswerByToken", error);
+  return data ? { content: data.content } : null;
+}
+
 export async function getPublicConversationByToken(
   shareToken: string
 ): Promise<any> {

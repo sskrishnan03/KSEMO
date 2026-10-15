@@ -295,7 +295,17 @@ export function registerChatStream(app: Express) {
       temporary?: boolean;
       /** The viewer's IANA zone, so time answers use their clock, not ours. */
       timeZone?: string;
+      /** Prior assistant answer from a shared-answer link, seeded on first continuation. */
+      sharedAnswerContext?: string;
     };
+    const sharedAnswerContext =
+      typeof body.sharedAnswerContext === "string"
+        ? body.sharedAnswerContext
+        : "";
+    if (sharedAnswerContext.length > 64_000) {
+      res.status(400).json({ error: "The shared answer is too long to continue." });
+      return;
+    }
     const temporary = body.temporary === true;
     let content = body.content?.trim();
     const hasAttachments = (body.attachmentFileIds?.length ?? 0) > 0;
@@ -338,6 +348,19 @@ export function registerChatStream(app: Express) {
           title: createInitialTitle(content),
           ephemeral: temporary,
         });
+        if (sharedAnswerContext.trim()) {
+          const sharedAnswerCreatedAt = new Date(Date.now() - 1);
+          await createMessage({
+            id: crypto.randomUUID(),
+            conversationId: conversation.id,
+            role: "assistant",
+            content: sharedAnswerContext,
+            model: null,
+            status: "completed",
+            createdAt: sharedAnswerCreatedAt,
+            updatedAt: sharedAnswerCreatedAt,
+          });
+        }
       }
 
       if (!conversation) throw new Error("Conversation creation failed");

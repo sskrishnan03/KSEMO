@@ -39,6 +39,7 @@ import {
   Volume2,
   X,
 } from "lucide-react";
+import { ShareIcon } from "./icons";
 import { type MessageFeedbackValue } from "./MessageFeedback";
 import { EMOJI_GROUPS } from "@/data/emojiGroups";
 import { usePersistFn } from "@/hooks/usePersistFn";
@@ -491,11 +492,13 @@ export const MessageContent = memo(function MessageContent({
   fileCreationNode,
   generatedCode,
   onOpenCode,
+  sharedAnswerPreview = false,
 }: {
   message: KsemoMessage;
   fileCreationNode?: React.ReactNode;
   generatedCode?: string;
   onOpenCode?: (code: string, filename?: string) => void;
+  sharedAnswerPreview?: boolean;
   onSpeak: (text: string, messageId: string) => void;
   onPause?: () => void;
   onResume?: () => void;
@@ -512,7 +515,7 @@ export const MessageContent = memo(function MessageContent({
   onRetry?: (message: KsemoMessage) => void;
   onFeedback?: (messageId: string, value: "up" | "down") => void;
   feedback?: MessageFeedbackValue | null;
-  onShare?: (message: KsemoMessage) => void;
+  onShare?: (message: KsemoMessage) => void | Promise<void>;
   onDelete?: (message: KsemoMessage) => void;
   isEditing?: boolean;
   editValue?: string;
@@ -521,6 +524,7 @@ export const MessageContent = memo(function MessageContent({
   onCancelEdit?: () => void;
 }) {
   const [copied, setCopied] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const [actionsOpen, setActionsOpen] = useState(false);
   const [responseDurationMs, setResponseDurationMs] = useState<number | null>(null);
   const reactionsStorageKey = `ksemo-reactions:${message.id}`;
@@ -623,6 +627,16 @@ export const MessageContent = memo(function MessageContent({
     await navigator.clipboard.writeText(cleanContent);
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1_500);
+  }
+
+  async function shareResponse() {
+    if (!onShare || sharing) return;
+    setSharing(true);
+    try {
+      await onShare(message);
+    } finally {
+      setSharing(false);
+    }
   }
 
   if (message.role === "system" || message.role === "tool") return null;
@@ -1107,20 +1121,33 @@ export const MessageContent = memo(function MessageContent({
                     ),
                     copyMessage
                   )}
-                {hasActiveIndicator &&
+                {!sharedAnswerPreview && message.content && onShare &&
+                  action(
+                    sharing ? "Preparing answer link…" : "Share response",
+                    sharing ? (
+                      <span
+                        className="loader loader-xs text-current"
+                        aria-hidden="true"
+                      />
+                    ) : (
+                      <ShareIcon className="size-4" />
+                    ),
+                    () => void shareResponse()
+                  )}
+                {!sharedAnswerPreview && hasActiveIndicator &&
                   action(
                     feedback === "up" ? "Liked" : "Disliked",
                     feedback === "up" ? (
                       <ThumbsUp
                         className={cn(
-                          "size-[17px] text-emerald-600 dark:text-emerald-400",
+                          "size-4 text-emerald-600 dark:text-emerald-400",
                           "ksemo-feedback-thumb-active"
                         )}
                       />
                     ) : (
                       <ThumbsDown
                         className={cn(
-                          "size-[17px] text-rose-600 dark:text-rose-400",
+                          "size-4 text-rose-600 dark:text-rose-400",
                           "ksemo-feedback-thumb-active"
                         )}
                       />
@@ -1128,7 +1155,7 @@ export const MessageContent = memo(function MessageContent({
                     () => handleFeedbackToggle(feedback as "up" | "down"),
                     true
                   )}{" "}
-                {message.content && !isCancelled && (
+                {!sharedAnswerPreview && message.content && !isCancelled && (
                   <Popover
                     open={emojiPickerOpen}
                     onOpenChange={open => {
@@ -1150,7 +1177,7 @@ export const MessageContent = memo(function MessageContent({
                             )}
                             aria-label="Add reaction"
                           >
-                            <SmilePlus className="size-[18px]" />
+                            <SmilePlus className="size-4" />
                           </Button>
                         </PopoverTrigger>
                       </TooltipTrigger>
@@ -1212,7 +1239,7 @@ export const MessageContent = memo(function MessageContent({
                     </PopoverContent>
                   </Popover>
                 )}
-                {hasOverflowActions && (
+                {!sharedAnswerPreview && hasOverflowActions && (
                   <div className="relative inline-flex shrink-0">
                     <DropdownMenu
                       open={actionsOpen}
@@ -1233,10 +1260,7 @@ export const MessageContent = memo(function MessageContent({
                               aria-label={actionsMenuLabel}
                               aria-live="polite"
                             >
-                              <MoreHorizontal
-                                className="size-[22px] shrink-0"
-                                style={{ width: 22, height: 22 }}
-                              />
+                              <MoreHorizontal className="size-4 shrink-0" />
                             </Button>
                           </DropdownMenuTrigger>
                         </TooltipTrigger>
@@ -1329,7 +1353,7 @@ export const MessageContent = memo(function MessageContent({
                               }
                             >
                               {isSpeaking ? (
-                                <Square className="size-3.5 fill-current text-muted-foreground" />
+                                <Square className="size-4 fill-current text-muted-foreground" />
                               ) : (
                                 <Volume2 className="size-4 text-muted-foreground" />
                               )}

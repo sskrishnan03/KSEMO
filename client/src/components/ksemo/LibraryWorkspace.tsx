@@ -1390,7 +1390,7 @@ const LibraryGridCard = memo(function LibraryGridCard({
               {sharing ? (
                 <span className="loader loader-xs mr-2 text-current" aria-hidden="true" />
               ) : (
-                <ShareIcon className="mr-2 size-4" />
+                <ShareIcon className="mr-2 size-[17px]" />
               )}
               Share
             </DropdownMenuItem>
@@ -1674,7 +1674,7 @@ const LibraryListRow = memo(function LibraryListRow({
               {sharing ? (
                 <span className="loader loader-xs mr-2 text-current" aria-hidden="true" />
               ) : (
-                <ShareIcon className="mr-2 size-4" />
+                <ShareIcon className="mr-2 size-[17px]" />
               )}
               Share
             </DropdownMenuItem>

@@ -131,6 +131,20 @@ CREATE INDEX idx_conversations_deleted_at ON conversations(deleted_at);
 CREATE INDEX idx_conversations_is_pinned ON conversations(is_pinned);
 
 -- ============================================
+-- SHARED ANSWERS TABLE
+-- ============================================
+CREATE TABLE shared_answers (
+    share_token VARCHAR(64) PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    content TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE shared_answers ENABLE ROW LEVEL SECURITY;
+
+CREATE INDEX idx_shared_answers_user_id ON shared_answers(user_id);
+
+-- ============================================
 -- VOICE SESSIONS TABLE
 -- ============================================
 CREATE TABLE voice_sessions (

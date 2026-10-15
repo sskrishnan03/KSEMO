@@ -23,11 +23,6 @@ export function UnpinTackIcon({ className }: { className?: string }) {
   return <PinOff className={cn("size-4", className)} />;
 }
 
-// Stroke-based share icon drawn on the same 24-unit grid as the lucide icons
-// used across the app (strokeWidth 2, currentColor, round caps/joins) so it
-// inherits the same color and renders at the same visual weight and size as
-// every other icon (copy, download, etc.). It depicts an upward arrow breaking
-// out of a rounded base — the widely recognised "share" glyph.
 export function ShareIcon({ className }: { className?: string }) {
   return (
     <svg

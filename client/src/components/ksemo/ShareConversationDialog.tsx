@@ -12,12 +12,11 @@ import {
   Check,
   ChevronRight,
   Copy,
-  Link2,
   LockKeyhole,
-  Share2,
   X,
 } from "lucide-react";
 import { ChatLine } from "reicon-react/icons/ChatLine";
+import { Link2 } from "reicon-react";
 import { cn } from "@/lib/utils";
 
 export interface SharePreviewMessage {
@@ -146,7 +145,7 @@ export function ShareConversationPanel({
       <div className="relative z-10 rounded-[26px] border border-border bg-popover shadow-2xl md:rounded-none md:border-0 md:bg-transparent md:shadow-none">
         <header className="flex items-start justify-between gap-4 px-5 pb-5 pt-5 sm:px-7 sm:pt-7 md:px-8 md:pb-5 md:pt-7">
           <div className="flex min-w-0 items-start gap-3.5">
-            <Share2 className="mt-1 size-6 shrink-0 text-foreground" strokeWidth={1.8} />
+            <Link2 size={24} className="mt-1 size-6 shrink-0 text-foreground" />
             <div className="min-w-0">
               <h2 className="text-lg font-semibold tracking-tight sm:text-xl">Share conversation</h2>
               <p className="mt-1 text-sm text-muted-foreground">Share this conversation with others</p>
@@ -184,7 +183,7 @@ export function ShareConversationPanel({
         <main className="mx-auto space-y-3 px-5 pb-5 sm:px-7 md:w-[min(100%,400px)] md:px-0 md:pb-7 md:pt-5">
           <p className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Share link</p>
           <div className="flex min-w-0 items-center gap-3 rounded-2xl border border-border bg-muted/30 p-3.5">
-            <Link2 className="size-5 shrink-0 text-muted-foreground" />
+            <Link2 size={20} className="size-5 shrink-0 text-muted-foreground" />
             <div className="min-w-0 flex-1">
               <p className="text-sm font-medium">Conversation link</p>
               {hasLink ? (
@@ -211,7 +210,7 @@ export function ShareConversationPanel({
                 <ChevronRight className={cn("size-4 transition-transform duration-200", moreOpen && "rotate-90")} />
               </Button>
               <Button type="button" onClick={primaryAction} disabled={!enabled} className="h-10 gap-2 rounded-full px-5 font-semibold shadow-sm">
-                {hasLink ? <Copy className="size-4" /> : <Share2 className="size-4" />}
+                {hasLink ? <Copy className="size-4" /> : <Link2 size={16} className="size-4" />}
                 {hasLink ? (copyState === "copied" ? "Copied" : "Copy link") : "Share"}
               </Button>
             </div>

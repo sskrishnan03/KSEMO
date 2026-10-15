@@ -14,11 +14,11 @@ import {
   Mic,
   Paperclip,
   Search,
-  Share2,
   SquarePen,
   Volume2,
   X,
 } from "lucide-react";
+import { Link2 } from "reicon-react";
 import { TemporaryChatIcon } from "@/components/ksemo/icons";
 import {
   ExcelLogo,
@@ -58,7 +58,7 @@ const ROW_3: TickerItem[] = [
   { id: "read-aloud", title: "Read aloud", icon: Volume2 },
   { id: "code-snippets", title: "Code snippets", icon: Code2 },
   { id: "memory", title: "Memory", icon: Brain },
-  { id: "share-chats", title: "Share chats", icon: Share2 },
+  { id: "share-chats", title: "Share chats", icon: Link2 },
 ];
 
 function TickerPill({ item }: { item: TickerItem }) {

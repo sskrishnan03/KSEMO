@@ -49,7 +49,6 @@ import {
   ShieldCheck,
   Settings,
   Star,
-  Unlink,
   User,
   Volume2,
   X,
@@ -1512,7 +1511,7 @@ function DataSection({
           />
           <SettingRow
             title="Shared chats"
-            description="Chats you made public — copy a link or stop sharing"
+            description="Chats you made public — copy a link"
             action={
               <button
                 type="button"
@@ -1864,12 +1863,6 @@ function SharedChatsWorkspace({
   } | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [copyPending, setCopyPending] = useState(false);
-  const unpublishMutation = trpc.conversation.configurePublicShare.useMutation({
-    onSuccess: () => {
-      utils.conversation.list.invalidate();
-    },
-    onError: () => {},
-  });
   const deleteMutation = trpc.conversation.remove.useMutation({
     onSuccess: () => {
       setDeleteError(null);
@@ -1903,8 +1896,7 @@ function SharedChatsWorkspace({
     }
   };
 
-  const busy =
-    unpublishMutation.isPending || deleteMutation.isPending || copyPending;
+  const busy = deleteMutation.isPending || copyPending;
 
   return (
     <>
@@ -1926,7 +1918,7 @@ function SharedChatsWorkspace({
           <div className="min-w-0">
             <p className="text-base font-semibold">Shared chats</p>
             <p className="text-xs text-muted-foreground">
-              Copy a link or stop sharing.
+              Copy a link.
             </p>
           </div>
         </div>
@@ -1970,28 +1962,6 @@ function SharedChatsWorkspace({
                       </TooltipTrigger>
                       <TooltipContent side="bottom">
                         Copy link
-                      </TooltipContent>
-                    </Tooltip>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          aria-label="Stop sharing"
-                          className="size-8 shrink-0 rounded-lg text-muted-foreground transition-colors outline-none hover:bg-foreground/10 hover:text-foreground focus-visible:ring-0 focus-visible:outline-none"
-                          disabled={busy}
-                          onClick={() =>
-                            unpublishMutation.mutate({
-                              id: c.id,
-                              isPublic: false,
-                            })
-                          }
-                        >
-                          <Unlink className="size-4" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent side="bottom">
-                        Stop sharing
                       </TooltipContent>
                     </Tooltip>
                     <Tooltip>
