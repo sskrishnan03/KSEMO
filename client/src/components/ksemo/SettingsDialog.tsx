@@ -58,7 +58,6 @@ import {
 import React, { memo, useEffect, useMemo, useRef, useState } from "react";
 import { Trash6Icon } from "./icons";
 import { MemorySection } from "./MemorySection";
-import { BotVoiceOrb } from "@/components/voice/BotVoiceOrb";
 
 type Preferences =
   | {
@@ -1428,24 +1427,6 @@ function AppearanceSection() {
         </div>
       </div>
 
-      <div className="h-px bg-border/60" />
-
-      <div className="relative flex min-h-36 items-center gap-5 overflow-hidden rounded-2xl border border-border/70 bg-gradient-to-br from-card via-card to-accent/35 px-5 py-4">
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute -left-8 top-1/2 size-36 -translate-y-1/2 rounded-full bg-sky-400/10 blur-2xl"
-        />
-        <BotVoiceOrb size={88} active className="relative z-10 shrink-0" />
-        <div className="relative z-10 min-w-0">
-          <p className="text-base font-semibold tracking-tight text-foreground">
-            KSEMO voice orb
-          </p>
-          <p className="mt-1 max-w-sm text-xs leading-relaxed text-muted-foreground">
-            One signature aurora design, with flowing cyan and sapphire light that
-            responds while KSEMO listens, thinks, and speaks.
-          </p>
-        </div>
-      </div>
     </div>
   );
 }
