@@ -133,7 +133,7 @@ export const DictateRecordingPill = memo(function DictateRecordingPill({
   onTranscribe: () => void;
 }) {
   const [waveHistory, setWaveHistory] = useState<number[]>(() =>
-    Array.from({ length: 56 }, () => 0)
+    Array.from({ length: 32 }, () => 0)
   );
   const latestAudioLevelRef = useRef(audioLevel);
   latestAudioLevelRef.current = audioLevel;
@@ -157,7 +157,7 @@ export const DictateRecordingPill = memo(function DictateRecordingPill({
   }, []);
   return (
     <div
-      className="flex h-10 w-56 max-w-[55vw] shrink-0 min-w-0 items-center gap-1 overflow-hidden rounded-full border border-border bg-muted text-popover-foreground backdrop-blur-xs py-0 pl-2 pr-0.5 shadow-sm animate-in fade-in zoom-in-95 duration-150 sm:gap-2 sm:pl-3 sm:pr-0.5"
+      className="flex h-10 w-[200px] max-w-[50vw] shrink-0 min-w-0 items-center gap-1 overflow-hidden rounded-full border border-border bg-muted text-popover-foreground backdrop-blur-xs py-0 pl-2 pr-0.5 shadow-sm animate-in fade-in zoom-in-95 duration-150 sm:gap-2 sm:pl-3 sm:pr-0.5"
       role="region"
       aria-label="Dictation recording controls"
     >
@@ -171,7 +171,7 @@ export const DictateRecordingPill = memo(function DictateRecordingPill({
           return (
             <span
               key={index}
-              className="min-w-px flex-1 rounded-full bg-foreground transition-[height,opacity] duration-200 ease-out"
+              className="min-w-[2px] flex-1 rounded-full bg-foreground transition-[height,opacity] duration-200 ease-out"
               style={{
                 height: `${height}px`,
                 opacity: amplitude ? 0.3 + amplitude * 0.7 : 0.32,
