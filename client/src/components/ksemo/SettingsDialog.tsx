@@ -37,8 +37,6 @@ import {
   Brain,
   Bug,
   Check,
-  ChevronLeft,
-  ChevronRight,
   Copy,
   Database,
   HelpCircle,
@@ -60,16 +58,6 @@ import {
 import React, { memo, useEffect, useMemo, useRef, useState } from "react";
 import { Trash6Icon } from "./icons";
 import { MemorySection } from "./MemorySection";
-import {
-  BOT_ORB_THEME_LIST,
-  BOT_ORB_THEMES,
-  getSphereStyle,
-  RealRollingOrb,
-  useBotOrbTheme,
-  type BotOrbTheme,
-  type BotOrbThemeId,
-} from "@/lib/botOrbTheme";
-import { useBotReplyVoice } from "@/lib/speechVoices";
 import { BotVoiceOrb } from "@/components/voice/BotVoiceOrb";
 
 type Preferences =
@@ -1368,45 +1356,6 @@ function SystemPreviewThumb() {
 
 function AppearanceSection() {
   const { mode, setMode } = useTheme();
-  const { themeId, setTheme, themes } = useBotOrbTheme();
-  const { voiceName } = useBotReplyVoice();
-
-  const handleCircleVoice = (t: BotOrbTheme) => {
-    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
-    const synth = window.speechSynthesis;
-    synth.cancel();
-    const text = t.previewPhrase || `${t.name} with you.`;
-    const utterance = new SpeechSynthesisUtterance(text);
-    if (voiceName) {
-      const match = synth.getVoices().find(v => v.name === voiceName);
-      if (match) utterance.voice = match;
-    }
-    utterance.rate = 1.0;
-    utterance.pitch = 1.0;
-    synth.speak(utterance);
-  };
-
-  const currentIndex = themes.findIndex(t => t.id === themeId);
-  const validCurrentIndex = currentIndex >= 0 ? currentIndex : 0;
-  const currentTheme = themes[validCurrentIndex];
-
-  const prevIndex = (validCurrentIndex - 1 + themes.length) % themes.length;
-  const nextIndex = (validCurrentIndex + 1) % themes.length;
-
-  const prevTheme = themes[prevIndex];
-  const nextTheme = themes[nextIndex];
-
-  const handlePrev = () => {
-    const t = themes[prevIndex];
-    setTheme(t.id);
-    handleCircleVoice(t);
-  };
-
-  const handleNext = () => {
-    const t = themes[nextIndex];
-    setTheme(t.id);
-    handleCircleVoice(t);
-  };
 
   return (
     <div className="space-y-4 max-lg:overflow-y-auto max-lg:max-h-[calc(100dvh-14rem)]">
@@ -1481,111 +1430,20 @@ function AppearanceSection() {
 
       <div className="h-px bg-border/60" />
 
-      {/* 2. Bot Section: directly in the page below the Bot label, no container, no overflow clipping */}
-      <div className="space-y-2">
-        <p className="text-sm font-medium text-muted-foreground">Bot</p>
-        {/* Laptop: all 6 visible in a row */}
-        <div className="hidden lg:flex items-center gap-2 w-full select-none flex-1">
-          {themes.map((t) => {
-            const isSelected = t.id === themeId;
-            return (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => {
-                  setTheme(t.id);
-                  handleCircleVoice(t);
-                }}
-                className={cn(
-                  "relative flex flex-col items-center gap-1.5 py-2.5 px-2.5 rounded-lg border border-border/80 bg-background/80 transition-all cursor-pointer outline-none flex-1",
-                  isSelected
-                    ? "border-primary/50 bg-accent/60 scale-105"
-                    : "hover:bg-accent/30"
-                )}
-                aria-label={`Select ${t.name}`}
-              >
-                {isSelected && (
-                  <div className="absolute top-1 right-1 flex size-3.5 items-center justify-center rounded-full bg-primary">
-                    <Check className="size-2 text-background" />
-                  </div>
-                )}
-                <div className="flex items-center justify-center">
-                  <RealRollingOrb
-                    theme={t}
-                    size={42}
-                    active={isSelected}
-                  />
-                </div>
-                <div className="text-center">
-                  <span className="text-[11px] font-semibold text-foreground block">
-                    {t.name}
-                  </span>
-                  <span className="text-[9px] text-muted-foreground block">
-                    {t.combinationLabel}
-                  </span>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-        {/* Mobile: carousel with left/right buttons and dots - same as ChatComposer */}
-        <div className="lg:hidden flex flex-col items-center gap-2 w-full select-none p-3 rounded-2xl border border-border/80 bg-background/80">
-          <div className="flex items-center gap-2 w-full">
-            <button
-              type="button"
-              onClick={handlePrev}
-              className="flex size-6 items-center justify-center rounded-full border border-border/80 bg-background/80 hover:bg-accent/60 hover:border-foreground/20 text-foreground transition-all shrink-0"
-              aria-label="Previous bot"
-            >
-              <ChevronLeft className="size-3" />
-            </button>
-
-            <div className="flex-1 flex flex-col items-center gap-1">
-              <div className="flex items-center justify-center">
-                <RealRollingOrb
-                  theme={currentTheme}
-                  size={64}
-                  active={true}
-                />
-              </div>
-              <div className="text-center">
-                <h3 className="text-xs font-semibold text-foreground">{currentTheme.name}</h3>
-                <p className="text-[10px] text-muted-foreground">{currentTheme.combinationLabel}</p>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={handleNext}
-              className="flex size-6 items-center justify-center rounded-full border border-border/80 bg-background/80 hover:bg-accent/60 hover:border-foreground/20 text-foreground transition-all shrink-0"
-              aria-label="Next bot"
-            >
-              <ChevronRight className="size-3" />
-            </button>
-          </div>
-
-          <div className="flex items-center gap-1">
-            {themes.map((t, index) => {
-              const isSelected = t.id === themeId;
-              return (
-                <button
-                  key={t.id}
-                  type="button"
-                  onClick={() => {
-                    setTheme(t.id);
-                    handleCircleVoice(t);
-                  }}
-                  className={cn(
-                    "size-1.5 rounded-full transition-all shrink-0",
-                    isSelected
-                      ? "bg-foreground scale-125"
-                      : "bg-muted-foreground/30 hover:bg-muted-foreground/50"
-                  )}
-                  aria-label={`Select ${t.name}`}
-                />
-              );
-            })}
-          </div>
+      <div className="relative flex min-h-36 items-center gap-5 overflow-hidden rounded-2xl border border-border/70 bg-gradient-to-br from-card via-card to-accent/35 px-5 py-4">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -left-8 top-1/2 size-36 -translate-y-1/2 rounded-full bg-sky-400/10 blur-2xl"
+        />
+        <BotVoiceOrb size={88} active className="relative z-10 shrink-0" />
+        <div className="relative z-10 min-w-0">
+          <p className="text-base font-semibold tracking-tight text-foreground">
+            KSEMO voice orb
+          </p>
+          <p className="mt-1 max-w-sm text-xs leading-relaxed text-muted-foreground">
+            One signature aurora design, with flowing cyan and sapphire light that
+            responds while KSEMO listens, thinks, and speaks.
+          </p>
         </div>
       </div>
     </div>

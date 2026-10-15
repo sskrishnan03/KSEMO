@@ -100,10 +100,12 @@ export function useBotVoice({
 }) {
   const [state, setState] = useState<BotVoiceState>("idle");
   const [micDenied, setMicDenied] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
 
   const transcribe = trpc.voice.transcribe.useMutation();
 
   const stateRef = useRef<BotVoiceState>("idle");
+  const mutedRef = useRef(false);
   const setStateBoth = useCallback((next: BotVoiceState) => {
     stateRef.current = next;
     setState(next);
@@ -486,9 +488,37 @@ export function useBotVoice({
     }
   }, [clearSilenceTimer, startRecognition]);
 
+  const toggleMute = useCallback(() => {
+    if (stateRef.current === "idle") return;
+    const nextMuted = !mutedRef.current;
+    mutedRef.current = nextMuted;
+    pausedRef.current = nextMuted;
+    setIsMuted(nextMuted);
+    clearSilenceTimer();
+    streamRef.current?.getAudioTracks().forEach(track => {
+      track.enabled = !nextMuted;
+    });
+    recorderRef.current?.stream.getAudioTracks().forEach(track => {
+      track.enabled = !nextMuted;
+    });
+
+    if (nextMuted) {
+      levelRef.current = 0;
+      stopRecognition();
+      return;
+    }
+
+    if (!recorderRef.current && !unmountedRef.current) {
+      wantListeningRef.current = true;
+      startRecognition();
+    }
+  }, [clearSilenceTimer, startRecognition, stopRecognition]);
+
   const start = useCallback(async () => {
     if (stateRef.current !== "idle") return;
     pausedRef.current = false;
+    mutedRef.current = false;
+    setIsMuted(false);
     committedRef.current = "";
     interimRef.current = "";
     // Preserve whatever was already in the composer so a voice turn extends it
@@ -530,6 +560,8 @@ export function useBotVoice({
   const stop = useCallback(() => {
     if (stateRef.current === "idle") return;
     pausedRef.current = false;
+    mutedRef.current = false;
+    setIsMuted(false);
     playBotVoiceStop();
     if (recorderRef.current) {
       stopRecordingFallback();
@@ -550,6 +582,8 @@ export function useBotVoice({
 
   const cancel = useCallback(() => {
     pausedRef.current = false;
+    mutedRef.current = false;
+    setIsMuted(false);
     clearSilenceTimer();
     committedRef.current = "";
     interimRef.current = "";
@@ -594,12 +628,14 @@ export function useBotVoice({
   return {
     state,
     micDenied,
+    isMuted,
     /** Live spectrum for the wave. Mutated in place each frame. */
     barsRef,
     levelRef,
     continuousSupported: getRecognitionCtor() !== null,
     pauseListening,
     resumeListening,
+    toggleMute,
     start,
     stop,
     cancel,

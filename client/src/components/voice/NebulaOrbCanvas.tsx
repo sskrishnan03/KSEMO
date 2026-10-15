@@ -55,11 +55,11 @@ void main() {
     discard;
   }
 
-  // Smooth clean antialiased perimeter edge
-  float edgeAlpha = smoothstep(1.0, 0.965, dist);
+  // Soft glass edge keeps the light contained in a crisp sphere.
+  float edgeAlpha = 1.0 - smoothstep(0.965, 1.0, dist);
 
   // Smooth color falloff so energy clouds stay softly inside the glass sphere
-  float colorPerimeterFade = smoothstep(1.0, 0.72, dist);
+  float colorPerimeterFade = 1.0 - smoothstep(0.72, 1.0, dist);
 
   // 3D spherical perspective refraction
   float z = sqrt(max(0.0, 1.0 - dist * dist));
@@ -90,29 +90,40 @@ void main() {
   float f = fbmSmooth(p + 2.5 * r);
   f = f * 0.65 + ribbon * 0.35;
 
-  // Asymmetric spatial distribution matching reference image:
-  // Luminous sweeping clouds through upper-left to bottom-right, deep velvety black in top-right
-  float bias = 0.5 + 0.5 * sin(angle + 1.35) - 0.3 * uv.x * uv.y;
-  float cloudDensity = clamp(f * 1.45 * (0.35 + 0.65 * bias), 0.0, 1.0) * colorPerimeterFade;
+  // A diagonal aurora current, with enough dark space to keep the sphere dimensional.
+  float bias = 0.52 + 0.48 * sin(angle + 1.1) - 0.22 * uv.x * uv.y;
+  float cloudDensity = clamp(f * 1.62 * (0.34 + 0.66 * bias), 0.0, 1.0) * colorPerimeterFade;
 
-  // Deep space obsidian black base volume
-  vec3 col = vec3(0.006, 0.008, 0.012);
+  // Midnight glass base volume.
+  vec3 col = vec3(0.004, 0.008, 0.022);
 
-  // Secondary deep color swirls distributed throughout
-  float secWeight = smoothstep(0.15, 0.68, cloudDensity);
+  // Sapphire shadows and cyan aurora ribbons build a single signature palette.
+  float secWeight = smoothstep(0.08, 0.72, cloudDensity);
   col = mix(col, u_color_secondary, secWeight);
 
-  // Primary vivid color wisps curving through the dark space
-  float primWeight = smoothstep(0.35, 0.85, cloudDensity + 0.25 * q.x);
+  float primWeight = smoothstep(0.27, 0.86, cloudDensity + 0.24 * q.x);
   col = mix(col, u_color_primary, primWeight);
 
-  // Luminous accent highlights in the center vortex and brightest silk crests
-  float coreGlow = pow(cloudDensity, 2.2) * smoothstep(0.85, 0.12, dist) * 1.5;
-  float crestGlow = pow(clamp(ribbon * q.y * 1.6, 0.0, 1.0), 3.0) * 1.2;
-  col = mix(col, u_color_accent, clamp(coreGlow + crestGlow, 0.0, 1.0));
+  // Pearl highlights trace the aurora filaments and catch a soft upper-left light.
+  float coreGlow =
+    pow(cloudDensity, 2.0) * (1.0 - smoothstep(0.08, 0.9, dist)) * 1.25;
+  float crestGlow = pow(clamp(ribbon * q.y * 1.7, 0.0, 1.0), 3.2) * 1.35;
+  float pearlGlint = pow(
+    max(0.0, 1.0 - length(uv - vec2(-0.38, 0.42)) * 3.3),
+    8.0
+  ) * 0.6;
+  col = mix(
+    col,
+    u_color_accent,
+    clamp(coreGlow + crestGlow + pearlGlint, 0.0, 1.0)
+  );
 
-  // Volumetric 3D spherical depth: natural edge falloff
-  float factor = (0.55 + 0.45 * z) * u_brightness;
+  // Fine cool rim light gives the orb a polished glass silhouette.
+  float rimLight = pow(1.0 - z, 2.5) * 0.34;
+  col += u_color_primary * rimLight;
+
+  // Volumetric spherical depth and soft upper-left illumination.
+  float factor = (0.62 + 0.38 * z) * u_brightness;
   col = clamp(col * factor, 0.0, 1.0);
 
   gl_FragColor = vec4(col, edgeAlpha);
@@ -279,10 +290,10 @@ export function NebulaOrbCanvas({
         );
         gl.uniform3fv(uColorAccent, currentTheme.accentGl || [0.38, 1.0, 0.78]);
 
-        const baseBrightness = isActive ? 1.08 : 0.82;
+        const baseBrightness = isActive ? 1.12 : 0.98;
         gl.uniform1f(uBrightness, baseBrightness + act * 0.35);
 
-        const baseSpeed = isActive ? 0.95 : 0.65;
+        const baseSpeed = isActive ? 0.92 : 0.48;
         gl.uniform1f(uSpeed, baseSpeed + act * 0.65);
 
         gl.drawArrays(gl.TRIANGLES, 0, 6);
@@ -330,21 +341,10 @@ export function NebulaOrbCanvas({
         justifyContent: "center",
         overflow: "hidden",
         borderRadius: "50%",
-        backgroundColor: "#000000",
+        backgroundColor: "transparent",
         position: "relative",
       }}
     >
-      <div
-        aria-hidden="true"
-        style={{
-          position: "absolute",
-          inset: 0,
-          borderRadius: "50%",
-          backgroundColor: "#000000",
-          backgroundImage: `radial-gradient(circle at 35% 35%, ${theme.coreColor || "rgba(239,68,68,0.9)"} 0%, ${theme.midColor || "rgba(185,28,28,0.5)"} 50%, #000000 85%)`,
-          opacity: 0.9,
-        }}
-      />
       <canvas
         ref={canvasRef}
         style={{

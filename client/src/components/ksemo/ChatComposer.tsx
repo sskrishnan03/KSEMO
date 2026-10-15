@@ -1,7 +1,5 @@
 import { Button } from "@/components/ui/button";
 import { BotVoiceOrb } from "@/components/voice/BotVoiceOrb";
-import { RealRollingOrb } from "@/components/voice/RealRollingOrb";
-import { useBotOrbTheme } from "@/lib/botOrbTheme";
 import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
@@ -31,16 +29,14 @@ import {
   Check,
   Camera,
   ChevronDown,
-  ChevronLeft,
-  ChevronRight,
   Loader2,
   Maximize2,
   Mic,
+  MicOff,
   Minimize2,
   Monitor,
   Paperclip,
   Plus,
-  SlidersHorizontal,
   Square,
   X,
 } from "lucide-react";
@@ -224,6 +220,8 @@ export const ChatComposer = memo(function ChatComposer({
   onBotVoiceStop,
   botVoiceState = "idle",
   botVoiceActive = false,
+  botVoiceMuted = false,
+  onBotVoiceMuteToggle,
   botOrbLevel,
   replyVoices,
   replyVoiceName,
@@ -274,6 +272,8 @@ export const ChatComposer = memo(function ChatComposer({
   onBotVoiceStop?: () => void;
   botVoiceState?: "idle" | "listening" | "transcribing";
   botVoiceActive?: boolean;
+  botVoiceMuted?: boolean;
+  onBotVoiceMuteToggle?: () => void;
   /** Live voice level for the Bot orb, mutated in place each frame. */
   botOrbLevel?: React.RefObject<number>;
   /** Speech voices the bot can answer in; where absent the picker hides. */
@@ -354,20 +354,6 @@ export const ChatComposer = memo(function ChatComposer({
     () => propActiveTag ?? "chat"
   );
 
-  const {
-    theme: currentOrbTheme,
-    setTheme: setOrbTheme,
-    themes: orbThemes,
-  } = useBotOrbTheme();
-  const [orbMenuOpen, setOrbMenuOpen] = useState(false);
-
-  const handleSelectOrb = useCallback(
-    (t: (typeof orbThemes)[0]) => {
-      setOrbTheme(t.id);
-    },
-    [setOrbTheme]
-  );
-
   useEffect(() => {
     if (propActiveTag && propActiveTag !== activeTag) {
       setActiveTag(propActiveTag);
@@ -381,9 +367,8 @@ export const ChatComposer = memo(function ChatComposer({
     activeMode && activeMode !== "chat"
       ? getCapabilityOption(activeMode)
       : null;
-  // Bot mode puts the orb outside the chat box. It stands down for temporary
-  // chat, which has its own theme, and for edit mode, which has no mode
-  // toggle at all.
+  // Bot mode shows the voice dock inside the composer. It stands down for
+  // temporary chat and edit mode, which do not offer the voice-chat toggle.
   const botActive =
     activeTag === "bot" && !temporary && !guestMode && !isEditingMessage;
 
@@ -747,6 +732,10 @@ export const ChatComposer = memo(function ChatComposer({
     };
   }, [onAttachment, guestMode]);
 
+  // Home renders the voice experience over the chat workspace so the app
+  // sidebar and other workspace chrome remain available.
+  if (botActive) return null;
+
   return (
     <div
       className={cn(
@@ -875,7 +864,7 @@ export const ChatComposer = memo(function ChatComposer({
           {/* Main Composer Content */}
           <div className="flex flex-col">
             {/* Text Input Area — Bot mode is voice-only, so it has no typing box */}
-            {!botActive && (
+            {!botActive ? (
               <div
                 className="relative flex flex-1 items-start cursor-text"
                 onClick={event => {
@@ -1015,15 +1004,25 @@ export const ChatComposer = memo(function ChatComposer({
                   </span>
                 )}
               </div>
+            ) : (
+              <div className="flex min-h-10 items-center justify-center px-3 text-xs font-medium text-muted-foreground" aria-live="polite">
+                {isBotSpeaking
+                  ? "KSEMO is speaking"
+                  : isGenerating
+                    ? "KSEMO is thinking"
+                    : botVoiceMuted
+                      ? "Microphone muted"
+                      : "Listening"}
+              </div>
             )}
 
-            {/* Bottom Control Row — in Bot mode this row is the only content, so
-                it drops the chat-only top padding and centres itself in the box. */}
+            {/* Bot mode keeps this row inside the composer with the orb centered
+                between its cancel and microphone controls. */}
             <div
               className={cn(
                 "flex w-full flex-wrap items-center justify-between gap-x-1.5 gap-y-1.5 pt-1",
                 isRecording && "flex-nowrap",
-                botActive && "py-0"
+                botActive && "relative h-10 flex-nowrap py-0"
               )}
             >
               {/* Left Side Controls */}
@@ -1161,34 +1160,43 @@ export const ChatComposer = memo(function ChatComposer({
                   </DropdownMenu>
                 )}
 
-                {/* In Bot mode: BotVoiceOrb + dynamic status label */}
+                {/* Bot mode: cancel control stays on the left side. */}
                 {botActive && (
-                  <div className="flex animate-in items-center gap-2.5 pl-1 fade-in zoom-in-95 duration-200 sm:pl-1.5">
-                    <BotVoiceOrb
-                      active={orbListening}
-                      isSpeaking={isBotSpeaking}
-                      isThinking={isGenerating && botActive}
-                      levelRef={botOrbLevel}
-                      className="size-10 sm:size-12 shrink-0"
-                    />
-                    {(isBotSpeaking || isGenerating) && (
-                      <span
-                        className={cn(
-                          "text-[14px] font-medium leading-none select-none tracking-tight transition-colors duration-150",
-                          isBotSpeaking
-                            ? "text-foreground font-semibold"
-                            : "text-muted-foreground animate-pulse"
-                        )}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => {
+                          onCancel();
+                          changeTag("chat");
+                        }}
+                        className="size-9 shrink-0 rounded-full text-muted-foreground hover:bg-accent hover:text-foreground"
+                        aria-label="Cancel voice chat"
                       >
-                        {isBotSpeaking ? "Speaking..." : "Thinking..."}
-                      </span>
-                    )}
-                  </div>
+                        <X className="size-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">Cancel voice chat</TooltipContent>
+                  </Tooltip>
                 )}
               </div>
 
               {/* Right Side Controls */}
-              <div className="ml-auto flex items-center gap-1.5">
+              {botActive && (
+                <div className="pointer-events-none absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 animate-in fade-in zoom-in-95 duration-200">
+                  <BotVoiceOrb
+                    active={orbListening}
+                    isSpeaking={isBotSpeaking}
+                    isThinking={isGenerating}
+                    levelRef={botOrbLevel}
+                    size={40}
+                  />
+                </div>
+              )}
+
+              <div className={cn("ml-auto flex items-center gap-1.5", botActive && "ml-0")}>
                 {isEditingMessage ? (
                   <>
                     {/* Recorded audio / Mic button */}
@@ -1336,155 +1344,35 @@ export const ChatComposer = memo(function ChatComposer({
                     )}
                     {/* Send / Stop Button / Bot Mode Controls */}
                     {botActive ? (
-                      <div className="flex items-center gap-1 sm:gap-1.5 animate-in fade-in zoom-in-95 duration-200">
-                        {/* 1. Select Bot Persona Option */}
-                        <DropdownMenu
-                          open={orbMenuOpen}
-                          onOpenChange={setOrbMenuOpen}
-                        >
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <DropdownMenuTrigger asChild>
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  className={cn(
-                                    "h-9 px-3 rounded-full border border-border/80 bg-background/80 hover:bg-accent/60 hover:border-foreground/20 text-foreground transition-all flex items-center gap-1.5 text-xs font-semibold select-none shadow-xs",
-                                    orbMenuOpen &&
-                                      "border-primary/50 bg-accent text-primary ring-1 ring-primary/20"
-                                  )}
-                                  aria-label={`Select bot: ${currentOrbTheme.name}`}
-                                  aria-expanded={orbMenuOpen}
-                                >
-                                  <SlidersHorizontal className="size-4 shrink-0 text-foreground" />
-                                  <span className="tracking-tight">
-                                    {currentOrbTheme.name}
-                                  </span>
-                                  <ChevronDown
-                                    className={cn(
-                                      "size-3.5 shrink-0 text-muted-foreground transition-transform duration-200 ml-0.5",
-                                      orbMenuOpen && "rotate-180"
-                                    )}
-                                  />
-                                </Button>
-                              </DropdownMenuTrigger>
-                            </TooltipTrigger>
-                            <TooltipContent side="top">
-                              Select bot
-                            </TooltipContent>
-                          </Tooltip>
-                          <DropdownMenuContent
-                            align="end"
-                            side="top"
-                            sideOffset={14}
-                            collisionPadding={12}
-                            className="relative w-auto p-3 rounded-2xl border border-border bg-popover text-popover-foreground shadow-2xl animate-in fade-in zoom-in-95 duration-150 z-50 select-none overflow-hidden"
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={onBotVoiceMuteToggle}
+                            className={cn(
+                              "size-9 shrink-0 rounded-full transition-colors",
+                              botVoiceMuted
+                                ? "bg-destructive/10 text-destructive hover:bg-destructive/15"
+                                : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                            )}
+                            aria-label={
+                              botVoiceMuted ? "Unmute microphone" : "Mute microphone"
+                            }
+                            aria-pressed={botVoiceMuted}
                           >
-                            <div className="flex flex-col items-center gap-2">
-                              {/* Orb in the center */}
-                              <div className="flex flex-col items-center gap-1">
-                                <div className="flex items-center justify-center">
-                                  <RealRollingOrb
-                                    theme={currentOrbTheme}
-                                    size={72}
-                                    active={true}
-                                  />
-                                </div>
-                                <div className="text-center">
-                                  <h3 className="text-xs font-semibold text-foreground">
-                                    {currentOrbTheme.name}
-                                  </h3>
-                                  <p className="text-[10px] text-muted-foreground">
-                                    {currentOrbTheme.combinationLabel}
-                                  </p>
-                                </div>
-                              </div>
-
-                              {/* Left button, dots, right button at the bottom */}
-                              <div className="flex items-center gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const currentIndex = orbThemes.findIndex(
-                                      t => t.id === currentOrbTheme.id
-                                    );
-                                    const prevIndex =
-                                      currentIndex > 0
-                                        ? currentIndex - 1
-                                        : orbThemes.length - 1;
-                                    handleSelectOrb(orbThemes[prevIndex]);
-                                  }}
-                                  className="flex size-6 items-center justify-center rounded-full border border-border/80 bg-background/80 hover:bg-accent/60 hover:border-foreground/20 text-foreground transition-all shrink-0"
-                                  aria-label="Previous bot"
-                                >
-                                  <ChevronLeft className="size-3" />
-                                </button>
-
-                                <div className="flex items-center gap-1.5">
-                                  {orbThemes.map((t, index) => {
-                                    const isSelected =
-                                      t.id === currentOrbTheme.id;
-                                    return (
-                                      <button
-                                        key={t.id}
-                                        type="button"
-                                        onClick={() => handleSelectOrb(t)}
-                                        className={cn(
-                                          "size-1.5 rounded-full transition-all shrink-0",
-                                          isSelected
-                                            ? "bg-foreground scale-125"
-                                            : "bg-muted-foreground/30 hover:bg-muted-foreground/50"
-                                        )}
-                                        aria-label={`Select ${t.name}`}
-                                      />
-                                    );
-                                  })}
-                                </div>
-
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const currentIndex = orbThemes.findIndex(
-                                      t => t.id === currentOrbTheme.id
-                                    );
-                                    const nextIndex =
-                                      currentIndex < orbThemes.length - 1
-                                        ? currentIndex + 1
-                                        : 0;
-                                    handleSelectOrb(orbThemes[nextIndex]);
-                                  }}
-                                  className="flex size-6 items-center justify-center rounded-full border border-border/80 bg-background/80 hover:bg-accent/60 hover:border-foreground/20 text-foreground transition-all shrink-0"
-                                  aria-label="Next bot"
-                                >
-                                  <ChevronRight className="size-3" />
-                                </button>
-                              </div>
-                            </div>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-
-                        {/* 2. Stop Button */}
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              type="button"
-                              onClick={() => {
-                                onCancel();
-                                onCancelRecording?.();
-                                onBotVoiceStop?.();
-                                onValueChange("");
-                                changeTag("chat");
-                              }}
-                              size="icon"
-                              className="size-10 rounded-full bg-foreground text-background hover:bg-foreground/90 transition-colors"
-                              aria-label="Stop"
-                            >
-                              <Square className="size-4 fill-current" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent side="top">Stop</TooltipContent>
-                        </Tooltip>
-                      </div>
+                            {botVoiceMuted ? (
+                              <MicOff className="size-4" />
+                            ) : (
+                              <Mic className="size-4" />
+                            )}
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top">
+                          {botVoiceMuted ? "Unmute" : "Mute"}
+                        </TooltipContent>
+                      </Tooltip>
                     ) : isGenerating || isBotSpeaking ? (
                       <Tooltip>
                         <TooltipTrigger asChild>

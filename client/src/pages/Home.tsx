@@ -36,6 +36,8 @@ import {
   Download,
   MoreHorizontal,
   LogIn,
+  Mic,
+  MicOff,
   Pause,
   Play,
   UserPlus,
@@ -69,6 +71,7 @@ import React, {
 import { memo } from "react";
 import { useLocation, useRoute } from "wouter";
 import { ChatComposer } from "../components/ksemo/ChatComposer";
+import { BotVoiceOrb } from "../components/voice/BotVoiceOrb";
 import {
   ChatFilesDialog,
   type ChatFile,
@@ -1938,6 +1941,13 @@ export default function Home() {
   // sentinel so it always lands exactly on the last item of the thread.
   function scrollChatToEnd(mode: "auto" | "smooth") {
     const container = messagesContainerRef.current;
+    if (composerTag === "bot" && !guestMode && !isTemporaryChat && container) {
+      // Voice mode reserves invisible space below the transcript for the
+      // floating controls, so align to the padded scroll end instead of the
+      // sentinel immediately before that space.
+      container.scrollTo({ top: container.scrollHeight, behavior: mode });
+      return;
+    }
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({
         behavior: mode,
@@ -1976,7 +1986,7 @@ export default function Home() {
     });
     observer.observe(body);
     return () => observer.disconnect();
-  }, [visibleMessages.length]);
+  }, [visibleMessages.length, composerTag, guestMode, isTemporaryChat]);
 
   useEffect(
     () => () => {
@@ -3397,6 +3407,15 @@ export default function Home() {
   }
 
   function newChat() {
+    if (composerTag === "bot" || botVoiceOpenRef.current) {
+      botVoiceOpenRef.current = false;
+      setComposerTag("chat");
+      try {
+        window.sessionStorage?.setItem("ksemo:composer-tag", "chat");
+        window.localStorage?.setItem("ksemo:composer-tag", "chat");
+      } catch {}
+      botVoice.cancel();
+    }
     // Guest mode: New Chat simply resets the local thread and sign-in prompt.
     if (!user) {
       setGuestPromptOpen(false);
@@ -3908,6 +3927,21 @@ export default function Home() {
   }
 
   function selectConversation(id: string) {
+    if (
+      id !== activeConversationId &&
+      (composerTag === "bot" || botVoiceOpenRef.current)
+    ) {
+      // Voice chat belongs to the conversation where it was started. Closing
+      // it on navigation prevents its controls from following the user into
+      // another recent chat.
+      botVoiceOpenRef.current = false;
+      setComposerTag("chat");
+      try {
+        window.sessionStorage?.setItem("ksemo:composer-tag", "chat");
+        window.localStorage?.setItem("ksemo:composer-tag", "chat");
+      } catch {}
+      botVoice.cancel();
+    }
     resetStreamingTts();
     closePdf();
     setChatFilesOpen(false);
@@ -4095,6 +4129,11 @@ export default function Home() {
       const text = rawTranscript.trim();
       if (!text) return;
 
+      // A fresh voice question should pin the conversation to the new turn;
+      // the existing message/stream observers then follow the answer as it grows.
+      isNearBottomRef.current = true;
+      setShowJumpToLatest(false);
+      requestAnimationFrame(() => scrollChatToEnd("auto"));
       botVoice.pauseListening();
 
       const decision = routeBotCommand(text);
@@ -4548,6 +4587,8 @@ export default function Home() {
       onBotVoiceStop={stableBotVoiceStop}
       botVoiceState={botVoice.state}
       botVoiceActive={botVoice.state !== "idle"}
+      botVoiceMuted={botVoice.isMuted}
+      onBotVoiceMuteToggle={botVoice.toggleMute}
       botOrbLevel={botVoice.levelRef}
       replyVoices={botReplyVoice.voices}
       replyVoiceName={botReplyVoice.voiceName}
@@ -4704,13 +4745,68 @@ export default function Home() {
                 : "lg:w-full"
             )}
           >
-            {/* Shared chat navbar with the same short fade at every width */}
+            {composerTag === "bot" && !guestMode && !isTemporaryChat && (
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 flex justify-center px-4 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+                <div className="pointer-events-auto flex items-center justify-center gap-6 bg-transparent sm:gap-7">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => stableOnTagChange("chat")}
+                        className="size-11 rounded-xl border border-border/70 bg-sidebar text-sidebar-foreground shadow-sm transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                        aria-label="Cancel voice chat"
+                      >
+                        <X className="size-5" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="left">
+                      Cancel
+                    </TooltipContent>
+                  </Tooltip>
+                  <div className="pointer-events-none -translate-y-2">
+                    <BotVoiceOrb
+                      active={botVoice.state === "listening" && !botVoice.isMuted}
+                      isSpeaking={isBotSpeakingAloud}
+                      isThinking={isGenerating}
+                      levelRef={botVoice.levelRef}
+                      size={100}
+                      halo={false}
+                    />
+                  </div>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={botVoice.toggleMute}
+                        className={cn(
+                          "size-11 rounded-xl border border-border/70 bg-sidebar shadow-sm transition-colors hover:bg-sidebar-accent",
+                          botVoice.isMuted
+                            ? "text-destructive hover:text-destructive"
+                            : "text-sidebar-foreground hover:text-sidebar-accent-foreground"
+                        )}
+                        aria-label={botVoice.isMuted ? "Unmute microphone" : "Mute microphone"}
+                        aria-pressed={botVoice.isMuted}
+                      >
+                        {botVoice.isMuted ? <MicOff className="size-5" /> : <Mic className="size-5" />}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="right">
+                      {botVoice.isMuted ? "Unmute" : "Mute"}
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+              </div>
+            )}
+
+            {/* Shared chat navbar */}
             <div
               aria-hidden="true"
               className="pointer-events-none absolute inset-x-0 top-0 z-10 h-12 bg-background backdrop-blur-md"
-            >
-              <div className="pointer-events-none absolute inset-x-0 top-full h-4 bg-gradient-to-b from-background to-transparent" />
-            </div>
+            />
 
             <Button
               variant="ghost"
@@ -4724,6 +4820,7 @@ export default function Home() {
             </Button>
 
             {!guestMode &&
+              composerTag !== "bot" &&
               !activeConversationId &&
               visibleMessages.length === 0 && (
                 <div className="absolute right-2 top-2 z-20">
@@ -5203,7 +5300,12 @@ export default function Home() {
               {visibleMessages.length ? (
                 <div
                   ref={messagesBodyRef}
-                  className="mx-auto max-w-3xl space-y-5 px-4 pb-3 pt-16 sm:px-6 sm:pb-4 lg:pt-16"
+                  className={cn(
+                    "mx-auto max-w-3xl space-y-5 px-4 pt-16 sm:px-6 lg:pt-16",
+                    composerTag === "bot" && !guestMode && !isTemporaryChat
+                      ? "pb-[16rem]"
+                      : "pb-3 sm:pb-4"
+                  )}
                 >
                   {visibleMessages.map(message => {
                     const activeFileGen =
@@ -5318,6 +5420,8 @@ export default function Home() {
                   activeConversationId &&
                   !isGenerating) ? (
                 <Loading />
+              ) : composerTag === "bot" && !guestMode && !isTemporaryChat ? (
+                <div className="h-full min-h-0" aria-hidden="true" />
               ) : (
                 <EmptyState
                   greeting={greeting}
@@ -5335,7 +5439,7 @@ export default function Home() {
                 />
               )}
             </section>
-            {(visibleMessages.length > 0 || isMobile) && (
+            {(visibleMessages.length > 0 || isMobile || composerTag === "bot") && (
               <div
                 className={cn(
                   "z-10",
@@ -5344,7 +5448,7 @@ export default function Home() {
                     : "relative"
                 )}
               >
-                {visibleMessages.length > 0 && (
+                {visibleMessages.length > 0 && composerTag !== "bot" && (
                   <div
                     className="relative mx-auto w-full max-w-3xl"
                     aria-hidden={!showJumpToLatest}
@@ -5369,12 +5473,8 @@ export default function Home() {
                     </button>
                   </div>
                 )}
-                <div
-                  aria-hidden="true"
-                  className="pointer-events-none absolute -top-8 left-0 right-0 h-8 bg-gradient-to-b from-transparent to-background"
-                />
-                <div className="relative mx-auto w-full max-w-3xl">
-                  {readAloudActive && (
+                <div className="relative mx-auto w-full max-w-3xl bg-transparent">
+                  {readAloudActive && composerTag !== "bot" && (
                     <div
                       role="group"
                       aria-label="Read aloud playback controls"
