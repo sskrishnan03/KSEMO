@@ -51,6 +51,7 @@ export function useVoiceInput({
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animFrameRef = useRef<number | null>(null);
   const lastAudioUpdateRef = useRef<number>(0);
+  const smoothedAudioLevelRef = useRef(0);
   const mutation = trpc.voice.transcribe.useMutation({
     onSuccess: result => {
       setState("idle");
@@ -77,6 +78,7 @@ export function useVoiceInput({
       audioContextRef.current = null;
     }
     analyserRef.current = null;
+    smoothedAudioLevelRef.current = 0;
     setAudioLevel(0);
     setAudioBars(new Array(12).fill(0.12));
 
@@ -189,44 +191,31 @@ export function useVoiceInput({
           source.connect(analyser);
           analyserRef.current = analyser;
 
-          const freqBins = new Uint8Array(analyser.frequencyBinCount);
-          const BAR_COUNT = 12;
+          const timeDomain = new Uint8Array(analyser.fftSize);
 
           const tick = (now: number) => {
             if (!streamRef.current || !analyserRef.current) return;
             if (now - lastAudioUpdateRef.current >= 40) {
               lastAudioUpdateRef.current = now;
-              analyser.getByteFrequencyData(freqBins);
+              analyser.getByteTimeDomainData(timeDomain);
 
-              let sum = 0;
-              for (let i = 0; i < freqBins.length; i++) {
-                sum += freqBins[i];
+              let sumSquares = 0;
+              for (let i = 0; i < timeDomain.length; i++) {
+                const sample = (timeDomain[i] - 128) / 128;
+                sumSquares += sample * sample;
               }
-              const avg = sum / (freqBins.length * 255);
-              // Gate the meter below the microphone noise floor. Without this,
-              // tiny ambient variations are amplified into a speech-like wave
-              // even when the user has not started speaking.
-              const hasAudibleInput = avg >= 0.035;
-              const normalizedLevel = hasAudibleInput
-                ? Math.min(1, avg * 3.0)
-                : 0;
-              setAudioLevel(normalizedLevel);
-
-              const bars: number[] = [];
-              const step = Math.max(1, Math.floor(freqBins.length / BAR_COUNT));
-              for (let i = 0; i < BAR_COUNT; i++) {
-                const raw = hasAudibleInput
-                  ? (freqBins[i * step] || 0) / 255
-                  : 0;
-                const boosted = hasAudibleInput
-                  ? Math.min(
-                      1,
-                      Math.max(0.12, raw * 1.5 + normalizedLevel * 1.2)
-                    )
-                  : 0.12;
-                bars.push(boosted);
-              }
-              setAudioBars(bars);
+              const rms = Math.sqrt(sumSquares / timeDomain.length);
+              // Gate room and device noise, then smooth the actual mic level.
+              // Speech rises quickly; silence fades more gently between bars.
+              const targetLevel =
+                rms >= 0.025 ? Math.min(1, (rms - 0.018) * 8) : 0;
+              const currentLevel = smoothedAudioLevelRef.current;
+              const smoothedLevel =
+                currentLevel +
+                (targetLevel - currentLevel) *
+                  (targetLevel > currentLevel ? 0.48 : 0.16);
+              smoothedAudioLevelRef.current = smoothedLevel;
+              setAudioLevel(smoothedLevel < 0.025 ? 0 : smoothedLevel);
             }
             animFrameRef.current = requestAnimationFrame(tick);
           };

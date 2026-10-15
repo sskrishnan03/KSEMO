@@ -133,7 +133,7 @@ export const DictateRecordingPill = memo(function DictateRecordingPill({
   onTranscribe: () => void;
 }) {
   const [waveHistory, setWaveHistory] = useState<number[]>(() =>
-    Array.from({ length: 32 }, () => 0)
+    Array.from({ length: 56 }, () => 0)
   );
   const latestAudioLevelRef = useRef(audioLevel);
   latestAudioLevelRef.current = audioLevel;
@@ -141,37 +141,46 @@ export const DictateRecordingPill = memo(function DictateRecordingPill({
   useEffect(() => {
     const timer = window.setInterval(() => {
       const level = latestAudioLevelRef.current;
-      setWaveHistory(current =>
-        level < 0.035
-          ? current.map(() => 0)
-          : [...current.slice(1), level]
-      );
-    }, 65);
+      if (level >= 0.045) {
+        setWaveHistory(current => [...current.slice(1), level]);
+      } else {
+        // Leave the meter completely still during silence, then let the last
+        // spoken peaks trail away gradually instead of flickering at idle.
+        setWaveHistory(current =>
+          current.some(value => value > 0)
+            ? [...current.slice(1), 0]
+            : current
+        );
+      }
+    }, 110);
     return () => window.clearInterval(timer);
   }, []);
   return (
     <div
-      className="flex h-10 min-w-0 items-center justify-between gap-1 overflow-hidden rounded-full border border-border bg-muted/80 backdrop-blur-xs px-2 shadow-sm animate-in fade-in zoom-in-95 duration-150 sm:min-w-[220px] sm:gap-2 sm:px-3"
+      className="flex h-10 w-56 max-w-[55vw] shrink-0 min-w-0 items-center gap-1 overflow-hidden rounded-full border border-border bg-muted text-popover-foreground backdrop-blur-xs py-0 pl-2 pr-0.5 shadow-sm animate-in fade-in zoom-in-95 duration-150 sm:gap-2 sm:pl-3 sm:pr-0.5"
       role="region"
       aria-label="Dictation recording controls"
     >
       <div
-        className="flex h-6 w-28 shrink-0 items-center justify-center gap-px"
+        className="flex h-7 min-w-0 flex-1 items-center justify-center gap-[2px] overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_9%,black_91%,transparent)]"
         aria-hidden="true"
       >
         {waveHistory.map((level, index) => {
           const amplitude = Math.max(0, Math.min(1, level * 2.2));
-          const height = amplitude < 0.03 ? 1.5 : 2 + amplitude * 18;
+          const height = amplitude < 0.03 ? 2 : 2 + amplitude * 18;
           return (
             <span
               key={index}
-              className="w-0.5 rounded-full bg-foreground transition-[height] duration-75 ease-out"
-              style={{ height: `${height}px` }}
+              className="min-w-px flex-1 rounded-full bg-foreground transition-[height,opacity] duration-200 ease-out"
+              style={{
+                height: `${height}px`,
+                opacity: amplitude ? 0.3 + amplitude * 0.7 : 0.32,
+              }}
             />
           );
         })}
       </div>
-      <div className="flex items-center gap-1 sm:gap-1.5">
+      <div className="flex shrink-0 items-center gap-0.5">
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
@@ -179,7 +188,7 @@ export const DictateRecordingPill = memo(function DictateRecordingPill({
               variant="ghost"
               size="icon"
               onClick={onStop}
-              className="size-7 rounded-full text-foreground/80 hover:bg-destructive/15 hover:text-destructive transition-colors"
+              className="size-8 !rounded-lg bg-background/80 text-foreground shadow-xs hover:bg-destructive/10 hover:text-destructive transition-colors"
               aria-label="Stop"
             >
               <Square className="size-2.5 fill-current" />
@@ -193,10 +202,10 @@ export const DictateRecordingPill = memo(function DictateRecordingPill({
               type="button"
               size="icon"
               onClick={onTranscribe}
-              className="size-7 rounded-full bg-foreground text-background hover:bg-foreground/90 transition-colors shadow-xs"
+              className="size-8 !rounded-lg bg-white text-black shadow-sm hover:bg-white/90 transition-colors"
               aria-label="Transcribe"
             >
-              <Check className="size-3.5 stroke-[2.5]" />
+              <Check className="size-4 stroke-[2.5]" />
             </Button>
           </TooltipTrigger>
           <TooltipContent side="bottom">Transcribe</TooltipContent>
