@@ -3705,7 +3705,7 @@ export const PdfDrawer = memo(function PdfDrawer({
                   data-testid="pdf-drawer-expand-btn"
                   aria-label={isExpanded ? "Collapse file panel" : "Expand file panel"}
                   aria-pressed={isExpanded}
-                  className="size-8 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+                  className="hidden size-8 rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground lg:flex"
                 >
                   {isExpanded ? <Minimize2 className="size-3.5" /> : <Maximize2 className="size-3.5" />}
                 </Button>
