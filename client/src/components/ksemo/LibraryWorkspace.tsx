@@ -1204,10 +1204,10 @@ function FilePreview({
       />
     );
   if (compact)
-    return <LibraryFormatIcon file={file} className="size-10 shrink-0" />;
+    return <LibraryFormatIcon file={file} className="size-5 shrink-0" />;
   return (
     <span className="flex size-full items-center justify-center bg-muted/45">
-      <LibraryFormatIcon file={file} className="size-12" />
+      <LibraryFormatIcon file={file} className="size-4" />
     </span>
   );
 }
@@ -1252,6 +1252,13 @@ function LibraryFormatIcon({
   }
 
   return <File className={cn(className, "text-foreground")} />;
+}
+
+function libraryFileTypeLabel(file: LibraryWorkspaceFile): string {
+  const extension = file.filename.split(".").pop()?.trim().toUpperCase();
+  if (!extension || extension === file.filename.toUpperCase()) return "FILE";
+  if (extension === "TXT") return "TEXT";
+  return extension;
 }
 
 const LibraryGridCard = memo(function LibraryGridCard({
@@ -1325,32 +1332,24 @@ const LibraryGridCard = memo(function LibraryGridCard({
         selected ? "border-muted-foreground/50" : "border-border"
       )}
     >
-      <div className="flex min-w-0 items-center gap-2 px-2 py-1.5">
+      <div className="flex min-w-0 items-center gap-1.5 px-2 py-1">
         <a
           href={file.url}
-          target={
-            isPdfFile || isImageFile(file.filename, file.mimeType)
-              ? undefined
-              : "_blank"
-          }
-          rel={
-            isPdfFile || isImageFile(file.filename, file.mimeType)
-              ? undefined
-              : "noreferrer"
-          }
+          target={isPdfFile || isImageFile(file.filename, file.mimeType) ? undefined : "_blank"}
+          rel={isPdfFile || isImageFile(file.filename, file.mimeType) ? undefined : "noreferrer"}
           onClick={handleOpenFile}
-          className="flex min-w-0 flex-1 items-center gap-1.5"
+          className="min-w-0 flex-1"
           title={file.filename}
         >
-          {isImageFile(file.filename, file.mimeType) && (
+          <span className="flex min-w-0 items-center gap-1.5">
             <LibraryFormatIcon file={file} className="size-4 shrink-0" />
-          )}
-          <span className="block min-w-0 truncate text-xs font-medium text-foreground hover:underline">
-            {file.filename}
+            <span className="truncate text-xs font-medium text-foreground hover:underline">
+              {file.filename}
+            </span>
           </span>
         </a>
         {selectionMode ? (
-          <span className="size-8 shrink-0" aria-hidden="true" />
+          <span className="size-[30px] shrink-0" aria-hidden="true" />
         ) : (
         <DropdownMenu open={isMenuOpen} onOpenChange={onMenuOpenChange}>
           <DropdownMenuTrigger asChild>
@@ -1358,7 +1357,7 @@ const LibraryGridCard = memo(function LibraryGridCard({
               type="button"
               onClick={event => event.stopPropagation()}
               className={cn(
-                "pointer-events-none flex size-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground opacity-0 transition-[opacity,color,background-color] group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100 hover:bg-accent hover:text-foreground max-lg:pointer-events-auto max-lg:opacity-100",
+                "pointer-events-none flex size-[30px] shrink-0 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-[opacity,color,background-color] group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100 hover:bg-accent hover:text-foreground max-lg:pointer-events-auto max-lg:opacity-100",
                 isMenuOpen && "pointer-events-auto opacity-100",
                 selectionMode && "pointer-events-none opacity-0"
               )}
@@ -1398,7 +1397,7 @@ const LibraryGridCard = memo(function LibraryGridCard({
               {sharing ? (
                 <span className="loader loader-xs mr-2 text-current" aria-hidden="true" />
               ) : (
-                <ShareIcon className="mr-2 size-[17px]" />
+                <ShareIcon className="mr-2 size-4" />
               )}
               Share
             </DropdownMenuItem>
@@ -1446,15 +1445,20 @@ const LibraryGridCard = memo(function LibraryGridCard({
         >
           <FilePreview file={file} />
         </a>
+        {!isImageFile(file.filename, file.mimeType) && (
+          <span className="pointer-events-none absolute left-1 top-1 rounded bg-sidebar px-1.5 py-0.5 text-[10px] font-medium leading-3 text-sidebar-foreground shadow-sm">
+            {libraryFileTypeLabel(file)}
+          </span>
+        )}
         <div
           className={cn(
-            "pointer-events-none absolute bottom-2 left-2 flex max-w-[calc(100%-3.5rem)] items-center gap-1.5 text-xs text-white opacity-0 drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)] transition-opacity group-hover/preview:opacity-100 group-focus-within/preview:opacity-100 max-lg:opacity-100",
+            "pointer-events-none absolute bottom-2 left-2 flex max-w-[calc(100%-3.5rem)] items-center gap-1.5 text-xs text-white opacity-0 drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)] transition-opacity group-hover/preview:opacity-100 group-focus-within/preview:opacity-100",
             selectionMode && "invisible"
           )}
         >
           {file.createdAt && <span>{formatDateLabel(file.createdAt)}</span>}
           {isFavorite && (
-            <Star className="size-3 shrink-0" />
+            <Star className="size-4 shrink-0" />
           )}
         </div>
         <button
@@ -1615,13 +1619,15 @@ const LibraryListRow = memo(function LibraryListRow({
         }}
         className="min-w-0 flex-1"
       >
-        <span className="flex min-w-0 items-start gap-1.5">
-          {isImageFile(file.filename, file.mimeType) && (
-            <LibraryFormatIcon file={file} className="size-4 shrink-0" />
-          )}
-          <span className="block min-w-0 truncate text-sm font-medium hover:underline">
+        <span className="flex min-w-0 items-center gap-1.5">
+          <span className="min-w-0 truncate text-sm font-medium hover:underline">
             {file.filename}
           </span>
+          {!isImageFile(file.filename, file.mimeType) && (
+            <span className="inline-flex shrink-0 rounded bg-sidebar px-1.5 py-0.5 text-[10px] font-medium leading-3 text-sidebar-foreground shadow-sm">
+              {libraryFileTypeLabel(file)}
+            </span>
+          )}
         </span>
         <p
           className={cn(
@@ -1634,7 +1640,7 @@ const LibraryListRow = memo(function LibraryListRow({
       </a>
       <div className="shrink-0">
         {selectionMode ? (
-          <span className="size-8" aria-hidden="true" />
+          <span className="size-[30px]" aria-hidden="true" />
         ) : (
         <DropdownMenu open={isMenuOpen} onOpenChange={onMenuOpenChange}>
           <DropdownMenuTrigger asChild>
@@ -1642,7 +1648,7 @@ const LibraryListRow = memo(function LibraryListRow({
               type="button"
               onClick={event => event.stopPropagation()}
               className={cn(
-                "pointer-events-none flex size-8 items-center justify-center rounded-lg text-muted-foreground opacity-0 transition-[opacity,color,background-color] group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100 hover:bg-accent hover:text-foreground max-lg:pointer-events-auto max-lg:opacity-100",
+                "pointer-events-none flex size-[30px] items-center justify-center rounded-md text-muted-foreground opacity-0 transition-[opacity,color,background-color] group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100 hover:bg-accent hover:text-foreground max-lg:pointer-events-auto max-lg:opacity-100",
                 isMenuOpen && "pointer-events-auto opacity-100",
                 selectionMode && "pointer-events-none opacity-0"
               )}
@@ -1682,7 +1688,7 @@ const LibraryListRow = memo(function LibraryListRow({
               {sharing ? (
                 <span className="loader loader-xs mr-2 text-current" aria-hidden="true" />
               ) : (
-                <ShareIcon className="mr-2 size-[17px]" />
+                <ShareIcon className="mr-2 size-4" />
               )}
               Share
             </DropdownMenuItem>
