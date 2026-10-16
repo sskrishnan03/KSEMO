@@ -84,7 +84,6 @@ import {
   type FileSource,
 } from "../components/ksemo/FileCreationCard";
 import { PdfDrawer } from "../components/ksemo/PdfDrawer";
-import { CodeViewerPanel } from "../components/ksemo/CodeViewerPanel";
 import type { DocFormat } from "@/lib/docFormats";
 import { usePdfViewer } from "@/contexts/PdfViewerContext";
 import { FaqHelpDrawer } from "./SupportPage";
@@ -655,15 +654,9 @@ export default function Home({
       (searchParams.get("workspace") === "library" ? "library" : null)
   );
   const [chatFilesOpen, setChatFilesOpen] = useState(false);
-  const [showCode, setShowCode] = useState<{
-    code: string;
-    filename?: string;
-    messageId: string;
-  } | null>(null);
   const activePrimaryWorkspace = primaryWorkspace;
   useEffect(() => {
     setChatFilesOpen(false);
-    setShowCode(null);
   }, [activeConversationId, activePrimaryWorkspace]);
   const [shareTarget, setShareTarget] = useState<{
     id: string;
@@ -5491,19 +5484,6 @@ export default function Home({
                       <Fragment key={message.clientId ?? message.id}>
                       <MessageContent
                         message={message}
-                        generatedCode={
-                          activeFileGen?.status === "created"
-                            ? activeFileGen.code
-                            : undefined
-                        }
-                        onOpenCode={(code, filename) => {
-                          setChatFilesOpen(false);
-                          setShowCode(current =>
-                            current?.messageId === message.id
-                              ? null
-                              : { code, filename, messageId: message.id }
-                          );
-                        }}
                         responseStartedAt={
                           isGenerating && generatingMessageId === message.id
                             ? activeStream?.startedAt
@@ -5708,12 +5688,6 @@ export default function Home({
                 </div>
               </div>
             )}
-            <CodeViewerPanel
-              open={Boolean(showCode)}
-              code={showCode?.code ?? ""}
-              filename={showCode?.filename}
-              onClose={() => setShowCode(null)}
-            />
           </div>
         )}
         <PdfDrawer
@@ -5728,7 +5702,6 @@ export default function Home({
           onOpenChange={open => {
             if (open) {
               setHelpDrawerOpen(false);
-              setShowCode(null);
             }
             setChatFilesOpen(open);
           }}

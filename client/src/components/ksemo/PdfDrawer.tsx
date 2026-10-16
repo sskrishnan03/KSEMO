@@ -22,7 +22,6 @@ import {
 } from "@/contexts/PdfViewerContext";
 import { downloadFile } from "@/lib/downloadFile";
 import { trpc } from "@/lib/trpc";
-import { FileBrandMark, brandVariantForExt } from "./FileBrandIcons";
 import { KsemoCodeBlock } from "./code-block";
 import {
   ChevronLeft,
@@ -2657,7 +2656,7 @@ const EditablePageField = memo(function EditablePageField({
         type="button"
         onClick={startEditing}
         aria-label={`${label} ${value} of ${total}`}
-        className="flex h-9 min-w-[72px] cursor-pointer select-none items-center justify-center gap-1 rounded-lg px-2.5 text-sm font-bold tabular-nums text-foreground transition-colors hover:bg-accent hover:text-foreground"
+        className="flex h-7 min-w-[60px] cursor-pointer select-none items-center justify-center gap-1 rounded-full px-1.5 text-xs font-semibold tabular-nums text-foreground transition-colors hover:bg-accent hover:text-foreground"
       >
         {value}
         <span className="font-semibold text-muted-foreground">/</span>
@@ -2688,7 +2687,7 @@ const EditablePageField = memo(function EditablePageField({
           }
         }}
         onBlur={cancel}
-        className="h-9 w-11 rounded-lg bg-accent text-center text-sm font-bold text-foreground outline-none"
+        className="h-7 w-9 rounded-md bg-accent text-center text-xs font-semibold text-foreground outline-none"
       />
     </span>
   );
@@ -2963,7 +2962,6 @@ export const PdfDrawer = memo(function PdfDrawer({
     ext.toLowerCase() === "py" ||
     ext.toLowerCase() === "python"
   );
-  const brandVariant = brandVariantForExt(ext);
   const pptxCount = canonicalSpec
     ? canonicalSpec.slides.length
     : pptxSlides.length;
@@ -3665,20 +3663,17 @@ export const PdfDrawer = memo(function PdfDrawer({
       )}
     >
       {/* Top Header */}
-      <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-border bg-card/90 px-3 sm:px-4 backdrop-blur-md">
-        {/* Left Side: Only the File Name, Brand mark, and mobile Slides toggle */}
-        <div className="flex min-w-0 items-center gap-2 sm:gap-2.5">
+      <header className="flex h-12 shrink-0 items-center justify-between gap-2 border-b border-border bg-card px-3 sm:px-4">
+        {/* Left side: File name and mobile Slides toggle */}
+        <div className="flex min-w-0 items-center gap-2">
           {!isCodeDoc && (
-            <>
-              <FileBrandMark variant={brandVariant} className="size-6 shrink-0" />
-              <p
-                className="truncate text-sm font-semibold text-foreground leading-normal"
-                title={currentPdf.filename}
-                data-testid="pdf-drawer-filename"
-              >
-                {currentPdf.filename}
-              </p>
-            </>
+            <p
+              className="truncate text-sm font-semibold text-foreground leading-normal"
+              title={currentPdf.filename}
+              data-testid="pdf-drawer-filename"
+            >
+              {currentPdf.filename}
+            </p>
           )}
           {isPowerPointDoc && pptxCount > 0 && (
             <Button
@@ -3699,7 +3694,7 @@ export const PdfDrawer = memo(function PdfDrawer({
         </div>
 
         {/* Right Side: Edit (text only), Download, then Cancel (only icons, with hover) */}
-        <div className="flex shrink-0 items-center gap-1">
+        <div className="flex shrink-0 items-center gap-0.5">
           {layout === "chat" && (
             <Tooltip>
               <TooltipTrigger asChild>
@@ -3708,15 +3703,15 @@ export const PdfDrawer = memo(function PdfDrawer({
                   size="icon"
                   onClick={() => setIsExpanded(value => !value)}
                   data-testid="pdf-drawer-expand-btn"
-                  aria-label={isExpanded ? "Restore file panel" : "Expand file panel"}
+                  aria-label={isExpanded ? "Collapse file panel" : "Expand file panel"}
                   aria-pressed={isExpanded}
-                  className="size-9 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+                  className="size-8 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
                 >
-                  {isExpanded ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
+                  {isExpanded ? <Minimize2 className="size-3.5" /> : <Maximize2 className="size-3.5" />}
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom" sideOffset={6}>
-                {isExpanded ? "Restore" : "Expand"}
+                {isExpanded ? "Collapse" : "Expand"}
               </TooltipContent>
             </Tooltip>
           )}
@@ -3736,16 +3731,16 @@ export const PdfDrawer = memo(function PdfDrawer({
                     data-testid="pdf-drawer-edit-btn"
                     aria-label={isEditingText ? "Done editing" : "Edit text"}
                     className={cn(
-                      "size-9 rounded-lg transition-colors",
+                      "size-8 rounded-lg transition-colors",
                       isEditingText
                         ? "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 hover:text-primary-foreground"
                         : "text-muted-foreground hover:bg-accent hover:text-foreground"
                     )}
                   >
                     {isEditingText ? (
-                      <Save className="size-4" />
+                      <Save className="size-3.5" />
                     ) : (
-                      <Pencil className="size-4" />
+                      <Pencil className="size-3.5" />
                     )}
                   </Button>
                 </TooltipTrigger>
@@ -3765,9 +3760,9 @@ export const PdfDrawer = memo(function PdfDrawer({
                   onClick={() => void handleDownloadFile()}
                   data-testid="pdf-drawer-download-btn"
                   aria-label="Download"
-                  className="size-9 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+                  className="size-8 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
                 >
-                  <Download className="size-4" />
+                  <Download className="size-3.5" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom" sideOffset={6}>
@@ -3785,9 +3780,9 @@ export const PdfDrawer = memo(function PdfDrawer({
                 onClick={closePdf}
                 data-testid="pdf-drawer-close-btn"
                 aria-label="Close"
-                className="size-10 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+                className="size-8 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
               >
-                <X className="size-5" />
+                <X className="size-4" />
               </Button>
             </TooltipTrigger>
             <TooltipContent side="bottom" sideOffset={6}>
@@ -4046,114 +4041,132 @@ export const PdfDrawer = memo(function PdfDrawer({
               </div>
             )}
         </div>
-        {/* Bottom-Left Pagination Pill */}
-        {hasPagination && !isLoading && !loadError && (
-          <div
-            data-testid="pdf-drawer-pagination-bar"
-            className="absolute bottom-4 sm:bottom-5 left-4 z-30 flex items-center gap-0.5 rounded-full border border-border/70 bg-card px-2 py-1 shadow-lg [&_svg]:stroke-[2.5] animate-in fade-in-0 duration-200 select-none"
-          >
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  disabled={isAtPrevBoundary}
-                  onClick={navPrevious}
-                  aria-label={`Previous ${navLabel}`}
-                  className="size-9 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-30 transition-colors"
-                >
-                  <ChevronLeft className="size-5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="top">Previous {navLabel}</TooltipContent>
-            </Tooltip>
+        {/* Bottom-left page navigation */}
+        {!isLoading && !loadError && (hasPagination || !isCodeDoc) && (
+          <>
+            {hasPagination && (
+              <div
+                data-testid="pdf-drawer-pagination-bar"
+                className="absolute bottom-3 left-3 z-30 flex items-center gap-0.5 rounded-full border border-border/70 bg-card px-1 py-0.5 shadow-md animate-in fade-in-0 duration-200 select-none"
+              >
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      disabled={isAtPrevBoundary}
+                      onClick={navPrevious}
+                      aria-label={`Previous ${navLabel}`}
+                      className="size-7 rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-30"
+                    >
+                      <ChevronLeft className="size-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" sideOffset={8}>
+                    Previous {navLabel}
+                  </TooltipContent>
+                </Tooltip>
 
-            <EditablePageField
-              value={currentIdx}
-              total={totalCount}
-              label={navLabel}
-              onNavigate={isPdfDoc || isWordDoc ? scrollToPage : scrollToSlide}
-            />
+                <EditablePageField
+                  value={currentIdx}
+                  total={totalCount}
+                  label={navLabel}
+                  onNavigate={isPdfDoc || isWordDoc ? scrollToPage : scrollToSlide}
+                />
 
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  disabled={isAtNextBoundary}
-                  onClick={navNext}
-                  aria-label={`Next ${navLabel}`}
-                  className="size-9 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-30 transition-colors"
-                >
-                  <ChevronRight className="size-5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="top">Next {navLabel}</TooltipContent>
-            </Tooltip>
-          </div>
-        )}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      disabled={isAtNextBoundary}
+                      onClick={navNext}
+                      aria-label={`Next ${navLabel}`}
+                      className="size-7 rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-30"
+                    >
+                      <ChevronRight className="size-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" sideOffset={8}>
+                    Next {navLabel}
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+            )}
 
-        {/* Bottom-Right Zoom Pill */}
-        {!isLoading && !loadError && !isCodeDoc && (
-          <div
-            data-testid="pdf-drawer-control-bar"
-            className="absolute bottom-4 sm:bottom-5 right-4 z-30 flex items-center gap-0.5 rounded-full border border-border/70 bg-card px-2 py-1 shadow-lg [&_svg]:stroke-[2.5] animate-in fade-in-0 duration-200 select-none"
-          >
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  disabled={
-                    isPowerPointDoc
-                      ? effectivePptScale <= 0.4
-                      : scale <= 0.35
-                  }
-                  onClick={isPowerPointDoc ? handlePptZoomOut : handleZoomOut}
-                  aria-label="Zoom out"
-                  className="size-9 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-30 transition-colors"
-                >
-                  <Minus className="size-5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="top">Zoom out (-)</TooltipContent>
-            </Tooltip>
+            {!isCodeDoc && (
+              <div
+                data-testid="pdf-drawer-control-bar"
+                className="absolute bottom-3 right-3 z-30 flex items-center gap-0.5 rounded-full border border-border/70 bg-card px-1 py-0.5 shadow-md animate-in fade-in-0 duration-200 select-none"
+              >
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      disabled={
+                        isPowerPointDoc
+                          ? effectivePptScale <= 0.4
+                          : scale <= 0.35
+                      }
+                      onClick={isPowerPointDoc ? handlePptZoomOut : handleZoomOut}
+                      aria-label="Zoom out"
+                      className="size-7 rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-30"
+                    >
+                      <Minus className="size-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" sideOffset={8}>
+                    Zoom out (-)
+                  </TooltipContent>
+                </Tooltip>
 
-            {/* Fit / Percentage toggle */}
-            <button
-              type="button"
-              onClick={isPowerPointDoc ? handlePptToggleFit : handleToggleFit}
-              className="h-9 min-w-[52px] rounded-lg px-2.5 text-sm font-bold tabular-nums text-muted-foreground transition-colors cursor-pointer hover:bg-accent hover:text-foreground"
-            >
-              {isPowerPointDoc
-                ? isPptFit
-                  ? "Fit"
-                  : `${Math.round(effectivePptScale * 100)}%`
-                : isFit
-                  ? "Fit"
-                  : `${Math.round(scale * 100)}%`}
-            </button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={isPowerPointDoc ? handlePptToggleFit : handleToggleFit}
+                      aria-label="Fit page to viewer or reset zoom"
+                      className="h-7 min-w-[44px] rounded-lg px-1.5 text-xs font-semibold tabular-nums text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      {isPowerPointDoc
+                        ? isPptFit
+                          ? "Fit"
+                          : `${Math.round(effectivePptScale * 100)}%`
+                        : isFit
+                          ? "Fit"
+                          : `${Math.round(scale * 100)}%`}
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" sideOffset={8}>
+                    Fit or reset zoom
+                  </TooltipContent>
+                </Tooltip>
 
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  disabled={
-                    isPowerPointDoc
-                      ? effectivePptScale >= 2.5
-                      : scale >= 2.8
-                  }
-                  onClick={isPowerPointDoc ? handlePptZoomIn : handleZoomIn}
-                  aria-label="Zoom in"
-                  className="size-9 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-30 transition-colors"
-                >
-                  <Plus className="size-5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="top">Zoom in (+)</TooltipContent>
-            </Tooltip>
-          </div>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      disabled={
+                        isPowerPointDoc
+                          ? effectivePptScale >= 2.5
+                          : scale >= 2.8
+                      }
+                      onClick={isPowerPointDoc ? handlePptZoomIn : handleZoomIn}
+                      aria-label="Zoom in"
+                      className="size-7 rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-30"
+                    >
+                      <Plus className="size-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" sideOffset={8}>
+                    Zoom in (+)
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
