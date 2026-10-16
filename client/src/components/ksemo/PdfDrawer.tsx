@@ -21,6 +21,7 @@ import {
   usePdfViewer,
 } from "@/contexts/PdfViewerContext";
 import { downloadFile } from "@/lib/downloadFile";
+import { getCapabilityOption } from "@/lib/capabilities";
 import { trpc } from "@/lib/trpc";
 import { KsemoCodeBlock } from "./code-block";
 import {
@@ -2962,6 +2963,16 @@ export const PdfDrawer = memo(function PdfDrawer({
     ext.toLowerCase() === "py" ||
     ext.toLowerCase() === "python"
   );
+  const fileMode = isPdfDoc
+    ? "pdf"
+    : isWordDoc
+      ? "docx"
+      : isExcelDoc
+        ? "xlsx"
+        : isPowerPointDoc
+          ? "pptx"
+          : "txt";
+  const FileTypeIcon = getCapabilityOption(fileMode).icon;
   const pptxCount = canonicalSpec
     ? canonicalSpec.slides.length
     : pptxSlides.length;
@@ -3664,17 +3675,21 @@ export const PdfDrawer = memo(function PdfDrawer({
     >
       {/* Top Header */}
       <header className="flex h-12 shrink-0 items-center justify-between gap-2 border-b border-border bg-card px-3 sm:px-4">
-        {/* Left side: File name and mobile Slides toggle */}
+        {/* Left side: Matching Create Files icon, file name, and mobile Slides toggle */}
         <div className="flex min-w-0 items-center gap-2">
-          {!isCodeDoc && (
-            <p
-              className="truncate text-sm font-semibold text-foreground leading-normal"
-              title={currentPdf.filename}
-              data-testid="pdf-drawer-filename"
-            >
-              {currentPdf.filename}
-            </p>
-          )}
+          <FileTypeIcon
+            className={cn(
+              "size-[18px] shrink-0 text-foreground",
+              (fileMode === "xlsx" || fileMode === "pptx") && "stroke-[1.5]"
+            )}
+          />
+          <p
+            className="truncate text-sm font-semibold text-foreground leading-normal"
+            title={currentPdf.filename}
+            data-testid="pdf-drawer-filename"
+          >
+            {currentPdf.filename}
+          </p>
           {isPowerPointDoc && pptxCount > 0 && (
             <Button
               variant="outline"

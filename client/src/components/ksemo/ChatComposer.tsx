@@ -72,7 +72,7 @@ const COMPACT_INPUT_MAX_HEIGHT = 192;
 const EXPANDED_INPUT_MAX_HEIGHT = 512;
 const MIN_INPUT_HEIGHT = 40;
 
-const MENU_TITLE = "Attach";
+const MENU_TITLE = "Add files and more";
 
 const MODE_TOKEN_COLORS: Record<string, string> = {
   pdf: "#ef4444",
@@ -1144,7 +1144,10 @@ export const ChatComposer = memo(function ChatComposer({
                                   }}
                                 >
                                   <Icon
-                                    className="mr-2 size-5 shrink-0"
+                                    className={cn(
+                                      "mr-2 size-[18px] shrink-0",
+                                      option.mode === "xlsx" && "stroke-[1.5]"
+                                    )}
                                   />
                                   {option.title}
                                   {isActive && (

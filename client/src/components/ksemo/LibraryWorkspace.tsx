@@ -1220,7 +1220,7 @@ function LibraryFormatIcon({
   className: string;
 }) {
   if (isImageFile(file.filename, file.mimeType)) {
-    return <Gallery3 className={className} />;
+    return <Gallery3 className={cn(className, "text-foreground")} />;
   }
 
   const extension = extensionOfFilename(file.filename);
@@ -1240,10 +1240,18 @@ function LibraryFormatIcon({
   if (mode) {
     const option = getCapabilityOption(mode);
     const Icon = option.icon;
-    return <Icon className={className} />;
+    return (
+      <Icon
+        className={cn(
+          className,
+          "text-foreground",
+          (mode === "xlsx" || mode === "pptx") && "stroke-[1.5]"
+        )}
+      />
+    );
   }
 
-  return <File className={className} />;
+  return <File className={cn(className, "text-foreground")} />;
 }
 
 const LibraryGridCard = memo(function LibraryGridCard({

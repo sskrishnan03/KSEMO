@@ -600,7 +600,7 @@ function PreviewSkeleton({ variant }: { variant: FileBrandVariant }) {
       className="flex flex-col items-center gap-2.5 select-none"
       aria-hidden="true"
     >
-      <FileBrandMark variant={variant} className="size-8 shrink-0 opacity-55" />
+      <FileBrandMark variant={variant} className="size-[18px] shrink-0 opacity-55" />
       <div className="h-2 w-24 animate-pulse rounded-full bg-foreground/10" />
       <p className="text-[10.5px] font-medium text-muted-foreground/70">
         Loading preview…
@@ -620,7 +620,7 @@ function PreviewFallback({
 }) {
   return (
     <div className="flex flex-col items-center gap-2.5 text-center select-none">
-      <FileBrandMark variant={variant} className="size-8 shrink-0 opacity-90" />
+      <FileBrandMark variant={variant} className="size-[18px] shrink-0 opacity-90" />
       <p className="text-[11px] font-medium text-muted-foreground">{message}</p>
       <p className="max-w-[220px] truncate text-[10.5px] text-muted-foreground/70">
         {displayName}

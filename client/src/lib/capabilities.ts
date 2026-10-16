@@ -7,17 +7,35 @@
  * menu, active-mode chip and routing all derive from this configuration.
  */
 import type { ComponentType } from "react";
+import { createElement } from "react";
+import { Table2 } from "lucide-react";
 import { DocumentText } from "reicon-react/icons/DocumentText";
 import { FilePdf } from "reicon-react/icons/FilePdf";
-import { PresentationPlay } from "reicon-react/icons/PresentationPlay";
-import { Server2 } from "reicon-react/icons/Server2";
-import { TextSquare } from "reicon-react/icons/TextSquare";
+import { DocText } from "reicon-react/icons/DocText";
 import type {
   CapabilityMode,
   CreateMode,
 } from "@shared/capabilities";
 
 export type CapabilityKind = "create";
+
+function PowerPointClockIcon({ className }: { className?: string }) {
+  return createElement(
+    "svg",
+    {
+      "aria-hidden": true,
+      viewBox: "0 0 24 24",
+      fill: "none",
+      stroke: "currentColor",
+      strokeWidth: 1.5,
+      strokeLinecap: "round",
+      strokeLinejoin: "round",
+      className,
+    },
+    createElement("circle", { cx: 12, cy: 12, r: 10 }),
+    createElement("path", { d: "M12 2v10h10" })
+  );
+}
 
 export type CapabilityOption = {
   /** The mode this entry arms. */
@@ -66,7 +84,7 @@ const CREATE: CapabilityOption[] = [
     kind: "create",
     title: "Excel",
     description: "Create a structured Excel spreadsheet.",
-    icon: Server2,
+    icon: Table2,
     iconColor: "text-emerald-600",
     iconBg: "bg-emerald-500/15",
     placeholder: "Describe the spreadsheet you want to create...",
@@ -77,7 +95,7 @@ const CREATE: CapabilityOption[] = [
     kind: "create",
     title: "PowerPoint",
     description: "Create a professional PowerPoint presentation.",
-    icon: PresentationPlay,
+    icon: PowerPointClockIcon,
     iconColor: "text-orange-500",
     iconBg: "bg-orange-500/15",
     placeholder: "Describe the presentation you want to create...",
@@ -88,7 +106,7 @@ const CREATE: CapabilityOption[] = [
     kind: "create",
     title: "Text",
     description: "Create a plain text file.",
-    icon: TextSquare,
+    icon: DocText,
     iconColor: "text-sky-500",
     iconBg: "bg-sky-500/15",
     placeholder: "Describe the text file you want to create...",

@@ -5142,7 +5142,12 @@ export default function Home({
                               <DropdownMenuTrigger asChild>
                                 <button
                                   type="button"
-                                  className="flex size-7 shrink-0 items-center justify-center rounded-md text-foreground transition-colors hover:bg-accent/70 data-[state=open]:bg-accent/70 active:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                  className={cn(
+                                    "flex size-7 shrink-0 items-center justify-center rounded-md text-foreground transition-colors hover:bg-accent/70 data-[state=open]:bg-accent/70 active:bg-accent focus-visible:outline-none",
+                                    isDocumentOpen
+                                      ? "focus-visible:ring-0"
+                                      : "focus-visible:ring-2 focus-visible:ring-ring"
+                                  )}
                                   aria-label={`Conversation options for ${activeConversation?.title || "New Chat"}`}
                                 >
                                   <ChevronDown className="size-4" />
