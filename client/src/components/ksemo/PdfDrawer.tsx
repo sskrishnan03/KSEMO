@@ -3658,7 +3658,7 @@ export const PdfDrawer = memo(function PdfDrawer({
         layout === "chat"
           ? isExpanded
             ? "animate-in fade-in-0 zoom-in-95 duration-200 ease-out"
-            : "animate-in slide-in-from-right duration-300 ease-out"
+            : "animate-in fade-in-0 zoom-in-95 duration-200 ease-out lg:slide-in-from-right lg:duration-300"
           : "animate-in fade-in-0 zoom-in-95 duration-200 ease-out"
       )}
     >
