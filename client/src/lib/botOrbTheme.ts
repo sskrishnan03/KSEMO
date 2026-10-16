@@ -21,27 +21,27 @@ export interface BotOrbTheme {
   rollingGradient: string;
 }
 
-/** One fixed KSEMO orb: a luminous cyan/blue aurora with a pearl-white core. */
+/** One fixed KSEMO orb: near-black glass with a restrained graphite sheen. */
 export const KSEMO_ORB_THEME: BotOrbTheme = {
   id: "ksemo",
   name: "KSEMO",
-  combinationLabel: "Prismatic Aurora",
-  description: "A deep-space sphere with flowing cyan, sapphire, and pearl light.",
+  combinationLabel: "Obsidian",
+  description: "A near-black glass sphere with a subtle graphite edge light.",
   previewPhrase: "Hello, I’m KSEMO. What can I help you with?",
-  accentHex: "#C8F7FF",
-  rgb: [73, 202, 255],
-  primaryGl: [0.06, 0.58, 0.95],
-  secondaryGl: [0.12, 0.12, 0.52],
-  accentGl: [0.72, 0.96, 1.0],
-  coreColor: "rgba(70, 198, 255, 0.96)",
-  midColor: "rgba(42, 62, 190, 0.62)",
-  bounceColor: "rgba(95, 222, 255, 0.52)",
+  accentHex: "#747474",
+  rgb: [88, 88, 88],
+  primaryGl: [0.075, 0.075, 0.075],
+  secondaryGl: [0.018, 0.018, 0.018],
+  accentGl: [0.24, 0.24, 0.24],
+  coreColor: "rgba(38, 38, 38, 0.96)",
+  midColor: "rgba(16, 16, 16, 0.62)",
+  bounceColor: "rgba(70, 70, 70, 0.42)",
   cloudGradient1:
-    "radial-gradient(ellipse 68% 54% at 28% 30%, rgba(80, 220, 255, 0.92) 0%, rgba(28, 112, 230, 0.38) 44%, transparent 72%), radial-gradient(ellipse 58% 52% at 72% 68%, rgba(95, 100, 255, 0.78) 0%, rgba(35, 55, 180, 0.3) 42%, transparent 70%), radial-gradient(circle at 50% 50%, #020611 18%, transparent 68%)",
+    "radial-gradient(ellipse 68% 54% at 28% 30%, rgba(95, 95, 95, 0.42) 0%, rgba(35, 35, 35, 0.22) 44%, transparent 72%), radial-gradient(ellipse 58% 52% at 72% 68%, rgba(50, 50, 50, 0.3) 0%, rgba(12, 12, 12, 0.18) 42%, transparent 70%), radial-gradient(circle at 50% 50%, #020202 18%, transparent 68%)",
   cloudGradient2:
-    "radial-gradient(circle at 68% 28%, rgba(128, 244, 255, 0.86) 0%, rgba(36, 126, 244, 0.34) 42%, transparent 68%), radial-gradient(circle at 30% 74%, rgba(112, 110, 255, 0.76) 0%, rgba(42, 54, 174, 0.28) 40%, transparent 66%), radial-gradient(circle at 50% 50%, #020611 24%, transparent 70%)",
+    "radial-gradient(circle at 68% 28%, rgba(110, 110, 110, 0.42) 0%, rgba(42, 42, 42, 0.22) 42%, transparent 68%), radial-gradient(circle at 30% 74%, rgba(48, 48, 48, 0.3) 0%, rgba(10, 10, 10, 0.2) 40%, transparent 66%), radial-gradient(circle at 50% 50%, #020202 24%, transparent 70%)",
   rollingGradient:
-    "conic-gradient(from 0deg at 50% 50%, #020611 0deg, rgba(15, 76, 150, 0.72) 48deg, #62e5ff 112deg, rgba(99, 94, 255, 0.82) 184deg, #020611 278deg, #020611 360deg)",
+    "conic-gradient(from 0deg at 50% 50%, #020202 0deg, rgba(28, 28, 28, 0.72) 48deg, #505050 112deg, rgba(22, 22, 22, 0.82) 184deg, #020202 278deg, #020202 360deg)",
 };
 
 export const BOT_ORB_THEMES: Record<string, BotOrbTheme> = {

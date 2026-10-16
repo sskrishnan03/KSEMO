@@ -33,7 +33,9 @@ import {
   ChevronsUp,
   Code2,
   Download,
+  Maximize2,
   Minus,
+  Minimize2,
   Pencil,
   Plus,
   Presentation,
@@ -2892,8 +2894,16 @@ const WordPageViewer = memo(function WordPageViewer({
   );
 });
 
-export const PdfDrawer = memo(function PdfDrawer() {
+export const PdfDrawer = memo(function PdfDrawer({
+  layout = "library",
+}: {
+  layout?: "chat" | "library";
+}) {
   const { currentPdf, isOpen, closePdf } = usePdfViewer();
+  const [isExpanded, setIsExpanded] = useState(false);
+  useEffect(() => {
+    setIsExpanded(false);
+  }, [isOpen, currentPdf?.url, layout]);
   const [pdfDoc, setPdfDoc] = useState<any>(null);
   const [wordHtml, setWordHtml] = useState<string | null>(null);
   const [textContent, setTextContent] = useState<string | null>(null);
@@ -3641,9 +3651,17 @@ export const PdfDrawer = memo(function PdfDrawer() {
       aria-modal="true"
       data-testid="pdf-drawer"
       className={cn(
-        "absolute inset-0 z-40 flex flex-col bg-background text-foreground",
-        "border-l border-border/80 shadow-2xl overflow-hidden",
-        "animate-in slide-in-from-bottom duration-300 ease-out"
+        "absolute z-40 flex flex-col rounded-2xl border border-border/80 bg-background text-foreground shadow-2xl overflow-hidden",
+        layout === "chat"
+          ? isExpanded
+            ? "inset-1"
+            : "inset-1 lg:inset-y-1 lg:left-[calc(50%+0.25rem)] lg:right-1"
+          : "inset-1",
+        layout === "chat"
+          ? isExpanded
+            ? "animate-in fade-in-0 zoom-in-95 duration-200 ease-out"
+            : "animate-in slide-in-from-right duration-300 ease-out"
+          : "animate-in fade-in-0 zoom-in-95 duration-200 ease-out"
       )}
     >
       {/* Top Header */}
@@ -3682,6 +3700,26 @@ export const PdfDrawer = memo(function PdfDrawer() {
 
         {/* Right Side: Edit (text only), Download, then Cancel (only icons, with hover) */}
         <div className="flex shrink-0 items-center gap-1">
+          {layout === "chat" && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setIsExpanded(value => !value)}
+                  data-testid="pdf-drawer-expand-btn"
+                  aria-label={isExpanded ? "Restore file panel" : "Expand file panel"}
+                  aria-pressed={isExpanded}
+                  className="size-9 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+                >
+                  {isExpanded ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" sideOffset={6}>
+                {isExpanded ? "Restore" : "Expand"}
+              </TooltipContent>
+            </Tooltip>
+          )}
           {/* Edit Text Button (Text Documents Only, NOT code) */}
           {!isCodeDoc &&
             isTextDoc &&

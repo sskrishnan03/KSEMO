@@ -4866,64 +4866,68 @@ export default function Home({
           <div
             className={cn(
               "relative flex min-h-0 min-w-0 flex-1 flex-col transition-[width] duration-300 ease-out lg:flex-none",
-              chatFilesOpen
+              isDocumentOpen && !activePrimaryWorkspace
+                ? "lg:w-1/2"
+                : chatFilesOpen
                 ? "lg:w-[calc(100%-min(24rem,32vw)-1rem)]"
                 : "lg:w-full"
             )}
           >
             {composerTag === "bot" && !guestMode && !isTemporaryChat && (
-              <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 flex justify-center px-4 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
-                <div className="pointer-events-auto flex items-center justify-center gap-6 bg-transparent sm:gap-7">
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => stableOnTagChange("chat")}
-                        className="size-11 rounded-xl border border-border/70 bg-sidebar text-sidebar-foreground shadow-sm transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                        aria-label="Cancel voice chat"
-                      >
-                        <X className="size-5" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="left">
-                      Cancel
-                    </TooltipContent>
-                  </Tooltip>
-                  <div className="pointer-events-none -translate-y-2">
+              <div className="pointer-events-none absolute inset-x-0 bottom-3 z-30 flex justify-center px-4 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+                <div className="pointer-events-auto flex items-end justify-center gap-2 bg-transparent">
+                  <div className="pointer-events-auto">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => stableOnTagChange("chat")}
+                          className="size-11 rounded-xl border border-border/70 bg-sidebar text-sidebar-foreground shadow-sm transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                          aria-label="Cancel voice chat"
+                        >
+                          <X className="size-5" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="left">Cancel</TooltipContent>
+                    </Tooltip>
+                  </div>
+                  <div className="pointer-events-none">
                     <BotVoiceOrb
                       active={botVoice.state === "listening" && !botVoice.isMuted}
                       isSpeaking={isBotSpeakingAloud}
                       isThinking={isGenerating}
                       levelRef={botVoice.levelRef}
-                      size={100}
+                      size={120}
                       halo={false}
                     />
                   </div>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={botVoice.toggleMute}
-                        className={cn(
-                          "size-11 rounded-xl border border-border/70 bg-sidebar shadow-sm transition-colors hover:bg-sidebar-accent",
-                          botVoice.isMuted
-                            ? "text-destructive hover:text-destructive"
-                            : "text-sidebar-foreground hover:text-sidebar-accent-foreground"
-                        )}
-                        aria-label={botVoice.isMuted ? "Unmute microphone" : "Mute microphone"}
-                        aria-pressed={botVoice.isMuted}
-                      >
-                        {botVoice.isMuted ? <MicOff className="size-5" /> : <Mic className="size-5" />}
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="right">
-                      {botVoice.isMuted ? "Unmute" : "Mute"}
-                    </TooltipContent>
-                  </Tooltip>
+                  <div className="pointer-events-auto">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={botVoice.toggleMute}
+                          className={cn(
+                            "size-11 rounded-xl border border-border/70 bg-sidebar shadow-sm transition-colors hover:bg-sidebar-accent",
+                            botVoice.isMuted
+                              ? "text-destructive hover:text-destructive"
+                              : "text-sidebar-foreground hover:text-sidebar-accent-foreground"
+                          )}
+                          aria-label={botVoice.isMuted ? "Unmute microphone" : "Mute microphone"}
+                          aria-pressed={botVoice.isMuted}
+                        >
+                          {botVoice.isMuted ? <MicOff className="size-5" /> : <Mic className="size-5" />}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="right">
+                        {botVoice.isMuted ? "Unmute" : "Mute"}
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
                 </div>
               </div>
             )}
@@ -5096,7 +5100,7 @@ export default function Home({
                     sideOffset={6}
                     anchor={
                       <div className="contents">
-                        {!chatFilesOpen && (
+                        {!chatFilesOpen && !isDocumentOpen && (
                           <Button
                             variant="ghost"
                             size="sm"
@@ -5357,31 +5361,33 @@ export default function Home({
                                   </DropdownMenuItem>
                                 </DropdownMenuSubContent>
                               </DropdownMenuSub>
-                              <DropdownMenuItem
-                                disabled={!activeConversationId}
-                                onSelect={() => {
-                                  if (activeConversationId) {
-                                    stableOnShareConversation(
-                                      activeConversation
-                                        ? {
-                                            id: activeConversationId,
-                                            title: activeConversation.title,
-                                            isPublic:
-                                              activeConversation.isPublic,
-                                            shareToken:
-                                              activeConversation.shareToken,
-                                          }
-                                        : {
-                                            id: activeConversationId,
-                                            title: "this conversation",
-                                          }
-                                    );
-                                  }
-                                }}
-                              >
-                                <ShareIcon className="mr-2 size-[17px]" />
-                                Share
-                              </DropdownMenuItem>
+                              {!isDocumentOpen && (
+                                <DropdownMenuItem
+                                  disabled={!activeConversationId}
+                                  onSelect={() => {
+                                    if (activeConversationId) {
+                                      stableOnShareConversation(
+                                        activeConversation
+                                          ? {
+                                              id: activeConversationId,
+                                              title: activeConversation.title,
+                                              isPublic:
+                                                activeConversation.isPublic,
+                                              shareToken:
+                                                activeConversation.shareToken,
+                                            }
+                                          : {
+                                              id: activeConversationId,
+                                              title: "this conversation",
+                                            }
+                                      );
+                                    }
+                                  }}
+                                >
+                                  <ShareIcon className="mr-2 size-[17px]" />
+                                  Share
+                                </DropdownMenuItem>
+                              )}
                               <DropdownMenuItem
                                 onSelect={() => setChatFilesOpen(true)}
                               >
@@ -5710,7 +5716,9 @@ export default function Home({
             />
           </div>
         )}
-        <PdfDrawer />
+        <PdfDrawer
+          layout={activePrimaryWorkspace === "library" ? "library" : "chat"}
+        />
         <FaqHelpDrawer
           open={helpDrawerOpen}
           onClose={() => setHelpDrawerOpen(false)}

@@ -17,6 +17,7 @@ uniform vec3 u_color_secondary;
 uniform vec3 u_color_accent;
 uniform float u_brightness;
 uniform float u_speed;
+uniform float u_activity;
 
 float hash21(vec2 p) {
   return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
@@ -55,78 +56,7 @@ void main() {
     discard;
   }
 
-  // Soft glass edge keeps the light contained in a crisp sphere.
-  float edgeAlpha = 1.0 - smoothstep(0.965, 1.0, dist);
-
-  // Smooth color falloff so energy clouds stay softly inside the glass sphere
-  float colorPerimeterFade = 1.0 - smoothstep(0.72, 1.0, dist);
-
-  // 3D spherical perspective refraction
-  float z = sqrt(max(0.0, 1.0 - dist * dist));
-  vec2 sphereUv = uv / (1.0 + 0.35 * z);
-
-  // Spiral vortex twist into center eye
-  float angle = atan(sphereUv.y, sphereUv.x);
-  float swirlTwist = 2.4 * pow(1.0 - dist * 0.85, 1.4);
-  float spiral = angle + swirlTwist + u_time * u_speed * 0.15;
-
-  vec2 p = vec2(cos(spiral), sin(spiral)) * dist * 2.4;
-
-  // Domain warping for silky, smoky fluid wisps and organic cloud ribbons
-  vec2 q = vec2(
-    fbmSmooth(p + vec2(0.8, 1.2) + u_time * u_speed * 0.08),
-    fbmSmooth(p + vec2(3.1, 2.4) - u_time * u_speed * 0.07)
-  );
-
-  vec2 r = vec2(
-    fbmSmooth(p + 2.8 * q + vec2(1.5, 0.0) + u_time * u_speed * 0.09),
-    fbmSmooth(p + 2.8 * q + vec2(4.2, 1.9) - u_time * u_speed * 0.08)
-  );
-
-  // Silky ribbon wave modulation
-  float ribbon = sin((p.x * 0.8 + p.y * 0.6 + q.x * 2.5 + r.x * 1.5) * 3.14159);
-  ribbon = 0.5 + 0.5 * ribbon;
-
-  float f = fbmSmooth(p + 2.5 * r);
-  f = f * 0.65 + ribbon * 0.35;
-
-  // A diagonal aurora current, with enough dark space to keep the sphere dimensional.
-  float bias = 0.52 + 0.48 * sin(angle + 1.1) - 0.22 * uv.x * uv.y;
-  float cloudDensity = clamp(f * 1.62 * (0.34 + 0.66 * bias), 0.0, 1.0) * colorPerimeterFade;
-
-  // Midnight glass base volume.
-  vec3 col = vec3(0.004, 0.008, 0.022);
-
-  // Sapphire shadows and cyan aurora ribbons build a single signature palette.
-  float secWeight = smoothstep(0.08, 0.72, cloudDensity);
-  col = mix(col, u_color_secondary, secWeight);
-
-  float primWeight = smoothstep(0.27, 0.86, cloudDensity + 0.24 * q.x);
-  col = mix(col, u_color_primary, primWeight);
-
-  // Pearl highlights trace the aurora filaments and catch a soft upper-left light.
-  float coreGlow =
-    pow(cloudDensity, 2.0) * (1.0 - smoothstep(0.08, 0.9, dist)) * 1.25;
-  float crestGlow = pow(clamp(ribbon * q.y * 1.7, 0.0, 1.0), 3.2) * 1.35;
-  float pearlGlint = pow(
-    max(0.0, 1.0 - length(uv - vec2(-0.38, 0.42)) * 3.3),
-    8.0
-  ) * 0.6;
-  col = mix(
-    col,
-    u_color_accent,
-    clamp(coreGlow + crestGlow + pearlGlint, 0.0, 1.0)
-  );
-
-  // Fine cool rim light gives the orb a polished glass silhouette.
-  float rimLight = pow(1.0 - z, 2.5) * 0.34;
-  col += u_color_primary * rimLight;
-
-  // Volumetric spherical depth and soft upper-left illumination.
-  float factor = (0.62 + 0.38 * z) * u_brightness;
-  col = clamp(col * factor, 0.0, 1.0);
-
-  gl_FragColor = vec4(col, edgeAlpha);
+  gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
 }
 `;
 
@@ -136,6 +66,7 @@ export function NebulaOrbCanvas({
   fill = false,
   active = false,
   activity = 0,
+  levelRef,
   className,
 }: {
   theme: BotOrbTheme;
@@ -144,6 +75,7 @@ export function NebulaOrbCanvas({
   fill?: boolean;
   active?: boolean;
   activity?: number;
+  levelRef?: React.RefObject<number>;
   className?: string;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -248,6 +180,7 @@ export function NebulaOrbCanvas({
       const uColorAccent = gl.getUniformLocation(program, "u_color_accent");
       const uBrightness = gl.getUniformLocation(program, "u_brightness");
       const uSpeed = gl.getUniformLocation(program, "u_speed");
+      const uActivity = gl.getUniformLocation(program, "u_activity");
 
       gl.enable(gl.BLEND);
       gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
@@ -275,7 +208,10 @@ export function NebulaOrbCanvas({
         const elapsed = (performance.now() - startTime) * 0.001;
         const currentTheme = themeRef.current;
         const isActive = activeRef.current;
-        const act = activityRef.current;
+        const micActivity = activeRef.current
+          ? Math.min(1, Math.max(0, levelRef?.current ?? 0) * 2.5)
+          : 0;
+        const act = Math.max(activityRef.current, micActivity);
 
         gl.uniform2f(uResolution, width, height);
         gl.uniform1f(uTime, elapsed);
@@ -292,6 +228,7 @@ export function NebulaOrbCanvas({
 
         const baseBrightness = isActive ? 1.12 : 0.98;
         gl.uniform1f(uBrightness, baseBrightness + act * 0.35);
+        gl.uniform1f(uActivity, act);
 
         const baseSpeed = isActive ? 0.92 : 0.48;
         gl.uniform1f(uSpeed, baseSpeed + act * 0.65);
@@ -328,7 +265,7 @@ export function NebulaOrbCanvas({
       canvas.removeEventListener("webglcontextrestored", handleContextRestored);
       cleanupGL();
     };
-  }, [size]);
+  }, [size, levelRef]);
 
   return (
     <div
