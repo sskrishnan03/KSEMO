@@ -5,6 +5,7 @@ import React, {
   useMemo,
   useRef,
   useState,
+  useLayoutEffect,
 } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -2940,6 +2941,12 @@ export const PdfDrawer = memo(function PdfDrawer({
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const [containerWidth, setContainerWidth] = useState<number>(800);
   const basePageWidthRef = useRef<number>(600);
+  const previousScaleRef = useRef(scale);
+  const pendingZoomAnchorRef = useRef<{
+    element: HTMLElement;
+    x: number;
+    y: number;
+  } | null>(null);
 
   const isPdfDoc = currentPdf
     ? isPdf(currentPdf.filename, currentPdf.mimeType)
@@ -2973,6 +2980,42 @@ export const PdfDrawer = memo(function PdfDrawer({
           ? "pptx"
           : "txt";
   const FileTypeIcon = getCapabilityOption(fileMode).icon;
+
+  const zoomScrollElement = useCallback(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return null;
+    return isExcelDoc
+      ? container.querySelector<HTMLElement>(".overflow-auto") || container
+      : container;
+  }, [isExcelDoc]);
+
+  const setZoomAt = useCallback(
+    (nextScale: number, x?: number, y?: number) => {
+      const element = zoomScrollElement();
+      if (element) {
+        pendingZoomAnchorRef.current = {
+          element,
+          x: x ?? element.clientWidth / 2,
+          y: y ?? element.clientHeight / 2,
+        };
+      }
+      setScale(nextScale);
+    },
+    [zoomScrollElement]
+  );
+
+  useLayoutEffect(() => {
+    const previousScale = previousScaleRef.current;
+    previousScaleRef.current = scale;
+    const anchor = pendingZoomAnchorRef.current;
+    pendingZoomAnchorRef.current = null;
+    if (!anchor || previousScale <= 0 || scale === previousScale) return;
+    const ratio = scale / previousScale;
+    anchor.element.scrollLeft =
+      (anchor.element.scrollLeft + anchor.x) * ratio - anchor.x;
+    anchor.element.scrollTop =
+      (anchor.element.scrollTop + anchor.y) * ratio - anchor.y;
+  }, [scale]);
   const pptxCount = canonicalSpec
     ? canonicalSpec.slides.length
     : pptxSlides.length;
@@ -3003,6 +3046,12 @@ export const PdfDrawer = memo(function PdfDrawer({
   const PPT_ZOOM_STEPS = [0.4, 0.5, 0.67, 0.8, 1.0, 1.25, 1.5, 1.75, 2.0, 2.5];
   const [pptZoomMultiplier, setPptZoomMultiplier] = useState<number>(1.0);
   const [isPptFit, setIsPptFit] = useState<boolean>(true);
+  const previousPptScaleRef = useRef<number>(1);
+  const pendingPptZoomAnchorRef = useRef<{
+    element: HTMLElement;
+    x: number;
+    y: number;
+  } | null>(null);
   const [stageDimensions, setStageDimensions] = useState<{
     width: number;
     height: number;
@@ -3046,32 +3095,56 @@ export const PdfDrawer = memo(function PdfDrawer({
   const pptSlideWidth = Math.round(PPT_DESIGN_W * effectivePptScale);
   const pptSlideHeight = Math.round(PPT_DESIGN_H * effectivePptScale);
 
-  const handlePptZoomIn = useCallback(() => {
-    setIsPptFit(false);
-    setPptZoomMultiplier(curr => {
-      const base = isPptFit ? pptFitScale : curr;
-      const next = PPT_ZOOM_STEPS.find(s => s > base + 0.05);
-      return next ?? PPT_ZOOM_STEPS[PPT_ZOOM_STEPS.length - 1];
-    });
-  }, [isPptFit, pptFitScale]);
+  const setPptZoomAt = useCallback(
+    (nextScale: number, x?: number, y?: number) => {
+      const element = zoomScrollElement();
+      if (element) {
+        pendingPptZoomAnchorRef.current = {
+          element,
+          x: x ?? element.clientWidth / 2,
+          y: y ?? element.clientHeight / 2,
+        };
+      }
+      setPptZoomMultiplier(nextScale);
+    },
+    [zoomScrollElement]
+  );
 
-  const handlePptZoomOut = useCallback(() => {
+  useLayoutEffect(() => {
+    const previousScale = previousPptScaleRef.current;
+    previousPptScaleRef.current = effectivePptScale;
+    const anchor = pendingPptZoomAnchorRef.current;
+    pendingPptZoomAnchorRef.current = null;
+    if (!anchor || previousScale <= 0 || effectivePptScale === previousScale) return;
+    const ratio = effectivePptScale / previousScale;
+    anchor.element.scrollLeft =
+      (anchor.element.scrollLeft + anchor.x) * ratio - anchor.x;
+    anchor.element.scrollTop =
+      (anchor.element.scrollTop + anchor.y) * ratio - anchor.y;
+  }, [effectivePptScale]);
+
+  const handlePptZoomIn = useCallback((x?: number, y?: number) => {
     setIsPptFit(false);
-    setPptZoomMultiplier(curr => {
-      const base = isPptFit ? pptFitScale : curr;
-      const prev = [...PPT_ZOOM_STEPS].reverse().find(s => s < base - 0.05);
-      return prev ?? PPT_ZOOM_STEPS[0];
-    });
-  }, [isPptFit, pptFitScale]);
+    const base = effectivePptScale;
+    const next = PPT_ZOOM_STEPS.find(s => s > base + 0.05);
+    setPptZoomAt(next ?? PPT_ZOOM_STEPS[PPT_ZOOM_STEPS.length - 1], x, y);
+  }, [effectivePptScale, setPptZoomAt]);
+
+  const handlePptZoomOut = useCallback((x?: number, y?: number) => {
+    setIsPptFit(false);
+    const base = effectivePptScale;
+    const prev = [...PPT_ZOOM_STEPS].reverse().find(s => s < base - 0.05);
+    setPptZoomAt(prev ?? PPT_ZOOM_STEPS[0], x, y);
+  }, [effectivePptScale, setPptZoomAt]);
 
   const handlePptToggleFit = useCallback(() => {
     if (isPptFit) {
       setIsPptFit(false);
-      setPptZoomMultiplier(1.0);
+      setPptZoomAt(1.0);
     } else {
       setIsPptFit(true);
     }
-  }, [isPptFit]);
+  }, [isPptFit, setPptZoomAt]);
 
   // Load Document (PDF, Word, Excel, PowerPoint, or Text) in-project
   useEffect(() => {
@@ -3363,28 +3436,28 @@ export const PdfDrawer = memo(function PdfDrawer({
   // Handle Zoom In
   const handleZoomIn = useCallback(() => {
     setIsFit(false);
-    setScale(prev => Math.min(Number((prev + 0.15).toFixed(2)), 3.0));
-  }, []);
+    setZoomAt(Math.min(Number((scale + 0.15).toFixed(2)), 3.0));
+  }, [scale, setZoomAt]);
 
   // Handle Zoom Out
   const handleZoomOut = useCallback(() => {
     setIsFit(false);
-    setScale(prev => Math.max(Number((prev - 0.15).toFixed(2)), 0.25));
-  }, []);
+    setZoomAt(Math.max(Number((scale - 0.15).toFixed(2)), 0.25));
+  }, [scale, setZoomAt]);
 
   // Toggle Fit / Reset
   const handleToggleFit = useCallback(() => {
     if (isFit) {
       setIsFit(false);
-      setScale(1.0);
+      setZoomAt(1.0);
     } else {
       setIsFit(true);
       const available = Math.max(containerWidth - 64, 280);
       const base =
         basePageWidthRef.current > 0 ? basePageWidthRef.current : 800;
-      setScale(Math.min(available / base, 2.5));
+      setZoomAt(Math.min(available / base, 2.5));
     }
-  }, [isFit, containerWidth]);
+  }, [isFit, containerWidth, setZoomAt]);
 
   // Touchpad pinch-to-zoom / Ctrl+Wheel zoom handler
   useEffect(() => {
@@ -3397,16 +3470,27 @@ export const PdfDrawer = memo(function PdfDrawer({
       if (e.ctrlKey) {
         e.preventDefault();
         if (isPowerPointDoc) {
+          const zoomElement = zoomScrollElement() || container;
+          const bounds = zoomElement.getBoundingClientRect();
+          const anchorX = e.clientX - bounds.left;
+          const anchorY = e.clientY - bounds.top;
           if (e.deltaY < 0) {
-            handlePptZoomIn();
+            handlePptZoomIn(anchorX, anchorY);
           } else {
-            handlePptZoomOut();
+            handlePptZoomOut(anchorX, anchorY);
           }
         } else {
           setIsFit(false);
           const zoomDelta = e.deltaY < 0 ? 0.08 : -0.08;
-          setScale(prev =>
-            Math.min(Math.max(Number((prev + zoomDelta).toFixed(2)), 0.25), 3.0)
+          setIsFit(false);
+          const zoomElement = zoomScrollElement() || container;
+          const bounds = zoomElement.getBoundingClientRect();
+          const anchorX = e.clientX - bounds.left;
+          const anchorY = e.clientY - bounds.top;
+          setZoomAt(
+            Math.min(Math.max(Number((scale + zoomDelta).toFixed(2)), 0.25), 3.0),
+            anchorX,
+            anchorY
           );
         }
       }
@@ -3416,7 +3500,7 @@ export const PdfDrawer = memo(function PdfDrawer({
     return () => {
       container.removeEventListener("wheel", handleWheel);
     };
-  }, [isOpen, isCodeDoc, isPowerPointDoc, handlePptZoomIn, handlePptZoomOut]);
+  }, [isOpen, isCodeDoc, isPowerPointDoc, scale, handlePptZoomIn, handlePptZoomOut, setZoomAt, zoomScrollElement]);
 
   // Scroll to a specific PowerPoint slide
   const scrollToSlide = useCallback((slideNum: number) => {
@@ -3679,8 +3763,8 @@ export const PdfDrawer = memo(function PdfDrawer({
         <div className="flex min-w-0 items-center gap-2">
           <FileTypeIcon
             className={cn(
-              "size-[18px] shrink-0 text-foreground",
-              (fileMode === "xlsx" || fileMode === "pptx") && "stroke-[1.5]"
+              "size-[18px] shrink-0",
+              fileMode === "xlsx" && "stroke-[1.5]"
             )}
           />
           <p
@@ -4124,7 +4208,9 @@ export const PdfDrawer = memo(function PdfDrawer({
                           ? effectivePptScale <= 0.4
                           : scale <= 0.35
                       }
-                      onClick={isPowerPointDoc ? handlePptZoomOut : handleZoomOut}
+                      onClick={() =>
+                        isPowerPointDoc ? handlePptZoomOut() : handleZoomOut()
+                      }
                       aria-label="Zoom out"
                       className="size-7 rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-30"
                     >
@@ -4168,7 +4254,9 @@ export const PdfDrawer = memo(function PdfDrawer({
                           ? effectivePptScale >= 2.5
                           : scale >= 2.8
                       }
-                      onClick={isPowerPointDoc ? handlePptZoomIn : handleZoomIn}
+                      onClick={() =>
+                        isPowerPointDoc ? handlePptZoomIn() : handleZoomIn()
+                      }
                       aria-label="Zoom in"
                       className="size-7 rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-30"
                     >

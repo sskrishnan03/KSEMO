@@ -1,6 +1,6 @@
 import { getFileKind, isImageFile } from "@/lib/fileKinds";
+import { getCapabilityOption } from "@/lib/capabilities";
 import { Eye, ExternalLink, X } from "lucide-react";
-import { WinrarIcon } from "./icons";
 import React, { memo, useEffect, useMemo, useState } from "react";
 import { usePdfViewer, isViewableDocument } from "@/contexts/PdfViewerContext";
 import { ImageLightbox } from "@/components/ui/image-lightbox";
@@ -61,7 +61,6 @@ export const ChatFilesDialog = memo(function ChatFilesDialog({
     >
       <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border/80 px-3.5 py-2.5 bg-muted/20">
         <div className="flex items-center gap-2.5 min-w-0">
-          <WinrarIcon className="size-4 shrink-0 text-foreground" />
           <p className="text-[15px] font-semibold leading-tight text-foreground truncate">
             Files in this chat
           </p>
@@ -99,6 +98,21 @@ export const ChatFilesDialog = memo(function ChatFilesDialog({
                 file.filename,
                 file.mimeType
               );
+              const createMode =
+                kind.label === "PDF"
+                  ? "pdf"
+                  : kind.label === "Sheet"
+                    ? "xlsx"
+                    : kind.label === "Slides"
+                      ? "pptx"
+                      : kind.label === "Word"
+                        ? "docx"
+                        : kind.label === "Text"
+                          ? "txt"
+                          : null;
+              const FileIcon = createMode
+                ? getCapabilityOption(createMode).icon
+                : kind.icon;
               return (
                 <li key={file.id}>
                   <a
@@ -121,7 +135,7 @@ export const ChatFilesDialog = memo(function ChatFilesDialog({
                         onOpenChange(false);
                       }
                     }}
-                    className="group flex items-center gap-3 rounded-xl border border-transparent p-2 transition-all hover:border-border/50 hover:bg-accent/60"
+                    className="group flex items-center gap-2.5 rounded-xl border border-transparent p-2.5 transition-all hover:border-border/50 hover:bg-accent/60"
                   >
                     {image ? (
                       <span className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-muted/40">
@@ -132,7 +146,7 @@ export const ChatFilesDialog = memo(function ChatFilesDialog({
                         />
                       </span>
                     ) : (
-                      <kind.icon className="size-10 shrink-0" />
+                      <FileIcon className="ml-0.5 size-7 shrink-0" />
                     )}
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[13px] font-semibold text-foreground group-hover:text-primary transition-colors">
