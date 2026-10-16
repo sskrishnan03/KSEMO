@@ -1502,14 +1502,17 @@ export const ChatComposer = memo(function ChatComposer({
                       }}
                       onClick={() => selectSlashOption(option.mode)}
                       className={cn(
-                        "flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-hidden transition-colors",
+                        "flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-hidden transition-colors",
                         index === slashHighlight
                           ? "bg-accent text-accent-foreground"
                           : "hover:bg-accent hover:text-accent-foreground"
                       )}
                     >
                       <Icon
-                        className="mr-2 size-5 shrink-0"
+                        className={cn(
+                          "mr-2 size-[18px] shrink-0 text-muted-foreground",
+                          option.mode === "xlsx" && "stroke-[1.5]"
+                        )}
                       />
                       {option.title}
                       {isActive && (

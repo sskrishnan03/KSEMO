@@ -1358,7 +1358,7 @@ const LibraryGridCard = memo(function LibraryGridCard({
               onClick={event => event.stopPropagation()}
               className={cn(
                 "pointer-events-none flex size-[30px] shrink-0 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-[opacity,color,background-color] group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100 hover:bg-accent hover:text-foreground max-lg:pointer-events-auto max-lg:opacity-100",
-                isMenuOpen && "pointer-events-auto opacity-100",
+                isMenuOpen && "pointer-events-auto opacity-100 bg-accent text-foreground",
                 selectionMode && "pointer-events-none opacity-0"
               )}
               aria-label={`More options for ${file.filename}`}
@@ -1649,7 +1649,7 @@ const LibraryListRow = memo(function LibraryListRow({
               onClick={event => event.stopPropagation()}
               className={cn(
                 "pointer-events-none flex size-[30px] items-center justify-center rounded-md text-muted-foreground opacity-0 transition-[opacity,color,background-color] group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100 hover:bg-accent hover:text-foreground max-lg:pointer-events-auto max-lg:opacity-100",
-                isMenuOpen && "pointer-events-auto opacity-100",
+                isMenuOpen && "pointer-events-auto opacity-100 bg-accent text-foreground",
                 selectionMode && "pointer-events-none opacity-0"
               )}
               aria-label={`More options for ${file.filename}`}
