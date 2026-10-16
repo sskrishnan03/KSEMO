@@ -1207,7 +1207,7 @@ function FilePreview({
     return <LibraryFormatIcon file={file} className="size-5 shrink-0" />;
   return (
     <span className="flex size-full items-center justify-center bg-muted/45">
-      <LibraryFormatIcon file={file} className="size-4" />
+      <LibraryFormatIcon file={file} className="size-8" />
     </span>
   );
 }
@@ -1220,7 +1220,7 @@ function LibraryFormatIcon({
   className: string;
 }) {
   if (isImageFile(file.filename, file.mimeType)) {
-    return <Gallery3 className={cn(className, "text-foreground")} />;
+    return <Gallery3 className={cn(className, "text-muted-foreground")} />;
   }
 
   const extension = extensionOfFilename(file.filename);
@@ -1244,14 +1244,14 @@ function LibraryFormatIcon({
       <Icon
         className={cn(
           className,
-          "text-foreground",
+          "text-muted-foreground",
           (mode === "xlsx" || mode === "pptx") && "stroke-[1.5]"
         )}
       />
     );
   }
 
-  return <File className={cn(className, "text-foreground")} />;
+  return <File className={cn(className, "text-muted-foreground")} />;
 }
 
 function libraryFileTypeLabel(file: LibraryWorkspaceFile): string {
@@ -1341,11 +1341,8 @@ const LibraryGridCard = memo(function LibraryGridCard({
           className="min-w-0 flex-1"
           title={file.filename}
         >
-          <span className="flex min-w-0 items-center gap-1.5">
-            <LibraryFormatIcon file={file} className="size-4 shrink-0" />
-            <span className="truncate text-xs font-medium text-foreground hover:underline">
-              {file.filename}
-            </span>
+          <span className="block truncate text-xs font-medium text-foreground hover:underline">
+            {file.filename}
           </span>
         </a>
         {selectionMode ? (
