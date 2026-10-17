@@ -5425,11 +5425,11 @@ export default function Home({
                               <DropdownMenuContent
                                 align="end"
                                 sideOffset={6}
-                                className="w-max min-w-40 max-w-[calc(100vw-1rem)] rounded-xl lg:hidden"
+                                className="w-48 max-w-[calc(100vw-1rem)] rounded-xl lg:hidden"
                               >
                                 {mobileConversationTitleOverflows && (
                                   <>
-                                    <DropdownMenuLabel className="whitespace-normal break-words text-foreground">
+                                    <DropdownMenuLabel className="line-clamp-2 whitespace-normal break-words text-foreground">
                                       {mobileConversationTitle}
                                     </DropdownMenuLabel>
                                     <DropdownMenuSeparator />
