@@ -143,9 +143,7 @@ export const DictateRecordingPill = memo(function DictateRecordingPill({
         // Leave the meter completely still during silence, then let the last
         // spoken peaks trail away gradually instead of flickering at idle.
         setWaveHistory(current =>
-          current.some(value => value > 0)
-            ? [...current.slice(1), 0]
-            : current
+          current.some(value => value > 0) ? [...current.slice(1), 0] : current
         );
       }
     }, 110);
@@ -1005,7 +1003,10 @@ export const ChatComposer = memo(function ChatComposer({
                 )}
               </div>
             ) : (
-              <div className="flex min-h-10 items-center justify-center px-3 text-xs font-medium text-muted-foreground" aria-live="polite">
+              <div
+                className="flex min-h-10 items-center justify-center px-3 text-xs font-medium text-muted-foreground"
+                aria-live="polite"
+              >
                 {isBotSpeaking
                   ? "KSEMO is speaking"
                   : isGenerating
@@ -1038,7 +1039,7 @@ export const ChatComposer = memo(function ChatComposer({
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="ksemo-composer-attach size-10 shrink-0 rounded-full bg-transparent text-foreground transition-colors hover:bg-accent hover:text-foreground data-[state=open]:bg-accent data-[state=open]:text-foreground"
+                            className="ksemo-composer-attach size-10 shrink-0 rounded-full bg-transparent text-foreground transition-colors hover:bg-accent hover:text-foreground data-[state=open]:bg-accent data-[state=open]:text-foreground aria-expanded:bg-accent aria-expanded:text-foreground"
                             aria-label={
                               toolsOpen && !libraryOpen
                                 ? "Close attachment options"
@@ -1075,7 +1076,8 @@ export const ChatComposer = memo(function ChatComposer({
                       <DropdownMenuItem
                         onClick={() => fileInputRef.current?.click()}
                       >
-                        <Paperclip className="mr-2 size-4 -rotate-45 -scale-x-100 text-foreground" /> Upload files
+                        <Paperclip className="mr-2 size-4 -rotate-45 -scale-x-100 text-foreground" />{" "}
+                        Upload files
                       </DropdownMenuItem>
                       {isMobile
                         ? !guestMode && (
@@ -1106,13 +1108,19 @@ export const ChatComposer = memo(function ChatComposer({
                           setToolsOpen(false);
                         }}
                       >
-                        <Library aria-hidden="true" className="mr-2 size-[17px] text-foreground" />
+                        <Library
+                          aria-hidden="true"
+                          className="mr-2 size-[17px] text-foreground"
+                        />
                         Browse Library
                       </DropdownMenuItem>
                       {!botActive && (
                         <DropdownMenuSub>
                           <DropdownMenuSubTrigger>
-                            <FilePlus size={17} className="mr-2 text-foreground" />
+                            <FilePlus
+                              size={17}
+                              className="mr-2 text-foreground"
+                            />
                             Create Files
                           </DropdownMenuSubTrigger>
                           <DropdownMenuSubContent
@@ -1181,7 +1189,9 @@ export const ChatComposer = memo(function ChatComposer({
                         <X className="size-4" />
                       </Button>
                     </TooltipTrigger>
-                    <TooltipContent side="top">Cancel voice chat</TooltipContent>
+                    <TooltipContent side="top">
+                      Cancel voice chat
+                    </TooltipContent>
                   </Tooltip>
                 )}
               </div>
@@ -1199,7 +1209,12 @@ export const ChatComposer = memo(function ChatComposer({
                 </div>
               )}
 
-              <div className={cn("ml-auto flex items-center gap-1.5", botActive && "ml-0")}>
+              <div
+                className={cn(
+                  "ml-auto flex items-center gap-1.5",
+                  botActive && "ml-0"
+                )}
+              >
                 {isEditingMessage ? (
                   <>
                     {/* Recorded audio / Mic button */}
@@ -1361,7 +1376,9 @@ export const ChatComposer = memo(function ChatComposer({
                                 : "text-foreground hover:bg-accent hover:text-foreground"
                             )}
                             aria-label={
-                              botVoiceMuted ? "Unmute microphone" : "Mute microphone"
+                              botVoiceMuted
+                                ? "Unmute microphone"
+                                : "Mute microphone"
                             }
                             aria-pressed={botVoiceMuted}
                           >
@@ -1416,8 +1433,13 @@ export const ChatComposer = memo(function ChatComposer({
                           Transcribing…
                         </TooltipContent>
                       </Tooltip>
-                    ) : !isRecording && !isTranscribing && !canSend &&
-                      !hideVoiceInput && !guestMode && !temporary && onBotVoice ? (
+                    ) : !isRecording &&
+                      !isTranscribing &&
+                      !canSend &&
+                      !hideVoiceInput &&
+                      !guestMode &&
+                      !temporary &&
+                      onBotVoice ? (
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button
@@ -1440,7 +1462,9 @@ export const ChatComposer = memo(function ChatComposer({
                             </span>
                           </Button>
                         </TooltipTrigger>
-                        <TooltipContent side="bottom">Voice chat</TooltipContent>
+                        <TooltipContent side="bottom">
+                          Voice chat
+                        </TooltipContent>
                       </Tooltip>
                     ) : !isRecording && !isTranscribing ? (
                       <Tooltip>
