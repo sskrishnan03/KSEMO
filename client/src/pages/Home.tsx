@@ -18,7 +18,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuSub,
   DropdownMenuSubContent,
@@ -33,7 +32,6 @@ import {
   ArrowDown,
   ChevronDown,
   Download,
-  MoreHorizontal,
   LogIn,
   Mic,
   MicOff,
@@ -668,15 +666,22 @@ export default function Home({
     shareToken: string | null;
   } | null>(null);
   const [shareEmail, setShareEmail] = useState("");
-  const [sharingConversationId, setSharingConversationId] = useState<string | null>(null);
-  const [shareNotice, setShareNotice] = useState<"success" | "error" | null>(null);
+  const [sharingConversationId, setSharingConversationId] = useState<
+    string | null
+  >(null);
+  const [shareNotice, setShareNotice] = useState<"success" | "error" | null>(
+    null
+  );
   const [shareNoticeText, setShareNoticeText] = useState("");
   const shareNoticeTimerRef = useRef<number | null>(null);
-  useEffect(() => () => {
-    if (shareNoticeTimerRef.current !== null) {
-      window.clearTimeout(shareNoticeTimerRef.current);
-    }
-  }, []);
+  useEffect(
+    () => () => {
+      if (shareNoticeTimerRef.current !== null) {
+        window.clearTimeout(shareNoticeTimerRef.current);
+      }
+    },
+    []
+  );
   const [renameTarget, setRenameTarget] = useState<{
     id: string;
     title: string;
@@ -1672,8 +1677,7 @@ export default function Home({
             ? {
                 conversationId: metadata.parentBranch.parentChatId,
                 title: metadata.parentBranch.parentChatTitle,
-                branchedAtMessageId:
-                  metadata.parentBranch.branchedAtMessageId,
+                branchedAtMessageId: metadata.parentBranch.branchedAtMessageId,
               }
             : typeof metadata?.branchOrigin?.conversationId === "string" &&
                 typeof metadata.branchOrigin.title === "string"
@@ -2508,8 +2512,7 @@ export default function Home({
             // returns to (or already has open) that conversation.
             if (isViewingThisStream()) {
               // Stream words aloud in real-time as sentences arrive (Bot voice turns only)
-              const isBotVoiceMode =
-                isVoiceTurn || botVoiceOpenRef.current;
+              const isBotVoiceMode = isVoiceTurn || botVoiceOpenRef.current;
 
               if (isBotVoiceMode) {
                 // In bot voice mode, words are displayed word-by-word synchronously as the bot speaks!
@@ -2999,8 +3002,7 @@ export default function Home({
         return;
       }
 
-      const isBotVoiceMode =
-        isVoiceTurn || botVoiceOpenRef.current;
+      const isBotVoiceMode = isVoiceTurn || botVoiceOpenRef.current;
 
       if (!isBotVoiceMode) {
         setChatMessages(current =>
@@ -3048,8 +3050,7 @@ export default function Home({
       // pipeline — it still attaches the finished file to the message. Poll
       // quietly and swap the frozen drafting card to the standard file card
       // once the file lands (or show a clean stopped card if it never does).
-      const isBotVoiceMode =
-        isVoiceTurn || botVoiceOpenRef.current;
+      const isBotVoiceMode = isVoiceTurn || botVoiceOpenRef.current;
 
       if (
         isBotVoiceMode &&
@@ -3694,9 +3695,7 @@ export default function Home({
   }
 
   async function copyConversationShareLink() {
-    showActionNotice(
-      "Chat link copied. Ready to share."
-    );
+    showActionNotice("Chat link copied. Ready to share.");
   }
 
   function openEmailShare() {
@@ -3716,10 +3715,16 @@ export default function Home({
     if (!conversation.id || sharingConversationId) return;
     setSharingConversationId(conversation.id);
     try {
-      const minimumLoading = new Promise(resolve => window.setTimeout(resolve, 500));
-      const result = conversation.isPublic && conversation.shareToken
-        ? { shareToken: conversation.shareToken }
-        : await publicShareMutation.mutateAsync({ id: conversation.id, isPublic: true });
+      const minimumLoading = new Promise(resolve =>
+        window.setTimeout(resolve, 500)
+      );
+      const result =
+        conversation.isPublic && conversation.shareToken
+          ? { shareToken: conversation.shareToken }
+          : await publicShareMutation.mutateAsync({
+              id: conversation.id,
+              isPublic: true,
+            });
       if (!result.shareToken) throw new Error("Missing share token");
       await minimumLoading;
       const url = conversationShareUrl(result.shareToken);
@@ -3735,10 +3740,7 @@ export default function Home({
         document.execCommand("copy");
         field.remove();
       }
-      showShareNotice(
-        "success",
-        "Chat link copied. Ready to share."
-      );
+      showShareNotice("success", "Chat link copied. Ready to share.");
     } catch {
       showShareNotice("error", "Couldn't copy chat link. Please try again.");
     } finally {
@@ -3750,9 +3752,13 @@ export default function Home({
     const answer = _message.content.trim();
     if (!answer) return;
 
-    const minimumLoading = new Promise(resolve => window.setTimeout(resolve, 500));
+    const minimumLoading = new Promise(resolve =>
+      window.setTimeout(resolve, 500)
+    );
     try {
-      const result = await sharedAnswerMutation.mutateAsync({ content: answer });
+      const result = await sharedAnswerMutation.mutateAsync({
+        content: answer,
+      });
       const answerUrl = new URL(
         `/share-answer/${encodeURIComponent(result.token)}`,
         window.location.origin
@@ -3771,10 +3777,7 @@ export default function Home({
         if (!copied) throw new Error("Clipboard copy failed");
       }
       await minimumLoading;
-      showShareNotice(
-        "success",
-        "Answer link copied. Ready to share."
-      );
+      showShareNotice("success", "Answer link copied. Ready to share.");
     } catch {
       await minimumLoading;
       showShareNotice("error", "Couldn't copy answer link. Please try again.");
@@ -4932,9 +4935,7 @@ export default function Home({
         locked={guestMode}
       />
 
-      <main
-        className="relative flex min-w-0 flex-1 flex-col lg:flex-row"
-      >
+      <main className="relative flex min-w-0 flex-1 flex-col lg:flex-row">
         {activePrimaryWorkspace === "library" ? (
           <LibraryWorkspace
             onClose={stableCloseWorkspace}
@@ -4955,8 +4956,8 @@ export default function Home({
               isDocumentOpen && !activePrimaryWorkspace
                 ? "lg:w-1/2"
                 : chatFilesOpen
-                ? "lg:w-[calc(100%-min(24rem,32vw)-1rem)]"
-                : "lg:w-full"
+                  ? "lg:w-[calc(100%-min(24rem,32vw)-1rem)]"
+                  : "lg:w-full"
             )}
           >
             {composerTag === "bot" && !guestMode && !isTemporaryChat && (
@@ -4981,7 +4982,9 @@ export default function Home({
                   </div>
                   <div className="pointer-events-none">
                     <BotVoiceOrb
-                      active={botVoice.state === "listening" && !botVoice.isMuted}
+                      active={
+                        botVoice.state === "listening" && !botVoice.isMuted
+                      }
                       isSpeaking={isBotSpeakingAloud}
                       isThinking={isGenerating}
                       levelRef={botVoice.levelRef}
@@ -5003,10 +5006,18 @@ export default function Home({
                               ? "text-destructive hover:text-destructive"
                               : "text-sidebar-foreground hover:text-sidebar-accent-foreground"
                           )}
-                          aria-label={botVoice.isMuted ? "Unmute microphone" : "Mute microphone"}
+                          aria-label={
+                            botVoice.isMuted
+                              ? "Unmute microphone"
+                              : "Mute microphone"
+                          }
                           aria-pressed={botVoice.isMuted}
                         >
-                          {botVoice.isMuted ? <MicOff className="size-5" /> : <Mic className="size-5" />}
+                          {botVoice.isMuted ? (
+                            <MicOff className="size-5" />
+                          ) : (
+                            <Mic className="size-5" />
+                          )}
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent side="right">
@@ -5176,7 +5187,10 @@ export default function Home({
                             size="sm"
                             className="pointer-events-auto absolute right-2 top-2 hidden h-8 rounded-lg border border-border/50 bg-muted/70 px-3 text-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground lg:flex"
                             aria-label="Share chat"
-                            disabled={!activeConversationId || sharingConversationId === activeConversationId}
+                            disabled={
+                              !activeConversationId ||
+                              sharingConversationId === activeConversationId
+                            }
                             onClick={() => {
                               if (activeConversationId) {
                                 stableOnShareConversation(
@@ -5197,7 +5211,8 @@ export default function Home({
                             }}
                           >
                             <span className="inline-flex items-center gap-1.5 text-sm font-medium">
-                              {sharingConversationId === activeConversationId ? (
+                              {sharingConversationId ===
+                              activeConversationId ? (
                                 <span
                                   className="loader loader-xs text-current"
                                   role="status"
@@ -5212,11 +5227,16 @@ export default function Home({
                         )}
                         <div className="pointer-events-auto absolute left-14 right-24 top-2 hidden lg:block lg:left-4">
                           <div className="inline-flex min-h-9 max-w-full items-center gap-1">
-                            {activeConversation?.title.startsWith("Branch: ") && (
+                            {activeConversation?.title.startsWith(
+                              "Branch: "
+                            ) && (
                               <BranchSplitIcon className="size-4 shrink-0 text-foreground" />
                             )}
                             <span className="min-w-0 max-w-[calc(100%-2rem)] whitespace-normal break-words text-sm font-semibold leading-4 text-foreground">
-                              {activeConversation?.title.replace(/^Branch:\s*/, "") || "New Chat"}
+                              {activeConversation?.title.replace(
+                                /^Branch:\s*/,
+                                ""
+                              ) || "New Chat"}
                             </span>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
@@ -5352,21 +5372,28 @@ export default function Home({
                             <DropdownMenuTrigger asChild>
                               <button
                                 type="button"
-                                className="pointer-events-auto absolute right-2 top-2 flex size-9 items-center justify-center rounded-lg text-foreground transition-colors hover:bg-accent/70 active:bg-accent data-[state=open]:bg-accent/70 data-[state=open]:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:hidden"
+                                className="pointer-events-auto absolute left-14 right-2 top-2 flex h-9 min-w-0 items-center gap-1 rounded-lg px-1.5 text-left text-foreground transition-colors hover:bg-accent/70 active:bg-accent data-[state=open]:bg-accent/70 data-[state=open]:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:hidden"
                                 aria-label={`More options for ${activeConversation?.title || "New Chat"}`}
                               >
-                                <MoreHorizontal className="size-5" />
+                                {activeConversation?.title.startsWith(
+                                  "Branch: "
+                                ) && (
+                                  <BranchSplitIcon className="size-4 shrink-0 text-foreground" />
+                                )}
+                                <span className="min-w-0 flex-1 truncate text-sm font-semibold">
+                                  {activeConversation?.title.replace(
+                                    /^Branch:\s*/,
+                                    ""
+                                  ) || "New Chat"}
+                                </span>
+                                <ChevronDown className="size-4 shrink-0" />
                               </button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent
                               align="end"
                               sideOffset={6}
-                              className="w-[162px] rounded-xl lg:hidden"
+                              className="w-52 max-w-[calc(100vw-1rem)] rounded-xl lg:hidden"
                             >
-                              <DropdownMenuLabel className="whitespace-normal break-words text-foreground">
-                                {activeConversation?.title || "New Chat"}
-                              </DropdownMenuLabel>
-                              <DropdownMenuSeparator />
                               <DropdownMenuItem
                                 disabled={!activeConversationId}
                                 onSelect={() => {
@@ -5439,33 +5466,31 @@ export default function Home({
                                   </DropdownMenuItem>
                                 </DropdownMenuSubContent>
                               </DropdownMenuSub>
-                              {!isDocumentOpen && (
-                                <DropdownMenuItem
-                                  disabled={!activeConversationId}
-                                  onSelect={() => {
-                                    if (activeConversationId) {
-                                      stableOnShareConversation(
-                                        activeConversation
-                                          ? {
-                                              id: activeConversationId,
-                                              title: activeConversation.title,
-                                              isPublic:
-                                                activeConversation.isPublic,
-                                              shareToken:
-                                                activeConversation.shareToken,
-                                            }
-                                          : {
-                                              id: activeConversationId,
-                                              title: "this conversation",
-                                            }
-                                      );
-                                    }
-                                  }}
-                                >
-                                  <ShareIcon className="mr-2 size-[17px]" />
-                                  Share
-                                </DropdownMenuItem>
-                              )}
+                              <DropdownMenuItem
+                                disabled={!activeConversationId}
+                                onSelect={() => {
+                                  if (activeConversationId) {
+                                    stableOnShareConversation(
+                                      activeConversation
+                                        ? {
+                                            id: activeConversationId,
+                                            title: activeConversation.title,
+                                            isPublic:
+                                              activeConversation.isPublic,
+                                            shareToken:
+                                              activeConversation.shareToken,
+                                          }
+                                        : {
+                                            id: activeConversationId,
+                                            title: "this conversation",
+                                          }
+                                    );
+                                  }
+                                }}
+                              >
+                                <ShareIcon className="mr-2 size-[17px]" />
+                                Share
+                              </DropdownMenuItem>
                               <DropdownMenuItem
                                 onSelect={() => setChatFilesOpen(true)}
                               >
@@ -5567,114 +5592,119 @@ export default function Home({
 
                     return (
                       <Fragment key={message.clientId ?? message.id}>
-                      <MessageContent
-                        message={message}
-                        responseStartedAt={
-                          isGenerating && generatingMessageId === message.id
-                            ? activeStream?.startedAt
-                            : undefined
-                        }
-                        fileCreationNode={fileCreationNode}
-                        isFileGenerating={Boolean(
-                          activeFileGen && activeFileGen.status === "processing"
-                        )}
-                        onSpeak={stableSpeak}
-                        onStop={stableStopSpeech}
-                        isSpeaking={speakingMessageId === message.id}
-                        isCurrentGeneration={
-                          isGenerating && generatingMessageId === message.id
-                        }
-                        hideTypingIndicator={Boolean(
-                          isFileGenerating ||
-                          activeFileGen ||
-                          message.fileGeneration ||
-                          (isGenerating &&
-                            generatingMessageId === message.id &&
-                            (activeMode !== "chat" || Boolean(fileGeneration)))
-                        )}
-                        onEdit={guestMode ? undefined : stableEditMessage}
-                        isEditing={editingMessage?.id === message.id}
-                        editValue={editValue}
-                        onEditValueChange={setEditValue}
-                        onSaveEdit={stableEditAction}
-                        onCancelEdit={stableCancelEdit}
-                        onRegenerate={
-                          guestMode ? undefined : stableRegenerateMessage
-                        }
-                        onRetry={
-                          guestMode ? undefined : stableRegenerateMessage
-                        }
-                        onShare={guestMode ? undefined : stableShareMessage}
-                        onBranch={
-                          guestMode || !activeConversationId
-                            ? undefined
-                            : stableBranchFromMessage
-                        }
-                        onDelete={guestMode ? undefined : stableDeleteMessage}
-                        onFeedback={guestMode ? undefined : stableOnFeedback}
-                        feedback={messageFeedback[message.id] ?? null}
-                        sharedAnswerPreview={
-                          isSharedAnswerPage &&
-                          !sharedAnswerContinued &&
-                          message.role === "assistant" &&
-                          message.content === sharedAnswer
-                        }
-                      />
-                      {[
-                        ...(message.branchOrigin
-                          ? [
-                              {
-                                conversationId:
-                                  message.branchOrigin.conversationId,
-                                title: message.branchOrigin.title,
-                                label: `From ${message.branchOrigin.title.replace(/^Branch:\s*/, "")}`,
-                              },
-                            ]
-                          : []),
-                        ...(message.branchTargets ?? []).map(target => ({
-                          conversationId: target.conversationId,
-                          title: target.title,
-                          label: `To Branch · ${target.title.replace(/^Branch:\s*/, "")}`,
-                        })),
-                      ].map((link, index) => (
-                            <div
-                              key={`${link.conversationId}-${index}`}
-                              className="flex items-center gap-3 py-3 text-xs text-muted-foreground"
-                            >
-                              <span className="h-px flex-1 bg-border/70" />
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  selectConversation(link.conversationId)
-                                }
-                                className="inline-flex max-w-[70%] items-center gap-1.5 truncate underline decoration-muted-foreground/40 underline-offset-2 transition-colors hover:text-foreground"
-                                aria-label={`Open branched chat: ${link.title}`}
-                              >
-                                <BranchSplitIcon className="size-3.5 shrink-0 text-foreground" />
-                                <span className="truncate">{link.label}</span>
-                              </button>
-                              <span className="h-px flex-1 bg-border/70" />
-                            </div>
-                      ))}
-                      {isSharedAnswerPage &&
-                        sharedAnswerContinued &&
-                        messageIndex ===
-                          visibleMessages.findIndex(
-                            item =>
-                              item.role === "assistant" &&
-                              item.content === sharedAnswer
-                          ) && (
+                        <MessageContent
+                          message={message}
+                          responseStartedAt={
+                            isGenerating && generatingMessageId === message.id
+                              ? activeStream?.startedAt
+                              : undefined
+                          }
+                          fileCreationNode={fileCreationNode}
+                          isFileGenerating={Boolean(
+                            activeFileGen &&
+                            activeFileGen.status === "processing"
+                          )}
+                          onSpeak={stableSpeak}
+                          onStop={stableStopSpeech}
+                          isSpeaking={speakingMessageId === message.id}
+                          isCurrentGeneration={
+                            isGenerating && generatingMessageId === message.id
+                          }
+                          hideTypingIndicator={Boolean(
+                            isFileGenerating ||
+                            activeFileGen ||
+                            message.fileGeneration ||
+                            (isGenerating &&
+                              generatingMessageId === message.id &&
+                              (activeMode !== "chat" ||
+                                Boolean(fileGeneration)))
+                          )}
+                          onEdit={guestMode ? undefined : stableEditMessage}
+                          isEditing={editingMessage?.id === message.id}
+                          editValue={editValue}
+                          onEditValueChange={setEditValue}
+                          onSaveEdit={stableEditAction}
+                          onCancelEdit={stableCancelEdit}
+                          onRegenerate={
+                            guestMode ? undefined : stableRegenerateMessage
+                          }
+                          onRetry={
+                            guestMode ? undefined : stableRegenerateMessage
+                          }
+                          onShare={guestMode ? undefined : stableShareMessage}
+                          onBranch={
+                            guestMode || !activeConversationId
+                              ? undefined
+                              : stableBranchFromMessage
+                          }
+                          onDelete={guestMode ? undefined : stableDeleteMessage}
+                          onFeedback={guestMode ? undefined : stableOnFeedback}
+                          feedback={messageFeedback[message.id] ?? null}
+                          sharedAnswerPreview={
+                            isSharedAnswerPage &&
+                            !sharedAnswerContinued &&
+                            message.role === "assistant" &&
+                            message.content === sharedAnswer
+                          }
+                        />
+                        {[
+                          ...(message.branchOrigin
+                            ? [
+                                {
+                                  conversationId:
+                                    message.branchOrigin.conversationId,
+                                  title: message.branchOrigin.title,
+                                  label: `From ${message.branchOrigin.title.replace(/^Branch:\s*/, "")}`,
+                                },
+                              ]
+                            : []),
+                          ...(message.branchTargets ?? []).map(target => ({
+                            conversationId: target.conversationId,
+                            title: target.title,
+                            label: `To Branch · ${target.title.replace(/^Branch:\s*/, "")}`,
+                          })),
+                        ].map((link, index) => (
                           <div
-                            role="note"
-                            className="mt-1 flex items-center justify-center gap-2 py-0.5 text-center text-xs text-muted-foreground"
+                            key={`${link.conversationId}-${index}`}
+                            className="flex items-center gap-3 py-3 text-xs text-muted-foreground"
                           >
-                            <ChatLine
-                              className="size-3.5 shrink-0"
-                              aria-hidden="true"
-                            />
-                            <span>This is a shared KSEMO answer — continue the conversation below.</span>
+                            <span className="h-px flex-1 bg-border/70" />
+                            <button
+                              type="button"
+                              onClick={() =>
+                                selectConversation(link.conversationId)
+                              }
+                              className="inline-flex max-w-[70%] items-center gap-1.5 truncate underline decoration-muted-foreground/40 underline-offset-2 transition-colors hover:text-foreground"
+                              aria-label={`Open branched chat: ${link.title}`}
+                            >
+                              <BranchSplitIcon className="size-3.5 shrink-0 text-foreground" />
+                              <span className="truncate">{link.label}</span>
+                            </button>
+                            <span className="h-px flex-1 bg-border/70" />
                           </div>
-                        )}
+                        ))}
+                        {isSharedAnswerPage &&
+                          sharedAnswerContinued &&
+                          messageIndex ===
+                            visibleMessages.findIndex(
+                              item =>
+                                item.role === "assistant" &&
+                                item.content === sharedAnswer
+                            ) && (
+                            <div
+                              role="note"
+                              className="mt-1 flex items-center justify-center gap-2 py-0.5 text-center text-xs text-muted-foreground"
+                            >
+                              <ChatLine
+                                className="size-3.5 shrink-0"
+                                aria-hidden="true"
+                              />
+                              <span>
+                                This is a shared KSEMO answer — continue the
+                                conversation below.
+                              </span>
+                            </div>
+                          )}
                       </Fragment>
                     );
                   })}
@@ -5704,7 +5734,9 @@ export default function Home({
                 />
               )}
             </section>
-            {(visibleMessages.length > 0 || isMobile || composerTag === "bot") && (
+            {(visibleMessages.length > 0 ||
+              isMobile ||
+              composerTag === "bot") && (
               <div
                 className={cn(
                   "z-10",
