@@ -1,8 +1,5 @@
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Loading } from "@/components/ui/loading";
 import { trpc } from "@/lib/trpc";
@@ -29,8 +26,6 @@ import {
   Grid2X2,
   Library,
   List,
-  ListChecks,
-  MessageCircle,
   MoreVertical,
   Pencil,
   Search,
@@ -39,6 +34,8 @@ import {
   X,
   ChevronDown,
 } from "lucide-react";
+import { ChatLine } from "reicon-react/icons/ChatLine";
+import { CheckListNotes } from "reicon-react/icons/CheckListNotes";
 import { Sidebar2 } from "reicon-react/icons/Sidebar2";
 import {
   DropdownMenu,
@@ -155,7 +152,9 @@ export function LibraryWorkspace({
   );
   const [renameValue, setRenameValue] = useState("");
   const [sharingFileId, setSharingFileId] = useState<string | null>(null);
-  const [shareNotice, setShareNotice] = useState<"success" | "error" | null>(null);
+  const [shareNotice, setShareNotice] = useState<"success" | "error" | null>(
+    null
+  );
   const shareNoticeTimerRef = useRef<number | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const { openPdf } = usePdfViewer();
@@ -172,11 +171,14 @@ export function LibraryWorkspace({
   const initialOpenedRef = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const utils = trpc.useUtils();
-  useEffect(() => () => {
-    if (shareNoticeTimerRef.current !== null) {
-      window.clearTimeout(shareNoticeTimerRef.current);
-    }
-  }, []);
+  useEffect(
+    () => () => {
+      if (shareNoticeTimerRef.current !== null) {
+        window.clearTimeout(shareNoticeTimerRef.current);
+      }
+    },
+    []
+  );
   useEffect(() => {
     if (!isSearchOpen) return;
     const closeOnOutsideClick = (event: PointerEvent) => {
@@ -186,7 +188,8 @@ export function LibraryWorkspace({
       if (
         target instanceof Element &&
         target.closest("[data-library-search-filter]")
-      ) return;
+      )
+        return;
       setIsSearchOpen(false);
     };
     const closeOnEscape = (event: KeyboardEvent) => {
@@ -234,7 +237,8 @@ export function LibraryWorkspace({
     onSuccess: invalidateFiles,
     onError: () => {},
   });
-  const createShareLinkMutation = trpc.workspace.files.createShareLink.useMutation();
+  const createShareLinkMutation =
+    trpc.workspace.files.createShareLink.useMutation();
   const favoriteMutation = trpc.workspace.files.setFavorite.useMutation({
     // Optimistic: flip the star instantly, roll back only on failure.
     onMutate: async ({ id, isFavorite }) => {
@@ -353,13 +357,10 @@ export function LibraryWorkspace({
     []
   );
 
-  const requestRename = useCallback(
-    (file: LibraryWorkspaceFile) => {
-      setRenameTarget(file);
-      setRenameValue(splitLibraryFilename(file.filename).name);
-    },
-    []
-  );
+  const requestRename = useCallback((file: LibraryWorkspaceFile) => {
+    setRenameTarget(file);
+    setRenameValue(splitLibraryFilename(file.filename).name);
+  }, []);
 
   async function confirmRename() {
     if (!renameTarget) return;
@@ -392,38 +393,46 @@ export function LibraryWorkspace({
     }
     setShareNotice(null);
   }, []);
-  const requestShare = useCallback(async (file: LibraryWorkspaceFile) => {
-    if (sharingFileId) return;
-    setShareNotice(null);
-    setSharingFileId(file.id);
-    try {
-      const minimumLoading = new Promise(resolve => window.setTimeout(resolve, 500));
-      const { path } = await createShareLinkMutation.mutateAsync({ id: file.id });
-      const shareUrl = `${window.location.origin}${path}`;
+  const requestShare = useCallback(
+    async (file: LibraryWorkspaceFile) => {
+      if (sharingFileId) return;
+      setShareNotice(null);
+      setSharingFileId(file.id);
       try {
-        await navigator.clipboard.writeText(shareUrl);
-      } catch {
-        const field = document.createElement("textarea");
-        field.value = shareUrl;
-        field.style.position = "fixed";
-        field.style.opacity = "0";
-        document.body.appendChild(field);
+        const minimumLoading = new Promise(resolve =>
+          window.setTimeout(resolve, 500)
+        );
+        const { path } = await createShareLinkMutation.mutateAsync({
+          id: file.id,
+        });
+        const shareUrl = `${window.location.origin}${path}`;
         try {
-          field.select();
-          if (!document.execCommand("copy")) throw new Error("Clipboard copy failed");
-        } finally {
-          field.remove();
+          await navigator.clipboard.writeText(shareUrl);
+        } catch {
+          const field = document.createElement("textarea");
+          field.value = shareUrl;
+          field.style.position = "fixed";
+          field.style.opacity = "0";
+          document.body.appendChild(field);
+          try {
+            field.select();
+            if (!document.execCommand("copy"))
+              throw new Error("Clipboard copy failed");
+          } finally {
+            field.remove();
+          }
         }
+        await minimumLoading;
+        showShareNotice("success");
+      } catch {
+        showShareNotice("error");
+      } finally {
+        setSharingFileId(null);
+        setOpenMenuFileId(null);
       }
-      await minimumLoading;
-      showShareNotice("success");
-    } catch {
-      showShareNotice("error");
-    } finally {
-      setSharingFileId(null);
-      setOpenMenuFileId(null);
-    }
-  }, [sharingFileId, showShareNotice]);
+    },
+    [sharingFileId, showShareNotice]
+  );
 
   function selectVisibleFiles() {
     setSelectedIds(current => selectVisibleLibraryItems(current, files));
@@ -589,7 +598,10 @@ export function LibraryWorkspace({
                   aria-label="Filter Library"
                   data-library-search-filter
                 >
-                  {LIBRARY_FILTERS.find(option => option.value === filter)?.label}
+                  {
+                    LIBRARY_FILTERS.find(option => option.value === filter)
+                      ?.label
+                  }
                   <ChevronDown className="ml-1.5 size-3.5" />
                 </Button>
               </DropdownMenuTrigger>
@@ -631,10 +643,7 @@ export function LibraryWorkspace({
                   autoFocus
                   value={query}
                   onChange={event => setQuery(event.target.value)}
-                  className={cn(
-                    "h-10 w-full rounded-xl",
-                    query && "pr-8"
-                  )}
+                  className={cn("h-10 w-full rounded-xl", query && "pr-8")}
                   placeholder="Search Library"
                   aria-label="Search your Library"
                 />
@@ -656,7 +665,9 @@ export function LibraryWorkspace({
               size="icon"
               className="size-9 shrink-0 rounded-full text-foreground transition-colors hover:border-neutral-700 hover:bg-neutral-800 active:bg-neutral-700 sm:size-10"
               onClick={() => setIsSearchOpen(open => !open)}
-              aria-label={isSearchOpen ? "Close Library search" : "Search Library"}
+              aria-label={
+                isSearchOpen ? "Close Library search" : "Search Library"
+              }
               aria-expanded={isSearchOpen}
             >
               <Search className="size-4" />
@@ -704,77 +715,43 @@ export function LibraryWorkspace({
               className="fixed bottom-0 inset-x-0 z-40 flex justify-center px-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:hidden select-none animate-in slide-in-from-bottom-5 duration-200"
               aria-label="Selected Library actions"
             >
-              <div className="flex flex-row items-center gap-1.5 rounded-[1.25rem] border border-border/80 bg-card/95 p-2 shadow-2xl shadow-black/10 backdrop-blur-xl">
-                <div
-                  className="flex h-11 w-11 cursor-default flex-col items-center justify-center gap-0.5 rounded-xl bg-foreground text-background shadow-md"
-                  aria-label={`${selectedFiles.length} selected`}
-                >
-                  <CheckCircle2 className="size-4.5" />
-                  <span className="text-[11px] font-bold leading-none tabular-nums">
-                    {selectedFiles.length}
-                  </span>
-                </div>
-
-                <div className="h-7 w-px bg-border" aria-hidden />
-
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      onClick={selectVisibleFiles}
-                      disabled={allVisibleSelected}
-                      className="flex h-11 w-11 items-center justify-center rounded-xl bg-neutral-900 text-neutral-50 transition-colors hover:bg-neutral-800 disabled:pointer-events-none disabled:opacity-40"
-                      aria-label="Select all visible files"
-                    >
-                      <ListChecks className="size-4.5" strokeWidth={2.5} />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="top">Select all</TooltipContent>
-                </Tooltip>
-
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedIds(new Set())}
-                      className="flex h-11 w-11 items-center justify-center rounded-xl bg-neutral-900 text-neutral-50 transition-colors hover:bg-neutral-800"
-                      aria-label="Clear selection"
-                    >
-                      <X className="size-4.5" strokeWidth={2.75} />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="top">Clear</TooltipContent>
-                </Tooltip>
-
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      onClick={chatWithSelected}
-                      className="flex h-11 w-11 items-center justify-center rounded-xl bg-foreground text-background shadow-md transition-all hover:bg-foreground/90 active:scale-95"
-                      aria-label="Chat with selected files"
-                    >
-                      <MessageCircle className="size-5" strokeWidth={2.5} />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="top">Chat</TooltipContent>
-                </Tooltip>
-
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      onClick={() => setDeleteTarget(selectedFiles)}
-                      className="flex h-11 w-11 items-center justify-center rounded-xl bg-neutral-900 text-destructive transition-colors hover:bg-neutral-800"
-                      aria-label={removeActionLabel}
-                    >
-                      <Trash6Icon className="size-4.5" />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="top">
-                    {removeActionLabel}
-                  </TooltipContent>
-                </Tooltip>
+              <div className="flex flex-row items-center gap-1 rounded-xl border border-border bg-card p-1 sm:gap-1.5">
+                <LibrarySelectionCount
+                  count={selectedFiles.length}
+                  side="top"
+                />
+                <LibrarySelectionAction
+                  label="Select all"
+                  ariaLabel="Select all visible files"
+                  icon={<CheckListNotes className="size-5" />}
+                  onClick={selectVisibleFiles}
+                  side="top"
+                  active
+                  disabled={allVisibleSelected}
+                />
+                <LibrarySelectionAction
+                  label="Cancel"
+                  ariaLabel="Clear selection"
+                  icon={<X className="size-5" strokeWidth={2.5} />}
+                  onClick={() => setSelectedIds(new Set())}
+                  side="top"
+                />
+                <LibrarySelectionAction
+                  label="Chat"
+                  ariaLabel="Chat with selected files"
+                  icon={<ChatLine aria-hidden="true" className="size-6" />}
+                  onClick={chatWithSelected}
+                  side="top"
+                  active
+                />
+                <LibrarySelectionAction
+                  label="Delete"
+                  ariaLabel={removeActionLabel}
+                  icon={<Trash6Icon className="size-4.5" />}
+                  onClick={() => setDeleteTarget(selectedFiles)}
+                  side="top"
+                  destructive
+                />
               </div>
             </div>
 
@@ -785,85 +762,43 @@ export function LibraryWorkspace({
               aria-label="Selected Library actions"
               className="fixed right-4 top-1/2 z-50 hidden -translate-y-1/2 select-none animate-in slide-in-from-right-8 fade-in-0 duration-300 ease-out sm:block"
             >
-              <div className="flex flex-col items-center gap-1.5 rounded-[1.25rem] border border-border/80 bg-card/95 p-2 shadow-2xl shadow-black/10 backdrop-blur-xl">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div
-                      className="flex h-11 w-11 cursor-default flex-col items-center justify-center gap-0.5 rounded-xl bg-foreground text-background shadow-md"
-                      aria-label={`${selectedFiles.length} selected`}
-                    >
-                      <CheckCircle2 className="size-4.5" />
-                      <span className="text-[11px] font-bold leading-none tabular-nums">
-                        {selectedFiles.length}
-                      </span>
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent side="left">
-                    {selectedFiles.length}{" "}
-                    {selectedFiles.length === 1 ? "file" : "files"} selected
-                  </TooltipContent>
-                </Tooltip>
-
-                <div className="h-px w-7 bg-border" aria-hidden />
-
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      onClick={selectVisibleFiles}
-                      disabled={allVisibleSelected}
-                      className="flex h-11 w-11 items-center justify-center rounded-xl bg-neutral-900 text-neutral-50 transition-colors hover:bg-neutral-800 disabled:pointer-events-none disabled:opacity-40"
-                      aria-label="Select all visible files"
-                    >
-                      <ListChecks className="size-4.5" strokeWidth={2.5} />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="left">Select all</TooltipContent>
-                </Tooltip>
-
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedIds(new Set())}
-                      className="flex h-11 w-11 items-center justify-center rounded-xl bg-neutral-900 text-neutral-50 transition-colors hover:bg-neutral-800"
-                      aria-label="Clear selection"
-                    >
-                      <X className="size-4.5" strokeWidth={2.75} />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="left">Clear</TooltipContent>
-                </Tooltip>
-
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      onClick={chatWithSelected}
-                      className="mt-0.5 flex h-11 w-11 items-center justify-center rounded-xl bg-foreground text-background shadow-md transition-all hover:bg-foreground/90 active:scale-95"
-                      aria-label="Chat with selected files"
-                    >
-                      <MessageCircle className="size-5" strokeWidth={2.5} />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="left">Chat</TooltipContent>
-                </Tooltip>
-
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      onClick={() => setDeleteTarget(selectedFiles)}
-                      className="flex h-11 w-11 items-center justify-center rounded-xl bg-neutral-900 text-destructive transition-colors hover:bg-neutral-800"
-                      aria-label={removeActionLabel}
-                    >
-                      <Trash6Icon className="size-4.5" />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="left">
-                    {removeActionLabel}
-                  </TooltipContent>
-                </Tooltip>
+              <div className="flex flex-col items-center gap-1 rounded-xl border border-border bg-card p-1">
+                <LibrarySelectionCount
+                  count={selectedFiles.length}
+                  side="left"
+                />
+                <LibrarySelectionAction
+                  label="Select all"
+                  ariaLabel="Select all visible files"
+                  icon={<CheckListNotes className="size-5" />}
+                  onClick={selectVisibleFiles}
+                  side="left"
+                  active
+                  disabled={allVisibleSelected}
+                />
+                <LibrarySelectionAction
+                  label="Cancel"
+                  ariaLabel="Clear selection"
+                  icon={<X className="size-5" strokeWidth={2.5} />}
+                  onClick={() => setSelectedIds(new Set())}
+                  side="left"
+                />
+                <LibrarySelectionAction
+                  label="Chat"
+                  ariaLabel="Chat with selected files"
+                  icon={<ChatLine aria-hidden="true" className="size-6" />}
+                  onClick={chatWithSelected}
+                  side="left"
+                  active
+                />
+                <LibrarySelectionAction
+                  label="Delete"
+                  ariaLabel={removeActionLabel}
+                  icon={<Trash6Icon className="size-4.5" />}
+                  onClick={() => setDeleteTarget(selectedFiles)}
+                  side="left"
+                  destructive
+                />
               </div>
             </div>
           </>
@@ -1120,7 +1055,11 @@ function SegmentedTags<T extends string>({
             )}
           >
             {option.icon}
-            <span className={iconsOnlyOnMobile ? "sr-only sm:not-sr-only" : undefined}>
+            <span
+              className={
+                iconsOnlyOnMobile ? "sr-only sm:not-sr-only" : undefined
+              }
+            >
               {option.label}
             </span>
           </button>
@@ -1198,6 +1137,81 @@ function FilePreview({
     <span className="flex size-full items-center justify-center bg-muted/45">
       <LibraryFormatIcon file={file} className="size-8" />
     </span>
+  );
+}
+
+function LibrarySelectionCount({
+  count,
+  side,
+}: {
+  count: number;
+  side: "left" | "top";
+}) {
+  return (
+    <div className="flex w-11 flex-col items-center gap-0.5 sm:w-12">
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div
+            className="flex size-10 cursor-default flex-col items-center justify-center gap-0.5 rounded-lg border border-border/60 bg-muted/50 text-foreground sm:size-11"
+            aria-label={`${count} files selected`}
+          >
+            <CheckCircle2 className="size-4" />
+            <span className="text-[10px] font-semibold leading-none tabular-nums">
+              {count}
+            </span>
+          </div>
+        </TooltipTrigger>
+        <TooltipContent side={side}>
+          {count} {count === 1 ? "file" : "files"} selected
+        </TooltipContent>
+      </Tooltip>
+    </div>
+  );
+}
+
+function LibrarySelectionAction({
+  label,
+  ariaLabel,
+  icon,
+  onClick,
+  side,
+  active = false,
+  destructive = false,
+  disabled = false,
+}: {
+  label: string;
+  ariaLabel: string;
+  icon: React.ReactNode;
+  onClick: () => void;
+  side: "left" | "top";
+  active?: boolean;
+  destructive?: boolean;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="flex w-11 flex-col items-center gap-0.5 sm:w-12">
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            onClick={onClick}
+            disabled={disabled}
+            className={cn(
+              "flex size-10 items-center justify-center rounded-lg border border-border/60 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40 sm:size-11",
+              active
+                ? "bg-foreground text-background"
+                : "text-foreground hover:bg-accent hover:text-foreground",
+              destructive &&
+                "text-red-400 hover:bg-red-500/10 hover:text-red-400"
+            )}
+            aria-label={ariaLabel}
+          >
+            {icon}
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side={side}>{label}</TooltipContent>
+      </Tooltip>
+    </div>
   );
 }
 
@@ -1324,8 +1338,16 @@ const LibraryGridCard = memo(function LibraryGridCard({
       <div className="flex min-w-0 items-center gap-1.5 px-2 py-1">
         <a
           href={file.url}
-          target={isPdfFile || isImageFile(file.filename, file.mimeType) ? undefined : "_blank"}
-          rel={isPdfFile || isImageFile(file.filename, file.mimeType) ? undefined : "noreferrer"}
+          target={
+            isPdfFile || isImageFile(file.filename, file.mimeType)
+              ? undefined
+              : "_blank"
+          }
+          rel={
+            isPdfFile || isImageFile(file.filename, file.mimeType)
+              ? undefined
+              : "noreferrer"
+          }
           onClick={handleOpenFile}
           className="min-w-0 flex-1"
           title={file.filename}
@@ -1337,80 +1359,84 @@ const LibraryGridCard = memo(function LibraryGridCard({
         {selectionMode ? (
           <span className="size-[30px] shrink-0" aria-hidden="true" />
         ) : (
-        <DropdownMenu open={isMenuOpen} onOpenChange={onMenuOpenChange}>
-          <DropdownMenuTrigger asChild>
-            <button
-              type="button"
-              onClick={event => event.stopPropagation()}
-              className={cn(
-                "pointer-events-none flex size-[30px] shrink-0 items-center justify-center rounded-md text-foreground opacity-0 transition-[opacity,color,background-color] group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100 hover:bg-accent hover:text-foreground max-lg:pointer-events-auto max-lg:opacity-100",
-                isMenuOpen && "pointer-events-auto opacity-100 bg-accent text-foreground",
-                selectionMode && "pointer-events-none opacity-0"
-              )}
-              aria-label={`More options for ${file.filename}`}
-            >
-              <MoreVertical className="size-4" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-44">
-            <DropdownMenuItem
-              onClick={event => {
-                event.stopPropagation();
-                void downloadFile(file.url, file.filename);
-              }}
-            >
-              <Download className="mr-2 size-4" />
-              Download
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={event => {
-                event.stopPropagation();
-                onRename(file);
-              }}
-            >
-              <Pencil className="mr-2 size-4" />
-              Rename
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={event => event.stopPropagation()}
-              onSelect={event => {
-                event.stopPropagation();
-                event.preventDefault();
-                onShare(file);
-              }}
-              aria-busy={sharing}
-            >
-              {sharing ? (
-                <span className="loader loader-xs mr-2 text-current" aria-hidden="true" />
-              ) : (
-                <ShareIcon className="mr-2 size-4" />
-              )}
-              Share
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={event => {
-                event.stopPropagation();
-                onToggleFavorite(file);
-              }}
-            >
-              <Star
-                className={cn("mr-2 size-4", isFavorite && "fill-current")}
-              />
-              {isFavorite ? "Remove from favorites" : "Add to favorites"}
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={event => {
-                event.stopPropagation();
-                onDelete(file);
-              }}
-              variant="destructive"
-            >
-              <Trash6Icon className="mr-2 size-4" />
-              Delete
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+          <DropdownMenu open={isMenuOpen} onOpenChange={onMenuOpenChange}>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                onClick={event => event.stopPropagation()}
+                className={cn(
+                  "pointer-events-none flex size-[30px] shrink-0 items-center justify-center rounded-md text-foreground opacity-0 transition-[opacity,color,background-color] group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100 hover:bg-accent hover:text-foreground max-lg:pointer-events-auto max-lg:opacity-100",
+                  isMenuOpen &&
+                    "pointer-events-auto opacity-100 bg-accent text-foreground",
+                  selectionMode && "pointer-events-none opacity-0"
+                )}
+                aria-label={`More options for ${file.filename}`}
+              >
+                <MoreVertical className="size-4" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-44">
+              <DropdownMenuItem
+                onClick={event => {
+                  event.stopPropagation();
+                  void downloadFile(file.url, file.filename);
+                }}
+              >
+                <Download className="mr-2 size-4" />
+                Download
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={event => {
+                  event.stopPropagation();
+                  onRename(file);
+                }}
+              >
+                <Pencil className="mr-2 size-4" />
+                Rename
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={event => event.stopPropagation()}
+                onSelect={event => {
+                  event.stopPropagation();
+                  event.preventDefault();
+                  onShare(file);
+                }}
+                aria-busy={sharing}
+              >
+                {sharing ? (
+                  <span
+                    className="loader loader-xs mr-2 text-current"
+                    aria-hidden="true"
+                  />
+                ) : (
+                  <ShareIcon className="mr-2 size-4" />
+                )}
+                Share
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={event => {
+                  event.stopPropagation();
+                  onToggleFavorite(file);
+                }}
+              >
+                <Star
+                  className={cn("mr-2 size-4", isFavorite && "fill-current")}
+                />
+                {isFavorite ? "Remove from favorites" : "Add to favorites"}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={event => {
+                  event.stopPropagation();
+                  onDelete(file);
+                }}
+                variant="destructive"
+              >
+                <Trash6Icon className="mr-2 size-4" />
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         )}
       </div>
       <div className="group/preview relative">
@@ -1443,9 +1469,7 @@ const LibraryGridCard = memo(function LibraryGridCard({
           )}
         >
           {file.createdAt && <span>{formatDateLabel(file.createdAt)}</span>}
-          {isFavorite && (
-            <Star className="size-4 shrink-0" />
-          )}
+          {isFavorite && <Star className="size-4 shrink-0" />}
         </div>
         <button
           type="button"
@@ -1628,80 +1652,84 @@ const LibraryListRow = memo(function LibraryListRow({
         {selectionMode ? (
           <span className="size-[30px]" aria-hidden="true" />
         ) : (
-        <DropdownMenu open={isMenuOpen} onOpenChange={onMenuOpenChange}>
-          <DropdownMenuTrigger asChild>
-            <button
-              type="button"
-              onClick={event => event.stopPropagation()}
-              className={cn(
-                "pointer-events-none flex size-[30px] items-center justify-center rounded-md text-foreground opacity-0 transition-[opacity,color,background-color] group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100 hover:bg-accent hover:text-foreground max-lg:pointer-events-auto max-lg:opacity-100",
-                isMenuOpen && "pointer-events-auto opacity-100 bg-accent text-foreground",
-                selectionMode && "pointer-events-none opacity-0"
-              )}
-              aria-label={`More options for ${file.filename}`}
-            >
-              <MoreVertical className="size-4" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-44">
-            <DropdownMenuItem
-              onClick={event => {
-                event.stopPropagation();
-                void downloadFile(file.url, file.filename);
-              }}
-            >
-              <Download className="mr-2 size-4" />
-              Download
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={event => {
-                event.stopPropagation();
-                onRename(file);
-              }}
-            >
-              <Pencil className="mr-2 size-4" />
-              Rename
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={event => event.stopPropagation()}
-              onSelect={event => {
-                event.stopPropagation();
-                event.preventDefault();
-                onShare(file);
-              }}
-              aria-busy={sharing}
-            >
-              {sharing ? (
-                <span className="loader loader-xs mr-2 text-current" aria-hidden="true" />
-              ) : (
-                <ShareIcon className="mr-2 size-4" />
-              )}
-              Share
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={event => {
-                event.stopPropagation();
-                onToggleFavorite(file);
-              }}
-            >
-              <Star
-                className={cn("mr-2 size-4", isFavorite && "fill-current")}
-              />
-              {isFavorite ? "Remove from favorites" : "Add to favorites"}
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={event => {
-                event.stopPropagation();
-                onDelete(file);
-              }}
-              variant="destructive"
-            >
-              <Trash6Icon className="mr-2 size-4" />
-              Delete
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+          <DropdownMenu open={isMenuOpen} onOpenChange={onMenuOpenChange}>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                onClick={event => event.stopPropagation()}
+                className={cn(
+                  "pointer-events-none flex size-[30px] items-center justify-center rounded-md text-foreground opacity-0 transition-[opacity,color,background-color] group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100 hover:bg-accent hover:text-foreground max-lg:pointer-events-auto max-lg:opacity-100",
+                  isMenuOpen &&
+                    "pointer-events-auto opacity-100 bg-accent text-foreground",
+                  selectionMode && "pointer-events-none opacity-0"
+                )}
+                aria-label={`More options for ${file.filename}`}
+              >
+                <MoreVertical className="size-4" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-44">
+              <DropdownMenuItem
+                onClick={event => {
+                  event.stopPropagation();
+                  void downloadFile(file.url, file.filename);
+                }}
+              >
+                <Download className="mr-2 size-4" />
+                Download
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={event => {
+                  event.stopPropagation();
+                  onRename(file);
+                }}
+              >
+                <Pencil className="mr-2 size-4" />
+                Rename
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={event => event.stopPropagation()}
+                onSelect={event => {
+                  event.stopPropagation();
+                  event.preventDefault();
+                  onShare(file);
+                }}
+                aria-busy={sharing}
+              >
+                {sharing ? (
+                  <span
+                    className="loader loader-xs mr-2 text-current"
+                    aria-hidden="true"
+                  />
+                ) : (
+                  <ShareIcon className="mr-2 size-4" />
+                )}
+                Share
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={event => {
+                  event.stopPropagation();
+                  onToggleFavorite(file);
+                }}
+              >
+                <Star
+                  className={cn("mr-2 size-4", isFavorite && "fill-current")}
+                />
+                {isFavorite ? "Remove from favorites" : "Add to favorites"}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={event => {
+                  event.stopPropagation();
+                  onDelete(file);
+                }}
+                variant="destructive"
+              >
+                <Trash6Icon className="mr-2 size-4" />
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         )}
       </div>
     </article>
@@ -1741,9 +1769,7 @@ function RenameFilePanel({
       input.scrollLeft = input.scrollWidth;
     });
   };
-  const clampSelectionToName = (
-    event: React.MouseEvent<HTMLInputElement>
-  ) => {
+  const clampSelectionToName = (event: React.MouseEvent<HTMLInputElement>) => {
     if (!extension) return;
     const input = event.currentTarget;
     requestAnimationFrame(() => {
