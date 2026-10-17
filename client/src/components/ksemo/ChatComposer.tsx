@@ -1038,7 +1038,7 @@ export const ChatComposer = memo(function ChatComposer({
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="ksemo-composer-attach size-10 shrink-0 rounded-full bg-transparent text-foreground hover:bg-accent hover:text-foreground transition-colors"
+                            className="ksemo-composer-attach size-10 shrink-0 rounded-full bg-transparent text-foreground transition-colors hover:bg-accent hover:text-foreground data-[state=open]:bg-accent data-[state=open]:text-foreground"
                             aria-label={
                               toolsOpen && !libraryOpen
                                 ? "Close attachment options"

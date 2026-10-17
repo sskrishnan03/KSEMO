@@ -47,13 +47,6 @@ function FooterLinks() {
   return (
     <div className="flex items-center justify-center gap-2 text-[11px] leading-5 text-muted-foreground">
       <Link
-        href="/support/faq"
-        className="transition-colors hover:text-foreground"
-      >
-        Help
-      </Link>
-      <span aria-hidden="true">·</span>
-      <Link
         href="/support/privacy"
         className="transition-colors hover:text-foreground"
       >

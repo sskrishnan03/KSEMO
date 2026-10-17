@@ -100,7 +100,6 @@ import { detectFileRequest } from "@shared/docDetect";
 
 import { SettingsDialog } from "../components/ksemo/SettingsDialog";
 import { SignInPrompt } from "../components/ksemo/SignInPrompt";
-import { ScanToOpenCard } from "../components/ksemo/ScanToOpenCard";
 import { setGuestModeActive } from "@/lib/guestMode";
 import {
   isSameMessageFeedback,
@@ -5903,17 +5902,6 @@ export default function Home({
         <SignInPrompt
           open={guestPromptOpen}
           onClose={() => setGuestPromptOpen(false)}
-        />
-      )}
-
-      {guestMode && (
-        <ScanToOpenCard
-          className={cn(
-            // Clear of the sidebar: 276px expanded / 64px collapsed, plus a
-            // 20px inset. The card is desktop-only, so these are the only
-            // offsets that ever apply.
-            sidebarCollapsed ? "left-[5.25rem]" : "left-[18.5rem]"
-          )}
         />
       )}
 

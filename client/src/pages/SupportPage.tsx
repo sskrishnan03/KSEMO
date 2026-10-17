@@ -280,26 +280,32 @@ function SupportShell({ topic }: { topic: SupportTopic }) {
       </header>
       <div className="mx-auto w-full max-w-5xl px-5 pb-14 pt-10 sm:px-8 sm:pt-14">
         <section className="text-center">
-          <div className="flex flex-wrap items-center justify-center gap-x-2.5 gap-y-1.5 text-xs text-muted-foreground">
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/50 px-2.5 py-1 font-medium text-foreground/80">
-              {meta.icon}
-              {meta.label}
-            </span>
-            <span aria-hidden>·</span>
-            <span>Last updated 17 October 2026</span>
-          </div>
-          <h1 className="mt-3 text-3xl font-semibold tracking-[-0.035em] sm:text-4xl">
-            {meta.title}
-          </h1>
-          {topic !== "faq" && (
-            <p className="mx-auto mt-4 max-w-xl rounded-xl border border-border bg-muted/40 px-4 py-2.5 text-xs leading-5 text-muted-foreground">
-              These pages describe KSEMO's app-level practices. Hosting, AI
-              providers, and local legal terms can vary by deployment.
-            </p>
+          {topic === "faq" ? (
+            <>
+              <div className="flex flex-wrap items-center justify-center gap-x-2.5 gap-y-1.5 text-xs text-muted-foreground">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/50 px-2.5 py-1 font-medium text-foreground/80">
+                  {meta.icon}
+                  {meta.label}
+                </span>
+                <span aria-hidden>·</span>
+                <span>Last updated 17 October 2026</span>
+              </div>
+              <h1 className="mt-3 text-3xl font-semibold tracking-[-0.035em] sm:text-4xl">
+                {meta.title}
+              </h1>
+            </>
+          ) : (
+            <>
+              <h1 className="text-3xl font-semibold tracking-[-0.035em] sm:text-4xl">
+                {meta.title}
+              </h1>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Last updated 17 October 2026
+              </p>
+            </>
           )}
         </section>
-        <div className="mt-10 gap-10 lg:grid lg:grid-cols-[13rem_minmax(0,1fr)]">
-          <SupportSectionNav topic={topic} />
+        <div className="mx-auto mt-10 w-full max-w-3xl">
           <div className="min-w-0">
             {topic === "faq" ? (
               <FaqContent />
@@ -321,12 +327,6 @@ function SupportShell({ topic }: { topic: SupportTopic }) {
               © 2026 KSEMO
             </span>
             <span aria-hidden>·</span>
-            <a
-              href="/support/faq"
-              className="transition-colors hover:text-foreground"
-            >
-              FAQ
-            </a>
             <a
               href="/support/privacy"
               className="transition-colors hover:text-foreground"
@@ -352,139 +352,6 @@ function policySectionId(title: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
-}
-
-const PRIVACY_SECTION_TITLES = [
-  "The short version",
-  "Information we handle",
-  "How KSEMO uses your information",
-  "Memory and files",
-  "Sharing and temporary chat",
-  "Retention and your controls",
-  "Security and providers",
-  "Your choices and contact",
-];
-
-const TERMS_SECTION_TITLES = [
-  "Using KSEMO",
-  "Your account",
-  "Your content",
-  "AI responses",
-  "Acceptable use",
-  "Availability, limits, and changes",
-  "Third-party services",
-  "Disclaimers and liability",
-  "Changes and contact",
-];
-
-// Tracks which section the reader is currently viewing. Position-based rather
-// than observer-based: on every scroll frame the active section is simply the
-// last heading above a line ~30% down the viewport, so detection stays exact
-// for short and very long sections alike.
-function useActiveSection(ids: Array<string>): string {
-  const [activeId, setActiveId] = useState("");
-  const idsKey = ids.join("|");
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    let frame = 0;
-    const measure = () => {
-      frame = 0;
-      const line = window.innerHeight * 0.3;
-      let current = "";
-      for (const id of idsKey.split("|")) {
-        if (!id) continue;
-        const element = document.getElementById(id);
-        if (!element) continue;
-        // Sections are ordered top-to-bottom, so the last heading that has
-        // passed the line wins.
-        if (element.getBoundingClientRect().top <= line) current = id;
-        else break;
-      }
-      setActiveId(current);
-    };
-    const onScroll = () => {
-      if (!frame) frame = requestAnimationFrame(measure);
-    };
-    measure();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", onScroll);
-    return () => {
-      if (frame) cancelAnimationFrame(frame);
-      window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", onScroll);
-    };
-  }, [idsKey]);
-  return activeId;
-}
-
-// The page's own outline beside the content: FAQ lists its categories with
-// question counts; Privacy and Terms list their main headings. Rows echo the
-// Settings navigation styling so all KSEMO surfaces feel alike.
-function SupportSectionNav({ topic }: { topic: SupportTopic }) {
-  const items = useMemo<Array<{ id: string; label: string }>>(
-    function buildItems() {
-      if (topic === "faq")
-        return FAQ_CATEGORIES.map(category => ({
-          id: `faq-${category.id}`,
-          label: category.label,
-        }));
-      if (topic === "privacy")
-        return PRIVACY_SECTION_TITLES.map(title => ({
-          id: policySectionId(title),
-          label: title,
-        }));
-      return TERMS_SECTION_TITLES.map(title => ({
-        id: policySectionId(title),
-        label: title,
-      }));
-    },
-    [topic]
-  );
-  const activeId = useActiveSection(items.map(item => item.id));
-
-  function scrollTo(id: string) {
-    const element = document.getElementById(id);
-    if (!element) return;
-    element.scrollIntoView({ behavior: "smooth", block: "start" });
-    window.history.replaceState(null, "", `#${id}`);
-  }
-
-  return (
-    <nav
-      aria-label={`${TOPIC_META[topic].title} sections`}
-      className="mb-6 lg:sticky lg:top-20 lg:mb-0 lg:self-start"
-    >
-      <p className="hidden px-3 pb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground lg:block">
-        On this page
-      </p>
-      {/* Phones: swipeable pill row. Desktop: vertical outline. */}
-      <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1 lg:mx-0 lg:block lg:space-y-0.5 lg:overflow-visible lg:px-0 lg:pb-0">
-        {items.map(item => {
-          const active = activeId === item.id;
-          return (
-            <a
-              key={item.id}
-              href={`#${item.id}`}
-              onClick={event => {
-                event.preventDefault();
-                scrollTo(item.id);
-              }}
-              aria-current={active ? "true" : undefined}
-              className={cn(
-                "flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs transition-colors",
-                "lg:w-full lg:shrink lg:rounded-lg lg:border-transparent lg:px-3 lg:py-1.5 lg:text-[13px] lg:leading-5 lg:whitespace-normal",
-                active
-                  ? "border-border bg-muted font-medium text-foreground lg:bg-muted/70"
-                  : "border-border bg-background text-muted-foreground hover:bg-muted/50 hover:text-foreground lg:border-transparent lg:bg-transparent"
-              )}
-            >
-              <span className="min-w-0">{item.label}</span>
-            </a>
-          );
-        })}
-      </div>
-    </nav>
-  );
 }
 
 function FaqContent({ compact = false }: { compact?: boolean }) {
@@ -1056,9 +923,6 @@ function TermsContent() {
   );
 }
 
-export function FaqPage() {
-  return <SupportShell topic="faq" />;
-}
 export function PrivacyPage() {
   return <SupportShell topic="privacy" />;
 }

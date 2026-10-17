@@ -1000,21 +1000,13 @@ export const ConversationActionsMenuItems = memo(
 export const MobileSupportMenuItems = memo(function MobileSupportMenuItems({
   onSupport,
 }: {
-  onSupport: (topic: "faq" | "privacy" | "terms") => void;
+  onSupport: (topic: "privacy" | "terms") => void;
 }) {
   return (
     <div
       className="mx-1 my-1 space-y-0.5 rounded-lg border border-border/40 bg-accent/35 p-1"
       data-testid="mobile-support-menu-items"
     >
-      <DropdownMenuItem
-        onClick={() => onSupport("faq")}
-        className="flex cursor-pointer items-center gap-2 rounded-md py-2 pl-2.5 pr-2 text-xs font-medium focus-visible:ring-0 focus-visible:outline-none"
-      >
-        <HelpCircle className="mr-2 size-3.5 text-muted-foreground" />
-        <span>FAQ</span>
-        <ExternalLink className="ml-auto size-3 text-muted-foreground" />
-      </DropdownMenuItem>
       <DropdownMenuItem
         onClick={() => onSupport("privacy")}
         className="flex cursor-pointer items-center gap-2 rounded-md py-2 pl-2.5 pr-2 text-xs font-medium focus-visible:ring-0 focus-visible:outline-none"

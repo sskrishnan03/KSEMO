@@ -150,17 +150,15 @@ describe("KSEMO conversation sidebar disclosure", () => {
     expect(markup).toContain("group-focus-within/brand");
   });
 
-  it("renders mobile Help & Support options with all three choices (FAQ, Privacy Policy, Terms of Service)", () => {
+  it("renders mobile Help & Support options with Privacy Policy and Terms of Service", () => {
     const markup = renderInMenu(
       createElement(MobileSupportMenuItems, {
         onSupport: () => undefined,
       })
     );
     expect(markup).toContain('data-testid="mobile-support-menu-items"');
-    expect(markup).toContain("FAQ");
     expect(markup).toContain("Privacy Policy");
     expect(markup).toContain("Terms of Service");
-    expect(markup).toContain("lucide-circle-help");
     expect(markup).toContain("lucide-shield-check");
     expect(markup).toContain("lucide-file-text");
     expect(markup).toContain("lucide-external-link");
