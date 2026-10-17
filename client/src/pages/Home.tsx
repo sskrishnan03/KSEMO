@@ -18,6 +18,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuSub,
   DropdownMenuSubContent,
@@ -899,6 +900,37 @@ export default function Home({
     activeQuery.data?.conversation,
     conversationQuery.data,
   ]);
+  const mobileConversationTitle =
+    activeConversation?.title.replace(/^Branch:\s*/, "") || "New Chat";
+  const mobileConversationTitleRef = useRef<HTMLSpanElement>(null);
+  const [
+    mobileConversationTitleOverflows,
+    setMobileConversationTitleOverflows,
+  ] = useState(false);
+
+  useEffect(() => {
+    const titleElement = mobileConversationTitleRef.current;
+    if (!titleElement) return;
+
+    const updateOverflow = () => {
+      setMobileConversationTitleOverflows(
+        titleElement.scrollWidth > titleElement.clientWidth + 1
+      );
+    };
+
+    updateOverflow();
+    const observer =
+      typeof ResizeObserver === "undefined"
+        ? null
+        : new ResizeObserver(updateOverflow);
+    observer?.observe(titleElement);
+    window.addEventListener("resize", updateOverflow);
+
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", updateOverflow);
+    };
+  }, [mobileConversationTitle, chatFilesOpen]);
   const preferencesQuery = trpc.preferences.get.useQuery(undefined, {
     enabled: Boolean(user),
   });
@@ -5368,17 +5400,17 @@ export default function Home({
                           </div>
                         </div>
                         {!chatFilesOpen && (
-                          <div className="pointer-events-auto absolute left-16 right-2 top-2 flex h-10 min-w-0 items-center gap-2 lg:hidden">
+                          <div className="pointer-events-auto absolute left-[4.5rem] right-2 top-2 flex h-10 min-w-0 items-center justify-end gap-1.5 lg:hidden">
                             {activeConversation?.title.startsWith(
                               "Branch: "
                             ) && (
                               <BranchSplitIcon className="size-4 shrink-0 text-foreground" />
                             )}
-                            <span className="min-w-0 flex-1 truncate text-sm font-semibold text-foreground">
-                              {activeConversation?.title.replace(
-                                /^Branch:\s*/,
-                                ""
-                              ) || "New Chat"}
+                            <span
+                              ref={mobileConversationTitleRef}
+                              className="min-w-0 max-w-[calc(100%-2.5rem)] truncate text-right text-sm font-semibold text-foreground"
+                            >
+                              {mobileConversationTitle}
                             </span>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
@@ -5395,6 +5427,14 @@ export default function Home({
                                 sideOffset={6}
                                 className="w-max min-w-40 max-w-[calc(100vw-1rem)] rounded-xl lg:hidden"
                               >
+                                {mobileConversationTitleOverflows && (
+                                  <>
+                                    <DropdownMenuLabel className="whitespace-normal break-words text-foreground">
+                                      {mobileConversationTitle}
+                                    </DropdownMenuLabel>
+                                    <DropdownMenuSeparator />
+                                  </>
+                                )}
                                 <DropdownMenuItem
                                   disabled={!activeConversationId}
                                   onSelect={() => {
