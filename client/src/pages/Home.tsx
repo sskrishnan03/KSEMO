@@ -5372,7 +5372,7 @@ export default function Home({
                             <DropdownMenuContent
                               align="end"
                               sideOffset={6}
-                              className="w-[184px] rounded-xl lg:hidden"
+                              className="w-[180px] rounded-xl lg:hidden"
                             >
                               <DropdownMenuLabel className="whitespace-normal break-words text-foreground">
                                 {activeConversation?.title || "New Chat"}
