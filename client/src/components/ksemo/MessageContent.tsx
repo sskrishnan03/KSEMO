@@ -999,6 +999,11 @@ export const MessageContent = memo(function MessageContent({
             >
               {isMobile ? (
                 <div className="inline-flex min-w-[132px] flex-col items-stretch gap-0 rounded-lg border border-border/70 bg-popover p-1 text-popover-foreground shadow-md">
+                  {messageTimestamp && (
+                    <time className="flex w-full justify-start px-2.5 pt-[10px] pb-2 text-left text-[12.5px] leading-4 tabular-nums text-muted-foreground/80">
+                      {messageTimestamp}
+                    </time>
+                  )}
                   {onEdit && !isEditing && (
                     <Button
                       type="button"
