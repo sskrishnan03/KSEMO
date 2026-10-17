@@ -5363,7 +5363,7 @@ export default function Home({
                             <DropdownMenuTrigger asChild>
                               <button
                                 type="button"
-                                className="pointer-events-auto absolute right-2 top-2 flex size-9 items-center justify-center rounded-lg text-foreground transition-colors hover:bg-accent/70 active:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:hidden"
+                                className="pointer-events-auto absolute right-2 top-2 flex size-9 items-center justify-center rounded-lg text-foreground transition-colors hover:bg-accent/70 active:bg-accent data-[state=open]:bg-accent/70 data-[state=open]:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:hidden"
                                 aria-label={`More options for ${activeConversation?.title || "New Chat"}`}
                               >
                                 <MoreHorizontal className="size-5" />
@@ -5372,7 +5372,7 @@ export default function Home({
                             <DropdownMenuContent
                               align="end"
                               sideOffset={6}
-                              className="w-[158px] rounded-xl lg:hidden"
+                              className="w-[162px] rounded-xl lg:hidden"
                             >
                               <DropdownMenuLabel className="whitespace-normal break-words text-foreground">
                                 {activeConversation?.title || "New Chat"}
