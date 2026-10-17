@@ -5429,7 +5429,7 @@ export default function Home({
                               >
                                 {mobileConversationTitleOverflows && (
                                   <>
-                                    <DropdownMenuLabel className="line-clamp-2 whitespace-normal break-words text-foreground">
+                                    <DropdownMenuLabel className="whitespace-normal break-words text-foreground">
                                       {mobileConversationTitle}
                                     </DropdownMenuLabel>
                                     <DropdownMenuSeparator />
