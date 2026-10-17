@@ -597,7 +597,7 @@ export const MessageContent = memo(function MessageContent({
           className={cn(
             "min-w-0",
             isUser
-              ? "relative flex flex-col items-end w-fit max-w-[84%] sm:max-w-[68%]"
+              ? "relative flex flex-col items-end w-fit max-w-[84%] sm:max-w-[82%]"
               : "w-full"
           )}
         >
@@ -1039,6 +1039,11 @@ export const MessageContent = memo(function MessageContent({
                 </div>
               ) : (
                 <>
+                  {messageTimestamp && (
+                    <time className="mr-1 flex items-center px-1 text-[12.5px] leading-4 tabular-nums text-muted-foreground/80">
+                      {messageTimestamp}
+                    </time>
+                  )}
                   {onEdit &&
                     !isEditing &&
                     action("Edit message", <Pencil className="size-4" />, () =>
