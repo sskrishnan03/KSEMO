@@ -48,6 +48,7 @@ import {
   BotActionStatus,
   type BotActionData,
 } from "@/components/voice/BotActionStatus";
+import { CopySuccessIcon } from "./ActionNotice";
 
 type KsemoMessage = {
   id: string;
@@ -99,21 +100,6 @@ type KsemoMessage = {
     code?: string;
   };
 };
-
-function AnimatedSquareCheck({ className }: { className: string }) {
-  return (
-    <svg
-      aria-hidden="true"
-      className={cn("ksemo-copy-success", className)}
-      viewBox="0 0 24 24"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <circle className="ksemo-copy-success-circle" cx="12" cy="12" r="10.5" />
-      <path className="ksemo-copy-success-tick" d="m6.5 12.5 4 4 7.5-8" />
-    </svg>
-  );
-}
 
 const FEEDBACK_SPARK_DIRECTIONS = [
   [-19, -19],
@@ -1044,7 +1030,7 @@ export const MessageContent = memo(function MessageContent({
                     }}
                   >
                     {copied ? (
-                      <AnimatedSquareCheck className="size-4" />
+                      <CopySuccessIcon className="size-[17px]" />
                     ) : (
                       <Copy className="size-4" />
                     )}
@@ -1066,7 +1052,7 @@ export const MessageContent = memo(function MessageContent({
                   {action(
                     "Copy message",
                     copied ? (
-                      <AnimatedSquareCheck className="size-4" />
+                      <CopySuccessIcon className="size-[17px]" />
                     ) : (
                       <Copy className="size-4" />
                     ),
@@ -1088,7 +1074,7 @@ export const MessageContent = memo(function MessageContent({
                   action(
                     copied ? "Copied" : "Copy response",
                     copied ? (
-                      <AnimatedSquareCheck className="size-4" />
+                      <CopySuccessIcon className="size-[17px]" />
                     ) : (
                       <Copy className="size-4" />
                     ),

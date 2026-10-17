@@ -660,9 +660,13 @@ html.ksemo-reduce-motion .loader-xs {
   stroke-linejoin: round;
 }
 .ksemo-copy-success-circle {
+  fill: none;
+  stroke: #fff;
   animation: ksemo-copy-box-in 110ms ease-out both;
 }
 .ksemo-copy-success-tick {
+  stroke: #fff;
+  stroke-width: 2.2;
   stroke-dasharray: 20;
   stroke-dashoffset: 20;
   animation: ksemo-copy-tick-draw 150ms 25ms ease-out forwards;

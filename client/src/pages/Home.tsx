@@ -32,7 +32,6 @@ import {
   Archive,
   ArrowDown,
   ChevronDown,
-  CheckCircle2,
   Download,
   MoreHorizontal,
   LogIn,
@@ -130,6 +129,10 @@ import {
 } from "@/lib/speechReactive";
 import { WorkspacePanel } from "../components/ksemo/WorkspacePanel";
 import { LibraryWorkspace } from "../components/ksemo/LibraryWorkspace";
+import {
+  ActionNotice,
+  showActionNotice,
+} from "../components/ksemo/ActionNotice";
 import { SearchWorkspace } from "../components/ksemo/PremiumSearch";
 import {
   createConversationPdfFile,
@@ -3672,7 +3675,10 @@ export default function Home({
     }
     setShareNotice(status);
     setShareNoticeText(
-      message ?? (status === "success" ? "Link copied" : "Could not copy link")
+      message ??
+        (status === "success"
+          ? "Link copied. Ready to share."
+          : "Couldn't copy link. Please try again.")
     );
     shareNoticeTimerRef.current = window.setTimeout(() => {
       setShareNotice(null);
@@ -3689,8 +3695,8 @@ export default function Home({
   }
 
   async function copyConversationShareLink() {
-    toast.success(
-      "Chat link copied. Anyone with the link can view this conversation."
+    showActionNotice(
+      "Chat link copied. Ready to share."
     );
   }
 
@@ -3732,10 +3738,10 @@ export default function Home({
       }
       showShareNotice(
         "success",
-        "Chat link copied. Anyone with the link can view this conversation."
+        "Chat link copied. Ready to share."
       );
     } catch {
-      showShareNotice("error", "Could not copy the chat link. Please try again.");
+      showShareNotice("error", "Couldn't copy chat link. Please try again.");
     } finally {
       setSharingConversationId(null);
     }
@@ -3768,11 +3774,11 @@ export default function Home({
       await minimumLoading;
       showShareNotice(
         "success",
-        "Answer link copied. Anyone with the link can view this response."
+        "Answer link copied. Ready to share."
       );
     } catch {
       await minimumLoading;
-      showShareNotice("error", "Could not copy the answer link. Please try again.");
+      showShareNotice("error", "Couldn't copy answer link. Please try again.");
     }
   }
 
@@ -5126,28 +5132,12 @@ export default function Home({
                 Boolean(shareNotice)) && (
                 <div className="pointer-events-none absolute inset-x-0 top-0 z-20 h-13">
                   {shareNotice && (
-                    <div
-                      role="status"
-                      aria-live="polite"
-                      className={cn(
-                        "pointer-events-auto absolute right-2 top-11 flex w-max max-w-[calc(100vw-1rem)] translate-x-0 items-center gap-2 rounded-lg border px-3 py-2 text-white shadow-lg shadow-black/20 animate-in fade-in slide-in-from-top-1 duration-200",
-                        shareNotice === "success"
-                          ? "border-emerald-400/30 bg-emerald-700"
-                          : "border-rose-400/30 bg-rose-700"
-                      )}
-                    >
-                      <CheckCircle2 className="size-4 shrink-0" aria-hidden="true" />
-                      <p className="max-w-[min(20rem,calc(100vw-5rem))] whitespace-normal text-xs font-semibold">
-                        {shareNoticeText}
-                      </p>
-                      <button
-                        type="button"
-                        onClick={dismissShareNotice}
-                        aria-label="Dismiss share message"
-                        className="flex size-7 shrink-0 items-center justify-center rounded-md text-white/80 transition-colors hover:bg-white/15 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
-                      >
-                        <X className="size-4" />
-                      </button>
+                    <div className="pointer-events-auto absolute right-2 top-11 animate-in fade-in slide-in-from-top-1 duration-200">
+                      <ActionNotice
+                        message={shareNoticeText}
+                        status={shareNotice}
+                        onDismiss={dismissShareNotice}
+                      />
                     </div>
                   )}
                   <ShareConversationDialog

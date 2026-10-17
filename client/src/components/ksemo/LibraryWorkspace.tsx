@@ -53,6 +53,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { ShareIcon, Trash6Icon } from "./icons";
+import { ActionNotice } from "./ActionNotice";
 import { downloadFile } from "@/lib/downloadFile";
 import { toast } from "sonner";
 import React, {
@@ -558,22 +559,16 @@ export function LibraryWorkspace({
 
         <section className="mt-3 flex min-w-0 flex-wrap items-center gap-2 overflow-visible py-1 sm:flex-nowrap sm:gap-3">
           {shareNotice && (
-            <div
-              role="status"
-              aria-live="polite"
-              className={cn(
-                "fixed right-3 top-[max(env(safe-area-inset-top),0.75rem)] z-[100] flex items-center gap-1 rounded-lg border px-2 py-1.5 text-white shadow-lg sm:hidden",
-                shareNotice === "success"
-                  ? "border-emerald-400/30 bg-emerald-700"
-                  : "border-rose-400/30 bg-rose-700"
-              )}
-            >
-              <span className="text-xs font-semibold">
-                {shareNotice === "success" ? "Link copied" : "Copy failed"}
-              </span>
-              <button type="button" onClick={dismissShareNotice} aria-label="Dismiss share message" className="flex size-5 shrink-0 items-center justify-center rounded text-white/80 hover:bg-white/15">
-                <X className="size-3" />
-              </button>
+            <div className="fixed right-3 top-[max(env(safe-area-inset-top),0.75rem)] z-[100] sm:hidden">
+              <ActionNotice
+                message={
+                  shareNotice === "success"
+                    ? "File link copied. Ready to share."
+                    : "Couldn't copy file link. Please try again."
+                }
+                status={shareNotice}
+                onDismiss={dismissShareNotice}
+              />
             </div>
           )}
           <div className="hidden sm:block">
@@ -677,22 +672,16 @@ export function LibraryWorkspace({
           />
           <div className="relative order-first ml-auto hidden shrink-0 sm:order-last sm:ml-0 sm:block">
             {shareNotice && (
-              <div
-                role="status"
-                aria-live="polite"
-                className={cn(
-                  "absolute bottom-full right-0 mb-2 hidden items-center gap-1.5 whitespace-nowrap rounded-lg border px-2.5 py-1.5 text-white shadow-md sm:flex",
-                  shareNotice === "success"
-                    ? "border-emerald-400/30 bg-emerald-700"
-                    : "border-rose-400/30 bg-rose-700"
-                )}
-              >
-                <span className="text-xs font-semibold">
-                  {shareNotice === "success" ? "Link copied" : "Copy failed"}
-                </span>
-                <button type="button" onClick={dismissShareNotice} aria-label="Dismiss share message" className="flex size-5 shrink-0 items-center justify-center rounded text-white/80 hover:bg-white/15">
-                  <X className="size-3" />
-                </button>
+              <div className="absolute bottom-full right-0 mb-2 hidden sm:block">
+                <ActionNotice
+                  message={
+                    shareNotice === "success"
+                      ? "File link copied. Ready to share."
+                      : "Couldn't copy file link. Please try again."
+                  }
+                  status={shareNotice}
+                  onDismiss={dismissShareNotice}
+                />
               </div>
             )}
             <Button
