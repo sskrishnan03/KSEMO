@@ -397,6 +397,7 @@ export const MessageContent = memo(function MessageContent({
   const [responseDurationMs, setResponseDurationMs] = useState<number | null>(null);
   const isMobile = useIsMobile();
   const [showMobileUserActions, setShowMobileUserActions] = useState(false);
+  const mobileUserActionsRef = useRef<HTMLDivElement | null>(null);
   const userLongPressTimerRef = useRef<number | null>(null);
 
   useEffect(
@@ -425,6 +426,20 @@ export const MessageContent = memo(function MessageContent({
       userLongPressTimerRef.current = null;
     }
   };
+
+  useEffect(() => {
+    if (!isMobile || !showMobileUserActions) return;
+
+    const dismissOnOutsidePress = (event: PointerEvent) => {
+      if (!mobileUserActionsRef.current?.contains(event.target as Node)) {
+        setShowMobileUserActions(false);
+      }
+    };
+
+    document.addEventListener("pointerdown", dismissOnOutsidePress);
+    return () =>
+      document.removeEventListener("pointerdown", dismissOnOutsidePress);
+  }, [isMobile, showMobileUserActions]);
 
   useEffect(() => {
     if (
@@ -965,6 +980,7 @@ export const MessageContent = memo(function MessageContent({
 
           {isUser && message.content && (
             <div
+              ref={mobileUserActionsRef}
               className={cn(
                 "flex items-center gap-1 transition-opacity duration-150",
                 isMobile
@@ -981,13 +997,13 @@ export const MessageContent = memo(function MessageContent({
               }
             >
               {isMobile ? (
-                <div className="inline-flex items-center gap-1 rounded-lg border border-border/70 bg-popover p-1 text-popover-foreground shadow-md">
+                <div className="inline-flex min-w-24 flex-col items-stretch gap-0 rounded-lg border border-border/70 bg-popover p-1 text-popover-foreground shadow-md">
                   {onEdit && !isEditing && (
                     <Button
                       type="button"
                       variant="ghost"
                       size="sm"
-                      className="h-8 gap-2 rounded-md px-2.5 text-sm"
+                      className="h-8 w-full justify-start gap-2 rounded-md px-2.5 text-sm"
                       onClick={() => {
                         setShowMobileUserActions(false);
                         onEdit(message);
@@ -1001,7 +1017,7 @@ export const MessageContent = memo(function MessageContent({
                     type="button"
                     variant="ghost"
                     size="sm"
-                    className="h-8 gap-2 rounded-md px-2.5 text-sm"
+                    className="h-8 w-full justify-start gap-2 rounded-md px-2.5 text-sm"
                     onClick={() => {
                       setShowMobileUserActions(false);
                       void copyMessage();
