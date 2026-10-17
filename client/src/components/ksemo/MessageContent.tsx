@@ -582,7 +582,7 @@ export const MessageContent = memo(function MessageContent({
           className={cn(
             "min-w-0",
             isUser
-              ? "flex flex-col items-end w-fit max-w-[84%] sm:max-w-[68%]"
+              ? "relative flex flex-col items-end w-fit max-w-[84%] sm:max-w-[68%]"
               : "w-full"
           )}
         >
@@ -966,12 +966,12 @@ export const MessageContent = memo(function MessageContent({
           {isUser && message.content && (
             <div
               className={cn(
-                "mt-1.5 flex items-center gap-1 transition-opacity duration-150",
+                "flex items-center gap-1 transition-opacity duration-150",
                 isMobile
                   ? showMobileUserActions
-                    ? "animate-in fade-in duration-150"
+                    ? "absolute right-0 top-full z-30 mt-1 animate-in fade-in duration-150"
                     : "hidden"
-                  : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
+                  : "mt-1.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
               )}
               role={isMobile && showMobileUserActions ? "group" : undefined}
               aria-label={
