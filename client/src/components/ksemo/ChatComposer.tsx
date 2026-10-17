@@ -29,6 +29,13 @@ import {
   Check,
   Camera,
   ChevronDown,
+  File,
+  FileArchive,
+  FileAudio,
+  FileCode,
+  FileImage,
+  FileText,
+  FileVideo,
   Loader2,
   Maximize2,
   Mic,
@@ -810,22 +817,6 @@ export const ChatComposer = memo(function ChatComposer({
                   (IMAGE_EXT.test(item.name) ||
                     (item.mimeType ?? "").startsWith("image/"));
                 const kind = getFileKind(item.name, item.mimeType);
-                const createMode =
-                  kind.label === "PDF"
-                    ? "pdf"
-                    : kind.label === "Word"
-                      ? "docx"
-                      : kind.label === "Sheet"
-                        ? "xlsx"
-                        : kind.label === "Slides"
-                          ? "pptx"
-                          : kind.label === "Text"
-                            ? "txt"
-                            : null;
-                const createOption = createMode
-                  ? getCapabilityOption(createMode)
-                  : null;
-                const AttachmentIcon = createOption?.icon ?? kind.icon;
                 return isImage && item.url ? (
                   <div
                     key={item.fileId}
@@ -863,15 +854,13 @@ export const ChatComposer = memo(function ChatComposer({
                   >
                     <span
                       className={cn(
-                        "relative flex size-11 shrink-0 items-center justify-center rounded-lg",
-                        createOption?.iconBg ?? kind.colorClass
+                        "relative flex size-11 shrink-0 items-center justify-center rounded-lg bg-muted/50 text-foreground"
                       )}
                     >
-                      <AttachmentIcon
-                        className={cn(
-                          createOption ? "size-[18px]" : "size-10 shrink-0",
-                          createOption?.iconColor
-                        )}
+                      <ComposerFileIcon
+                        name={item.name}
+                        mimeType={item.mimeType}
+                        className="size-[22px] shrink-0"
                       />
                       {item.uploading && (
                         <span
@@ -1604,6 +1593,56 @@ export const ChatComposer = memo(function ChatComposer({
   );
 });
 
+function ComposerFileIcon({
+  name,
+  mimeType,
+  className,
+}: {
+  name: string;
+  mimeType?: string;
+  className?: string;
+}) {
+  const kind = getFileKind(name, mimeType);
+  const createMode =
+    kind.label === "PDF"
+      ? "pdf"
+      : kind.label === "Word"
+        ? "docx"
+        : kind.label === "Sheet"
+          ? "xlsx"
+          : kind.label === "Slides"
+            ? "pptx"
+            : kind.label === "Text"
+              ? "txt"
+              : null;
+
+  if (createMode) {
+    const Icon = getCapabilityOption(createMode).icon;
+    return (
+      <Icon className={cn(className, "text-foreground")} aria-hidden="true" />
+    );
+  }
+
+  const Icon =
+    kind.label === "Archive"
+      ? FileArchive
+      : kind.label === "Audio"
+        ? FileAudio
+        : kind.label === "Code"
+          ? FileCode
+          : kind.label === "Image"
+            ? FileImage
+            : kind.label === "Text"
+              ? FileText
+              : kind.label === "Video"
+                ? FileVideo
+                : File;
+
+  return (
+    <Icon className={cn(className, "text-foreground")} aria-hidden="true" />
+  );
+}
+
 export function LibraryPickerContent({
   files,
   query,
@@ -1726,7 +1765,11 @@ export function LibraryPickerContent({
                       className="size-11 shrink-0 rounded-lg object-cover"
                     />
                   ) : (
-                    <kind.icon className="size-10 shrink-0" />
+                    <ComposerFileIcon
+                      name={file.filename}
+                      mimeType={file.mimeType}
+                      className="size-7 shrink-0 text-foreground"
+                    />
                   )}
                   <div className="flex min-w-0 flex-1 flex-col">
                     <span className="truncate text-sm font-medium text-foreground">
