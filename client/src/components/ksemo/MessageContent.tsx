@@ -539,6 +539,35 @@ export const MessageContent = memo(function MessageContent({
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const [emojiSearch, setEmojiSearch] = useState("");
   const isMobile = useIsMobile();
+  const [showMobileUserActions, setShowMobileUserActions] = useState(false);
+  const userLongPressTimerRef = useRef<number | null>(null);
+
+  useEffect(
+    () => () => {
+      if (userLongPressTimerRef.current !== null) {
+        window.clearTimeout(userLongPressTimerRef.current);
+      }
+    },
+    []
+  );
+
+  const startUserLongPress = () => {
+    if (!isMobile) return;
+    if (userLongPressTimerRef.current !== null) {
+      window.clearTimeout(userLongPressTimerRef.current);
+    }
+    userLongPressTimerRef.current = window.setTimeout(() => {
+      setShowMobileUserActions(true);
+      userLongPressTimerRef.current = null;
+    }, 450);
+  };
+
+  const cancelUserLongPress = () => {
+    if (userLongPressTimerRef.current !== null) {
+      window.clearTimeout(userLongPressTimerRef.current);
+      userLongPressTimerRef.current = null;
+    }
+  };
 
   useEffect(() => {
     if (
@@ -782,6 +811,15 @@ export const MessageContent = memo(function MessageContent({
           <ReactionsContext.Provider value={reactions}>
             {(!isUser || message.content.trim().length > 0) && (
               <div
+                onPointerDown={isUser ? startUserLongPress : undefined}
+                onPointerUp={isUser ? cancelUserLongPress : undefined}
+                onPointerLeave={isUser ? cancelUserLongPress : undefined}
+                onPointerCancel={isUser ? cancelUserLongPress : undefined}
+                onContextMenu={
+                  isUser && isMobile
+                    ? event => event.preventDefault()
+                    : undefined
+                }
                 className={cn(
                   "text-[15px] leading-6",
                   isUser
@@ -1081,7 +1119,21 @@ export const MessageContent = memo(function MessageContent({
           ) : null}
 
           {isUser && message.content && (
-            <div className="mt-1.5 flex items-center gap-1 max-lg:opacity-100 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
+            <div
+              className={cn(
+                "mt-1.5 flex items-center gap-1 transition-opacity duration-150",
+                isMobile
+                  ? showMobileUserActions
+                    ? "animate-in fade-in duration-150"
+                    : "hidden"
+                  : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
+              )}
+            >
+              {onEdit &&
+                !isEditing &&
+                action("Edit message", <Pencil className="size-4" />, () =>
+                  onEdit(message)
+                )}
               {action(
                 "Copy message",
                 copied ? (
@@ -1091,11 +1143,6 @@ export const MessageContent = memo(function MessageContent({
                 ),
                 copyMessage
               )}
-              {onEdit &&
-                !isEditing &&
-                action("Edit message", <Pencil className="size-4" />, () =>
-                  onEdit(message)
-                )}
             </div>
           )}
           {!isUser &&

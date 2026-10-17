@@ -702,6 +702,7 @@ export default function Home({
       userMessageId: string | null;
       assistantMessageId: string | null;
       userContent: string;
+      isVoiceTurn: boolean;
       responseText: string;
       controller: AbortController;
       active: boolean;
@@ -2268,6 +2269,7 @@ export default function Home({
       assistantMessageId:
         options.regenerateAssistantMessageId ?? `local-assistant-${draftNow}`,
       userContent: content,
+      isVoiceTurn,
       responseText: "",
       controller,
       active: true,
@@ -3418,18 +3420,24 @@ export default function Home({
     );
   }
 
-  function stopGeneration() {
+  function stopGeneration(voiceOnly = false) {
     // Stop only the stream for the currently-viewed conversation; any other
     // conversations generating in the background are left untouched.
     // This cancels file generation operations.
-    resetStreamingTts();
+    if (!voiceOnly || activeVoiceMessageIdRef.current) resetStreamingTts();
     const target = activeConversationId;
     const activeFileGeneration = fileGeneration;
+    let stoppedVoiceMessageId: string | null = null;
     for (const stream of streamsRef.current) {
-      if (stream.active && stream.conversationId === target) {
+      if (
+        stream.active &&
+        stream.conversationId === target &&
+        (!voiceOnly || stream.isVoiceTurn)
+      ) {
         stream.stoppedByUser = true;
         stoppedStreamTurnIdsRef.current.add(stream.turnId);
         const assistantMessageId = stream.assistantMessageId;
+        if (voiceOnly) stoppedVoiceMessageId = assistantMessageId;
         const conversationId = stream.conversationId;
         if (
           assistantMessageId &&
@@ -3472,7 +3480,10 @@ export default function Home({
         flushPendingDeltas();
       });
     }
-    if (activeFileGeneration) {
+    if (
+      activeFileGeneration &&
+      (!voiceOnly || stoppedVoiceMessageId === activeFileGeneration.messageId)
+    ) {
       settleInterruptedGeneration(
         activeFileGeneration.messageId,
         activeFileGeneration.format
@@ -4450,11 +4461,11 @@ export default function Home({
       window.sessionStorage?.setItem("ksemo:composer-tag", "chat");
       window.localStorage?.setItem("ksemo:composer-tag", "chat");
     } catch {}
-    resetStreamingTts();
-    stopGeneration();
+    stopGeneration(true);
     botVoice.cancel();
   });
   const stableOnTagChange = usePersistFn((tag: ComposerTag) => {
+    const wasBotVoiceOpen = botVoiceOpenRef.current || composerTag === "bot";
     setComposerTag(tag);
     try {
       window.sessionStorage?.setItem("ksemo:composer-tag", tag);
@@ -4466,9 +4477,10 @@ export default function Home({
       void botVoice.start();
     } else {
       botVoiceOpenRef.current = false;
-      resetStreamingTts();
-      stopGeneration();
-      botVoice.cancel();
+      if (wasBotVoiceOpen) {
+        stopGeneration(true);
+        botVoice.cancel();
+      }
     }
   });
   // Good/bad response is an exclusive pair: pressing the other thumb switches

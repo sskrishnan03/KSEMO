@@ -21,8 +21,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 export type BotVoiceState = "idle" | "listening" | "transcribing";
 
 /** How long a pause counts as "I've finished talking". */
-const SILENCE_MS = 1400;
-const FINAL_SILENCE_MS = 900;
+// Keep the turn responsive while leaving a short end-of-speech boundary.
+// The live mic meter below keeps extending this while the user is speaking.
+const SILENCE_MS = 700;
+const FINAL_SILENCE_MS = 500;
 
 /** Above this the mic is considered open, which drives the wave. */
 const LISTENING_LEVEL_THRESHOLD = 0.02;
@@ -117,11 +119,13 @@ export function useBotVoice({
 
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const wantListeningRef = useRef(false);
+  const voiceRunIdRef = useRef(0);
   const unmountedRef = useRef(false);
   const pausedRef = useRef(false);
 
   /** Everything recognised in this turn, final segments only. */
   const committedRef = useRef("");
+  const hasSpokenRef = useRef(false);
   /** The composer text as it was before listening started. */
   const baseRef = useRef("");
   const silenceTimerRef = useRef<number | null>(null);
@@ -159,22 +163,20 @@ export function useBotVoice({
   /** Hands the finished turn to the bot and resets for the next one. */
   const finishTurn = useCallback(() => {
     clearSilenceTimer();
-    const spoken = [
-      baseRef.current.trim(),
-      committedRef.current.trim(),
-      interimRef.current.trim(),
-    ]
+    const voiceText = [committedRef.current.trim(), interimRef.current.trim()]
       .filter(Boolean)
       .join(" ")
       .trim();
+    const baseText = baseRef.current.trim();
+    const spoken = [baseText, voiceText].filter(Boolean).join(" ").trim();
     interimRef.current = "";
     committedRef.current = "";
     baseRef.current = "";
-    if (spoken) {
+    if (voiceText) {
       pausedRef.current = true;
       onSend(spoken);
     } else {
-      onDraft("");
+      onDraft(baseText);
     }
   }, [clearSilenceTimer, onDraft, onSend]);
 
@@ -185,10 +187,17 @@ export function useBotVoice({
       clearSilenceTimer();
       silenceTimerRef.current = window.setTimeout(() => {
         silenceTimerRef.current = null;
-        const spoken = [
-          committedRef.current.trim(),
-          interimRef.current.trim(),
-        ]
+        if (recorderRef.current) {
+          if (hasSpokenRef.current) {
+            try {
+              recorderRef.current.stop();
+            } catch {
+              // The recorder may already be stopping.
+            }
+          }
+          return;
+        }
+        const spoken = [committedRef.current.trim(), interimRef.current.trim()]
           .filter(Boolean)
           .join(" ")
           .trim();
@@ -245,6 +254,7 @@ export function useBotVoice({
       analyserRef.current = analyser;
 
       const freqBins = new Uint8Array(analyser.frequencyBinCount);
+      const timeDomain = new Uint8Array(analyser.fftSize);
       const out = barsRef.current;
       // Log-ish spacing: low frequencies carry most speech energy, and a linear
       // split leaves the right-hand bars almost permanently flat.
@@ -255,11 +265,27 @@ export function useBotVoice({
       const tick = () => {
         if (unmountedRef.current || !analyserRef.current) return;
         analyserRef.current.getByteFrequencyData(freqBins);
-        let sum = 0;
-        for (let index = 0; index < freqBins.length; index += 1) {
-          sum += freqBins[index];
+        analyserRef.current.getByteTimeDomainData(timeDomain);
+        let squareSum = 0;
+        for (let index = 0; index < timeDomain.length; index += 1) {
+          const sample = (timeDomain[index] - 128) / 128;
+          squareSum += sample * sample;
         }
-        levelRef.current = Math.min(1, (sum / (freqBins.length * 255)) * 2.4);
+        // RMS tracks actual speech energy much more clearly than an average
+        // frequency bin, especially for quiet microphones.
+        levelRef.current = Math.min(
+          1,
+          Math.max(0, (Math.sqrt(squareSum / timeDomain.length) - 0.012) * 7)
+        );
+        if (levelRef.current >= 0.08) {
+          if (recorderRef.current) hasSpokenRef.current = true;
+          if (
+            hasSpokenRef.current &&
+            (committedRef.current || interimRef.current)
+          ) {
+            armSilenceTimer();
+          }
+        }
 
         for (let index = 0; index < out.length; index += 1) {
           const bin = Math.min(
@@ -284,10 +310,12 @@ export function useBotVoice({
       setMicDenied(true);
       stopMetering();
       setStateBoth("idle");
-      onError?.("Microphone permission was denied. Please allow microphone access in your browser.");
+      onError?.(
+        "Microphone permission was denied. Please allow microphone access in your browser."
+      );
       return false;
     }
-  }, [onError, setStateBoth, stopMetering]);
+  }, [armSilenceTimer, onError, setStateBoth, stopMetering]);
 
   // --- recognition -------------------------------------------------------
   const startRecognition = useCallback(() => {
@@ -314,6 +342,7 @@ export function useBotVoice({
         if (!result) continue;
         const text = (result[0]?.transcript ?? "").trim();
         if (!text) continue;
+        hasSpokenRef.current = true;
         if (result.isFinal) {
           committedRef.current = joinText(committedRef.current, text);
           hasFinal = true;
@@ -349,7 +378,9 @@ export function useBotVoice({
         setMicDenied(true);
         stopMetering();
         setStateBoth("idle");
-        onError?.("Microphone permission was denied. Please allow microphone access.");
+        onError?.(
+          "Microphone permission was denied. Please allow microphone access."
+        );
       } else if (event.error === "network") {
         // Speech recognition network error
         onError?.("Speech recognition network connection interrupted.");
@@ -383,6 +414,7 @@ export function useBotVoice({
   // There is no interim text to show, so the wave runs off the same analyser and
   // the transcript only lands once recording has stopped.
   const startRecordingFallback = useCallback(async () => {
+    const runId = voiceRunIdRef.current;
     const mimeType = chooseRecorderType();
     let recorder: MediaRecorder;
     try {
@@ -393,7 +425,7 @@ export function useBotVoice({
           autoGainControl: true,
         },
       });
-      if (unmountedRef.current) {
+      if (unmountedRef.current || runId !== voiceRunIdRef.current) {
         stream.getTracks().forEach(track => track.stop());
         return false;
       }
@@ -416,6 +448,10 @@ export function useBotVoice({
       chunksRef.current = [];
       recorderRef.current = null;
       stopMetering();
+      if (!hasSpokenRef.current) {
+        setStateBoth("idle");
+        return;
+      }
       if (!blob.size) {
         setStateBoth("idle");
         onError?.(
@@ -516,11 +552,13 @@ export function useBotVoice({
 
   const start = useCallback(async () => {
     if (stateRef.current !== "idle") return;
+    const runId = ++voiceRunIdRef.current;
     pausedRef.current = false;
     mutedRef.current = false;
     setIsMuted(false);
     committedRef.current = "";
     interimRef.current = "";
+    hasSpokenRef.current = false;
     // Preserve whatever was already in the composer so a voice turn extends it
     // instead of wiping it.
     baseRef.current = getCurrentText?.() ?? "";
@@ -529,6 +567,10 @@ export function useBotVoice({
     playBotVoiceStart();
 
     const meteringOk = await startMetering();
+    if (runId !== voiceRunIdRef.current) {
+      stopMetering();
+      return;
+    }
     if (meteringOk === false) {
       return;
     }
@@ -540,6 +582,11 @@ export function useBotVoice({
 
     // No SpeechRecognition — record, then transcribe when stopped.
     const started = await startRecordingFallback();
+    if (runId !== voiceRunIdRef.current) {
+      stopRecordingFallback();
+      stopMetering();
+      return;
+    }
     if (!started) {
       stopMetering();
       setStateBoth("idle");
@@ -554,11 +601,13 @@ export function useBotVoice({
     startMetering,
     startRecordingFallback,
     startRecognition,
+    stopRecordingFallback,
     stopMetering,
   ]);
 
   const stop = useCallback(() => {
     if (stateRef.current === "idle") return;
+    voiceRunIdRef.current += 1;
     pausedRef.current = false;
     mutedRef.current = false;
     setIsMuted(false);
@@ -581,12 +630,14 @@ export function useBotVoice({
   ]);
 
   const cancel = useCallback(() => {
+    voiceRunIdRef.current += 1;
     pausedRef.current = false;
     mutedRef.current = false;
     setIsMuted(false);
     clearSilenceTimer();
     committedRef.current = "";
     interimRef.current = "";
+    hasSpokenRef.current = false;
     baseRef.current = "";
     onDraft("");
     playBotVoiceCancel();

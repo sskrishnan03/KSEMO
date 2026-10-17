@@ -52,11 +52,25 @@ void main() {
   vec2 uv = (gl_FragCoord.xy - 0.5 * u_resolution) / (0.5 * min(u_resolution.x, u_resolution.y));
   float dist = length(uv);
 
-  if (dist > 1.0) {
+  float pulse = u_activity * (0.025 + 0.035 * sin(u_time * 5.0));
+  float edgeNoise = (fbmSmooth(uv * (5.0 + u_speed * 2.0) + u_time * 0.22) - 0.5)
+    * (0.018 + u_activity * 0.075);
+  float radius = 0.78 + pulse + edgeNoise;
+  if (dist > radius + 0.08) {
     discard;
   }
 
-  gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+  float normalizedDist = dist / radius;
+  float edge = smoothstep(0.78, 1.0, normalizedDist);
+  float glow = exp(-max(0.0, normalizedDist - 0.78) * 30.0) * (0.14 + u_activity * 0.58);
+  float cloud = fbmSmooth(uv * (4.5 + u_speed * 2.0) + vec2(u_time * 0.12, -u_time * 0.08));
+  vec3 core = mix(u_color_secondary, u_color_primary, smoothstep(0.2, 0.82, cloud));
+  core = mix(core, u_color_accent, smoothstep(0.62, 0.95, cloud) * (0.22 + u_activity * 0.45));
+  core *= u_brightness * (0.58 + cloud * 0.52);
+  vec3 color = mix(core, u_color_accent, edge * (0.45 + u_activity * 0.45));
+  color += u_color_primary * glow;
+  float alpha = 1.0 - smoothstep(0.98, 1.06, normalizedDist);
+  gl_FragColor = vec4(color, alpha);
 }
 `;
 
