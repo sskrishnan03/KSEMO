@@ -5425,7 +5425,7 @@ export default function Home({
                               <DropdownMenuContent
                                 align="end"
                                 sideOffset={6}
-                                className="w-44 max-w-[calc(100vw-1rem)] rounded-xl lg:hidden"
+                                className="w-[188px] max-w-[calc(100vw-1rem)] rounded-xl lg:hidden"
                               >
                                 {mobileConversationTitleOverflows && (
                                   <>
