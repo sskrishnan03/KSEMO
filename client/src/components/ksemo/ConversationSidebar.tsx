@@ -41,6 +41,7 @@ import { Library } from "reicon-react/icons/Library";
 import { Sidebar2 } from "reicon-react/icons/Sidebar2";
 import { ChatLine } from "reicon-react/icons/ChatLine";
 import { ChatSquareCall } from "reicon-react/icons/ChatSquareCall";
+import { BranchSplitIcon } from "./BranchSplitIcon";
 import { ShareIcon, PinTackIcon, UnpinTackIcon, Trash6Icon } from "./icons";
 import { PdfFileIcon, WordFileIcon } from "./FileBrandIcons";
 import { useIsMobile } from "@/hooks/useIsMobile";
@@ -151,7 +152,7 @@ export const ConversationSidebar = memo(function ConversationSidebar({
 
   const startRename = (conversation: Conversation) => {
     setRenamingId(conversation.id);
-    setRenameValue(conversation.title);
+    setRenameValue(conversation.title.replace(/^Branch:\s*/, ""));
   };
   const confirmRename = () => {
     if (!renamingId) return;
@@ -1074,7 +1075,10 @@ const ConversationTitleButton = memo(function ConversationTitleButton({
   isRowHovered: boolean;
 }) {
   const titleRef = useRef<HTMLSpanElement>(null);
-  const fullTitle = conversation.title;
+  const isBranch = conversation.title.startsWith("Branch: ");
+  const fullTitle = isBranch
+    ? conversation.title.slice("Branch: ".length)
+    : conversation.title;
   const [displayTitle, setDisplayTitle] = useState(fullTitle);
   const [wasTruncated, setWasTruncated] = useState(false);
   const [isOverflowing, setIsOverflowing] = useState(false);
@@ -1132,10 +1136,12 @@ const ConversationTitleButton = memo(function ConversationTitleButton({
   return (
     <button
       onClick={() => onSelect(conversation.id)}
-      aria-label={conversation.title}
+      aria-label={isBranch ? `Branch chat: ${fullTitle}` : conversation.title}
       className="flex min-w-0 flex-1 items-center gap-2 self-stretch py-2 pl-1 pr-0 text-left text-sm leading-5"
     >
-      {conversation.isPinned ? (
+      {isBranch ? (
+        <BranchSplitIcon className="size-[18px] shrink-0 text-foreground/70 transition-colors group-hover:text-foreground" />
+      ) : conversation.isPinned ? (
         <ChatSquareCall
           aria-hidden="true"
           className="size-[20px] shrink-0 text-foreground/70 transition-colors group-hover:text-foreground"

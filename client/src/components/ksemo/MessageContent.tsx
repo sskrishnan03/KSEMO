@@ -11,11 +11,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { getFileKind } from "@/lib/fileKinds";
 import { CardWheelFan } from "@/components/ui/card-wheel-fan";
 import { ImageLightbox } from "@/components/ui/image-lightbox";
@@ -29,25 +24,22 @@ import {
   ExternalLink,
   MoreHorizontal,
   Pencil,
-  Search,
   RotateCcw,
-  SmilePlus,
   Square,
   ThumbsDown,
   ThumbsUp,
   Volume2,
   X,
 } from "lucide-react";
+import { BranchSplitIcon } from "./BranchSplitIcon";
 import { ShareIcon } from "./icons";
 import { type MessageFeedbackValue } from "./MessageFeedback";
-import { EMOJI_GROUPS } from "@/data/emojiGroups";
 import { usePersistFn } from "@/hooks/usePersistFn";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import React, { memo, useEffect, useRef, useState } from "react";
 import {
   Streamdown,
   defaultRehypePlugins,
-  type StreamdownProps,
 } from "streamdown";
 import { KsemoMarkdownCode } from "./code-block";
 import { sanitizeAssistantText } from "@/lib/sanitizeAssistant";
@@ -78,6 +70,16 @@ type KsemoMessage = {
     content: string;
     category?: string;
     sourceConversationId?: string | null;
+  }>;
+  branchOrigin?: {
+    conversationId: string;
+    title: string;
+    branchedAtMessageId?: string;
+  };
+  branchTargets?: Array<{
+    conversationId: string;
+    title: string;
+    targetMessageId?: string;
   }>;
   fileGeneration?: {
     stage: string;
@@ -159,31 +161,9 @@ function KsemoMarkdownLink({
 // Stable Streamdown component map so the internal `marked.Lexer` cache is not
 // invalidated on every render (a fresh `components` object defeats Streamdown's
 // memo and forces a full re-parse of the message on each streaming flush).
-const ReactionsContext = React.createContext<string[]>([]);
-
-function ReactionsSpan({
-  node: _node,
-  ...rest
-}: React.ComponentPropsWithoutRef<"span"> & { node?: unknown }) {
-  const reactions = React.useContext(ReactionsContext);
-  if ("data-ksemo-reactions" in rest) {
-    return (
-      <>
-        {reactions.map(emoji => (
-          <span key={emoji} className="ksemo-inline-reaction">
-            {emoji}
-          </span>
-        ))}
-      </>
-    );
-  }
-  return <span {...rest} />;
-}
-
 const KSEMO_MARKDOWN_COMPONENTS = {
   code: KsemoMarkdownCode,
   a: KsemoMarkdownLink,
-  span: ReactionsSpan,
 };
 
 type KsemoFile = NonNullable<KsemoMessage["attachments"]>[number];
@@ -228,171 +208,8 @@ const LIST_ARROW_LINES_D =
 const LIST_ARROW_ARROW_D =
   "M17.5 12.25C17.9142 12.25 18.25 12.5858 18.25 13V17.1893L19.4697 15.9697C19.7626 15.6768 20.2374 15.6768 20.5303 15.9697C20.8232 16.2626 20.8232 16.7374 20.5303 17.0303L18.0303 19.5303C17.7374 19.8232 17.2626 19.8232 16.9697 19.5303L14.4697 17.0303C14.1768 16.7374 14.1768 16.2626 14.4697 15.9697C14.7626 15.6768 15.2374 15.6768 15.5303 15.9697L16.75 17.1893V13C16.75 12.5858 17.0858 12.25 17.5 12.25Z";
 
-const VISIBLE_EMOJI_GROUPS = EMOJI_GROUPS.filter(
-  group => group.name !== "Flags" && group.name !== "Symbols"
-);
-
-/**
- * Full emoji grid behind the "all emojis" submenu. Extracted as a memo so that
- * ticking a reaction re-renders only the changed button instead of the whole
- * panel of hundreds of emojis.
- */
-const AllEmojiGrid = memo(function AllEmojiGrid({
-  reactions,
-  onToggle,
-  isMobile,
-  searchQuery,
-}: {
-  reactions: string[];
-  onToggle: (emoji: string) => void;
-  isMobile: boolean;
-  searchQuery: string;
-}) {
-  const [visibleGroupCount, setVisibleGroupCount] = useState(1);
-  const normalizedSearch = searchQuery.trim().toLocaleLowerCase();
-  const matchingGroups = normalizedSearch
-    ? VISIBLE_EMOJI_GROUPS.map(group => ({
-        ...group,
-        emojis: group.emojis.filter(
-          ({ emoji, name }) =>
-            name.toLocaleLowerCase().includes(normalizedSearch) ||
-            emoji.includes(normalizedSearch)
-        ),
-      })).filter(group => group.emojis.length > 0)
-    : VISIBLE_EMOJI_GROUPS.slice(0, visibleGroupCount);
-
-  return (
-    <div
-      role="group"
-      aria-label="All emojis"
-      className={cn(
-        "overflow-x-hidden overflow-y-auto overscroll-contain",
-        isMobile ? "h-[min(220px,42vh)]" : "h-[260px]"
-      )}
-      onScroll={event => {
-        const element = event.currentTarget;
-        if (
-          element.scrollTop + element.clientHeight >=
-          element.scrollHeight - 100
-        ) {
-          setVisibleGroupCount(current =>
-            Math.min(VISIBLE_EMOJI_GROUPS.length, current + 2)
-          );
-        }
-      }}
-    >
-      {matchingGroups.map(group => (
-        <div key={group.name} role="group" aria-label={group.name}>
-          <div className="sticky top-0 bg-popover px-1 pt-1.5 pb-1 text-[11px] font-medium leading-4 text-muted-foreground">
-            {group.name}
-          </div>
-          <div className={cn("grid", isMobile ? "grid-cols-8" : "grid-cols-7")}>
-            {group.emojis.map(({ emoji, name }) => (
-              <button
-                key={`${group.name}-${name}`}
-                type="button"
-                aria-label={name}
-                aria-pressed={reactions.includes(emoji)}
-                onClick={() => onToggle(emoji)}
-                className={cn(
-                  cn(
-                    "group flex items-center justify-center rounded-md leading-none select-none transition-colors focus-visible:ring-0 focus-visible:outline-none",
-                    isMobile ? "h-8 text-xl" : "h-9 text-2xl"
-                  ),
-                  reactions.includes(emoji) && "bg-accent text-foreground"
-                )}
-              >
-                <span
-                  aria-hidden="true"
-                  className="transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] group-hover:scale-[1.7] group-active:scale-95 motion-reduce:transform-none"
-                >
-                  {emoji}
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
-      ))}
-      {normalizedSearch && matchingGroups.length === 0 && (
-        <p className="px-2 py-8 text-center text-sm text-muted-foreground">
-          No emojis found
-        </p>
-      )}
-    </div>
-  );
-});
-
-type HastNode = {
-  type: string;
-  tagName?: string;
-  properties?: Record<string, unknown>;
-  children?: HastNode[];
-  value?: string;
-};
-
-const REACTION_BLOCK_TAGS = new Set([
-  "p",
-  "h1",
-  "h2",
-  "h3",
-  "h4",
-  "h5",
-  "h6",
-  "ul",
-  "ol",
-  "li",
-  "dl",
-  "dt",
-  "dd",
-  "blockquote",
-  "pre",
-  "table",
-  "thead",
-  "tbody",
-  "tfoot",
-  "tr",
-  "th",
-  "td",
-  "figure",
-  "figcaption",
-  "section",
-  "article",
-  "div",
-]);
-
 const singleMarkdownBlock = (markdown: string) => (markdown ? [markdown] : []);
-
-const appendReactionsPlaceholder = () => (tree: HastNode) => {
-  let block = tree;
-  for (;;) {
-    const children = block.children;
-    if (!children || children.length === 0) break;
-    const last = children[children.length - 1];
-    if (
-      last.type === "element" &&
-      last.tagName !== undefined &&
-      REACTION_BLOCK_TAGS.has(last.tagName) &&
-      last.children &&
-      last.children.length > 0
-    ) {
-      block = last;
-      continue;
-    }
-    break;
-  }
-  if (!block.children) return;
-  block.children.push({
-    type: "element",
-    tagName: "span",
-    properties: { dataKsemoReactions: "" },
-    children: [],
-  });
-};
-
-const STABLE_REHYPE_PLUGINS: StreamdownProps["rehypePlugins"] = [
-  ...Object.values(defaultRehypePlugins),
-  appendReactionsPlaceholder,
-];
+const STABLE_REHYPE_PLUGINS = Object.values(defaultRehypePlugins);
 
 function ActionsMenuGlyph({ open }: { open: boolean }) {
   return (
@@ -482,6 +299,7 @@ export const MessageContent = memo(function MessageContent({
   onFeedback,
   feedback = null,
   onShare,
+  onBranch,
   onDelete,
   isEditing = false,
   editValue = "",
@@ -511,6 +329,7 @@ export const MessageContent = memo(function MessageContent({
   onFeedback?: (messageId: string, value: "up" | "down") => void;
   feedback?: MessageFeedbackValue | null;
   onShare?: (message: KsemoMessage) => void | Promise<void>;
+  onBranch?: (message: KsemoMessage) => void | Promise<void>;
   onDelete?: (message: KsemoMessage) => void;
   isEditing?: boolean;
   editValue?: string;
@@ -522,22 +341,6 @@ export const MessageContent = memo(function MessageContent({
   const [sharing, setSharing] = useState(false);
   const [actionsOpen, setActionsOpen] = useState(false);
   const [responseDurationMs, setResponseDurationMs] = useState<number | null>(null);
-  const reactionsStorageKey = `ksemo-reactions:${message.id}`;
-  const [reactions, setReactions] = useState<string[]>(() => {
-    try {
-      const stored = localStorage.getItem(reactionsStorageKey);
-      const parsed: unknown = stored ? JSON.parse(stored) : [];
-      return Array.isArray(parsed)
-        ? parsed
-            .filter((item): item is string => typeof item === "string")
-            .slice(0, 3)
-        : [];
-    } catch {
-      return [];
-    }
-  });
-  const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
-  const [emojiSearch, setEmojiSearch] = useState("");
   const isMobile = useIsMobile();
   const [showMobileUserActions, setShowMobileUserActions] = useState(false);
   const userLongPressTimerRef = useRef<number | null>(null);
@@ -585,23 +388,6 @@ export const MessageContent = memo(function MessageContent({
     return () => window.clearInterval(timer);
   }, [message.role, message.status, responseStartedAt]);
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(reactionsStorageKey, JSON.stringify(reactions));
-    } catch {
-      // storage unavailable; reactions stay in memory for this session
-    }
-  }, [reactionsStorageKey, reactions]);
-
-  const toggleReaction = usePersistFn((emoji: string) => {
-    setReactions(prev =>
-      prev.includes(emoji)
-        ? prev.filter(item => item !== emoji)
-        : prev.length < 3
-          ? [...prev, emoji]
-          : prev
-    );
-  });
   const [previewFile, setPreviewFile] = useState<KsemoFile | null>(null);
   const [lightboxFile, setLightboxFile] = useState<KsemoFile | null>(null);
   const { openPdf } = usePdfViewer();
@@ -705,9 +491,10 @@ export const MessageContent = memo(function MessageContent({
   const canReadAloud = Boolean(message.content && !!onSpeak && !isCancelled);
   const canRegenerate = Boolean(onRegenerate || onRetry);
   const canRate = Boolean(onFeedback && message.content && !isCancelled);
-  const hasOverflowActions = canReadAloud || canRegenerate || canRate;
-  const hasActiveIndicator =
-    canRate && (feedback === "up" || feedback === "down");
+  const canBranch = Boolean(
+    message.content && onBranch && message.status !== "streaming"
+  );
+  const hasOverflowActions = canReadAloud || canRegenerate || canBranch;
   const actionsMenuLabel = "More message actions";
 
   const renderStoppedNotice = () => (
@@ -808,8 +595,7 @@ export const MessageContent = memo(function MessageContent({
                 );
               })()
             : null}
-          <ReactionsContext.Provider value={reactions}>
-            {(!isUser || message.content.trim().length > 0) && (
+          {(!isUser || message.content.trim().length > 0) && (
               <div
                 onPointerDown={isUser ? startUserLongPress : undefined}
                 onPointerUp={isUser ? cancelUserLongPress : undefined}
@@ -1011,8 +797,7 @@ export const MessageContent = memo(function MessageContent({
                   </details>
                 )}
               </div>
-            )}
-          </ReactionsContext.Provider>
+          )}
 
           {/* Attachments (e.g. images, uploaded files; generated document is presented via primary FileCreationCard) */}
           {!isUser &&
@@ -1128,20 +913,65 @@ export const MessageContent = memo(function MessageContent({
                     : "hidden"
                   : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
               )}
+              role={isMobile && showMobileUserActions ? "group" : undefined}
+              aria-label={
+                isMobile && showMobileUserActions
+                  ? "Message options"
+                  : undefined
+              }
             >
-              {onEdit &&
-                !isEditing &&
-                action("Edit message", <Pencil className="size-4" />, () =>
-                  onEdit(message)
-                )}
-              {action(
-                "Copy message",
-                copied ? (
-                  <Check className="size-4" />
-                ) : (
-                  <Copy className="size-4" />
-                ),
-                copyMessage
+              {isMobile ? (
+                <div className="inline-flex items-center gap-1 rounded-lg border border-border/70 bg-popover p-1 text-popover-foreground shadow-md">
+                  {onEdit && !isEditing && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 gap-2 rounded-md px-2.5 text-sm"
+                      onClick={() => {
+                        setShowMobileUserActions(false);
+                        onEdit(message);
+                      }}
+                    >
+                      <Pencil className="size-4" />
+                      Edit
+                    </Button>
+                  )}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 gap-2 rounded-md px-2.5 text-sm"
+                    onClick={() => {
+                      setShowMobileUserActions(false);
+                      void copyMessage();
+                    }}
+                  >
+                    {copied ? (
+                      <Check className="size-4" />
+                    ) : (
+                      <Copy className="size-4" />
+                    )}
+                    Copy
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  {onEdit &&
+                    !isEditing &&
+                    action("Edit message", <Pencil className="size-4" />, () =>
+                      onEdit(message)
+                    )}
+                  {action(
+                    "Copy message",
+                    copied ? (
+                      <Check className="size-4" />
+                    ) : (
+                      <Copy className="size-4" />
+                    ),
+                    copyMessage
+                  )}
+                </>
               )}
             </div>
           )}
@@ -1163,6 +993,34 @@ export const MessageContent = memo(function MessageContent({
                     ),
                     copyMessage
                   )}
+                {!sharedAnswerPreview && canRate && (
+                  <>
+                    {action(
+                      feedback === "up" ? "Remove like" : "Like",
+                      <ThumbsUp
+                        className={cn(
+                          "size-4",
+                          feedback === "up" &&
+                            "text-emerald-600 dark:text-emerald-400 ksemo-feedback-thumb-active"
+                        )}
+                      />,
+                      () => handleFeedbackToggle("up"),
+                      feedback === "up"
+                    )}
+                    {action(
+                      feedback === "down" ? "Remove dislike" : "Dislike",
+                      <ThumbsDown
+                        className={cn(
+                          "size-4",
+                          feedback === "down" &&
+                            "text-rose-600 dark:text-rose-400 ksemo-feedback-thumb-active"
+                        )}
+                      />,
+                      () => handleFeedbackToggle("down"),
+                      feedback === "down"
+                    )}
+                  </>
+                )}
                 {!sharedAnswerPreview && message.content && onShare &&
                   action(
                     sharing ? "Preparing answer link…" : "Share response",
@@ -1176,111 +1034,6 @@ export const MessageContent = memo(function MessageContent({
                     ),
                     () => void shareResponse()
                   )}
-                {!sharedAnswerPreview && hasActiveIndicator &&
-                  action(
-                    feedback === "up" ? "Liked" : "Disliked",
-                    feedback === "up" ? (
-                      <ThumbsUp
-                        className={cn(
-                          "size-4 text-emerald-600 dark:text-emerald-400",
-                          "ksemo-feedback-thumb-active"
-                        )}
-                      />
-                    ) : (
-                      <ThumbsDown
-                        className={cn(
-                          "size-4 text-rose-600 dark:text-rose-400",
-                          "ksemo-feedback-thumb-active"
-                        )}
-                      />
-                    ),
-                    () => handleFeedbackToggle(feedback as "up" | "down"),
-                    true
-                  )}{" "}
-                {!sharedAnswerPreview && message.content && !isCancelled && (
-                  <Popover
-                    open={emojiPickerOpen}
-                    onOpenChange={open => {
-                      setEmojiPickerOpen(open);
-                      if (!open) setEmojiSearch("");
-                    }}
-                  >
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <PopoverTrigger asChild>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className={cn(
-                              actionClass,
-                              emojiPickerOpen &&
-                                "bg-accent/70 text-foreground hover:bg-accent/70 hover:text-foreground"
-                            )}
-                            aria-label="Add reaction"
-                          >
-                            <SmilePlus className="size-4" />
-                          </Button>
-                        </PopoverTrigger>
-                      </TooltipTrigger>
-                      <TooltipContent side="bottom">React</TooltipContent>
-                    </Tooltip>
-                    <PopoverContent
-                      side="top"
-                      align="start"
-                      sideOffset={8}
-                      collisionPadding={8}
-                      className="w-[min(20rem,calc(100vw-1rem))] rounded-xl border border-border/70 p-2 shadow-lg data-[state=open]:animate-none data-[state=closed]:animate-none data-[state=open]:transition-none data-[state=closed]:transition-none"
-                    >
-                      {!isMobile && (
-                        <div className="mb-2 flex min-h-9 items-center gap-2 rounded-lg bg-muted/60 px-2.5">
-                          <Search className="size-4 shrink-0 text-muted-foreground" />
-                          <input
-                            type="text"
-                            value={emojiSearch}
-                            onChange={event =>
-                              setEmojiSearch(event.target.value)
-                            }
-                            placeholder="Search emoji"
-                            aria-label="Search emojis"
-                            autoComplete="off"
-                            className="min-w-0 flex-1 bg-transparent py-2 text-sm outline-none placeholder:text-muted-foreground"
-                          />
-                          {reactions.length > 0 && (
-                            <span
-                              className="flex shrink-0 items-center gap-0.5 border-l border-border/50 pl-1"
-                              aria-label={`${reactions.length} selected reactions`}
-                            >
-                              {reactions.map(emoji => {
-                                const name = EMOJI_GROUPS.flatMap(
-                                  group => group.emojis
-                                ).find(item => item.emoji === emoji)?.name;
-                                return (
-                                  <button
-                                    key={emoji}
-                                    type="button"
-                                    aria-label={`Undo ${name ?? "emoji"} reaction`}
-                                    title={`Undo ${name ?? "emoji"} reaction`}
-                                    onClick={() => toggleReaction(emoji)}
-                                    className="flex size-8 shrink-0 items-center justify-center rounded-md text-2xl hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                                  >
-                                    <span aria-hidden="true">{emoji}</span>
-                                  </button>
-                                );
-                              })}
-                            </span>
-                          )}
-                        </div>
-                      )}
-                      <AllEmojiGrid
-                        reactions={reactions}
-                        onToggle={toggleReaction}
-                        isMobile={isMobile}
-                        searchQuery={isMobile ? "" : emojiSearch}
-                      />
-                    </PopoverContent>
-                  </Popover>
-                )}
                 {!sharedAnswerPreview && hasOverflowActions && (
                   <div className="relative inline-flex shrink-0">
                     <DropdownMenu
@@ -1322,50 +1075,6 @@ export const MessageContent = memo(function MessageContent({
                               {messageTimestamp}
                             </time>
                           )}
-                          {canRate && (
-                            <>
-                              <DropdownMenuItem
-                                className="gap-2.5 whitespace-nowrap rounded-lg py-2 pl-2.5 pr-2.5 data-[active=true]:text-emerald-600 dark:data-[active=true]:text-emerald-400"
-                                data-active={feedback === "up"}
-                                onSelect={() => handleFeedbackToggle("up")}
-                                aria-label={
-                                  feedback === "up" ? "Liked" : "Like"
-                                }
-                              >
-                                <ThumbsUp
-                                  className={cn(
-                                    "size-4",
-                                    feedback === "up"
-                                      ? "text-emerald-600 dark:text-emerald-400 ksemo-feedback-thumb-active"
-                                      : "text-muted-foreground"
-                                  )}
-                                />
-                                <span>
-                                  {feedback === "up" ? "Liked" : "Like"}
-                                </span>
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                className="gap-2.5 whitespace-nowrap rounded-lg py-2 pl-2.5 pr-2.5 data-[active=true]:text-rose-600 dark:data-[active=true]:text-rose-400"
-                                data-active={feedback === "down"}
-                                onSelect={() => handleFeedbackToggle("down")}
-                                aria-label={
-                                  feedback === "down" ? "Disliked" : "Dislike"
-                                }
-                              >
-                                <ThumbsDown
-                                  className={cn(
-                                    "size-4",
-                                    feedback === "down"
-                                      ? "text-rose-600 dark:text-rose-400 ksemo-feedback-thumb-active"
-                                      : "text-muted-foreground"
-                                  )}
-                                />
-                                <span>
-                                  {feedback === "down" ? "Disliked" : "Dislike"}
-                                </span>
-                              </DropdownMenuItem>
-                            </>
-                          )}
                           {(onRegenerate || onRetry) && (
                             <DropdownMenuItem
                               className="gap-2.5 whitespace-nowrap rounded-lg py-2 pl-2.5 pr-8"
@@ -1402,6 +1111,16 @@ export const MessageContent = memo(function MessageContent({
                               <span>
                                 {isSpeaking ? "Stop reading" : "Read aloud"}
                               </span>
+                            </DropdownMenuItem>
+                          ) : null}
+                          {canBranch ? (
+                            <DropdownMenuItem
+                              className="group/branch gap-2.5 whitespace-nowrap rounded-lg py-2 pl-2.5 pr-8"
+                              onSelect={() => void onBranch?.(message)}
+                              aria-label="Branch in new chat"
+                            >
+                              <BranchSplitIcon className="size-4 text-muted-foreground transition-colors group-hover/branch:text-foreground" />
+                              <span>Branch in new chat</span>
                             </DropdownMenuItem>
                           ) : null}
                         </div>

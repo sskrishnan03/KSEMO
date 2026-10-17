@@ -8,6 +8,7 @@ import {
   clearMessageFeedbackForUser,
   deleteAllConversationsForUser,
   deleteConversationForUser,
+  deleteFileForUser,
   deleteMessageForUser,
   editMessageForUser,
   getConversationForUser,
@@ -17,8 +18,10 @@ import {
   createSharedAnswerForUser,
   getSharedAnswerByToken,
   getMessageForUser,
+  getFileForUser,
   listMessageVersionsForUser,
   listMessageFilesForUser,
+  attachFileToMessageForUser,
   getUserPreferences,
   listConversationsForUser,
   listMessageFeedbackForUser,
@@ -34,7 +37,7 @@ setMessageFeedbackForUser,
   upsertUserPreferences,
   createFileForUser,
 } from "../supabase-db";
-import { storagePut } from "../storage";
+import { storageDownload, storagePut } from "../storage";
 import { listLLMModels } from "../_core/llm";
 import type { Message } from "../_core/llm";
 import { transcribeAudio } from "../_core/voiceTranscription";
@@ -160,9 +163,12 @@ export const conversationRouter = router({
       z.object({ id: conversationId, title: z.string().trim().min(1).max(120) })
     )
     .mutation(async ({ ctx, input }) => {
-      await requireConversation(input.id, ctx.user.id);
+      const conversation = await requireConversation(input.id, ctx.user.id);
+      const title = conversation.title.startsWith("Branch: ")
+        ? `Branch: ${input.title.replace(/^Branch:\s*/, "").slice(0, 112)}`
+        : input.title;
       return updateConversationForUser(input.id, ctx.user.id, {
-        title: input.title,
+        title,
       });
     }),
   setPinned: protectedProcedure
@@ -240,6 +246,169 @@ export const conversationRouter = router({
         });
       }
       return duplicate;
+    }),
+  branch: protectedProcedure
+    .input(
+      z.object({
+        id: conversationId,
+        messageId: z.string().min(1).max(128),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const original = await requireConversation(input.id, ctx.user.id);
+      const originalMessages = await listMessagesForConversation(original.id);
+      const selectedIndex = originalMessages.findIndex(
+        message => message.id === input.messageId
+      );
+      if (
+        selectedIndex < 0 ||
+        !["assistant", "user"].includes(originalMessages[selectedIndex].role) ||
+        originalMessages[selectedIndex].status === "streaming"
+      ) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "The selected message is no longer available to branch.",
+        });
+      }
+
+      const branch = await createConversationForUser({
+        id: crypto.randomUUID(),
+        userId: ctx.user.id,
+        title: `Branch: ${original.title.slice(0, 112)}`,
+        conversationType: original.conversationType,
+      });
+      if (!branch) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "A branch conversation could not be created.",
+        });
+      }
+
+      const historyToClone = originalMessages.slice(0, selectedIndex + 1);
+      const clonedFileIds = new Map<string, string>();
+      const createdFileIds: string[] = [];
+      try {
+        if (original.projectId) {
+          await updateConversationForUser(branch.id, ctx.user.id, {
+            projectId: original.projectId,
+          });
+        }
+        for (const message of historyToClone) {
+          const clonedMessageId = crypto.randomUUID();
+          let clonedMetadata = message.metadata
+            ? structuredClone(message.metadata)
+            : undefined;
+          if (clonedMetadata) {
+            // Branch relationships belong to their original message IDs. Keep
+            // all message data, but do not copy graph edges into a new branch.
+            delete clonedMetadata.branches;
+            delete clonedMetadata.branchTargets;
+            delete clonedMetadata.parentBranch;
+            delete clonedMetadata.branchOrigin;
+          }
+          if (message.id === input.messageId) {
+            clonedMetadata = {
+              ...(clonedMetadata ?? {}),
+              parentBranch: {
+                parentChatId: original.id,
+                parentChatTitle: original.title,
+                branchedAtMessageId: message.id,
+              },
+            };
+          }
+          await createMessage({
+            id: clonedMessageId,
+            conversationId: branch.id,
+            role: message.role,
+            content: message.content,
+            model: message.model,
+            metadata: clonedMetadata,
+            status: message.status,
+            createdAt: message.createdAt,
+            updatedAt: message.updatedAt,
+          });
+
+          const files = await listMessageFilesForUser(message.id, ctx.user.id);
+          for (const file of files) {
+            let branchFileId: string =
+              clonedFileIds.get(file.id) ?? file.id;
+            if (!clonedFileIds.has(file.id)) {
+              const sourceFile = await getFileForUser(file.id, ctx.user.id);
+              if (sourceFile) {
+                const downloaded = await storageDownload(sourceFile.storageKey);
+                if (downloaded.data) {
+                  const clonedFileId = crypto.randomUUID();
+                  const stored = await storagePut(
+                    `branches/${branch.id}/${sourceFile.filename}`,
+                    downloaded.data,
+                    sourceFile.mimeType || downloaded.contentType
+                  );
+                  await createFileForUser({
+                    ...sourceFile,
+                    id: clonedFileId,
+                    storageKey: stored.key,
+                    url: stored.url,
+                    createdAt: new Date(sourceFile.createdAt),
+                    updatedAt: new Date(sourceFile.updatedAt),
+                  });
+                  branchFileId = clonedFileId;
+                  createdFileIds.push(clonedFileId);
+                }
+              }
+              clonedFileIds.set(file.id, branchFileId);
+            }
+            await attachFileToMessageForUser({
+              id: crypto.randomUUID(),
+              fileId: branchFileId,
+              messageId: clonedMessageId,
+              conversationId: branch.id,
+              userId: ctx.user.id,
+            });
+          }
+        }
+        const sourceMessage = originalMessages[selectedIndex];
+        const sourceMetadata = sourceMessage.metadata
+          ? structuredClone(sourceMessage.metadata)
+          : {};
+        const existingBranches = Array.isArray(sourceMetadata.branches)
+          ? sourceMetadata.branches.filter(
+              (target): target is {
+                targetMessageId: string;
+                childChatId: string;
+                childTitle: string;
+              } =>
+                Boolean(
+                  target &&
+                    typeof target.targetMessageId === "string" &&
+                    typeof target.childChatId === "string" &&
+                    typeof target.childTitle === "string"
+                )
+            )
+          : [];
+        await updateMessage(sourceMessage.id, {
+          metadata: {
+            ...sourceMetadata,
+            branches: [
+              ...existingBranches,
+              {
+                targetMessageId: sourceMessage.id,
+                childChatId: branch.id,
+                childTitle: branch.title,
+              },
+            ],
+          },
+        });
+      } catch (error) {
+        await deleteConversationForUser(branch.id, ctx.user.id).catch(
+          cleanupError =>
+            console.error("Failed to clean up an incomplete chat branch:", cleanupError)
+        );
+        await Promise.allSettled(
+          createdFileIds.map(fileId => deleteFileForUser(fileId, ctx.user.id))
+        );
+        throw error;
+      }
+      return branch;
     }),
   export: protectedProcedure
     .input(z.object({ id: conversationId }))

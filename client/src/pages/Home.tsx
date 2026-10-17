@@ -43,6 +43,7 @@ import {
   UserPlus,
   X,
 } from "lucide-react";
+import { BranchSplitIcon } from "@/components/ksemo/BranchSplitIcon";
 import { Sidebar2 } from "reicon-react/icons/Sidebar2";
 import { ChatLine } from "reicon-react/icons/ChatLine";
 import {
@@ -989,6 +990,7 @@ export default function Home({
     });
   const sharedAnswerMutation =
     trpc.conversation.createSharedAnswer.useMutation();
+  const branchConversationMutation = trpc.conversation.branch.useMutation();
   const permanentDeleteMutation = trpc.conversation.remove.useMutation({
     onSuccess: () => {
       utils.conversation.list.invalidate();
@@ -1585,6 +1587,18 @@ export default function Home({
               category?: string;
               sourceConversationId?: string | null;
             }>;
+            branchOrigin?: { conversationId?: string; title?: string };
+            branchTargets?: Array<{ conversationId?: string; title?: string }>;
+            parentBranch?: {
+              parentChatId?: string;
+              parentChatTitle?: string;
+              branchedAtMessageId?: string;
+            };
+            branches?: Array<{
+              targetMessageId?: string;
+              childChatId?: string;
+              childTitle?: string;
+            }>;
           }
         | undefined;
       const restoredOutline = isPptOutlinePlan(metadata?.pptOutline?.outline)
@@ -1650,6 +1664,44 @@ export default function Home({
             : message.content,
         status: message.status,
         createdAt: message.createdAt,
+        branchOrigin:
+          typeof metadata?.parentBranch?.parentChatId === "string" &&
+          typeof metadata.parentBranch.parentChatTitle === "string"
+            ? {
+                conversationId: metadata.parentBranch.parentChatId,
+                title: metadata.parentBranch.parentChatTitle,
+                branchedAtMessageId:
+                  metadata.parentBranch.branchedAtMessageId,
+              }
+            : typeof metadata?.branchOrigin?.conversationId === "string" &&
+                typeof metadata.branchOrigin.title === "string"
+              ? {
+                  conversationId: metadata.branchOrigin.conversationId,
+                  title: metadata.branchOrigin.title,
+                }
+              : undefined,
+        branchTargets: [
+          ...(Array.isArray(metadata?.branches)
+            ? metadata.branches
+                .filter(
+                  target =>
+                    typeof target?.childChatId === "string" &&
+                    typeof target.childTitle === "string"
+                )
+                .map(target => ({
+                  conversationId: target.childChatId!,
+                  title: target.childTitle!,
+                  targetMessageId: target.targetMessageId,
+                }))
+            : []),
+          ...(Array.isArray(metadata?.branchTargets)
+            ? metadata.branchTargets.filter(
+                (target): target is { conversationId: string; title: string } =>
+                  typeof target?.conversationId === "string" &&
+                  typeof target.title === "string"
+              )
+            : []),
+        ],
         attachments: message.attachments,
         memoryUses: metadata?.memoryUses,
         // Rebuild completed fileGeneration with durable sources and metrics restored from attachment metadata
@@ -3733,6 +3785,29 @@ export default function Home({
     });
   }
 
+  async function branchFromMessage(message: KsemoMessage) {
+    if (
+      !activeConversationId ||
+      guestMode ||
+      branchConversationMutation.isPending ||
+      (message.role !== "assistant" && message.role !== "user")
+    ) {
+      return;
+    }
+    try {
+      const branch = await branchConversationMutation.mutateAsync({
+        id: activeConversationId,
+        messageId: message.id,
+      });
+      await utils.conversation.get.invalidate({ id: activeConversationId });
+      await utils.conversation.list.invalidate();
+      selectConversation(branch.id);
+      toast.success("Branched into a new chat from this response.");
+    } catch {
+      toast.error("Could not branch this response into a new chat.");
+    }
+  }
+
   function editMessage(message: KsemoMessage) {
     if (!editingMessage) {
       savedComposerDraftRef.current = composerValue;
@@ -4438,6 +4513,7 @@ export default function Home({
   const stableRegenerateMessage = usePersistFn(regenerateMessage);
   const stableShareMessage = usePersistFn(shareMessage);
   const stableDeleteMessage = usePersistFn(deleteMessage);
+  const stableBranchFromMessage = usePersistFn(branchFromMessage);
   const stableVoiceAction = usePersistFn(
     voice.state === "recording" ? voice.stop : voice.start
   );
@@ -5147,8 +5223,11 @@ export default function Home({
                         )}
                         <div className="pointer-events-auto absolute left-14 right-24 top-2 hidden lg:block lg:left-4">
                           <div className="inline-flex min-h-9 max-w-full items-center gap-1">
+                            {activeConversation?.title.startsWith("Branch: ") && (
+                              <BranchSplitIcon className="size-4 shrink-0 text-foreground/75" />
+                            )}
                             <span className="min-w-0 max-w-[calc(100%-2rem)] whitespace-normal break-words text-sm font-semibold leading-4 text-foreground">
-                              {activeConversation?.title || "New Chat"}
+                              {activeConversation?.title.replace(/^Branch:\s*/, "") || "New Chat"}
                             </span>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
@@ -5537,6 +5616,11 @@ export default function Home({
                           guestMode ? undefined : stableRegenerateMessage
                         }
                         onShare={guestMode ? undefined : stableShareMessage}
+                        onBranch={
+                          guestMode || !activeConversationId
+                            ? undefined
+                            : stableBranchFromMessage
+                        }
                         onDelete={guestMode ? undefined : stableDeleteMessage}
                         onFeedback={guestMode ? undefined : stableOnFeedback}
                         feedback={messageFeedback[message.id] ?? null}
@@ -5547,6 +5631,42 @@ export default function Home({
                           message.content === sharedAnswer
                         }
                       />
+                      {[
+                        ...(message.branchOrigin
+                          ? [
+                              {
+                                conversationId:
+                                  message.branchOrigin.conversationId,
+                                title: message.branchOrigin.title,
+                                label: `From ${message.branchOrigin.title.replace(/^Branch:\s*/, "")}`,
+                              },
+                            ]
+                          : []),
+                        ...(message.branchTargets ?? []).map(target => ({
+                          conversationId: target.conversationId,
+                          title: target.title,
+                          label: `To Branch · ${target.title.replace(/^Branch:\s*/, "")}`,
+                        })),
+                      ].map((link, index) => (
+                            <div
+                              key={`${link.conversationId}-${index}`}
+                              className="flex items-center gap-3 py-3 text-xs text-muted-foreground"
+                            >
+                              <span className="h-px flex-1 bg-border/70" />
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  selectConversation(link.conversationId)
+                                }
+                                className="inline-flex max-w-[70%] items-center gap-1.5 truncate underline decoration-muted-foreground/40 underline-offset-2 transition-colors hover:text-foreground"
+                                aria-label={`Open branched chat: ${link.title}`}
+                              >
+                                <BranchSplitIcon className="size-3.5 shrink-0" />
+                                <span className="truncate">{link.label}</span>
+                              </button>
+                              <span className="h-px flex-1 bg-border/70" />
+                            </div>
+                      ))}
                       {isSharedAnswerPage &&
                         sharedAnswerContinued &&
                         messageIndex ===

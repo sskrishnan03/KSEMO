@@ -1035,16 +1035,19 @@ export function registerChatStream(app: Express) {
                   messages,
                   signal: controller.signal,
                 });
-                if (
-                  intelligentTitle &&
-                  intelligentTitle !== conversation.title
-                ) {
+                const branchPrefix = conversation.title.startsWith("Branch: ")
+                  ? "Branch: "
+                  : "";
+                const nextTitle = intelligentTitle
+                  ? `${branchPrefix}${intelligentTitle}`.slice(0, 120)
+                  : "";
+                if (nextTitle && nextTitle !== conversation.title) {
                   await updateConversationForUser(conversation.id, user.id, {
-                    title: intelligentTitle,
+                    title: nextTitle,
                   });
                   writeEvent(res, "conversation.titleUpdated", {
                     conversationId: conversation.id,
-                    title: intelligentTitle,
+                    title: nextTitle,
                   });
                 }
               }
