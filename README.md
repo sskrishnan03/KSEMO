@@ -82,7 +82,7 @@ The application architecture and user journey are organized across five core int
 
 ---
 
-### 3. Ephemeral & Privacy-Preserving Temporary Chat
+### 3. Temporary Chat
 
 <p align="center">
   <img src="client/src/img/3.png" alt="3. Temporary Chat Incognito Mode" width="100%" style="border-radius: 8px; border: 1px solid #2d2d2d;" />
@@ -90,11 +90,11 @@ The application architecture and user journey are organized across five core int
 
 #### 🔍 Analysis & Capabilities:
 
-- **Zero Data Retention**: A dedicated incognito mode designed for disposable inquiries, sensitive data processing, and quick brainstorming.
+- **Temporary session**: A mode for conversations that should not appear in saved chat lists or be included in Memory.
 - **Visual Privacy Feedback**: Distinctive top notification and glowing input badge (_"Temporary chat — This conversation won't be saved to your chat history"_).
 - **Ephemeral State Lifecycle**:
-  - Conversations exist exclusively in client memory for the duration of the session.
-  - No database logging, no analytics tracking, and excluded from long-term memory extraction.
+  - Messages are processed and temporarily stored by the server so the live conversation can work. The app attempts to delete the temporary conversation when the session ends.
+  - Temporary conversations are excluded from normal history and Memory. This does not guarantee zero retention in hosting or AI-provider logs, backups, or other operational records.
 
 ---
 
@@ -287,7 +287,7 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 | **Start Chatting**           | Type any query into the central prompt box or click the microphone to dictate.                                           |
 | **Create Documents**         | Click the `+` button in the composer &rarr; select **Create Files** &rarr; choose PDF, Word, Excel, PowerPoint, or Text. |
 | **Hands-Free Voice**         | Click the audio visualizer icon in the chat composer to open Voice Mode with real-time speech synthesis.                 |
-| **Temporary Incognito Mode** | Toggle temporary chat mode to conduct private, unlogged conversational sessions.                                         |
+| **Temporary Chat**           | Keep a live conversation out of saved history and Memory; messages are still processed and temporarily stored to provide the session. |
 | **Manage File Library**      | Navigate to `Library` from the sidebar to upload documents, preview assets, and organize favorites.                      |
 | **Full-Text Search**         | Navigate to `Search` to query conversation history and message logs by keyword and date filters.                         |
 | **Share Conversation**       | Open conversation settings &rarr; generate a public link or send directly via email.                                     |

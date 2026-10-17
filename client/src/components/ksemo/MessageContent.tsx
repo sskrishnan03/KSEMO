@@ -17,7 +17,6 @@ import { ImageLightbox } from "@/components/ui/image-lightbox";
 import { isImageFile } from "@/lib/fileKinds";
 import { ThinkingIndicator } from "@/components/ui/thinking-indicator";
 import {
-  Check,
   ChevronDown,
   Copy,
   Download,
@@ -100,6 +99,21 @@ type KsemoMessage = {
     code?: string;
   };
 };
+
+function AnimatedSquareCheck({ className }: { className: string }) {
+  return (
+    <svg
+      aria-hidden="true"
+      className={cn("ksemo-copy-success", className)}
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <circle className="ksemo-copy-success-circle" cx="12" cy="12" r="10.5" />
+      <path className="ksemo-copy-success-tick" d="m6.5 12.5 4 4 7.5-8" />
+    </svg>
+  );
+}
 
 const FEEDBACK_SPARK_DIRECTIONS = [
   [-19, -19],
@@ -1030,7 +1044,7 @@ export const MessageContent = memo(function MessageContent({
                     }}
                   >
                     {copied ? (
-                      <Check className="size-4" />
+                      <AnimatedSquareCheck className="size-4" />
                     ) : (
                       <Copy className="size-4" />
                     )}
@@ -1052,7 +1066,7 @@ export const MessageContent = memo(function MessageContent({
                   {action(
                     "Copy message",
                     copied ? (
-                      <Check className="size-4" />
+                      <AnimatedSquareCheck className="size-4" />
                     ) : (
                       <Copy className="size-4" />
                     ),
@@ -1069,12 +1083,12 @@ export const MessageContent = memo(function MessageContent({
               message.status === "failed" ||
               message.status === "cancelled" ||
               Boolean(fileCreationNode)) && (
-              <div className="mt-1.5 flex items-center gap-1">
+              <div className="-ml-1 mt-1.5 flex items-center gap-1">
                 {message.content &&
                   action(
                     copied ? "Copied" : "Copy response",
                     copied ? (
-                      <Check className="size-4" />
+                      <AnimatedSquareCheck className="size-4" />
                     ) : (
                       <Copy className="size-4" />
                     ),

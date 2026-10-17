@@ -52,7 +52,7 @@ export const FAQ_CATEGORIES: FaqCategory[] = [
         id: "gs-8",
         question: "Which AI models does KSEMO use?",
         answer:
-          "KSEMO is powered by Google's Gemini family of models. The model used for a reply is chosen automatically for your request, and you can see or change your preferred model from Settings → Preferences.",
+          "KSEMO sends requests to the AI provider and model configured for the deployment. Available models and routing can change; check Settings → Preferences for the choices exposed by your instance.",
       },
       {
         id: "gs-9",
@@ -82,7 +82,7 @@ export const FAQ_CATEGORIES: FaqCategory[] = [
         id: "gs-13",
         question: "Can I try KSEMO before creating an account?",
         answer:
-          "When the platform runs without a configured database it provides a built-in demo account so you can explore the full interface immediately. For a personal, persistent workspace you sign in with your Google account.",
+          "Depending on server configuration, sign-in may offer Google or email and password. A local demo account may be available in development; do not use demo credentials for private data.",
       },
       {
         id: "gs-14",
@@ -112,7 +112,7 @@ export const FAQ_CATEGORIES: FaqCategory[] = [
         id: "ac-1",
         question: "How do I sign in to KSEMO?",
         answer:
-          "Use the “Sign in with Google” button on the access screen. Your Google account securely identifies you and creates your private KSEMO space.",
+          "Choose an available sign-in method on the access screen. Depending on deployment, KSEMO supports Google sign-in and email/password accounts.",
       },
       {
         id: "ac-2",
@@ -124,56 +124,56 @@ export const FAQ_CATEGORIES: FaqCategory[] = [
         id: "ac-3",
         question: "Where do I manage my name and email?",
         answer:
-          "Your name and email come from your Google account and are shown read-only in Settings → Account. To change them, update your Google profile and they will reflect in KSEMO.",
+          "Your profile details and available editing controls appear in Settings → Account. Google passwords remain managed by Google; email/password accounts use KSEMO password controls.",
       },
       {
         id: "ac-4",
         question: "Can multiple people use the same KSEMO account?",
         answer:
-          "KSEMO accounts are personal. Each person should sign in with their own Google account so conversations and files stay private to them.",
+          "KSEMO accounts are personal. Each person should use their own account and sign-in method so conversations and files remain associated with the correct user.",
       },
       {
         id: "ac-5",
         question: "What happens if I lose access to my Google account?",
         answer:
-          "Because signing in depends on Google, recovering your Google account through Google's account recovery is the way back in. Your KSEMO data stays safe and waits for you.",
+          "Recover access through the same sign-in method you used. For Google, use Google account recovery; for email/password, use KSEMO password reset. We cannot guarantee recovery if you lose account access.",
       },
       {
         id: "ac-6",
         question: "Does KSEMO ever ask for my password?",
         answer:
-          "Never. KSEMO only uses Google's official sign-in window. If any page or message asks for your password directly, do not enter it and report it to us immediately.",
+          "KSEMO does not ask for your Google password. If you use an email/password account, enter it only on the KSEMO sign-in page. Never share passwords or one-time codes in chat, feedback, or email.",
       },
       {
         id: "ac-7",
         question: "How do I keep my account secure?",
         answer:
-          "Use a strong password and two-step verification on your Google account, avoid sharing your device session, and sign out on shared computers. Review public share links regularly and turn off ones you no longer need.",
+          "Use a unique strong password for email/password accounts, enable two-step verification with your identity provider where available, avoid sharing your session, and sign out on shared computers. Review public links and disable ones you no longer need.",
       },
       {
         id: "ac-8",
         question: "What security measures protect my KSEMO account and data?",
         answer:
-          "KSEMO protects data in several layers:\n- All traffic between your browser and KSEMO is encrypted in transit with HTTPS/TLS.\n- Data at rest is protected by encryption on our cloud infrastructure.\n- Your workspace is private to your account and isolated from other users.\n- Sessions rely on signed, secure cookies scoped to the KSEMO application.\n- Internal access to your content is limited to what is strictly required to operate, debug, or meet legal obligations, under least-privilege controls.\nSee Security measures in the Privacy Policy for the full detail.",
+          "KSEMO uses account-based authorization. Production transport encryption, storage encryption, administrator access, and provider safeguards depend on deployment. Review the Privacy Policy and the operator's notices; this FAQ is not a security certification.",
       },
       {
         id: "ac-9",
         question: "Does KSEMO support two-factor authentication?",
         answer:
-          "KSEMO itself relies on Google identity; it does not add a separate login of its own. The most effective protection is enabling two-step verification on your Google account — that same protection then guards every KSEMO session you create. Any login problem with Google is handled through Google's own recovery flow.",
+          "KSEMO supports sign-in methods configured by the deployment. Google accounts can use Google two-step verification; email/password accounts should use a unique strong password. Additional factors depend on deployment.",
       },
       {
         id: "ac-10",
         question: "Is my connection to KSEMO encrypted?",
         answer:
-          "Yes. Every connection between your browser and KSEMO uses HTTPS/TLS encryption, and your session is protected by signed, secure cookies. KSEMO also pushes back on broad or informal requests for your data as described in the Privacy Policy.",
+          "The production site should be accessed over HTTPS. Exact session and transport protections depend on deployment. Check that the browser address begins with https:// before signing in.",
       },
       {
         id: "ac-11",
         question:
           "How are my conversations protected from unauthorized access?",
         answer:
-          "Conversations are tied to your signed-in identity and are not accessible without an authenticated session. Access is limited to your workspace, data storage is isolated per account, and internal staff access is restricted to what is strictly necessary. Public sharing is always opt-in and per-conversation.",
+          "Conversations are associated with your account and require authorization to access. Public sharing is enabled per conversation; anyone with an active link may be able to read that conversation. Operator and provider access practices depend on deployment.",
       },
       {
         id: "ac-12",
@@ -192,7 +192,7 @@ export const FAQ_CATEGORIES: FaqCategory[] = [
         id: "ac-14",
         question: "How do I sign out everywhere at once?",
         answer:
-          "KSEMO signs out the browser you are currently using. To end sessions on a shared or lost device, sign out of your Google account there or revoke the session from Google's security page — since KSEMO sessions depend on Google identity, ending the Google session ends KSEMO access too.",
+          "Sign out from each KSEMO browser session you can access. For Google sign-in, also review Google account sessions; for email/password accounts, change your KSEMO password if you suspect compromise. Do not assume one sign-out revokes every KSEMO session.",
       },
       {
         id: "ac-15",
@@ -211,7 +211,7 @@ export const FAQ_CATEGORIES: FaqCategory[] = [
         question:
           "What happens to my account if I am inactive for a long time?",
         answer:
-          "Your account and data remain in place while you are away. Abandoned or suspended accounts may be purged only after a prolonged inactive period where legally permitted, and we would make reasonable efforts to provide notice first. If you plan to be away, screenshots and exports are the simplest way to keep a copy of what matters.",
+          "This app does not define an automatic inactivity deletion period. You can delete your account in Settings → Account. Keep your own exports of anything you need to retain.",
       },
     ],
   },
@@ -224,6 +224,12 @@ export const FAQ_CATEGORIES: FaqCategory[] = [
         question: "Are my conversations saved?",
         answer:
           "Yes. Conversations are stored privately in your account so you can reopen them after refreshing or coming back later. You can rename, archive, share, or permanently delete them anytime.",
+      },
+      {
+        id: "cn-temporary",
+        question: "How does Temporary chat handle my data?",
+        answer:
+          "Temporary chats are hidden from saved conversation lists and excluded from Memory. To support the live conversation, messages are still processed and temporarily stored by the service while the session is active; the app attempts to delete them when you leave Temporary chat or the session ends. This is not a guarantee of zero retention by hosting or AI providers, and content sent to an AI provider is subject to that provider's terms. Avoid entering information that must never be processed or retained.",
       },
       {
         id: "cn-2",
@@ -423,7 +429,7 @@ export const FAQ_CATEGORIES: FaqCategory[] = [
         id: "lf-10",
         question: "Are the files I upload encrypted?",
         answer:
-          "Yes. Library files live in private object storage that is encrypted at rest, and they are reached only through short-lived, authorized links for your session. They are transferred over HTTPS and are accessible only with an authenticated session.",
+          "Library files are associated with your account and delivered through authorized application routes. Storage encryption and link expiry depend on deployment; check the Privacy Policy and site address for the instance you use.",
       },
       {
         id: "lf-11",
@@ -628,7 +634,7 @@ export const FAQ_CATEGORIES: FaqCategory[] = [
         id: "pd-12",
         question: "How long is my data stored after I delete it?",
         answer:
-          "Permanent deletion removes content from the active system promptly; residual encrypted backups expire on the backup rotation schedule and are then gone entirely. Items in Trash remain recoverable until they are permanently deleted. KSEMO keeps only the minimum operational records required for security and compliance, for as long as necessary.",
+          "Permanent deletion removes content from active application records. Backup and provider retention periods depend on the deployment and are not specified by the app. Items in Trash remain recoverable until permanently deleted.",
       },
       {
         id: "pd-13",
@@ -640,13 +646,13 @@ export const FAQ_CATEGORIES: FaqCategory[] = [
         id: "pd-14",
         question: "Does KSEMO comply with CCPA, GDPR, and similar laws?",
         answer:
-          "KSEMO is engineered around privacy-by-design: minimal collection, explicit user controls, and direct deletion. The Privacy Policy maps these protections to GDPR, CCPA/CPRA, UK GDPR, Colorado/Connecticut/Utah/Virginia consumer statutes, PIPEDA, and LGPD, and KSEMO honors the strongest protections that apply to you — including the right to access, correct, export, and delete your information.",
+          "Privacy rights depend on your location and the service operator. The Privacy Policy describes general controls; it does not certify compliance with a particular law. Contact the operator through Settings → Feedback to ask about a request or applicable rights.",
       },
       {
         id: "pd-15",
         question: "How does KSEMO respond to data breaches?",
         answer:
-          "The service is monitored for suspicious activity and unauthorized access. If we confirm a breach that materially compromises your personal information, we notify affected users without undue delay, describing what happened and what we are doing, and we notify regulators where the law requires it. See Data breach response in the Privacy Policy.",
+          "Notification duties depend on the facts and applicable law. The Privacy Policy describes general expectations; report concerns through Settings → Feedback so the service operator can investigate.",
       },
       {
         id: "pd-16",
@@ -676,13 +682,13 @@ export const FAQ_CATEGORIES: FaqCategory[] = [
         id: "mm-2",
         question: "Is Memory on by default?",
         answer:
-          "No. Memory starts off for every account. Nothing is analyzed or remembered until you switch Memory on in Settings → Memory.",
+          "Check Settings → Memory for the current state. New accounts may receive a default configured by the deployment; when Memory is on, KSEMO may extract facts from conversations for later replies.",
       },
       {
         id: "mm-3",
         question: "How do I turn Memory on or off?",
         answer:
-          "Open Settings → Memory and toggle the single Memory switch. On means conversations are analyzed automatically; off means they are not.",
+          "Open Settings → Memory and change the Memory switch. When on, conversations may be analyzed for durable facts; when off, new memory extraction and retrieval are disabled. Turning it off does not delete memories already saved.",
       },
       {
         id: "mm-4",
@@ -700,13 +706,13 @@ export const FAQ_CATEGORIES: FaqCategory[] = [
         id: "mm-6",
         question: "What happens when I turn Memory off?",
         answer:
-          "KSEMO stops analyzing new conversations and stops using your saved memories in replies. The memories already stored stay in your account while Memory is off, and are used again only if you turn Memory back on. To remove everything, delete your account or contact us from Settings → Feedback.",
+          "Turning Memory off stops new memory extraction and retrieval. Existing memories remain until you remove them or delete your account; turning the switch off does not delete them.",
       },
       {
         id: "mm-7",
         question: "Where can I see how many memories are saved?",
         answer:
-          "Settings → Memory shows the current memory status and how many memories are saved. KSEMO does not currently offer a separate per-fact memory manager, so to review or clear specific facts, contact us from Settings → Feedback.",
+          "Settings → Memory shows saved memories and provides controls to review, edit, and remove them. You can disable Memory to stop new extraction and retrieval.",
       },
       {
         id: "mm-8",
@@ -719,7 +725,7 @@ export const FAQ_CATEGORIES: FaqCategory[] = [
         id: "mm-9",
         question: "Can I see or edit individual saved memories?",
         answer:
-          "Settings → Memory shows the memory status and count. A per-fact memory manager is not available yet, but you can prevent new captures by turning Memory off and can request a full memory review or clearing from Settings → Feedback.",
+          "Open Settings → Memory to view, edit, or remove saved memories. Turn Memory off to stop new extraction and retrieval.",
       },
       {
         id: "mm-10",
@@ -743,7 +749,7 @@ export const FAQ_CATEGORIES: FaqCategory[] = [
         id: "mm-13",
         question: "How is Memory stored and protected?",
         answer:
-          "Memories are stored privately with your account under the same security controls as the rest of your content — encrypted transport, encryption at rest, and restricted internal access. They are not sold, not shared with advertising networks, and not used to train third-party models.",
+          "Memories are associated with your account and may be included in AI requests when Memory is enabled. Transport, storage encryption, provider retention, and training settings depend on deployment and provider configuration; check the applicable privacy notices.",
       },
     ],
   },
@@ -807,7 +813,7 @@ export const FAQ_CATEGORIES: FaqCategory[] = [
         id: "ai-9",
         question: "What happens when I run out of a model's daily allowance?",
         answer:
-          "KSEMO automatically switches to a fallback model so you can continue chatting without interruption. You can also switch your preferred model in Settings to a fresh daily allowance. Limits exist to keep capacity fair for everyone and are explained in Plans & usage limits.",
+          "The app may switch to a fallback model when one is configured and available; uninterrupted service is not guaranteed. You can also switch your preferred model in Settings to a fresh daily allowance. Limits exist to keep capacity fair for everyone and are explained in Plans & usage limits.",
       },
       {
         id: "ai-10",
@@ -900,7 +906,7 @@ export const FAQ_CATEGORIES: FaqCategory[] = [
         id: "pl-2",
         question: "What happens when I reach a usage limit?",
         answer:
-          "KSEMO automatically falls back to another available model so your work is not interrupted. You can also switch your preferred model in Settings to continue on a fresh daily allowance. If limits are ever removed or relaxed, this page will be updated.",
+          "The app may switch to another configured model when one is available; uninterrupted service is not guaranteed. You can also switch your preferred model in Settings to continue on a fresh daily allowance. If limits are ever removed or relaxed, this page will be updated.",
       },
       {
         id: "pl-3",
@@ -913,7 +919,7 @@ export const FAQ_CATEGORIES: FaqCategory[] = [
         id: "pl-4",
         question: "Will KSEMO remain free, or will there be paid plans?",
         answer:
-          "KSEMO is currently free during its launch period. If paid plans are introduced later, the Terms commit us to clearly disclosing price, billing cycle, and inclusions before you subscribe; recurring plans would be cancelable before renewal, taxes shown at checkout, and refunds handled per the plan terms.",
+          "Pricing and access depend on the deployment and any terms shown to you. If paid plans are introduced later, the Terms commit us to clearly disclosing price, billing cycle, and inclusions before you subscribe; recurring plans would be cancelable before renewal, taxes shown at checkout, and refunds handled per the plan terms.",
       },
       {
         id: "pl-5",
