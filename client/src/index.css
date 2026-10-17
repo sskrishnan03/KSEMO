@@ -675,8 +675,49 @@ html.ksemo-reduce-motion .loader-xs {
   animation: ksemo-feedback-thumb-pop 480ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+@keyframes ksemo-feedback-spark-particle {
+  0% {
+    opacity: 0.98;
+    transform: translate(-50%, -50%) scale(0.65) rotate(var(--spark-angle));
+  }
+  100% {
+    opacity: 0;
+    transform: translate(
+        calc(-50% + var(--spark-x)),
+        calc(-50% + var(--spark-y))
+      )
+      scale(0.9)
+      rotate(var(--spark-angle));
+  }
+}
+.ksemo-feedback-spark-particle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  background: currentColor;
+  filter: drop-shadow(0 0 3px currentColor) drop-shadow(0 0 1px currentColor);
+  animation: ksemo-feedback-spark-particle 520ms
+    cubic-bezier(0.2, 0.75, 0.3, 1) both;
+}
+.ksemo-feedback-spark-star {
+  width: 6px;
+  height: 6px;
+  clip-path: polygon(50% 0, 64% 36%, 100% 50%, 64% 64%, 50% 100%, 36% 64%, 0 50%, 36% 36%);
+}
+.ksemo-feedback-spark-ray {
+  width: 2px;
+  height: 8px;
+  border-radius: 999px;
+}
+.ksemo-feedback-spark-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .ksemo-feedback-thumb-pop {
+  .ksemo-feedback-thumb-pop,
+  .ksemo-feedback-spark-particle {
     animation: none;
   }
 }
@@ -688,6 +729,15 @@ html.ksemo-reduce-motion .loader-xs {
 [data-radix-dropdown-menu-content][class*="max-h"] {
   scrollbar-width: none;
   -ms-overflow-style: none;
+}
+.ksemo-tools-menu {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none;
+}
+.ksemo-tools-menu::-webkit-scrollbar {
+  display: none !important;
+  width: 0;
+  height: 0;
 }
 
 @keyframes fileDraftShimmer {

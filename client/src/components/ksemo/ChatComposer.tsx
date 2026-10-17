@@ -1070,12 +1070,12 @@ export const ChatComposer = memo(function ChatComposer({
                       sideOffset={8}
                       alignOffset={-8}
                       collisionPadding={12}
-                      className="ksemo-thin-scroll w-48 rounded-xl max-h-[16rem] overflow-y-auto"
+                      className="ksemo-tools-menu w-48 rounded-xl max-h-[16rem] overflow-y-auto [&_svg]:text-foreground"
                     >
                       <DropdownMenuItem
                         onClick={() => fileInputRef.current?.click()}
                       >
-                        <Paperclip className="mr-2 size-4" /> Upload files
+                        <Paperclip className="mr-2 size-4 -rotate-45 -scale-x-100 text-foreground" /> Upload files
                       </DropdownMenuItem>
                       {isMobile
                         ? !guestMode && (
@@ -1085,7 +1085,7 @@ export const ChatComposer = memo(function ChatComposer({
                                 setCameraOpen(true);
                               }}
                             >
-                              <Camera className="mr-2 size-4" />
+                              <Camera className="mr-2 size-[17px] text-foreground" />
                               Camera
                             </DropdownMenuItem>
                           )
@@ -1096,7 +1096,7 @@ export const ChatComposer = memo(function ChatComposer({
                                 onTakeScreenshot();
                               }}
                             >
-                              <Monitor className="mr-2 size-4" />
+                              <Monitor className="mr-2 size-4 text-foreground" />
                               Take Screenshot
                             </DropdownMenuItem>
                           )}
@@ -1106,20 +1106,20 @@ export const ChatComposer = memo(function ChatComposer({
                           setToolsOpen(false);
                         }}
                       >
-                        <Library aria-hidden="true" className="mr-2 size-4" />
+                        <Library aria-hidden="true" className="mr-2 size-[17px] text-foreground" />
                         Browse Library
                       </DropdownMenuItem>
                       {!botActive && (
                         <DropdownMenuSub>
                           <DropdownMenuSubTrigger>
-                            <FilePlus size={16} className="mr-2" />
+                            <FilePlus size={17} className="mr-2 text-foreground" />
                             Create Files
                           </DropdownMenuSubTrigger>
                           <DropdownMenuSubContent
                             sideOffset={6}
                             alignOffset={-84}
                             collisionPadding={16}
-                            className="ksemo-thin-scroll w-44 rounded-xl max-h-[16rem] overflow-y-auto shadow-md"
+                            className="ksemo-tools-menu w-44 rounded-xl max-h-[16rem] overflow-y-auto shadow-md [&_svg]:text-foreground"
                           >
                             {CAPABILITY_SECTIONS.find(
                               s => s.id === "create"
@@ -1145,7 +1145,7 @@ export const ChatComposer = memo(function ChatComposer({
                                 >
                                   <Icon
                                     className={cn(
-                                      "mr-2 size-[18px] shrink-0",
+                                      "mr-2 size-[18px] shrink-0 text-foreground",
                                       option.mode === "xlsx" && "stroke-[1.5]"
                                     )}
                                   />
@@ -1175,7 +1175,7 @@ export const ChatComposer = memo(function ChatComposer({
                           onCancel();
                           changeTag("chat");
                         }}
-                        className="size-9 shrink-0 rounded-full text-muted-foreground hover:bg-accent hover:text-foreground"
+                        className="size-9 shrink-0 rounded-full text-foreground hover:bg-accent hover:text-foreground"
                         aria-label="Cancel voice chat"
                       >
                         <X className="size-4" />
@@ -1218,7 +1218,7 @@ export const ChatComposer = memo(function ChatComposer({
                                 variant="ghost"
                                 size="icon"
                                 disabled
-                                className="size-10 rounded-full bg-transparent text-muted-foreground transition-colors"
+                                className="size-10 rounded-full bg-transparent text-foreground transition-colors"
                                 aria-label="Converting speech to text"
                               >
                                 <div
@@ -1310,7 +1310,7 @@ export const ChatComposer = memo(function ChatComposer({
                                 variant="ghost"
                                 size="icon"
                                 disabled
-                                className="size-10 rounded-full bg-transparent text-muted-foreground transition-colors"
+                                className="size-10 rounded-full bg-transparent text-foreground transition-colors"
                                 aria-label="Converting speech to text"
                               >
                                 <div
@@ -1358,7 +1358,7 @@ export const ChatComposer = memo(function ChatComposer({
                               "size-9 shrink-0 rounded-full transition-colors",
                               botVoiceMuted
                                 ? "bg-destructive/10 text-destructive hover:bg-destructive/15"
-                                : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                                : "text-foreground hover:bg-accent hover:text-foreground"
                             )}
                             aria-label={
                               botVoiceMuted ? "Unmute microphone" : "Mute microphone"
@@ -1402,7 +1402,7 @@ export const ChatComposer = memo(function ChatComposer({
                           <Button
                             disabled
                             size="icon"
-                            className="size-10 rounded-full bg-transparent text-muted-foreground"
+                            className="size-10 rounded-full bg-transparent text-foreground"
                             aria-label="Converting speech to text"
                           >
                             <div
@@ -1453,7 +1453,7 @@ export const ChatComposer = memo(function ChatComposer({
                               "ksemo-composer-send size-10 rounded-full transition-colors",
                               canSend
                                 ? "ksemo-composer-send-ready bg-foreground text-background hover:bg-foreground/90"
-                                : "bg-muted text-muted-foreground hover:bg-accent"
+                                : "bg-muted text-foreground hover:bg-accent"
                             )}
                             aria-label="Send message"
                           >
@@ -1510,7 +1510,7 @@ export const ChatComposer = memo(function ChatComposer({
                     >
                       <Icon
                         className={cn(
-                          "mr-2 size-[18px] shrink-0 text-muted-foreground",
+                          "mr-2 size-[18px] shrink-0 text-foreground",
                           option.mode === "xlsx" && "stroke-[1.5]"
                         )}
                       />
@@ -1594,7 +1594,7 @@ export function LibraryPickerContent({
   return (
     <div className="space-y-2 p-2">
       <div className="flex items-center gap-2 px-1">
-        <Library aria-hidden="true" className="size-4 text-muted-foreground" />
+        <Library aria-hidden="true" className="size-4 text-foreground" />
         <p className="flex-1 text-sm font-medium">Browse Library</p>
         {onCancel && (
           <Button

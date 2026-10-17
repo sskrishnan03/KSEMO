@@ -508,7 +508,7 @@ export function LibraryWorkspace({
       {isDragging && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
           <div className="rounded-2xl border-2 border-dashed border-muted-foreground/40 bg-card p-8 text-center">
-            <Upload className="mx-auto size-12 text-muted-foreground" />
+            <Upload className="mx-auto size-12 text-foreground" />
             <p className="mt-4 text-lg font-medium">Drop files to upload</p>
             <p className="mt-2 text-sm text-muted-foreground">
               Supported: PDF, Word, Excel, PowerPoint, text, data, and images up
@@ -647,7 +647,7 @@ export function LibraryWorkspace({
                   <button
                     type="button"
                     onClick={() => setQuery("")}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground transition-colors hover:text-foreground"
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-md p-1 text-foreground transition-colors hover:text-foreground"
                     aria-label="Clear search query"
                   >
                     <X className="size-4" />
@@ -1127,7 +1127,7 @@ function SegmentedTags<T extends string>({
                   : "px-2.5 py-1",
               active
                 ? "text-background"
-                : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                : "text-foreground hover:bg-accent hover:text-foreground"
             )}
           >
             {option.icon}
@@ -1164,7 +1164,7 @@ function EmptyLibrary({
   return (
     <div className="grid min-h-72 place-items-center rounded-2xl border border-dashed border-border bg-muted/20 p-7 text-center">
       <div>
-        <FolderOpen className="mx-auto size-10 text-muted-foreground" />
+        <FolderOpen className="mx-auto size-10 text-foreground" />
         <h2 className="mt-4 text-base font-medium">
           {hasQuery ? "No items match this view" : "Your Library is ready"}
         </h2>
@@ -1220,7 +1220,7 @@ function LibraryFormatIcon({
   className: string;
 }) {
   if (isImageFile(file.filename, file.mimeType)) {
-    return <Gallery3 className={cn(className, "text-muted-foreground")} />;
+    return <Gallery3 className={cn(className, "text-foreground")} />;
   }
 
   const extension = extensionOfFilename(file.filename);
@@ -1244,14 +1244,14 @@ function LibraryFormatIcon({
       <Icon
         className={cn(
           className,
-          "text-muted-foreground",
+          "text-foreground",
           (mode === "xlsx" || mode === "pptx") && "stroke-[1.5]"
         )}
       />
     );
   }
 
-  return <File className={cn(className, "text-muted-foreground")} />;
+  return <File className={cn(className, "text-foreground")} />;
 }
 
 function libraryFileTypeLabel(file: LibraryWorkspaceFile): string {
@@ -1354,7 +1354,7 @@ const LibraryGridCard = memo(function LibraryGridCard({
               type="button"
               onClick={event => event.stopPropagation()}
               className={cn(
-                "pointer-events-none flex size-[30px] shrink-0 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-[opacity,color,background-color] group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100 hover:bg-accent hover:text-foreground max-lg:pointer-events-auto max-lg:opacity-100",
+                "pointer-events-none flex size-[30px] shrink-0 items-center justify-center rounded-md text-foreground opacity-0 transition-[opacity,color,background-color] group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100 hover:bg-accent hover:text-foreground max-lg:pointer-events-auto max-lg:opacity-100",
                 isMenuOpen && "pointer-events-auto opacity-100 bg-accent text-foreground",
                 selectionMode && "pointer-events-none opacity-0"
               )}
@@ -1645,7 +1645,7 @@ const LibraryListRow = memo(function LibraryListRow({
               type="button"
               onClick={event => event.stopPropagation()}
               className={cn(
-                "pointer-events-none flex size-[30px] items-center justify-center rounded-md text-muted-foreground opacity-0 transition-[opacity,color,background-color] group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100 hover:bg-accent hover:text-foreground max-lg:pointer-events-auto max-lg:opacity-100",
+                "pointer-events-none flex size-[30px] items-center justify-center rounded-md text-foreground opacity-0 transition-[opacity,color,background-color] group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100 hover:bg-accent hover:text-foreground max-lg:pointer-events-auto max-lg:opacity-100",
                 isMenuOpen && "pointer-events-auto opacity-100 bg-accent text-foreground",
                 selectionMode && "pointer-events-none opacity-0"
               )}

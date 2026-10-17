@@ -101,6 +101,56 @@ type KsemoMessage = {
   };
 };
 
+const FEEDBACK_SPARK_DIRECTIONS = [
+  [-19, -19],
+  [-8, -23],
+  [8, -23],
+  [19, -19],
+  [23, -8],
+  [23, 8],
+  [19, 19],
+  [8, 23],
+  [-8, 23],
+  [-19, 19],
+  [-23, 8],
+  [-23, -8],
+] as const;
+
+function FeedbackSparkBurst({ tone }: { tone: "up" | "down" }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={cn(
+        "pointer-events-none absolute inset-0 z-0 overflow-visible",
+        tone === "up"
+          ? "text-emerald-600 dark:text-emerald-500"
+          : "text-rose-600 dark:text-rose-500"
+      )}
+    >
+      {FEEDBACK_SPARK_DIRECTIONS.map(([x, y], index) => (
+        <span
+          key={`${x}-${y}`}
+          className={cn(
+            "ksemo-feedback-spark-particle",
+            index % 3 === 0
+              ? "ksemo-feedback-spark-star"
+              : index % 3 === 1
+                ? "ksemo-feedback-spark-ray"
+                : "ksemo-feedback-spark-dot"
+          )}
+          style={
+            {
+              "--spark-x": `${x}px`,
+              "--spark-y": `${y}px`,
+              "--spark-angle": `${(Math.atan2(y, x) * 180) / Math.PI + 90}deg`,
+            } as React.CSSProperties
+          }
+        />
+      ))}
+    </span>
+  );
+}
+
 function formatShortResponseDuration(durationMs: number): string {
   const seconds = Math.max(1, Math.ceil(durationMs / 1000));
   return `${seconds}s`;
@@ -339,6 +389,10 @@ export const MessageContent = memo(function MessageContent({
 }) {
   const [copied, setCopied] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const [feedbackPulse, setFeedbackPulse] = useState<MessageFeedbackValue | null>(
+    null
+  );
+  const [feedbackPulseKey, setFeedbackPulseKey] = useState(0);
   const [actionsOpen, setActionsOpen] = useState(false);
   const [responseDurationMs, setResponseDurationMs] = useState<number | null>(null);
   const isMobile = useIsMobile();
@@ -433,6 +487,12 @@ export const MessageContent = memo(function MessageContent({
     onFeedback?.(message.id, value)
   );
 
+  const animateFeedbackToggle = (value: MessageFeedbackValue) => {
+    setFeedbackPulse(value);
+    setFeedbackPulseKey(key => key + 1);
+    handleFeedbackToggle(value);
+  };
+
   async function copyMessage() {
     await navigator.clipboard.writeText(cleanContent);
     setCopied(true);
@@ -452,7 +512,7 @@ export const MessageContent = memo(function MessageContent({
   if (message.role === "system" || message.role === "tool") return null;
 
   const actionClass =
-    "size-8 rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground";
+    "size-8 rounded-md text-foreground transition-colors hover:bg-accent hover:text-foreground";
   const action = (
     label: string,
     icon: React.ReactNode,
@@ -834,7 +894,7 @@ export const MessageContent = memo(function MessageContent({
                               href={file.url}
                               download
                               aria-label={`Download ${file.filename}`}
-                              className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                              className="flex size-7 items-center justify-center rounded-md text-foreground transition-colors hover:bg-accent hover:text-foreground"
                             >
                               <Download className="size-3.5" />
                             </a>
@@ -888,7 +948,7 @@ export const MessageContent = memo(function MessageContent({
                           href={file.url}
                           download
                           aria-label={`Download ${file.filename}`}
-                          className="flex size-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                          className="flex size-9 shrink-0 items-center justify-center rounded-lg text-foreground transition-colors hover:bg-accent hover:text-foreground"
                         >
                           <Download className="size-4" />
                         </a>
@@ -997,26 +1057,46 @@ export const MessageContent = memo(function MessageContent({
                   <>
                     {action(
                       feedback === "up" ? "Remove like" : "Like",
-                      <ThumbsUp
-                        className={cn(
-                          "size-4",
-                          feedback === "up" &&
-                            "text-emerald-600 dark:text-emerald-400 ksemo-feedback-thumb-active"
+                      <span className="relative grid size-4 place-items-center">
+                        {feedbackPulse === "up" && (
+                          <FeedbackSparkBurst
+                            key={feedbackPulseKey}
+                            tone="up"
+                          />
                         )}
-                      />,
-                      () => handleFeedbackToggle("up"),
+                        <ThumbsUp
+                          key={feedbackPulseKey}
+                          className={cn(
+                            "relative z-10 size-4",
+                            feedback === "up" &&
+                              "text-emerald-600 dark:text-emerald-400 ksemo-feedback-thumb-active",
+                            feedbackPulse === "up" && "ksemo-feedback-thumb-pop"
+                          )}
+                        />
+                      </span>,
+                      () => animateFeedbackToggle("up"),
                       feedback === "up"
                     )}
                     {action(
                       feedback === "down" ? "Remove dislike" : "Dislike",
-                      <ThumbsDown
-                        className={cn(
-                          "size-4",
-                          feedback === "down" &&
-                            "text-rose-600 dark:text-rose-400 ksemo-feedback-thumb-active"
+                      <span className="relative grid size-4 place-items-center">
+                        {feedbackPulse === "down" && (
+                          <FeedbackSparkBurst
+                            key={feedbackPulseKey}
+                            tone="down"
+                          />
                         )}
-                      />,
-                      () => handleFeedbackToggle("down"),
+                        <ThumbsDown
+                          key={feedbackPulseKey}
+                          className={cn(
+                            "relative z-10 size-4",
+                            feedback === "down" &&
+                              "text-rose-600 dark:text-rose-400 ksemo-feedback-thumb-active",
+                            feedbackPulse === "down" && "ksemo-feedback-thumb-pop"
+                          )}
+                        />
+                      </span>,
+                      () => animateFeedbackToggle("down"),
                       feedback === "down"
                     )}
                   </>
@@ -1071,7 +1151,7 @@ export const MessageContent = memo(function MessageContent({
                       >
                         <div className="rounded-lg border border-border/70 bg-popover p-1 shadow-sm">
                           {messageTimestamp && (
-                            <time className="flex w-full justify-start px-2.5 pt-1 pb-2 text-left text-xs leading-4 tabular-nums text-muted-foreground/80">
+                            <time className="flex w-full justify-start px-2.5 pt-[10px] pb-2 text-left text-[12.5px] leading-4 tabular-nums text-muted-foreground/80">
                               {messageTimestamp}
                             </time>
                           )}
@@ -1084,7 +1164,7 @@ export const MessageContent = memo(function MessageContent({
                               }}
                               aria-label="Try again"
                             >
-                              <RotateCcw className="size-4 text-muted-foreground" />
+                              <RotateCcw className="size-4 text-foreground" />
                               <span>Try again</span>
                             </DropdownMenuItem>
                           )}
@@ -1104,9 +1184,9 @@ export const MessageContent = memo(function MessageContent({
                               }
                             >
                               {isSpeaking ? (
-                                <Square className="size-4 fill-current text-muted-foreground" />
+                                <Square className="size-4 fill-current text-foreground" />
                               ) : (
-                                <Volume2 className="size-4 text-muted-foreground" />
+                                <Volume2 className="size-4 text-foreground" />
                               )}
                               <span>
                                 {isSpeaking ? "Stop reading" : "Read aloud"}
@@ -1119,7 +1199,7 @@ export const MessageContent = memo(function MessageContent({
                               onSelect={() => void onBranch?.(message)}
                               aria-label="Branch in new chat"
                             >
-                              <BranchSplitIcon className="size-4 text-muted-foreground transition-colors group-hover/branch:text-foreground" />
+                              <BranchSplitIcon className="size-4 text-foreground transition-colors group-hover/branch:text-foreground" />
                               <span>Branch in new chat</span>
                             </DropdownMenuItem>
                           ) : null}

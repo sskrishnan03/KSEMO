@@ -5224,7 +5224,7 @@ export default function Home({
                         <div className="pointer-events-auto absolute left-14 right-24 top-2 hidden lg:block lg:left-4">
                           <div className="inline-flex min-h-9 max-w-full items-center gap-1">
                             {activeConversation?.title.startsWith("Branch: ") && (
-                              <BranchSplitIcon className="size-4 shrink-0 text-foreground/75" />
+                              <BranchSplitIcon className="size-4 shrink-0 text-foreground" />
                             )}
                             <span className="min-w-0 max-w-[calc(100%-2rem)] whitespace-normal break-words text-sm font-semibold leading-4 text-foreground">
                               {activeConversation?.title.replace(/^Branch:\s*/, "") || "New Chat"}
@@ -5661,7 +5661,7 @@ export default function Home({
                                 className="inline-flex max-w-[70%] items-center gap-1.5 truncate underline decoration-muted-foreground/40 underline-offset-2 transition-colors hover:text-foreground"
                                 aria-label={`Open branched chat: ${link.title}`}
                               >
-                                <BranchSplitIcon className="size-3.5 shrink-0" />
+                                <BranchSplitIcon className="size-3.5 shrink-0 text-foreground" />
                                 <span className="truncate">{link.label}</span>
                               </button>
                               <span className="h-px flex-1 bg-border/70" />
