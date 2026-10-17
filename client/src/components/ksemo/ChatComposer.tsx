@@ -40,7 +40,6 @@ import {
   Square,
   X,
 } from "lucide-react";
-import { CameraCaptureDialog } from "./CameraCaptureDialog";
 
 import { Library } from "reicon-react/icons/Library";
 import { FilePlus } from "reicon-react/icons/FilePlus";
@@ -339,11 +338,11 @@ export const ChatComposer = memo(function ChatComposer({
 }) {
   const editorRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   const libraryPanelRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
   const [libraryOpen, setLibraryOpen] = useState(initialLibraryOpen);
   const [toolsOpen, setToolsOpen] = useState(initialToolsOpen);
-  const [cameraOpen, setCameraOpen] = useState(false);
   const [libraryQuery, setLibraryQuery] = useState("");
   const [isDragActive, setIsDragActive] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -661,13 +660,6 @@ export const ChatComposer = memo(function ChatComposer({
     for (const file of files) onAttachment?.(file);
   }
 
-  const handleCameraCapture = useCallback(
-    (file: File) => {
-      onAttachment?.(file);
-    },
-    [onAttachment]
-  );
-
   function handlePaste(event: React.ClipboardEvent<HTMLDivElement>) {
     const items = Array.from(event.clipboardData?.items ?? []);
     const files = items
@@ -794,6 +786,15 @@ export const ChatComposer = memo(function ChatComposer({
             onChange={selectFile}
             accept="image/*,audio/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.tsv,.md,.markdown,.json,.xml,.yml,.yaml,.ts,.tsx,.js,.jsx,.py,.c,.cpp,.h,.hpp,.cs,.rb,.go,.rs,.php,.sql,.sh,.bat,.ps1,.zip,.tar,.gz"
             className="sr-only"
+          />
+          <input
+            ref={cameraInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={selectFile}
+            className="sr-only"
+            aria-label="Take a photo with your camera"
           />
           {visibleAttachmentNotices.length > 0 && (
             <div className="mx-1 mb-0.5 flex items-center gap-2 overflow-x-auto px-2 pt-2 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -1084,7 +1085,7 @@ export const ChatComposer = memo(function ChatComposer({
                             <DropdownMenuItem
                               onSelect={() => {
                                 setToolsOpen(false);
-                                setCameraOpen(true);
+                                cameraInputRef.current?.click();
                               }}
                             >
                               <Camera className="mr-2 size-[17px] text-foreground" />
@@ -1550,11 +1551,6 @@ export const ChatComposer = memo(function ChatComposer({
           )}
         </div>
       </div>
-      <CameraCaptureDialog
-        open={cameraOpen}
-        onOpenChange={setCameraOpen}
-        onCapture={handleCameraCapture}
-      />
     </div>
   );
 });
