@@ -298,6 +298,7 @@ export const ChatComposer = memo(function ChatComposer({
     linked: boolean;
     mimeType?: string;
     url?: string;
+    uploading?: boolean;
   }>;
   onClearAttachment?: (fileId?: string) => void;
   libraryFiles?: Array<{
@@ -407,10 +408,14 @@ export const ChatComposer = memo(function ChatComposer({
       (attachmentNotice
         ? [{ fileId: attachmentNotice.name, ...attachmentNotice }]
         : []));
+  const hasUploadingAttachments = visibleAttachmentNotices.some(
+    attachment => attachment.uploading
+  );
   const canSend =
-    Boolean(value.trim()) ||
-    visibleAttachmentNotices.length > 0 ||
-    Boolean(activeMode && activeMode !== "chat");
+    !hasUploadingAttachments &&
+    (Boolean(value.trim()) ||
+      visibleAttachmentNotices.length > 0 ||
+      Boolean(activeMode && activeMode !== "chat"));
 
   useEffect(() => {
     if (isEditingMessage) {
@@ -630,6 +635,7 @@ export const ChatComposer = memo(function ChatComposer({
       }
       return;
     }
+    if (hasUploadingAttachments) return;
     const content = value.trim();
     if (
       (!content &&
@@ -804,6 +810,22 @@ export const ChatComposer = memo(function ChatComposer({
                   (IMAGE_EXT.test(item.name) ||
                     (item.mimeType ?? "").startsWith("image/"));
                 const kind = getFileKind(item.name, item.mimeType);
+                const createMode =
+                  kind.label === "PDF"
+                    ? "pdf"
+                    : kind.label === "Word"
+                      ? "docx"
+                      : kind.label === "Sheet"
+                        ? "xlsx"
+                        : kind.label === "Slides"
+                          ? "pptx"
+                          : kind.label === "Text"
+                            ? "txt"
+                            : null;
+                const createOption = createMode
+                  ? getCapabilityOption(createMode)
+                  : null;
+                const AttachmentIcon = createOption?.icon ?? kind.icon;
                 return isImage && item.url ? (
                   <div
                     key={item.fileId}
@@ -814,6 +836,15 @@ export const ChatComposer = memo(function ChatComposer({
                       alt={item.name}
                       className="h-full w-full rounded-xl border border-border object-cover shadow-sm"
                     />
+                    {item.uploading && (
+                      <span
+                        className="absolute inset-0 flex items-center justify-center rounded-xl bg-background/40 text-foreground"
+                        role="status"
+                        aria-label={`Uploading ${item.name}`}
+                      >
+                        <Loader2 className="size-5 animate-spin" />
+                      </span>
+                    )}
                     {onClearAttachment && (
                       <button
                         type="button"
@@ -831,17 +862,35 @@ export const ChatComposer = memo(function ChatComposer({
                     className="group flex h-16 shrink-0 items-center gap-3 rounded-xl border border-border bg-muted py-2 pl-2 pr-3 shadow-sm transition-colors hover:bg-accent"
                   >
                     <span
-                      className={`flex size-11 shrink-0 items-center justify-center rounded-lg ${kind.colorClass}`}
+                      className={cn(
+                        "relative flex size-11 shrink-0 items-center justify-center rounded-lg",
+                        createOption?.iconBg ?? kind.colorClass
+                      )}
                     >
-                      <kind.icon className="size-10 shrink-0" />
+                      <AttachmentIcon
+                        className={cn(
+                          createOption ? "size-[18px]" : "size-10 shrink-0",
+                          createOption?.iconColor
+                        )}
+                      />
+                      {item.uploading && (
+                        <span
+                          className="absolute inset-0 flex items-center justify-center rounded-lg bg-background/55 text-foreground"
+                          role="status"
+                          aria-label={`Uploading ${item.name}`}
+                        >
+                          <Loader2 className="size-4 animate-spin" />
+                        </span>
+                      )}
                     </span>
                     <span className="flex min-w-0 flex-col">
                       <span className="max-w-[150px] truncate text-[13px] font-semibold text-foreground">
                         {item.name}
                       </span>
                       <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                        {kind.label}
-                        {item.linked ? " · linked" : " · library"}
+                        {item.uploading
+                          ? "Uploading…"
+                          : `${kind.label}${item.linked ? " · linked" : " · library"}`}
                       </span>
                     </span>
                     {onClearAttachment && (

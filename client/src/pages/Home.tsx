@@ -206,6 +206,7 @@ type SelectedAttachment = {
   mimeType?: string;
   url: string;
   linked: boolean;
+  uploading?: boolean;
 };
 
 // Returns true when an attachment with the same filename is already selected,
@@ -593,6 +594,32 @@ export default function Home({
   const [attachmentNotices, setAttachmentNotices] = useState<
     SelectedAttachment[]
   >([]);
+  const pendingComposerUploadsRef = useRef(new Set<string>());
+  const attachmentPreviewUrlsRef = useRef(new Set<string>());
+
+  useEffect(() => {
+    const activePreviewUrls = new Set(
+      attachmentNotices
+        .map(attachment => attachment.url)
+        .filter(url => url.startsWith("blob:"))
+    );
+    for (const url of attachmentPreviewUrlsRef.current) {
+      if (!activePreviewUrls.has(url)) {
+        URL.revokeObjectURL(url);
+        attachmentPreviewUrlsRef.current.delete(url);
+      }
+    }
+  }, [attachmentNotices]);
+
+  useEffect(
+    () => () => {
+      for (const url of attachmentPreviewUrlsRef.current) {
+        URL.revokeObjectURL(url);
+      }
+      attachmentPreviewUrlsRef.current.clear();
+    },
+    []
+  );
   const [fileGeneration, setFileGeneration] = useState<{
     messageId: string;
     stage: string;
@@ -3988,10 +4015,35 @@ export default function Home({
       toast.error(`"${file.name}" exceeds the 25MB limit.`);
       return;
     }
+    const nameKey = file.name.trim().toLowerCase();
     const resolvedMime = resolveMimeType(file);
-    if (hasDuplicateAttachment(attachmentNotices, file.name)) {
+    if (
+      hasDuplicateAttachment(attachmentNotices, file.name) ||
+      pendingComposerUploadsRef.current.has(nameKey)
+    ) {
       return;
     }
+    pendingComposerUploadsRef.current.add(nameKey);
+    const pendingFileId = `uploading:${
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}`
+    }`;
+    const previewUrl = resolvedMime.startsWith("image/")
+      ? URL.createObjectURL(file)
+      : "";
+    if (previewUrl) attachmentPreviewUrlsRef.current.add(previewUrl);
+    setAttachmentNotices(current => [
+      ...current,
+      {
+        fileId: pendingFileId,
+        name: file.name,
+        mimeType: resolvedMime,
+        url: previewUrl,
+        linked: false,
+        uploading: true,
+      },
+    ]);
     try {
       const bytes = new Uint8Array(await file.arrayBuffer());
       let binary = "";
@@ -4006,36 +4058,38 @@ export default function Home({
         mimeType: resolvedMime,
         dataBase64: window.btoa(binary),
       });
+      const linked = Boolean(activeConversationId);
       if (activeConversationId) {
         await composerFileAttach.mutateAsync({
           fileId: uploaded.id,
           conversationId: activeConversationId,
         });
-        setAttachmentNotices(current => [
-          ...current,
-          {
-            fileId: uploaded.id,
-            name: file.name,
-            mimeType: resolvedMime,
-            url: uploaded.url,
-            linked: true,
-          },
-        ]);
-      } else {
-        setAttachmentNotices(current => [
-          ...current,
-          {
-            fileId: uploaded.id,
-            name: file.name,
-            mimeType: resolvedMime,
-            url: uploaded.url,
-            linked: false,
-          },
-        ]);
       }
+      setAttachmentNotices(current =>
+        current.map(attachment =>
+          attachment.fileId === pendingFileId
+            ? {
+                ...attachment,
+                fileId: uploaded.id,
+                url: previewUrl || uploaded.url,
+                linked,
+                uploading: false,
+              }
+            : attachment
+        )
+      );
     } catch (err) {
       console.error("[attachFromComposer] upload failed:", err);
+      setAttachmentNotices(current =>
+        current.filter(attachment => attachment.fileId !== pendingFileId)
+      );
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+        attachmentPreviewUrlsRef.current.delete(previewUrl);
+      }
       toast.error(`Failed to upload "${file.name}". Please try again.`);
+    } finally {
+      pendingComposerUploadsRef.current.delete(nameKey);
     }
   }
 
