@@ -985,7 +985,7 @@ export const MessageContent = memo(function MessageContent({
                 "flex items-center gap-1 transition-opacity duration-150",
                 isMobile
                   ? showMobileUserActions
-                    ? "absolute right-0 top-full z-30 mt-0 animate-in fade-in duration-150"
+                    ? "absolute right-0 top-full z-30 mt-px animate-in fade-in duration-150"
                     : "hidden"
                   : "mt-1.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
               )}
@@ -997,13 +997,13 @@ export const MessageContent = memo(function MessageContent({
               }
             >
               {isMobile ? (
-                <div className="inline-flex min-w-[116px] flex-col items-stretch gap-0 rounded-lg border border-border/70 bg-popover p-1 text-popover-foreground shadow-md">
+                <div className="inline-flex min-w-[120px] flex-col items-stretch gap-0 rounded-lg border border-border/70 bg-popover p-1 text-popover-foreground shadow-md">
                   {onEdit && !isEditing && (
                     <Button
                       type="button"
                       variant="ghost"
                       size="sm"
-                      className="h-[38px] w-full justify-start gap-2 rounded-md px-3 text-sm"
+                      className="h-10 w-full justify-start gap-2 rounded-md px-3 text-[15px]"
                       onClick={() => {
                         setShowMobileUserActions(false);
                         onEdit(message);
@@ -1017,7 +1017,7 @@ export const MessageContent = memo(function MessageContent({
                     type="button"
                     variant="ghost"
                     size="sm"
-                    className="h-[38px] w-full justify-start gap-2 rounded-md px-3 text-sm"
+                    className="h-10 w-full justify-start gap-2 rounded-md px-3 text-[15px]"
                     onClick={() => {
                       setShowMobileUserActions(false);
                       void copyMessage();
