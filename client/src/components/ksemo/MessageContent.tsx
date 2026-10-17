@@ -686,6 +686,7 @@ export const MessageContent = memo(function MessageContent({
                   isUser
                     ? cn(
                         "ksemo-user-message-bubble flex flex-col items-end rounded-2xl rounded-tr-md border border-border bg-muted px-3.5 py-2.5 text-[15px] leading-6 text-foreground shadow-sm",
+                        isMobile && "ksemo-mobile-user-message",
                         isEditing && "ring-1 ring-primary/40 border-primary/40"
                       )
                     : "max-w-none rounded-tl-md bg-transparent px-0 py-0 text-foreground"
@@ -985,7 +986,7 @@ export const MessageContent = memo(function MessageContent({
                 "flex items-center gap-1 transition-opacity duration-150",
                 isMobile
                   ? showMobileUserActions
-                    ? "absolute right-0 top-full z-30 mt-px animate-in fade-in duration-150"
+                    ? "absolute right-0 top-full z-30 mt-px animate-in fade-in slide-in-from-top-1 duration-150"
                     : "hidden"
                   : "mt-1.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
               )}
@@ -997,27 +998,27 @@ export const MessageContent = memo(function MessageContent({
               }
             >
               {isMobile ? (
-                <div className="inline-flex min-w-[120px] flex-col items-stretch gap-0 rounded-lg border border-border/70 bg-popover p-1 text-popover-foreground shadow-md">
+                <div className="inline-flex min-w-[132px] flex-col items-stretch gap-0 rounded-lg border border-border/70 bg-popover p-1 text-popover-foreground shadow-md">
                   {onEdit && !isEditing && (
                     <Button
                       type="button"
                       variant="ghost"
                       size="sm"
-                      className="h-10 w-full justify-start gap-2 rounded-md px-3 text-[15px]"
+                      className="h-10 w-full justify-start gap-1.5 rounded-md px-2 text-sm transition-transform active:scale-[0.98] active:bg-accent"
                       onClick={() => {
                         setShowMobileUserActions(false);
                         onEdit(message);
                       }}
                     >
                       <Pencil className="size-4" />
-                      Edit
+                      Edit message
                     </Button>
                   )}
                   <Button
                     type="button"
                     variant="ghost"
                     size="sm"
-                    className="h-10 w-full justify-start gap-2 rounded-md px-3 text-[15px]"
+                    className="h-10 w-full justify-start gap-1.5 rounded-md px-2 text-sm transition-transform active:scale-[0.98] active:bg-accent"
                     onClick={() => {
                       setShowMobileUserActions(false);
                       void copyMessage();
@@ -1028,7 +1029,7 @@ export const MessageContent = memo(function MessageContent({
                     ) : (
                       <Copy className="size-4" />
                     )}
-                    Copy
+                    Copy message
                   </Button>
                 </div>
               ) : (
