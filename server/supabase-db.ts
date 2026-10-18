@@ -193,9 +193,9 @@ function warnMetadataColumnMissing(): void {
   metadataColumnSupported = false;
   console.warn(
     "[supabase-db] The `messages.metadata` column is missing from the database " +
-      "schema cache. Presentation outlines will not persist across refreshes " +
-      "until you run this migration in the Supabase SQL editor:\n" +
-      "  alter table public.messages add column if not exists metadata jsonb;"
+      "schema cache. Branch links and other structured message state will not " +
+      "persist until you run supabase-schema/12-message-branch-lineage.sql " +
+      "in the Supabase SQL editor."
   );
 }
 

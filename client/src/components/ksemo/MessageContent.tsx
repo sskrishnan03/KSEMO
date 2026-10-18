@@ -380,6 +380,7 @@ export const MessageContent = memo(function MessageContent({
 }) {
   const [copied, setCopied] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const [branching, setBranching] = useState(false);
   const [feedbackPulse, setFeedbackPulse] =
     useState<MessageFeedbackValue | null>(null);
   const [feedbackPulseKey, setFeedbackPulseKey] = useState(0);
@@ -1217,10 +1218,27 @@ export const MessageContent = memo(function MessageContent({
                           {canBranch ? (
                             <DropdownMenuItem
                               className="group/branch gap-2.5 whitespace-nowrap rounded-lg py-2 pl-2.5 pr-8"
-                              onSelect={() => void onBranch?.(message)}
+                              disabled={branching}
+                              onSelect={event => {
+                                // Keep the menu open while the branch is being
+                                // created so progress is visible to the user.
+                                event.preventDefault();
+                                if (branching) return;
+                                setBranching(true);
+                                void Promise.resolve(onBranch?.(message)).finally(
+                                  () => setBranching(false)
+                                );
+                              }}
                               aria-label="Branch in new chat"
                             >
-                              <BranchSplitIcon className="size-4 text-foreground transition-colors group-hover/branch:text-foreground" />
+                              {branching ? (
+                                <span
+                                  className="loader loader-xs text-current"
+                                  aria-hidden="true"
+                                />
+                              ) : (
+                                <BranchSplitIcon className="size-4 text-foreground transition-colors group-hover/branch:text-foreground" />
+                              )}
                               <span>Branch in new chat</span>
                             </DropdownMenuItem>
                           ) : null}

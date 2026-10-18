@@ -8,7 +8,6 @@ import {
   clearMessageFeedbackForUser,
   deleteAllConversationsForUser,
   deleteConversationForUser,
-  deleteFileForUser,
   deleteMessageForUser,
   editMessageForUser,
   getConversationForUser,
@@ -18,7 +17,6 @@ import {
   createSharedAnswerForUser,
   getSharedAnswerByToken,
   getMessageForUser,
-  getFileForUser,
   listMessageVersionsForUser,
   listMessageFilesForUser,
   attachFileToMessageForUser,
@@ -37,7 +35,7 @@ setMessageFeedbackForUser,
   upsertUserPreferences,
   createFileForUser,
 } from "../supabase-db";
-import { storageDownload, storagePut } from "../storage";
+import { storagePut } from "../storage";
 import { listLLMModels } from "../_core/llm";
 import type { Message } from "../_core/llm";
 import { transcribeAudio } from "../_core/voiceTranscription";
@@ -59,6 +57,48 @@ const preferenceInput = z.object({
   reduceMotion: z.boolean().optional(),
 });
 
+type BranchHistoryMessage = {
+  id: string;
+  role: string;
+  content: string;
+  createdAt: Date | string;
+  metadata?: (Record<string, unknown> & {
+    parentBranch?: unknown;
+    branches?: Array<{ childChatId?: string }>;
+  }) | null;
+};
+
+function sharedBranchHistoryLength(
+  parentMessages: BranchHistoryMessage[],
+  branchMessages: BranchHistoryMessage[]
+) {
+  let length = 0;
+  while (length < parentMessages.length && length < branchMessages.length) {
+    const parentMessage = parentMessages[length];
+    const branchMessage = branchMessages[length];
+    if (
+      parentMessage.role !== branchMessage.role ||
+      parentMessage.content !== branchMessage.content ||
+      new Date(parentMessage.createdAt).getTime() !==
+        new Date(branchMessage.createdAt).getTime()
+    ) {
+      break;
+    }
+    length += 1;
+  }
+  return length;
+}
+
+function addMessageMetadata(
+  message: BranchHistoryMessage,
+  values: Record<string, unknown>
+): BranchHistoryMessage {
+  return {
+    ...message,
+    metadata: { ...(message.metadata ?? {}), ...values },
+  };
+}
+
 function requireConversation(id: string, userId: number) {
   return getConversationForUser(id, userId).then(conversation => {
     if (!conversation)
@@ -68,6 +108,57 @@ function requireConversation(id: string, userId: number) {
       });
     return conversation;
   });
+}
+
+async function removeConversationBranchLinks(
+  conversationId: string,
+  userId: number
+) {
+  const conversations = await Promise.all(
+    (["active", "archived", "trash"] as const).map(scope =>
+      listConversationsForUser(userId, scope)
+    )
+  );
+  const seen = new Set<string>();
+  for (const conversation of conversations.flat()) {
+    if (conversation.id === conversationId || seen.has(conversation.id)) continue;
+    seen.add(conversation.id);
+    const messages = await listMessagesForConversation(conversation.id);
+    for (const message of messages) {
+      const metadata = message.metadata as Record<string, any> | null | undefined;
+      if (!metadata) continue;
+      let changed = false;
+      const next = { ...metadata };
+
+      if (
+        next.parentBranch?.parentChatId === conversationId ||
+        next.branchOrigin?.conversationId === conversationId
+      ) {
+        delete next.parentBranch;
+        delete next.branchOrigin;
+        changed = true;
+      }
+      if (Array.isArray(next.branches)) {
+        const branches = next.branches.filter(
+          (branch: any) => branch?.childChatId !== conversationId
+        );
+        if (branches.length !== next.branches.length) {
+          next.branches = branches;
+          changed = true;
+        }
+      }
+      if (Array.isArray(next.branchTargets)) {
+        const targets = next.branchTargets.filter(
+          (target: any) => target?.conversationId !== conversationId
+        );
+        if (targets.length !== next.branchTargets.length) {
+          next.branchTargets = targets;
+          changed = true;
+        }
+      }
+      if (changed) await updateMessage(message.id, { metadata: next });
+    }
+  }
 }
 
 export const conversationRouter = router({
@@ -141,7 +232,128 @@ export const conversationRouter = router({
         });
       }
       const isOwner = Boolean(user && conversation.userId === user.id);
-      const items = await listMessagesForConversation(conversation.id);
+      let items = await listMessagesForConversation(conversation.id);
+
+      // Older Supabase projects can be missing messages.metadata, which means
+      // the branch operation's relationship data was dropped even though the
+      // copied branch chat was created. Recover that lineage from the exact
+      // copied message prefix so existing branches still get navigable links.
+      if (isOwner && user && conversation.title) {
+        const [activeConversations, archivedConversations] = await Promise.all([
+          listConversationsForUser(user.id, "active"),
+          listConversationsForUser(user.id, "archived"),
+        ]);
+        const conversationsById = new Map(
+          [...activeConversations, ...archivedConversations].map(item => [
+            item.id,
+            item,
+          ])
+        );
+        const branchMessages = items as BranchHistoryMessage[];
+
+        if (conversation.title.startsWith("Branch: ")) {
+          const parentTitle = conversation.title.replace(/^Branch:\s*/, "");
+          const parents = [...conversationsById.values()].filter(
+            item => item.id !== conversation.id && item.title === parentTitle
+          );
+          const matches = await Promise.all(
+            parents.map(async parent => {
+              const parentMessages = (await listMessagesForConversation(
+                parent.id
+              )) as BranchHistoryMessage[];
+              return {
+                parent,
+                parentMessages,
+                sharedLength: sharedBranchHistoryLength(
+                  parentMessages,
+                  branchMessages
+                ),
+              };
+            })
+          );
+          matches.sort((a, b) => b.sharedLength - a.sharedLength);
+          const best = matches[0];
+          const isAmbiguous =
+            best &&
+            (matches[1]?.sharedLength ?? 0) === best.sharedLength &&
+            best.sharedLength > 0;
+          const alreadyLinked = branchMessages.some(
+            message => message.metadata?.parentBranch
+          );
+          if (best && best.sharedLength > 0 && !isAmbiguous && !alreadyLinked) {
+            const branchPoint = best.sharedLength - 1;
+            items = items.map((message, index) =>
+              index === branchPoint
+                ? (addMessageMetadata(message as BranchHistoryMessage, {
+                    parentBranch: {
+                      parentChatId: best.parent.id,
+                      parentChatTitle: best.parent.title,
+                      branchedAtMessageId: best.parentMessages[branchPoint].id,
+                    },
+                  }) as typeof message)
+                : message
+            );
+          }
+        } else {
+          const existingBranches = new Set(
+            branchMessages.flatMap(message => {
+              const metadata = message.metadata as
+                | { branches?: Array<{ childChatId?: string }> }
+                | null
+                | undefined;
+              return (metadata?.branches ?? [])
+                .map(branch => branch.childChatId)
+                .filter((id): id is string => typeof id === "string");
+            })
+          );
+          const children = [...conversationsById.values()].filter(
+            item =>
+              item.id !== conversation.id &&
+              item.title === `Branch: ${conversation.title}` &&
+              !existingBranches.has(item.id)
+          );
+          const matches = await Promise.all(
+            children.map(async child => {
+              const childMessages = (await listMessagesForConversation(
+                child.id
+              )) as BranchHistoryMessage[];
+              return {
+                child,
+                sharedLength: sharedBranchHistoryLength(
+                  branchMessages,
+                  childMessages
+                ),
+              };
+            })
+          );
+          items = items.map((message, index) => {
+            const branches = matches
+              .filter(match => match.sharedLength === index + 1)
+              .map(match => ({
+                targetMessageId: message.id,
+                childChatId: match.child.id,
+                childTitle: match.child.title,
+              }));
+            if (!branches.length) return message;
+            const metadata = (message as BranchHistoryMessage).metadata ?? {};
+            const existingValue = (metadata as { branches?: unknown }).branches;
+            const existing = Array.isArray(existingValue)
+              ? (existingValue as Array<{ childChatId?: string }>)
+              : [];
+            return addMessageMetadata(message as BranchHistoryMessage, {
+              branches: [
+                ...existing,
+                ...branches.filter(
+                  branch =>
+                    !existing.some(
+                      item => item.childChatId === branch.childChatId
+                    )
+                ),
+              ],
+            }) as typeof message;
+          });
+        }
+      }
       return {
         conversation: {
           ...conversation,
@@ -206,6 +418,7 @@ export const conversationRouter = router({
     .input(z.object({ id: conversationId }))
     .mutation(async ({ ctx, input }) => {
       await requireConversation(input.id, ctx.user.id);
+      await removeConversationBranchLinks(input.id, ctx.user.id);
       await deleteConversationForUser(input.id, ctx.user.id);
       return { success: true } as const;
     }),
@@ -285,8 +498,6 @@ export const conversationRouter = router({
       }
 
       const historyToClone = originalMessages.slice(0, selectedIndex + 1);
-      const clonedFileIds = new Map<string, string>();
-      const createdFileIds: string[] = [];
       try {
         if (original.projectId) {
           await updateConversationForUser(branch.id, ctx.user.id, {
@@ -330,36 +541,13 @@ export const conversationRouter = router({
 
           const files = await listMessageFilesForUser(message.id, ctx.user.id);
           for (const file of files) {
-            let branchFileId: string =
-              clonedFileIds.get(file.id) ?? file.id;
-            if (!clonedFileIds.has(file.id)) {
-              const sourceFile = await getFileForUser(file.id, ctx.user.id);
-              if (sourceFile) {
-                const downloaded = await storageDownload(sourceFile.storageKey);
-                if (downloaded.data) {
-                  const clonedFileId = crypto.randomUUID();
-                  const stored = await storagePut(
-                    `branches/${branch.id}/${sourceFile.filename}`,
-                    downloaded.data,
-                    sourceFile.mimeType || downloaded.contentType
-                  );
-                  await createFileForUser({
-                    ...sourceFile,
-                    id: clonedFileId,
-                    storageKey: stored.key,
-                    url: stored.url,
-                    createdAt: new Date(sourceFile.createdAt),
-                    updatedAt: new Date(sourceFile.updatedAt),
-                  });
-                  branchFileId = clonedFileId;
-                  createdFileIds.push(clonedFileId);
-                }
-              }
-              clonedFileIds.set(file.id, branchFileId);
-            }
+            // Keep the same file record and URL when copying a message into a
+            // branch. Re-uploading here created a second storage URL for each
+            // attachment, which could fail to load for image previews in the
+            // branched chat even though the source message rendered correctly.
             await attachFileToMessageForUser({
               id: crypto.randomUUID(),
-              fileId: branchFileId,
+              fileId: file.id,
               messageId: clonedMessageId,
               conversationId: branch.id,
               userId: ctx.user.id,
@@ -402,9 +590,6 @@ export const conversationRouter = router({
         await deleteConversationForUser(branch.id, ctx.user.id).catch(
           cleanupError =>
             console.error("Failed to clean up an incomplete chat branch:", cleanupError)
-        );
-        await Promise.allSettled(
-          createdFileIds.map(fileId => deleteFileForUser(fileId, ctx.user.id))
         );
         throw error;
       }

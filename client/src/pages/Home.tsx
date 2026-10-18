@@ -1057,8 +1057,14 @@ export default function Home({
     trpc.conversation.createSharedAnswer.useMutation();
   const branchConversationMutation = trpc.conversation.branch.useMutation();
   const permanentDeleteMutation = trpc.conversation.remove.useMutation({
-    onSuccess: () => {
-      utils.conversation.list.invalidate();
+    onSuccess: async () => {
+      const invalidations = [utils.conversation.list.invalidate()];
+      if (activeConversationId) {
+        invalidations.push(
+          utils.conversation.get.invalidate({ id: activeConversationId })
+        );
+      }
+      await Promise.all(invalidations);
     },
   });
   // Hard-delete every conversation created during the temporary session. These
@@ -5117,7 +5123,11 @@ export default function Home({
             {/* Shared chat navbar */}
             <div
               aria-hidden="true"
-              className="pointer-events-none absolute inset-x-0 top-0 z-10 h-12 bg-background backdrop-blur-md"
+              className="pointer-events-none absolute inset-x-0 top-0 z-[15] h-12 bg-background backdrop-blur-md"
+            />
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-x-0 top-12 z-[15] h-3 bg-gradient-to-b from-background to-transparent"
             />
 
             <Button
@@ -5767,34 +5777,40 @@ export default function Home({
                                 {
                                   conversationId:
                                     message.branchOrigin.conversationId,
-                                  title: message.branchOrigin.title,
-                                  label: `From ${message.branchOrigin.title.replace(/^Branch:\s*/, "")}`,
+                                  title: message.branchOrigin.title.replace(
+                                    /^Branch:\s*/,
+                                    ""
+                                  ),
+                                  direction: "From",
                                 },
                               ]
                             : []),
                           ...(message.branchTargets ?? []).map(target => ({
                             conversationId: target.conversationId,
-                            title: target.title,
-                            label: `To Branch · ${target.title.replace(/^Branch:\s*/, "")}`,
+                            title: target.title.replace(/^Branch:\s*/, ""),
+                            direction: "To Branch",
                           })),
                         ].map((link, index) => (
                           <div
                             key={`${link.conversationId}-${index}`}
-                            className="flex items-center gap-3 py-3 text-xs text-muted-foreground"
+                            className="!mt-0.5 flex items-center gap-1 py-0 text-sm"
                           >
-                            <span className="h-px flex-1 bg-border/70" />
+                            <span className="h-px min-w-3 flex-1 bg-foreground/30" />
+                            <BranchSplitIcon className="size-4 shrink-0 text-foreground" />
+                            <span className="shrink-0 text-foreground">
+                              {link.direction}
+                            </span>
                             <button
                               type="button"
                               onClick={() =>
                                 selectConversation(link.conversationId)
                               }
-                              className="inline-flex max-w-[70%] items-center gap-1.5 truncate underline decoration-muted-foreground/40 underline-offset-2 transition-colors hover:text-foreground"
+                              className="min-w-0 max-w-[55%] truncate text-left font-medium text-blue-600 underline decoration-dotted decoration-blue-500 underline-offset-4 transition-colors hover:text-blue-700 dark:text-blue-400 dark:decoration-blue-400 dark:hover:text-blue-300"
                               aria-label={`Open branched chat: ${link.title}`}
                             >
-                              <BranchSplitIcon className="size-3.5 shrink-0 text-foreground" />
-                              <span className="truncate">{link.label}</span>
+                              <span className="block truncate">{link.title}</span>
                             </button>
-                            <span className="h-px flex-1 bg-border/70" />
+                            <span className="h-px min-w-3 flex-1 bg-foreground/30" />
                           </div>
                         ))}
                         {isSharedAnswerPage &&
