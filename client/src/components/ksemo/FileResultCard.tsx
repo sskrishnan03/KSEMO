@@ -1,6 +1,6 @@
 /**
  * FileResultCard - A premium component for displaying generated files in the conversation.
- * 
+ *
  * This component renders a file card with:
  * - File icon
  * - File name
@@ -12,18 +12,10 @@
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import {
-  FileOutput,
-  FileText,
-  FileSpreadsheet,
-  Presentation,
-  Download,
-  CheckCircle2,
-  Loader2,
-  AlertCircle,
-} from "lucide-react";
+import { Download, CheckCircle2, Loader2, AlertCircle } from "lucide-react";
 import { type FileFormat } from "@shared/capabilities";
 import { usePdfViewer, isViewableDocument } from "@/contexts/PdfViewerContext";
+import { CreateFileModeIcon } from "./LibraryFileIcon";
 
 export interface FileResult {
   filename: string;
@@ -40,12 +32,12 @@ interface FileResultCardProps {
   className?: string;
 }
 
-const FILE_TYPE_CONFIG: Record<FileFormat, { icon: typeof FileOutput; label: string }> = {
-  pdf: { icon: FileOutput, label: "PDF" },
-  docx: { icon: FileText, label: "Word" },
-  xlsx: { icon: FileSpreadsheet, label: "Excel" },
-  pptx: { icon: Presentation, label: "PowerPoint" },
-  txt: { icon: FileText, label: "Text" },
+const FILE_TYPE_CONFIG: Record<FileFormat, { label: string }> = {
+  pdf: { label: "PDF" },
+  docx: { label: "Word" },
+  xlsx: { label: "Excel" },
+  pptx: { label: "PowerPoint" },
+  txt: { label: "Text" },
 };
 
 function formatFileSize(bytes: number): string {
@@ -57,11 +49,15 @@ function formatFileSize(bytes: number): string {
 }
 
 function getFileFormat(filename: string): FileFormat {
-  const ext = filename.split('.').pop()?.toLowerCase() || "txt";
+  const ext = filename.split(".").pop()?.toLowerCase() || "txt";
   return (ext in FILE_TYPE_CONFIG ? ext : "txt") as FileFormat;
 }
 
-export function FileResultCard({ file, onDownload, className }: FileResultCardProps) {
+export function FileResultCard({
+  file,
+  onDownload,
+  className,
+}: FileResultCardProps) {
   const { openPdf } = usePdfViewer();
   const format = getFileFormat(file.filename);
   const isViewableDoc =
@@ -70,7 +66,6 @@ export function FileResultCard({ file, onDownload, className }: FileResultCardPr
     isViewableDocument(file.filename, file.mimeType);
   const isCompleted = file.status === "completed";
   const config = FILE_TYPE_CONFIG[format];
-  const Icon = config.icon;
 
   const handleCardClick = () => {
     if (isViewableDoc && isCompleted && file.downloadUrl) {
@@ -84,22 +79,36 @@ export function FileResultCard({ file, onDownload, className }: FileResultCardPr
 
   return (
     <div
-      onClick={isViewableDoc && isCompleted && file.downloadUrl ? handleCardClick : undefined}
+      onClick={
+        isViewableDoc && isCompleted && file.downloadUrl
+          ? handleCardClick
+          : undefined
+      }
       className={cn(
         "group flex items-center gap-4 rounded-xl border border-border bg-card p-4 shadow-sm transition-all hover:shadow-md",
-        isViewableDoc && isCompleted && file.downloadUrl && "cursor-pointer hover:border-primary/50",
+        isViewableDoc &&
+          isCompleted &&
+          file.downloadUrl &&
+          "cursor-pointer hover:border-primary/50",
         className
       )}
     >
       {/* File Icon */}
       <div className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-muted text-foreground border border-border">
-        <Icon className="size-5" />
+        <CreateFileModeIcon mode={format} className="size-5" />
       </div>
 
       {/* File Info */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <h3 className={cn("text-sm font-semibold text-foreground truncate", isViewableDoc && isCompleted && "group-hover:text-primary transition-colors")}>
+          <h3
+            className={cn(
+              "text-sm font-semibold text-foreground truncate",
+              isViewableDoc &&
+                isCompleted &&
+                "group-hover:text-primary transition-colors"
+            )}
+          >
             {file.filename}
           </h3>
           <span className="shrink-0 text-xs font-medium uppercase tracking-wide text-muted-foreground">

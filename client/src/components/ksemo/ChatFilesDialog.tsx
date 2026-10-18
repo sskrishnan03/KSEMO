@@ -1,9 +1,9 @@
 import { getFileKind, isImageFile } from "@/lib/fileKinds";
-import { getCapabilityOption } from "@/lib/capabilities";
 import { Eye, ExternalLink, X } from "lucide-react";
 import React, { memo, useEffect, useMemo, useState } from "react";
 import { usePdfViewer, isViewableDocument } from "@/contexts/PdfViewerContext";
 import { ImageLightbox } from "@/components/ui/image-lightbox";
+import { LibraryFileIcon } from "./LibraryFileIcon";
 import {
   Tooltip,
   TooltipContent,
@@ -44,154 +44,143 @@ export const ChatFilesDialog = memo(function ChatFilesDialog({
     };
   }, [open, onOpenChange]);
 
-  // Closing the panel should also drop any lightbox it opened.
-  useEffect(() => {
-    if (!open) setLightboxFile(null);
-  }, [open]);
-
-  if (!open) return null;
-
   return (
     <>
-    <div
-      role="dialog"
-      aria-label="Files in this chat"
-      aria-modal="true"
-      className="fixed inset-4 z-50 mx-auto flex h-auto w-auto max-w-none flex-col overflow-hidden rounded-2xl border border-border bg-popover/95 text-popover-foreground shadow-lg backdrop-blur-md animate-in slide-in-from-bottom-8 fade-in duration-300 ease-out lg:relative lg:inset-auto lg:z-30 lg:my-4 lg:mr-4 lg:h-[calc(100%-2rem)] lg:min-h-0 lg:w-[min(24rem,32vw)] lg:max-w-none lg:shrink-0 lg:translate-y-0 lg:rounded-2xl lg:border lg:bg-popover lg:shadow-lg lg:backdrop-blur-md lg:slide-in-from-bottom-0 lg:slide-in-from-right-8"
-    >
-      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border/80 px-3.5 py-2.5 bg-muted/20">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <p className="text-[15px] font-semibold leading-tight text-foreground truncate">
-            Files in this chat
-          </p>
-        </div>
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                type="button"
-                onClick={() => onOpenChange(false)}
-                className="flex size-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
-                aria-label="Close files panel"
-              >
-                <X className="size-4.5" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">Close</TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      </div>
-
-      <div className="min-h-0 flex-1 overflow-y-auto p-2">
-        {!rows.length ? (
-          <div className="flex h-full min-h-36 items-center justify-center px-4 text-center">
-            <p className="text-sm font-medium text-foreground">
-              No files in this chat
+      {open && (
+        <div
+        role="dialog"
+        aria-label="Files in this chat"
+        aria-modal="true"
+        className="fixed inset-4 z-50 mx-auto flex h-auto w-auto max-w-none flex-col overflow-hidden rounded-2xl border border-border bg-popover/95 text-popover-foreground shadow-lg backdrop-blur-md animate-in slide-in-from-bottom-8 fade-in duration-300 ease-out lg:relative lg:inset-auto lg:z-30 lg:my-4 lg:mr-4 lg:h-[calc(100%-2rem)] lg:min-h-0 lg:w-[min(24rem,32vw)] lg:max-w-none lg:shrink-0 lg:translate-y-0 lg:rounded-2xl lg:border lg:bg-popover lg:shadow-lg lg:backdrop-blur-md lg:slide-in-from-bottom-0 lg:slide-in-from-right-8"
+      >
+        <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border/80 px-3.5 py-2.5 bg-muted/20">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <p className="text-[15px] font-semibold leading-tight text-foreground truncate">
+              Files in this chat
             </p>
           </div>
-        ) : (
-          <ul className="space-y-1.5 p-1">
-            {rows.map(file => {
-              const kind = getFileKind(file.filename, file.mimeType);
-              const image = isImageFile(file.filename, file.mimeType);
-              const isPdfFile = isViewableDocument(
-                file.filename,
-                file.mimeType
-              );
-              const createMode =
-                kind.label === "PDF"
-                  ? "pdf"
-                  : kind.label === "Sheet"
-                    ? "xlsx"
-                    : kind.label === "Slides"
-                      ? "pptx"
-                      : kind.label === "Word"
-                        ? "docx"
-                        : kind.label === "Text"
-                          ? "txt"
-                          : null;
-              const FileIcon = createMode
-                ? getCapabilityOption(createMode).icon
-                : kind.icon;
-              return (
-                <li key={file.id}>
-                  <a
-                    href={file.url}
-                    target={isPdfFile || image ? undefined : "_blank"}
-                    rel={isPdfFile || image ? undefined : "noreferrer"}
-                    onClick={e => {
-                      if (image) {
-                        e.preventDefault();
-                        setLightboxFile(file);
-                        return;
-                      }
-                      if (isPdfFile) {
-                        e.preventDefault();
-                        openPdf({
-                          url: file.url,
-                          filename: file.filename,
-                          id: file.id,
-                        });
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={() => onOpenChange(false)}
+                  className="flex size-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
+                  aria-label="Close files panel"
+                >
+                  <X className="size-4.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">Close</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto p-2">
+          {!rows.length ? (
+            <div className="flex h-full min-h-36 items-center justify-center px-4 text-center">
+              <p className="text-sm font-medium text-foreground">
+                No files in this chat
+              </p>
+            </div>
+          ) : (
+            <ul className="space-y-1.5 p-1">
+              {rows.map(file => {
+                const kind = getFileKind(file.filename, file.mimeType);
+                const image = isImageFile(file.filename, file.mimeType);
+                const isPdfFile = isViewableDocument(
+                  file.filename,
+                  file.mimeType
+                );
+                return (
+                  <li key={file.id}>
+                    <a
+                      href={file.url}
+                      target={isPdfFile || image ? undefined : "_blank"}
+                      rel={isPdfFile || image ? undefined : "noreferrer"}
+                      onClick={e => {
+                        if (image) {
+                          e.preventDefault();
+                          setLightboxFile(file);
+                          onOpenChange(false);
+                          return;
+                        }
+                        if (isPdfFile) {
+                          e.preventDefault();
+                          openPdf({
+                            url: file.url,
+                            filename: file.filename,
+                            id: file.id,
+                          });
+                          onOpenChange(false);
+                          return;
+                        }
+                        // File links that open in a new browser tab should
+                        // dismiss the chat files panel on both desktop and mobile.
                         onOpenChange(false);
-                      }
-                    }}
-                    className="group flex items-center gap-2.5 rounded-xl border border-transparent p-2.5 transition-all hover:border-border/50 hover:bg-accent/60"
-                  >
-                    {image ? (
-                      <span className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-muted/40">
-                        <img
-                          src={file.url}
-                          alt={file.filename}
-                          className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
+                      }}
+                      className="group flex items-center gap-2.5 rounded-xl border border-transparent p-2.5 transition-all hover:border-border/50 hover:bg-accent/60"
+                    >
+                      {image ? (
+                        <span className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-muted/40">
+                          <img
+                            src={file.url}
+                            alt={file.filename}
+                            className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
+                          />
+                        </span>
+                      ) : (
+                        <LibraryFileIcon
+                          filename={file.filename}
+                          mimeType={file.mimeType}
+                          className="ml-0.5 size-7 shrink-0"
                         />
+                      )}
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-[13px] font-semibold text-foreground group-hover:text-primary transition-colors">
+                          {file.filename}
+                        </span>
+                        <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                          {kind.label}
+                        </span>
                       </span>
-                    ) : (
-                      <FileIcon className="ml-0.5 size-7 shrink-0" />
-                    )}
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[13px] font-semibold text-foreground group-hover:text-primary transition-colors">
-                        {file.filename}
-                      </span>
-                      <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                        {kind.label}
-                      </span>
-                    </span>
-                    {image ? (
-                      <span className="flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors group-hover:bg-background/80 group-hover:text-foreground">
-                        <Eye className="size-3.5" />
-                      </span>
-                    ) : isPdfFile ? null : (
-                      <span className="flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors group-hover:bg-background/80 group-hover:text-foreground">
-                        <ExternalLink className="size-3.5" />
-                      </span>
-                    )}
-                  </a>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </div>
-    </div>
-    <ImageLightbox
-      images={
-        lightboxFile
-          ? [
-              {
-                src: lightboxFile.url,
-                alt: lightboxFile.filename,
-                label: lightboxFile.filename,
-                downloadUrl: lightboxFile.url,
-                downloadName: lightboxFile.filename,
-              },
-            ]
-          : []
-      }
-      index={lightboxFile ? 0 : null}
-      onIndexChange={() => {}}
-      onClose={() => setLightboxFile(null)}
-      title="Chat image"
-    />
+                      {image ? (
+                        <span className="flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors group-hover:bg-background/80 group-hover:text-foreground">
+                          <Eye className="size-3.5" />
+                        </span>
+                      ) : isPdfFile ? null : (
+                        <span className="flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors group-hover:bg-background/80 group-hover:text-foreground">
+                          <ExternalLink className="size-3.5" />
+                        </span>
+                      )}
+                    </a>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+        </div>
+      )}
+      <ImageLightbox
+        images={
+          lightboxFile
+            ? [
+                {
+                  src: lightboxFile.url,
+                  alt: lightboxFile.filename,
+                  label: lightboxFile.filename,
+                  downloadUrl: lightboxFile.url,
+                  downloadName: lightboxFile.filename,
+                },
+              ]
+            : []
+        }
+        index={lightboxFile ? 0 : null}
+        onIndexChange={() => {}}
+        onClose={() => setLightboxFile(null)}
+        title="Chat image"
+      />
     </>
   );
 });

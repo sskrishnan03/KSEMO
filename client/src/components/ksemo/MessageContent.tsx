@@ -15,6 +15,7 @@ import { getFileKind } from "@/lib/fileKinds";
 import { CardWheelFan } from "@/components/ui/card-wheel-fan";
 import { ImageLightbox } from "@/components/ui/image-lightbox";
 import { isImageFile } from "@/lib/fileKinds";
+import { LibraryFileIcon } from "./LibraryFileIcon";
 import { ThinkingIndicator } from "@/components/ui/thinking-indicator";
 import {
   ChevronDown,
@@ -36,10 +37,7 @@ import { type MessageFeedbackValue } from "./MessageFeedback";
 import { usePersistFn } from "@/hooks/usePersistFn";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import React, { memo, useEffect, useRef, useState } from "react";
-import {
-  Streamdown,
-  defaultRehypePlugins,
-} from "streamdown";
+import { Streamdown, defaultRehypePlugins } from "streamdown";
 import { KsemoMarkdownCode } from "./code-block";
 import { sanitizeAssistantText } from "@/lib/sanitizeAssistant";
 import { usePdfViewer, isViewableDocument } from "@/contexts/PdfViewerContext";
@@ -173,7 +171,8 @@ function normalizeOrderedListMarkers(markdown: string) {
       if (listItem && listItem[1].length < 4) {
         const indent = listItem[1].length;
         const previous = counters.get(indent);
-        const number = previous === undefined ? Number(listItem[2]) : previous + 1;
+        const number =
+          previous === undefined ? Number(listItem[2]) : previous + 1;
         for (const level of counters.keys()) {
           if (level > indent) counters.delete(level);
         }
@@ -217,16 +216,6 @@ const KSEMO_MARKDOWN_COMPONENTS = {
 };
 
 type KsemoFile = NonNullable<KsemoMessage["attachments"]>[number];
-
-function formatBytes(bytes?: number): string | null {
-  if (typeof bytes !== "number" || Number.isNaN(bytes) || bytes < 0)
-    return null;
-  const units = ["B", "KB", "MB", "GB"];
-  let value = bytes;
-  let unit = 0;
-  const digits = unit === 0 || value >= 100 ? 0 : value >= 10 ? 1 : 2;
-  return `${value.toFixed(digits)} ${units[unit]}`;
-}
 
 function formatMessageTimestamp(timestamp?: Date | string | number) {
   if (timestamp === undefined || timestamp === null) return null;
@@ -351,6 +340,7 @@ export const MessageContent = memo(function MessageContent({
   onShare,
   onBranch,
   onDelete,
+  onFileOpen,
   isEditing = false,
   editValue = "",
   onEditValueChange,
@@ -381,6 +371,7 @@ export const MessageContent = memo(function MessageContent({
   onShare?: (message: KsemoMessage) => void | Promise<void>;
   onBranch?: (message: KsemoMessage) => void | Promise<void>;
   onDelete?: (message: KsemoMessage) => void;
+  onFileOpen?: () => void;
   isEditing?: boolean;
   editValue?: string;
   onEditValueChange?: (value: string) => void;
@@ -389,12 +380,13 @@ export const MessageContent = memo(function MessageContent({
 }) {
   const [copied, setCopied] = useState(false);
   const [sharing, setSharing] = useState(false);
-  const [feedbackPulse, setFeedbackPulse] = useState<MessageFeedbackValue | null>(
-    null
-  );
+  const [feedbackPulse, setFeedbackPulse] =
+    useState<MessageFeedbackValue | null>(null);
   const [feedbackPulseKey, setFeedbackPulseKey] = useState(0);
   const [actionsOpen, setActionsOpen] = useState(false);
-  const [responseDurationMs, setResponseDurationMs] = useState<number | null>(null);
+  const [responseDurationMs, setResponseDurationMs] = useState<number | null>(
+    null
+  );
   const isMobile = useIsMobile();
   const [showMobileUserActions, setShowMobileUserActions] = useState(false);
   const mobileUserActionsRef = useRef<HTMLDivElement | null>(null);
@@ -604,7 +596,7 @@ export const MessageContent = memo(function MessageContent({
           {isUser && message.attachments?.length
             ? (() => {
                 const documents = message.attachments.filter(
-                  f => !f.mimeType?.startsWith("image/")
+                  f => !isImageFile(f.filename, f.mimeType)
                 );
                 return (
                   <div className="mb-2 flex max-w-full flex-col items-end gap-2">
@@ -625,7 +617,6 @@ export const MessageContent = memo(function MessageContent({
                             file.filename,
                             file.mimeType
                           );
-                          const size = formatBytes(file.sizeBytes);
                           const opensInDrawer = isViewableDocument(
                             file.filename,
                             file.mimeType
@@ -635,6 +626,7 @@ export const MessageContent = memo(function MessageContent({
                               key={file.id}
                               type="button"
                               onClick={() => {
+                                onFileOpen?.();
                                 if (opensInDrawer) {
                                   openPdf({
                                     url: file.url,
@@ -646,19 +638,20 @@ export const MessageContent = memo(function MessageContent({
                                   setPreviewFile(file);
                                 }
                               }}
-                              className="group/file flex h-10 min-w-36 max-w-[14rem] items-center gap-2 rounded-lg border border-border/70 bg-muted/70 py-1.5 pl-1.5 pr-2.5 text-left transition-all hover:border-border hover:bg-accent/80"
+                              className="group/file flex h-14 min-w-44 max-w-[18rem] items-center gap-3 rounded-xl border border-border/70 bg-muted/70 px-3 text-left transition-all hover:border-border hover:bg-accent/80"
                               aria-label={`Preview ${file.filename}`}
                             >
-                              <kind.icon className="size-7 shrink-0" />
+                              <LibraryFileIcon
+                                filename={file.filename}
+                                mimeType={file.mimeType}
+                                className="size-8 shrink-0"
+                              />
                               <span className="min-w-0 flex-1">
-                                <span className="block truncate text-[11px] font-semibold leading-tight text-foreground transition-colors group-hover/file:text-primary">
+                                <span className="block truncate text-[13px] font-semibold leading-tight text-foreground transition-colors group-hover/file:text-primary">
                                   {file.filename}
                                 </span>
-                                <span className="mt-0.5 flex items-center gap-1 text-[9px] font-medium uppercase tracking-wide text-muted-foreground">
-                                  <span>{kind.label}</span>
-                                  {size ? (
-                                    <span className="opacity-80">· {size}</span>
-                                  ) : null}
+                                <span className="mt-1 block text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                                  {kind.label}
                                 </span>
                               </span>
                             </button>
@@ -671,208 +664,205 @@ export const MessageContent = memo(function MessageContent({
               })()
             : null}
           {(!isUser || message.content.trim().length > 0) && (
-              <div
-                onPointerDown={isUser ? startUserLongPress : undefined}
-                onPointerUp={isUser ? cancelUserLongPress : undefined}
-                onPointerLeave={isUser ? cancelUserLongPress : undefined}
-                onPointerCancel={isUser ? cancelUserLongPress : undefined}
-                onContextMenu={
-                  isUser && isMobile
-                    ? event => event.preventDefault()
-                    : undefined
-                }
-                className={cn(
-                  "text-[15px] leading-6",
-                  isUser
-                    ? cn(
-                        "ksemo-user-message-bubble flex flex-col items-end rounded-2xl rounded-tr-md border border-border bg-muted px-3.5 py-2.5 text-[15px] leading-6 text-foreground shadow-sm",
-                        isMobile && "ksemo-mobile-user-message",
-                        isEditing && "ring-1 ring-primary/40 border-primary/40"
-                      )
-                    : "max-w-none rounded-tl-md bg-transparent px-0 py-0 text-foreground"
-                )}
-              >
-                {isUser ? (
-                  !userExpanded ? (
-                    <div
-                      role={userLong ? "button" : undefined}
-                      tabIndex={userLong ? 0 : undefined}
-                      aria-expanded={userLong ? false : undefined}
-                      onClick={
-                        userLong ? () => setUserExpanded(true) : undefined
-                      }
-                      onKeyDown={
-                        userLong
-                          ? e => {
-                              if (e.key === "Enter" || e.key === " ") {
-                                e.preventDefault();
-                                setUserExpanded(true);
-                              }
+            <div
+              onPointerDown={isUser ? startUserLongPress : undefined}
+              onPointerUp={isUser ? cancelUserLongPress : undefined}
+              onPointerLeave={isUser ? cancelUserLongPress : undefined}
+              onPointerCancel={isUser ? cancelUserLongPress : undefined}
+              onContextMenu={
+                isUser && isMobile ? event => event.preventDefault() : undefined
+              }
+              className={cn(
+                "text-[15px] leading-6",
+                isUser
+                  ? cn(
+                      "ksemo-user-message-bubble flex flex-col items-end rounded-2xl rounded-tr-md border border-border bg-muted px-3.5 py-2.5 text-[15px] leading-6 text-foreground shadow-sm",
+                      isMobile && "ksemo-mobile-user-message",
+                      isEditing && "ring-1 ring-primary/40 border-primary/40"
+                    )
+                  : "max-w-none rounded-tl-md bg-transparent px-0 py-0 text-foreground"
+              )}
+            >
+              {isUser ? (
+                !userExpanded ? (
+                  <div
+                    role={userLong ? "button" : undefined}
+                    tabIndex={userLong ? 0 : undefined}
+                    aria-expanded={userLong ? false : undefined}
+                    onClick={userLong ? () => setUserExpanded(true) : undefined}
+                    onKeyDown={
+                      userLong
+                        ? e => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              setUserExpanded(true);
                             }
-                          : undefined
-                      }
-                      className="relative w-full cursor-pointer text-left"
+                          }
+                        : undefined
+                    }
+                    className="relative w-full cursor-pointer text-left"
+                  >
+                    <p
+                      ref={userTextRef}
+                      className="w-full whitespace-pre-wrap text-left line-clamp-8"
                     >
-                      <p
-                        ref={userTextRef}
-                        className="w-full whitespace-pre-wrap text-left line-clamp-8"
-                      >
-                        {message.content}
-                      </p>
-                      {userLong && (
-                        <>
-                          <div
-                            className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-muted to-transparent"
-                            aria-hidden="true"
-                          />
-                          <span className="absolute -bottom-2.5 -right-3.5 flex items-center gap-1 rounded-full bg-accent px-3 py-1 text-[13px] font-bold text-foreground/70 transition-colors hover:text-foreground">
-                            Show more
-                            <ChevronDown className="size-3.5" />
-                          </span>
-                        </>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="relative w-full pb-9">
-                      <p
-                        ref={userTextRef}
-                        className="w-full whitespace-pre-wrap text-left"
-                      >
-                        {message.content}
-                      </p>
-                      {userLong && (
-                        <button
-                          type="button"
-                          onClick={() => setUserExpanded(false)}
-                          className="absolute -bottom-2.5 -right-3.5 flex items-center gap-1 rounded-full bg-accent px-3 py-1 text-[13px] font-bold text-foreground/70 transition-colors hover:text-foreground"
-                        >
-                          Show less
-                          <ChevronDown className="size-3.5 rotate-180 transition-transform" />
-                        </button>
-                      )}
-                    </div>
-                  )
-                ) : cleanContent ? (
-                  <>
-                    {fileCreationNode ? (
+                      {message.content}
+                    </p>
+                    {userLong && (
                       <>
-                        {(() => {
-                          const { first, rest } =
-                          splitFirstSentence(renderContent);
-                          return (
-                            <>
-                              {first ? (
-                                <div className="ksemo-markdown prose prose-neutral max-w-none text-[15px] leading-6 dark:prose-invert">
-                                  <Streamdown
-                                    components={KSEMO_MARKDOWN_COMPONENTS}
-                                    rehypePlugins={
-                                      rest ? undefined : STABLE_REHYPE_PLUGINS
-                                    }
-                                    parseMarkdownIntoBlocksFn={
-                                      rest ? undefined : singleMarkdownBlock
-                                    }
-                                  >
-                                    {first}
-                                  </Streamdown>
-                                </div>
-                              ) : null}
-
-                              <div className="my-2">{fileCreationNode}</div>
-
-                              {rest ? (
-                                <div className="ksemo-markdown prose prose-neutral max-w-none text-[15px] leading-6 dark:prose-invert mt-2">
-                                  <Streamdown
-                                    components={KSEMO_MARKDOWN_COMPONENTS}
-                                    rehypePlugins={STABLE_REHYPE_PLUGINS}
-                                    parseMarkdownIntoBlocksFn={
-                                      singleMarkdownBlock
-                                    }
-                                  >
-                                    {rest}
-                                  </Streamdown>
-                                </div>
-                              ) : null}
-                            </>
-                          );
-                        })()}
-                      </>
-                    ) : (
-                      <>
-                        {message.botAction && (
-                          <BotActionStatus action={message.botAction} />
-                        )}
-                              {renderContent && (
-                          <div className="ksemo-markdown prose prose-neutral max-w-none text-[15px] leading-6 dark:prose-invert">
-                            <Streamdown
-                              components={KSEMO_MARKDOWN_COMPONENTS}
-                              rehypePlugins={STABLE_REHYPE_PLUGINS}
-                              parseMarkdownIntoBlocksFn={singleMarkdownBlock}
-                            >
-                              {renderContent}
-                            </Streamdown>
-                          </div>
-                        )}
+                        <div
+                          className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-muted to-transparent"
+                          aria-hidden="true"
+                        />
+                        <span className="absolute -bottom-2.5 -right-3.5 flex items-center gap-1 rounded-full bg-accent px-3 py-1 text-[13px] font-bold text-foreground/70 transition-colors hover:text-foreground">
+                          Show more
+                          <ChevronDown className="size-3.5" />
+                        </span>
                       </>
                     )}
-                    {isCancelled && renderStoppedNotice()}
-                  </>
-                ) : message.botAction ? (
-                  <>
-                    <BotActionStatus action={message.botAction} />
-                    {isCancelled && renderStoppedNotice()}
-                  </>
-                ) : fileCreationNode ? (
-                  <>
-                    <div className="my-2">{fileCreationNode}</div>
-                    {isCancelled && renderStoppedNotice()}
-                  </>
-                ) : isCancelled ? (
-                  renderStoppedNotice()
+                  </div>
                 ) : (
-                  <>
-                    {message.status === "streaming" &&
-                      isCurrentGeneration &&
-                      !hideTypingIndicator &&
-                      !message.botAction &&
-                      !message.fileGeneration &&
-                      !fileCreationNode &&
-                      !(message.attachments?.length && !isUser) && (
-                        <div
-                          aria-label="KSEMO is responding"
-                          className="inline-flex items-center gap-2"
-                        >
-                          <ThinkingIndicator size={24} />
-                          <span className="text-sm font-medium text-muted-foreground">
-                            Working for {formatShortResponseDuration(responseDurationMs ?? 0)}
-                          </span>
+                  <div className="relative w-full pb-9">
+                    <p
+                      ref={userTextRef}
+                      className="w-full whitespace-pre-wrap text-left"
+                    >
+                      {message.content}
+                    </p>
+                    {userLong && (
+                      <button
+                        type="button"
+                        onClick={() => setUserExpanded(false)}
+                        className="absolute -bottom-2.5 -right-3.5 flex items-center gap-1 rounded-full bg-accent px-3 py-1 text-[13px] font-bold text-foreground/70 transition-colors hover:text-foreground"
+                      >
+                        Show less
+                        <ChevronDown className="size-3.5 rotate-180 transition-transform" />
+                      </button>
+                    )}
+                  </div>
+                )
+              ) : cleanContent ? (
+                <>
+                  {fileCreationNode ? (
+                    <>
+                      {(() => {
+                        const { first, rest } =
+                          splitFirstSentence(renderContent);
+                        return (
+                          <>
+                            {first ? (
+                              <div className="ksemo-markdown prose prose-neutral max-w-none text-[15px] leading-6 dark:prose-invert">
+                                <Streamdown
+                                  components={KSEMO_MARKDOWN_COMPONENTS}
+                                  rehypePlugins={
+                                    rest ? undefined : STABLE_REHYPE_PLUGINS
+                                  }
+                                  parseMarkdownIntoBlocksFn={
+                                    rest ? undefined : singleMarkdownBlock
+                                  }
+                                >
+                                  {first}
+                                </Streamdown>
+                              </div>
+                            ) : null}
+
+                            <div className="my-2">{fileCreationNode}</div>
+
+                            {rest ? (
+                              <div className="ksemo-markdown prose prose-neutral max-w-none text-[15px] leading-6 dark:prose-invert mt-2">
+                                <Streamdown
+                                  components={KSEMO_MARKDOWN_COMPONENTS}
+                                  rehypePlugins={STABLE_REHYPE_PLUGINS}
+                                  parseMarkdownIntoBlocksFn={
+                                    singleMarkdownBlock
+                                  }
+                                >
+                                  {rest}
+                                </Streamdown>
+                              </div>
+                            ) : null}
+                          </>
+                        );
+                      })()}
+                    </>
+                  ) : (
+                    <>
+                      {message.botAction && (
+                        <BotActionStatus action={message.botAction} />
+                      )}
+                      {renderContent && (
+                        <div className="ksemo-markdown prose prose-neutral max-w-none text-[15px] leading-6 dark:prose-invert">
+                          <Streamdown
+                            components={KSEMO_MARKDOWN_COMPONENTS}
+                            rehypePlugins={STABLE_REHYPE_PLUGINS}
+                            parseMarkdownIntoBlocksFn={singleMarkdownBlock}
+                          >
+                            {renderContent}
+                          </Streamdown>
                         </div>
                       )}
-                  </>
-                )}
-                {!isUser && (message.memoryUses?.length ?? 0) > 0 && (
-                  <details className="mt-2 max-w-xl rounded-lg border border-border/70 px-3 py-2 text-xs text-muted-foreground">
-                    <summary className="cursor-pointer select-none">
-                      Used {message.memoryUses!.length} saved context{" "}
-                      {message.memoryUses!.length === 1 ? "item" : "items"}
-                    </summary>
-                    <ul className="mt-2 space-y-1.5">
-                      {message.memoryUses!.map(memory => (
-                        <li key={memory.id}>
-                          {memory.content}
-                          {memory.sourceConversationId && (
-                            <a
-                              className="ml-2 underline underline-offset-2 hover:text-foreground"
-                              href={`/c/${memory.sourceConversationId}`}
-                            >
-                              Source chat
-                            </a>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
-                  </details>
-                )}
-              </div>
+                    </>
+                  )}
+                  {isCancelled && renderStoppedNotice()}
+                </>
+              ) : message.botAction ? (
+                <>
+                  <BotActionStatus action={message.botAction} />
+                  {isCancelled && renderStoppedNotice()}
+                </>
+              ) : fileCreationNode ? (
+                <>
+                  <div className="my-2">{fileCreationNode}</div>
+                  {isCancelled && renderStoppedNotice()}
+                </>
+              ) : isCancelled ? (
+                renderStoppedNotice()
+              ) : (
+                <>
+                  {message.status === "streaming" &&
+                    isCurrentGeneration &&
+                    !hideTypingIndicator &&
+                    !message.botAction &&
+                    !message.fileGeneration &&
+                    !fileCreationNode &&
+                    !(message.attachments?.length && !isUser) && (
+                      <div
+                        aria-label="KSEMO is responding"
+                        className="inline-flex items-center gap-2"
+                      >
+                        <ThinkingIndicator size={24} />
+                        <span className="text-sm font-medium text-muted-foreground">
+                          Working for{" "}
+                          {formatShortResponseDuration(responseDurationMs ?? 0)}
+                        </span>
+                      </div>
+                    )}
+                </>
+              )}
+              {!isUser && (message.memoryUses?.length ?? 0) > 0 && (
+                <details className="mt-2 max-w-xl rounded-lg border border-border/70 px-3 py-2 text-xs text-muted-foreground">
+                  <summary className="cursor-pointer select-none">
+                    Used {message.memoryUses!.length} saved context{" "}
+                    {message.memoryUses!.length === 1 ? "item" : "items"}
+                  </summary>
+                  <ul className="mt-2 space-y-1.5">
+                    {message.memoryUses!.map(memory => (
+                      <li key={memory.id}>
+                        {memory.content}
+                        {memory.sourceConversationId && (
+                          <a
+                            className="ml-2 underline underline-offset-2 hover:text-foreground"
+                            href={`/c/${memory.sourceConversationId}`}
+                          >
+                            Source chat
+                          </a>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+            </div>
           )}
 
           {/* Attachments (e.g. images, uploaded files; generated document is presented via primary FileCreationCard) */}
@@ -883,7 +873,6 @@ export const MessageContent = memo(function MessageContent({
             <div className="mt-2 flex max-w-full flex-col items-start gap-2">
               {message.attachments.map(file => {
                 const kind = getFileKind(file.filename, file.mimeType);
-                const size = formatBytes(file.sizeBytes);
                 const isImage = isImageFile(file.filename, file.mimeType);
                 if (isImage) {
                   return (
@@ -926,11 +915,12 @@ export const MessageContent = memo(function MessageContent({
                 return (
                   <div
                     key={file.id}
-                    className="group/card flex h-16 w-80 max-w-full items-center gap-2 rounded-2xl border border-border/80 bg-muted/60 p-2.5 pr-2 shadow-sm transition-colors hover:bg-accent"
+                    className="group/card flex h-[4.5rem] w-[21rem] max-w-full items-center gap-3 rounded-2xl border border-border/80 bg-muted/60 px-3.5 py-3 shadow-sm transition-colors hover:bg-accent"
                   >
                     <button
                       type="button"
                       onClick={() => {
+                        onFileOpen?.();
                         if (isViewableDocument(file.filename, file.mimeType)) {
                           openPdf({
                             url: file.url,
@@ -945,16 +935,17 @@ export const MessageContent = memo(function MessageContent({
                       className="flex min-w-0 flex-1 items-center gap-3 overflow-hidden rounded-lg text-left"
                       aria-label={`Preview ${file.filename}`}
                     >
-                      <kind.icon className="size-10 shrink-0" />
+                      <LibraryFileIcon
+                        filename={file.filename}
+                        mimeType={file.mimeType}
+                        className="size-11 shrink-0"
+                      />
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-[13px] font-semibold leading-snug text-foreground">
+                        <span className="block truncate text-sm font-semibold leading-snug text-foreground">
                           {file.filename}
                         </span>
-                        <span className="mt-0.5 flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                          <span>{kind.label}</span>
-                          {size ? (
-                            <span className="opacity-80">· {size}</span>
-                          ) : null}
+                        <span className="mt-1 block text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                          {kind.label}
                         </span>
                       </span>
                     </button>
@@ -1119,7 +1110,8 @@ export const MessageContent = memo(function MessageContent({
                             "relative z-10 size-4",
                             feedback === "down" &&
                               "text-rose-600 dark:text-rose-400 ksemo-feedback-thumb-active",
-                            feedbackPulse === "down" && "ksemo-feedback-thumb-pop"
+                            feedbackPulse === "down" &&
+                              "ksemo-feedback-thumb-pop"
                           )}
                         />
                       </span>,
@@ -1128,7 +1120,9 @@ export const MessageContent = memo(function MessageContent({
                     )}
                   </>
                 )}
-                {!sharedAnswerPreview && message.content && onShare &&
+                {!sharedAnswerPreview &&
+                  message.content &&
+                  onShare &&
                   action(
                     sharing ? "Preparing answer link…" : "Share response",
                     sharing ? (

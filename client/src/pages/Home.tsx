@@ -52,8 +52,6 @@ import {
   WinrarIcon,
   Trash6Icon,
 } from "../components/ksemo/icons";
-import { DocumentText } from "reicon-react/icons/DocumentText";
-import { FilePdf } from "reicon-react/icons/FilePdf";
 
 import {
   Tooltip,
@@ -82,6 +80,7 @@ import {
   type FileMetrics,
   type FileSource,
 } from "../components/ksemo/FileCreationCard";
+import { CreateFileModeIcon } from "../components/ksemo/LibraryFileIcon";
 import { PdfDrawer } from "../components/ksemo/PdfDrawer";
 import type { DocFormat } from "@/lib/docFormats";
 import { usePdfViewer } from "@/contexts/PdfViewerContext";
@@ -5406,7 +5405,11 @@ export default function Home({
                                         }
                                       }}
                                     >
-                                      <FilePdf className="mr-2 size-5 shrink-0" />
+                                      <CreateFileModeIcon
+                                        mode="pdf"
+                                        colored={false}
+                                        className="mr-2 size-5 shrink-0"
+                                      />
                                       <span>PDF</span>
                                     </DropdownMenuItem>
                                     <DropdownMenuItem
@@ -5419,7 +5422,11 @@ export default function Home({
                                         }
                                       }}
                                     >
-                                      <DocumentText className="mr-2 size-5 shrink-0" />
+                                      <CreateFileModeIcon
+                                        mode="docx"
+                                        colored={false}
+                                        className="mr-2 size-5 shrink-0"
+                                      />
                                       <span>Word</span>
                                     </DropdownMenuItem>
                                   </DropdownMenuSubContent>
@@ -5546,7 +5553,11 @@ export default function Home({
                                           );
                                       }}
                                     >
-                                      <FilePdf className="mr-2 size-5 shrink-0" />
+                                      <CreateFileModeIcon
+                                        mode="pdf"
+                                        colored={false}
+                                        className="mr-2 size-5 shrink-0"
+                                      />
                                       <span>PDF</span>
                                     </DropdownMenuItem>
                                     <DropdownMenuItem
@@ -5558,7 +5569,11 @@ export default function Home({
                                           );
                                       }}
                                     >
-                                      <DocumentText className="mr-2 size-5 shrink-0" />
+                                      <CreateFileModeIcon
+                                        mode="docx"
+                                        colored={false}
+                                        className="mr-2 size-5 shrink-0"
+                                      />
                                       <span>Word</span>
                                     </DropdownMenuItem>
                                   </DropdownMenuSubContent>
@@ -5692,6 +5707,7 @@ export default function Home({
                       <Fragment key={message.clientId ?? message.id}>
                         <MessageContent
                           message={message}
+                          onFileOpen={() => setChatFilesOpen(false)}
                           responseStartedAt={
                             isGenerating && generatingMessageId === message.id
                               ? activeStream?.startedAt

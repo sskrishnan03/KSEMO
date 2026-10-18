@@ -1,5 +1,4 @@
 import type { DocFormat } from "@/lib/docFormats";
-import { getCapabilityOption } from "@/lib/capabilities";
 import { Check, Eye } from "lucide-react";
 import React, {
   memo,
@@ -9,15 +8,10 @@ import React, {
   useRef,
   useState,
 } from "react";
-import {
-  FileBrandMark,
-  type FileBrandVariant,
-} from "@/components/ksemo/FileBrandIcons";
+import type { FileBrandVariant } from "@/components/ksemo/FileBrandIcons";
+import { CreateFileModeIcon } from "./LibraryFileIcon";
 import { cn } from "@/lib/utils";
-import {
-  KsemoCodeBlock,
-  stripShebang,
-} from "@/components/ksemo/code-block";
+import { KsemoCodeBlock, stripShebang } from "@/components/ksemo/code-block";
 import {
   loadFilePreview,
   type FilePreviewData,
@@ -329,7 +323,6 @@ export const FileCreationCard = memo(function FileCreationCard({
   const variant = FORMAT_TO_VARIANT[format] || "generic";
   const capabilityFormat =
     format === "markdown" || format === "csv" ? "txt" : format;
-  const FormatIcon = getCapabilityOption(capabilityFormat).icon;
   const displayName = filename || `document.${format}`;
 
   const cleanBaseName = useMemo(() => {
@@ -374,7 +367,10 @@ export const FileCreationCard = memo(function FileCreationCard({
     return (
       <div className="my-2 w-fit max-w-md animate-in fade-in duration-200">
         <div className="flex items-center gap-3.5 rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-destructive">
-          <FormatIcon className="size-9 shrink-0 opacity-80" />
+          <CreateFileModeIcon
+            mode={capabilityFormat}
+            className="size-9 shrink-0 opacity-80"
+          />
           <div className="min-w-0 flex-1">
             <p className="text-[13px] font-medium text-foreground">
               Document creation could not be completed
@@ -394,7 +390,10 @@ export const FileCreationCard = memo(function FileCreationCard({
     return (
       <div className="my-2 w-fit max-w-full animate-in fade-in duration-200">
         <div className="flex w-fit max-w-full items-center gap-2 rounded-xl border border-border/60 bg-muted/40 px-3 py-2 text-foreground">
-          <FormatIcon className="size-5 shrink-0 opacity-70" />
+          <CreateFileModeIcon
+            mode={capabilityFormat}
+            className="size-5 shrink-0 opacity-70"
+          />
           <span className="whitespace-nowrap text-[13px] font-medium text-foreground">
             Creation stopped
           </span>
@@ -412,7 +411,10 @@ export const FileCreationCard = memo(function FileCreationCard({
         data-testid="file-creation-drafting"
         className="relative my-2 flex items-center gap-2.5 py-1 select-none motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-left-2 motion-safe:duration-300"
       >
-        <FormatIcon className="size-5 shrink-0 select-none text-muted-foreground" />
+        <CreateFileModeIcon
+          mode={capabilityFormat}
+          className="size-5 shrink-0 select-none"
+        />
         <span className="text-[13.5px] font-medium select-none text-muted-foreground">
           {creatingPhrase}
         </span>
@@ -420,7 +422,10 @@ export const FileCreationCard = memo(function FileCreationCard({
           aria-hidden="true"
           className="ksemo-file-status-sweep pointer-events-none absolute inset-0 flex items-center gap-2.5 text-foreground"
         >
-          <FormatIcon className="size-5 shrink-0 select-none" />
+          <CreateFileModeIcon
+            mode={capabilityFormat}
+            className="size-5 shrink-0 select-none"
+          />
           <span className="text-[13.5px] font-medium select-none">
             {creatingPhrase}
           </span>
@@ -529,7 +534,6 @@ export const FileCreationCard = memo(function FileCreationCard({
           </div>
         </div>
       </div>
-
     </div>
   );
 });
@@ -595,12 +599,25 @@ function MiniPage({
 }
 
 function PreviewSkeleton({ variant }: { variant: FileBrandVariant }) {
+  const mode =
+    variant === "pdf"
+      ? "pdf"
+      : variant === "word"
+        ? "docx"
+        : variant === "excel"
+          ? "xlsx"
+          : variant === "powerpoint"
+            ? "pptx"
+            : "txt";
   return (
     <div
       className="flex flex-col items-center gap-2.5 select-none"
       aria-hidden="true"
     >
-      <FileBrandMark variant={variant} className="size-[18px] shrink-0 opacity-55" />
+      <CreateFileModeIcon
+        mode={mode}
+        className="size-[18px] shrink-0 opacity-55"
+      />
       <div className="h-2 w-24 animate-pulse rounded-full bg-foreground/10" />
       <p className="text-[10.5px] font-medium text-muted-foreground/70">
         Loading preview…
@@ -618,9 +635,22 @@ function PreviewFallback({
   displayName: string;
   message: string;
 }) {
+  const mode =
+    variant === "pdf"
+      ? "pdf"
+      : variant === "word"
+        ? "docx"
+        : variant === "excel"
+          ? "xlsx"
+          : variant === "powerpoint"
+            ? "pptx"
+            : "txt";
   return (
     <div className="flex flex-col items-center gap-2.5 text-center select-none">
-      <FileBrandMark variant={variant} className="size-[18px] shrink-0 opacity-90" />
+      <CreateFileModeIcon
+        mode={mode}
+        className="size-[18px] shrink-0 opacity-90"
+      />
       <p className="text-[11px] font-medium text-muted-foreground">{message}</p>
       <p className="max-w-[220px] truncate text-[10.5px] text-muted-foreground/70">
         {displayName}

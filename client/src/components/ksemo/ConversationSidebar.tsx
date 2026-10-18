@@ -43,7 +43,7 @@ import { ChatLine } from "reicon-react/icons/ChatLine";
 import { ChatSquareCall } from "reicon-react/icons/ChatSquareCall";
 import { BranchSplitIcon } from "./BranchSplitIcon";
 import { ShareIcon, PinTackIcon, UnpinTackIcon, Trash6Icon } from "./icons";
-import { PdfFileIcon, WordFileIcon } from "./FileBrandIcons";
+import { CreateFileModeIcon } from "./LibraryFileIcon";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { startLogin } from "@/const";
 import React, { memo, useMemo, useRef, useState } from "react";
@@ -220,9 +220,7 @@ export const ConversationSidebar = memo(function ConversationSidebar({
     <button
       className={cn(
         "group relative flex min-w-0 items-center rounded-lg py-2 text-left transition-colors hover:bg-sidebar-accent focus-visible:ring-0 focus-visible:outline-none",
-        compact
-          ? "w-full justify-center"
-          : "min-w-0 flex-1 gap-2.5 px-2"
+        compact ? "w-full justify-center" : "min-w-0 flex-1 gap-2.5 px-2"
       )}
       aria-label="Account menu"
       aria-haspopup="menu"
@@ -516,134 +514,143 @@ export const ConversationSidebar = memo(function ConversationSidebar({
           ))}
         {!locked && (
           <div className="mt-2">
-          {!compact && (
+            {!compact && (
+              <div
+                aria-hidden="true"
+                className="mb-2 h-px w-full bg-border/70"
+              />
+            )}
             <div
-              aria-hidden="true"
-              className="mb-2 h-px w-full bg-border/70"
-            />
-          )}
-          <div className={cn(compact ? "" : "flex items-center justify-between gap-px")}>
-          <DropdownMenu
-              open={previewSupportOpen || accountMenuOpen}
-              onOpenChange={setAccountMenuOpen}
+              className={cn(
+                compact ? "" : "flex items-center justify-between gap-px"
+              )}
             >
-              {compact ? (
+              <DropdownMenu
+                open={previewSupportOpen || accountMenuOpen}
+                onOpenChange={setAccountMenuOpen}
+              >
+                {compact ? (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <DropdownMenuTrigger asChild>
+                        {accountButton}
+                      </DropdownMenuTrigger>
+                    </TooltipTrigger>
+                    <TooltipContent
+                      side="right"
+                      sideOffset={8}
+                      collisionPadding={12}
+                    >
+                      Account
+                    </TooltipContent>
+                  </Tooltip>
+                ) : (
+                  <DropdownMenuTrigger asChild>
+                    {accountButton}
+                  </DropdownMenuTrigger>
+                )}
+                <DropdownMenuContent
+                  side={compact ? "right" : "top"}
+                  sideOffset={6}
+                  align={compact ? "end" : "start"}
+                  collisionPadding={12}
+                  className={cn(
+                    "w-52 rounded-xl",
+                    isMobile &&
+                      "max-h-[calc(100dvh-1.5rem)] max-w-[calc(100vw-1.5rem)] overflow-y-auto shadow-xl"
+                  )}
+                >
+                  <div className="px-2.5 py-2.5">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                      Logged in as
+                    </p>
+                    <p className="mt-0.5 truncate text-sm font-semibold">
+                      {user.name || "KSEMO user"}
+                    </p>
+                    <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                      {user.email || "Account"}
+                    </p>
+                  </div>
+                  <DropdownMenuItem
+                    onClick={onSettings}
+                    className="focus-visible:ring-0 focus-visible:outline-none"
+                  >
+                    <Settings className="mr-2 size-4" /> Settings
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => onSupport("faq")}
+                    className="focus-visible:ring-0 focus-visible:outline-none"
+                  >
+                    <HelpSquare size={16} className="mr-2" />
+                    Get help
+                    <ExternalLink className="ml-auto size-3.5 text-muted-foreground" />
+                  </DropdownMenuItem>
+                  <DropdownMenuSub>
+                    <DropdownMenuSubTrigger className="focus-visible:ring-0 focus-visible:outline-none">
+                      <ElementPlus size={16} className="mr-2" />
+                      Learn more
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent
+                      sideOffset={6}
+                      collisionPadding={12}
+                      className={cn(
+                        "w-44 rounded-xl",
+                        isMobile &&
+                          "max-h-[calc(100dvh-1.5rem)] overflow-y-auto"
+                      )}
+                    >
+                      <DropdownMenuItem
+                        onClick={() => onSupport("privacy")}
+                        className="focus-visible:ring-0 focus-visible:outline-none"
+                      >
+                        <ShieldCheck className="mr-2 size-4" />
+                        Privacy Policy
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => onSupport("terms")}
+                        className="focus-visible:ring-0 focus-visible:outline-none"
+                      >
+                        <FileText className="mr-2 size-4" />
+                        Terms of Service
+                      </DropdownMenuItem>
+                    </DropdownMenuSubContent>
+                  </DropdownMenuSub>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={onLogout} variant="destructive">
+                    <LogOut className="mr-2 size-4" /> Sign out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              {!compact && (
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <DropdownMenuTrigger asChild>
-                      {accountButton}
-                    </DropdownMenuTrigger>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => {
+                        if (locked) {
+                          setLockedIntent("search");
+                          return;
+                        }
+                        onSearch();
+                      }}
+                      aria-label="Search"
+                      className="group h-11 w-11 shrink-0 rounded-lg text-foreground/90 transition-[color,background-color,transform] duration-150 hover:bg-sidebar-accent hover:text-foreground active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <Search className="size-4 transition-transform duration-200 group-hover:scale-110 group-active:scale-95" />
+                    </Button>
                   </TooltipTrigger>
                   <TooltipContent
                     side="right"
                     sideOffset={8}
                     collisionPadding={12}
                   >
-                    Account
+                    Search
                   </TooltipContent>
                 </Tooltip>
-              ) : (
-                <DropdownMenuTrigger asChild>
-                  {accountButton}
-                </DropdownMenuTrigger>
               )}
-              <DropdownMenuContent
-                side={compact ? "right" : "top"}
-                sideOffset={6}
-                align={compact ? "end" : "start"}
-                collisionPadding={12}
-                className={cn(
-                  "w-52 rounded-xl",
-                  isMobile &&
-                    "max-h-[calc(100dvh-1.5rem)] max-w-[calc(100vw-1.5rem)] overflow-y-auto shadow-xl"
-                )}
-              >
-                <div className="px-2.5 py-2.5">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                    Logged in as
-                  </p>
-                  <p className="mt-0.5 truncate text-sm font-semibold">
-                    {user.name || "KSEMO user"}
-                  </p>
-                  <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                    {user.email || "Account"}
-                  </p>
-                </div>
-                <DropdownMenuItem
-                  onClick={onSettings}
-                  className="focus-visible:ring-0 focus-visible:outline-none"
-                >
-                  <Settings className="mr-2 size-4" /> Settings
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => onSupport("faq")}
-                  className="focus-visible:ring-0 focus-visible:outline-none"
-                >
-                  <HelpSquare size={16} className="mr-2" />
-                  Get help
-                  <ExternalLink className="ml-auto size-3.5 text-muted-foreground" />
-                </DropdownMenuItem>
-                <DropdownMenuSub>
-                  <DropdownMenuSubTrigger className="focus-visible:ring-0 focus-visible:outline-none">
-                    <ElementPlus size={16} className="mr-2" />
-                    Learn more
-                  </DropdownMenuSubTrigger>
-                  <DropdownMenuSubContent
-                    sideOffset={6}
-                    collisionPadding={12}
-                    className={cn(
-                      "w-44 rounded-xl",
-                      isMobile && "max-h-[calc(100dvh-1.5rem)] overflow-y-auto"
-                    )}
-                  >
-                    <DropdownMenuItem
-                      onClick={() => onSupport("privacy")}
-                      className="focus-visible:ring-0 focus-visible:outline-none"
-                    >
-                      <ShieldCheck className="mr-2 size-4" />
-                      Privacy Policy
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => onSupport("terms")}
-                      className="focus-visible:ring-0 focus-visible:outline-none"
-                    >
-                      <FileText className="mr-2 size-4" />
-                      Terms of Service
-                    </DropdownMenuItem>
-                  </DropdownMenuSubContent>
-                </DropdownMenuSub>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={onLogout} variant="destructive">
-                  <LogOut className="mr-2 size-4" /> Sign out
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-          </DropdownMenu>
-          {!compact && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => {
-                    if (locked) {
-                      setLockedIntent("search");
-                      return;
-                    }
-                    onSearch();
-                  }}
-                  aria-label="Search"
-                  className="group h-11 w-11 shrink-0 rounded-lg text-foreground/90 transition-[color,background-color,transform] duration-150 hover:bg-sidebar-accent hover:text-foreground active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  <Search className="size-4 transition-transform duration-200 group-hover:scale-110 group-active:scale-95" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="right" sideOffset={8} collisionPadding={12}>
-                Search
-              </TooltipContent>
-            </Tooltip>
-          )}
-          </div>
+            </div>
           </div>
         )}
       </aside>
@@ -1043,14 +1050,22 @@ export const MobileExportMenuItems = memo(function MobileExportMenuItems({
         onClick={() => onExport(conversation, "pdf")}
         className="flex cursor-pointer items-center gap-2 rounded-md py-2 pl-2.5 pr-2 text-xs font-medium"
       >
-        <PdfFileIcon className="mr-2 size-4 shrink-0" />
+        <CreateFileModeIcon
+          mode="pdf"
+          colored={false}
+          className="mr-2 size-4 shrink-0"
+        />
         <span>Download PDF</span>
       </DropdownMenuItem>
       <DropdownMenuItem
         onClick={() => onExport(conversation, "word")}
         className="flex cursor-pointer items-center gap-2 rounded-md py-2 pl-2.5 pr-2 text-xs font-medium"
       >
-        <WordFileIcon className="mr-2 size-4 shrink-0" />
+        <CreateFileModeIcon
+          mode="docx"
+          colored={false}
+          className="mr-2 size-4 shrink-0"
+        />
         <span>Download Word</span>
       </DropdownMenuItem>
     </div>

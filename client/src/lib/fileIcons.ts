@@ -1,16 +1,12 @@
 import {
   CodeFileIcon,
-  ExcelFileIcon,
   GenericFileIcon,
   ImageFileIcon,
-  PdfFileIcon,
-  PowerPointFileIcon,
-  TextFileIcon,
-  WordFileIcon,
   type FileBrandIconComponent,
   type FileBrandVariant,
   brandVariantForExt,
 } from "@/components/ksemo/FileBrandIcons";
+import { getCapabilityOption } from "@/lib/capabilities";
 
 export type FileVisual = {
   Icon: FileBrandIconComponent;
@@ -19,19 +15,55 @@ export type FileVisual = {
 };
 
 const EXT_VISUALS: Record<string, FileVisual> = {
-  pdf: { Icon: PdfFileIcon, variant: "pdf", className: "" },
-  doc: { Icon: WordFileIcon, variant: "word", className: "" },
-  docx: { Icon: WordFileIcon, variant: "word", className: "" },
-  xls: { Icon: ExcelFileIcon, variant: "excel", className: "" },
-  xlsx: { Icon: ExcelFileIcon, variant: "excel", className: "" },
-  ppt: { Icon: PowerPointFileIcon, variant: "powerpoint", className: "" },
-  pptx: { Icon: PowerPointFileIcon, variant: "powerpoint", className: "" },
+  pdf: {
+    Icon: getCapabilityOption("pdf").icon,
+    variant: "pdf",
+    className: getCapabilityOption("pdf").iconColor,
+  },
+  doc: {
+    Icon: getCapabilityOption("docx").icon,
+    variant: "word",
+    className: getCapabilityOption("docx").iconColor,
+  },
+  docx: {
+    Icon: getCapabilityOption("docx").icon,
+    variant: "word",
+    className: getCapabilityOption("docx").iconColor,
+  },
+  xls: {
+    Icon: getCapabilityOption("xlsx").icon,
+    variant: "excel",
+    className: getCapabilityOption("xlsx").iconColor,
+  },
+  xlsx: {
+    Icon: getCapabilityOption("xlsx").icon,
+    variant: "excel",
+    className: getCapabilityOption("xlsx").iconColor,
+  },
+  ppt: {
+    Icon: getCapabilityOption("pptx").icon,
+    variant: "powerpoint",
+    className: getCapabilityOption("pptx").iconColor,
+  },
+  pptx: {
+    Icon: getCapabilityOption("pptx").icon,
+    variant: "powerpoint",
+    className: getCapabilityOption("pptx").iconColor,
+  },
   json: { Icon: CodeFileIcon, variant: "code", className: "" },
   xml: { Icon: CodeFileIcon, variant: "code", className: "" },
   yml: { Icon: CodeFileIcon, variant: "code", className: "" },
   yaml: { Icon: CodeFileIcon, variant: "code", className: "" },
-  txt: { Icon: TextFileIcon, variant: "text", className: "" },
-  log: { Icon: TextFileIcon, variant: "text", className: "" },
+  txt: {
+    Icon: getCapabilityOption("txt").icon,
+    variant: "text",
+    className: getCapabilityOption("txt").iconColor,
+  },
+  log: {
+    Icon: getCapabilityOption("txt").icon,
+    variant: "text",
+    className: getCapabilityOption("txt").iconColor,
+  },
 };
 
 export function extensionOfFilename(filename: string): string {

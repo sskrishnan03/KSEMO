@@ -4,6 +4,7 @@
 
 import { Button } from "@/components/ui/button";
 import { getFileKind } from "@/lib/fileKinds";
+import { LibraryFileIcon } from "./LibraryFileIcon";
 import { downloadFile } from "@/lib/downloadFile";
 import { Download, ExternalLink, FolderOpen, X } from "lucide-react";
 import { memo, useEffect } from "react";
@@ -104,7 +105,11 @@ export const KsemoFilePreviewOverlay = memo(function KsemoFilePreviewOverlay({
             <span
               className={`flex size-8 shrink-0 items-center justify-center rounded-lg ${kind.colorClass}`}
             >
-              <kind.icon className="size-4" />
+              <LibraryFileIcon
+                filename={file.filename}
+                mimeType={file.mimeType}
+                className="size-4"
+              />
             </span>
             <div className="min-w-0">
               <p className="truncate text-sm font-medium text-foreground">
@@ -182,7 +187,11 @@ export const KsemoFilePreviewOverlay = memo(function KsemoFilePreviewOverlay({
               <span
                 className={`flex size-12 items-center justify-center rounded-xl ${kind.colorClass}`}
               >
-                <kind.icon className="size-6" />
+                <LibraryFileIcon
+                  filename={file.filename}
+                  mimeType={file.mimeType}
+                  className="size-6"
+                />
               </span>
               <p className="text-sm text-muted-foreground">
                 This file type can't be previewed inline.

@@ -22,7 +22,7 @@ import {
   usePdfViewer,
 } from "@/contexts/PdfViewerContext";
 import { downloadFile } from "@/lib/downloadFile";
-import { getCapabilityOption } from "@/lib/capabilities";
+import { CreateFileModeIcon } from "./LibraryFileIcon";
 import { trpc } from "@/lib/trpc";
 import { KsemoCodeBlock } from "./code-block";
 import {
@@ -2979,7 +2979,6 @@ export const PdfDrawer = memo(function PdfDrawer({
         : isPowerPointDoc
           ? "pptx"
           : "txt";
-  const FileTypeIcon = getCapabilityOption(fileMode).icon;
 
   const zoomScrollElement = useCallback(() => {
     const container = scrollContainerRef.current;
@@ -3761,7 +3760,8 @@ export const PdfDrawer = memo(function PdfDrawer({
       <header className="flex h-12 shrink-0 items-center justify-between gap-2 border-b border-border bg-card px-3 sm:px-4">
         {/* Left side: Matching Create Files icon, file name, and mobile Slides toggle */}
         <div className="flex min-w-0 items-center gap-2">
-          <FileTypeIcon
+          <CreateFileModeIcon
+            mode={fileMode}
             className={cn(
               "size-[18px] shrink-0",
               fileMode === "xlsx" && "stroke-[1.5]"

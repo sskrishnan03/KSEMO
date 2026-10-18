@@ -29,13 +29,6 @@ import {
   Check,
   Camera,
   ChevronDown,
-  File,
-  FileArchive,
-  FileAudio,
-  FileCode,
-  FileImage,
-  FileText,
-  FileVideo,
   Loader2,
   Maximize2,
   Mic,
@@ -61,6 +54,7 @@ import React, {
   type ChangeEvent,
 } from "react";
 import { FileResultCard } from "./FileResultCard";
+import { LibraryFileIcon } from "./LibraryFileIcon";
 
 export const getLibrarySubmenuClass = (isCentered: boolean) =>
   `absolute left-1/2 -translate-x-1/2 z-50 max-h-[calc(100dvh-${isCentered ? "12rem" : "6rem"})] w-full max-w-3xl rounded-xl border border-border bg-popover p-0 text-popover-foreground shadow-xl`;
@@ -1110,7 +1104,7 @@ export const ChatComposer = memo(function ChatComposer({
                       sideOffset={8}
                       alignOffset={-8}
                       collisionPadding={12}
-                      className="ksemo-tools-menu w-48 rounded-xl max-h-[16rem] overflow-y-auto [&_svg]:text-foreground"
+                      className="ksemo-tools-menu w-48 rounded-xl max-h-[16rem] overflow-y-auto"
                     >
                       <DropdownMenuItem
                         onClick={() => fileInputRef.current?.click()}
@@ -1166,7 +1160,7 @@ export const ChatComposer = memo(function ChatComposer({
                             sideOffset={6}
                             alignOffset={-84}
                             collisionPadding={16}
-                            className="ksemo-tools-menu w-44 rounded-xl max-h-[16rem] overflow-y-auto shadow-md [&_svg]:text-foreground"
+                            className="ksemo-tools-menu w-44 rounded-xl max-h-[16rem] overflow-y-auto shadow-md"
                           >
                             {CAPABILITY_SECTIONS.find(
                               s => s.id === "create"
@@ -1192,7 +1186,7 @@ export const ChatComposer = memo(function ChatComposer({
                                 >
                                   <Icon
                                     className={cn(
-                                      "mr-2 size-[18px] shrink-0 text-foreground",
+                                      "mr-2 size-[18px] shrink-0",
                                       option.mode === "xlsx" && "stroke-[1.5]"
                                     )}
                                   />
@@ -1573,9 +1567,11 @@ export const ChatComposer = memo(function ChatComposer({
                     >
                       <Icon
                         className={cn(
-                          "mr-2 size-[18px] shrink-0 text-foreground",
+                          "mr-2 size-[18px] shrink-0",
+                          option.iconColor,
                           option.mode === "xlsx" && "stroke-[1.5]"
                         )}
+                        style={{ color: option.iconHex }}
                       />
                       {option.title}
                       {isActive && (
@@ -1602,44 +1598,12 @@ function ComposerFileIcon({
   mimeType?: string;
   className?: string;
 }) {
-  const kind = getFileKind(name, mimeType);
-  const createMode =
-    kind.label === "PDF"
-      ? "pdf"
-      : kind.label === "Word"
-        ? "docx"
-        : kind.label === "Sheet"
-          ? "xlsx"
-          : kind.label === "Slides"
-            ? "pptx"
-            : kind.label === "Text"
-              ? "txt"
-              : null;
-
-  if (createMode) {
-    const Icon = getCapabilityOption(createMode).icon;
-    return (
-      <Icon className={cn(className, "text-foreground")} aria-hidden="true" />
-    );
-  }
-
-  const Icon =
-    kind.label === "Archive"
-      ? FileArchive
-      : kind.label === "Audio"
-        ? FileAudio
-        : kind.label === "Code"
-          ? FileCode
-          : kind.label === "Image"
-            ? FileImage
-            : kind.label === "Text"
-              ? FileText
-              : kind.label === "Video"
-                ? FileVideo
-                : File;
-
   return (
-    <Icon className={cn(className, "text-foreground")} aria-hidden="true" />
+    <LibraryFileIcon
+      filename={name}
+      mimeType={mimeType}
+      className={className}
+    />
   );
 }
 

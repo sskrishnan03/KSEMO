@@ -8,20 +8,14 @@ import { KsemoFilePreviewOverlay } from "./KsemoFilePreviewOverlay";
 import { ImageLightbox } from "@/components/ui/image-lightbox";
 import { isImageFile } from "@/lib/fileKinds";
 import { usePdfViewer, isViewableDocument } from "@/contexts/PdfViewerContext";
-import {
-  extensionOfFilename,
-  guessMimeType,
-  isSupportedUpload,
-} from "@/lib/fileIcons";
-import { getCapabilityOption } from "@/lib/capabilities";
-import { Gallery3 } from "reicon-react/icons/Gallery3";
+import { guessMimeType, isSupportedUpload } from "@/lib/fileIcons";
+import { LibraryFileIcon } from "./LibraryFileIcon";
 import { format, isToday, isYesterday, isThisYear } from "date-fns";
 import { cn } from "@/lib/utils";
 import {
   Check,
   CheckCircle2,
   Download,
-  File,
   FolderOpen,
   Grid2X2,
   Library,
@@ -1132,10 +1126,20 @@ function FilePreview({
       />
     );
   if (compact)
-    return <LibraryFormatIcon file={file} className="size-5 shrink-0" />;
+    return (
+      <LibraryFileIcon
+        filename={file.filename}
+        mimeType={file.mimeType}
+        className="size-5 shrink-0"
+      />
+    );
   return (
     <span className="flex size-full items-center justify-center bg-muted/45">
-      <LibraryFormatIcon file={file} className="size-8" />
+      <LibraryFileIcon
+        filename={file.filename}
+        mimeType={file.mimeType}
+        className="size-8"
+      />
     </span>
   );
 }
@@ -1213,48 +1217,6 @@ function LibrarySelectionAction({
       </Tooltip>
     </div>
   );
-}
-
-function LibraryFormatIcon({
-  file,
-  className,
-}: {
-  file: LibraryWorkspaceFile;
-  className: string;
-}) {
-  if (isImageFile(file.filename, file.mimeType)) {
-    return <Gallery3 className={cn(className, "text-foreground")} />;
-  }
-
-  const extension = extensionOfFilename(file.filename);
-  const mode =
-    extension === "pdf"
-      ? "pdf"
-      : ["doc", "docx"].includes(extension)
-        ? "docx"
-        : ["xls", "xlsx", "csv", "tsv"].includes(extension)
-          ? "xlsx"
-          : ["ppt", "pptx"].includes(extension)
-            ? "pptx"
-            : ["txt", "log", "md", "markdown"].includes(extension)
-              ? "txt"
-              : null;
-
-  if (mode) {
-    const option = getCapabilityOption(mode);
-    const Icon = option.icon;
-    return (
-      <Icon
-        className={cn(
-          className,
-          "text-foreground",
-          (mode === "xlsx" || mode === "pptx") && "stroke-[1.5]"
-        )}
-      />
-    );
-  }
-
-  return <File className={cn(className, "text-foreground")} />;
 }
 
 function libraryFileTypeLabel(file: LibraryWorkspaceFile): string {

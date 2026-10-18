@@ -9,11 +9,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Loading } from "@/components/ui/loading";
 import { trpc } from "@/lib/trpc";
-import {
-  fileVisualFor,
-  guessMimeType,
-  isSupportedUpload,
-} from "@/lib/fileIcons";
+import { guessMimeType, isSupportedUpload } from "@/lib/fileIcons";
 import { Upload } from "lucide-react";
 import { Link2 } from "reicon-react";
 import { Trash6Icon } from "./icons";
@@ -28,6 +24,7 @@ import { ConfirmDeleteDialog } from "./ConfirmDeleteDialog";
 import { ImageLightbox } from "@/components/ui/image-lightbox";
 import { isImageFile } from "@/lib/fileKinds";
 import { usePdfViewer, isViewableDocument } from "@/contexts/PdfViewerContext";
+import { LibraryFileIcon } from "./LibraryFileIcon";
 
 export type WorkspaceSection = "files";
 
@@ -196,18 +193,11 @@ export const WorkspacePanel = memo(function WorkspacePanel({
                       key={file.id}
                       className="flex items-center gap-3 rounded-xl border border-border p-3"
                     >
-                      {(() => {
-                        const visual = fileVisualFor(
-                          file.filename,
-                          file.mimeType
-                        );
-                        return (
-                          <visual.Icon
-                            className={`size-4 ${visual.className}`}
-                            aria-hidden
-                          />
-                        );
-                      })()}
+                      <LibraryFileIcon
+                        filename={file.filename}
+                        mimeType={file.mimeType}
+                        className="size-4"
+                      />
                       {(() => {
                         const isPdfFile = isViewableDocument(
                           file.filename,
@@ -221,7 +211,9 @@ export const WorkspacePanel = memo(function WorkspacePanel({
                           <a
                             href={file.url}
                             target={isPdfFile || isImage ? undefined : "_blank"}
-                            rel={isPdfFile || isImage ? undefined : "noreferrer"}
+                            rel={
+                              isPdfFile || isImage ? undefined : "noreferrer"
+                            }
                             onClick={e => {
                               if (isImage) {
                                 e.preventDefault();

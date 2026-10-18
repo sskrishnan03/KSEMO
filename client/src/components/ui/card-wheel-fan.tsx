@@ -111,7 +111,11 @@ function CardLinearSpreadImpl({
     rest.length === 0
       ? lastIndexed
       : [...rest.slice(0, center), newest, ...rest.slice(center)];
-  const hiddenCount = Math.max(0, total - display.length);
+  // When collapsed, only the front card is visible. While the fan is spread,
+  // all five slots are visible, so the badge should count only images beyond
+  // those currently shown.
+  const visibleCount = isHovered ? display.length : Math.min(total, 1);
+  const hiddenCount = Math.max(0, total - visibleCount);
 
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
   const pageStart = page * pageSize;

@@ -8,10 +8,9 @@
  */
 import type { ComponentType } from "react";
 import { createElement } from "react";
-import { Table2 } from "lucide-react";
+import { Table2, FileText } from "lucide-react";
 import { DocumentText } from "reicon-react/icons/DocumentText";
 import { FilePdf } from "reicon-react/icons/FilePdf";
-import { DocText } from "reicon-react/icons/DocText";
 import type {
   CapabilityMode,
   CreateMode,
@@ -49,6 +48,8 @@ export type CapabilityOption = {
   icon: ComponentType<{ className?: string }>;
   /** Accent classes for the icon tile. */
   iconColor: string;
+  /** Explicit color also works with SVG icons that do not inherit currentColor. */
+  iconHex: string;
   iconBg: string;
   /** Composer placeholder shown when this mode is active. */
   placeholder: string;
@@ -64,6 +65,7 @@ const CREATE: CapabilityOption[] = [
     description: "Create a formatted PDF document.",
     icon: FilePdf,
     iconColor: "text-red-500",
+    iconHex: "#ef4444",
     iconBg: "bg-red-500/15",
     placeholder: "Describe the PDF you want to create...",
     chipLabel: "Create PDF",
@@ -75,6 +77,7 @@ const CREATE: CapabilityOption[] = [
     description: "Create a Word document.",
     icon: DocumentText,
     iconColor: "text-blue-600",
+    iconHex: "#2563eb",
     iconBg: "bg-blue-500/15",
     placeholder: "Describe the Word document you want to create...",
     chipLabel: "Word Doc",
@@ -86,6 +89,7 @@ const CREATE: CapabilityOption[] = [
     description: "Create a structured Excel spreadsheet.",
     icon: Table2,
     iconColor: "text-emerald-600",
+    iconHex: "#059669",
     iconBg: "bg-emerald-500/15",
     placeholder: "Describe the spreadsheet you want to create...",
     chipLabel: "Create Excel",
@@ -97,6 +101,7 @@ const CREATE: CapabilityOption[] = [
     description: "Create a professional PowerPoint presentation.",
     icon: PowerPointClockIcon,
     iconColor: "text-orange-500",
+    iconHex: "#f97316",
     iconBg: "bg-orange-500/15",
     placeholder: "Describe the presentation you want to create...",
     chipLabel: "Create PowerPoint",
@@ -106,8 +111,9 @@ const CREATE: CapabilityOption[] = [
     kind: "create",
     title: "Text",
     description: "Create a plain text file.",
-    icon: DocText,
+    icon: FileText,
     iconColor: "text-sky-500",
+    iconHex: "#0ea5e9",
     iconBg: "bg-sky-500/15",
     placeholder: "Describe the text file you want to create...",
     chipLabel: "Text",
