@@ -5793,6 +5793,7 @@ export default function Home({
                               (activeMode !== "chat" ||
                                 Boolean(fileGeneration)))
                           )}
+                          hideActions={composerTag === "bot"}
                           onEdit={guestMode ? undefined : stableEditMessage}
                           isEditing={editingMessage?.id === message.id}
                           editValue={editValue}

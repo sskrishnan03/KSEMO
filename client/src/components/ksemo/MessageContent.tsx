@@ -333,6 +333,7 @@ export const MessageContent = memo(function MessageContent({
   isCurrentGeneration = false,
   isFileGenerating = false,
   hideTypingIndicator = false,
+  hideActions = false,
   onEdit,
   onRegenerate,
   onRetry,
@@ -364,6 +365,7 @@ export const MessageContent = memo(function MessageContent({
   isCurrentGeneration?: boolean;
   isFileGenerating?: boolean;
   hideTypingIndicator?: boolean;
+  hideActions?: boolean;
   onEdit?: (message: KsemoMessage) => void;
   onRegenerate?: (message: KsemoMessage) => void;
   onRetry?: (message: KsemoMessage) => void;
@@ -972,7 +974,7 @@ export const MessageContent = memo(function MessageContent({
             </div>
           ) : null}
 
-          {isUser && message.content && (
+          {!hideActions && isUser && message.content && (
             <div
               ref={mobileUserActionsRef}
               className={cn(
@@ -1055,7 +1057,8 @@ export const MessageContent = memo(function MessageContent({
               )}
             </div>
           )}
-          {!isUser &&
+          {!hideActions &&
+            !isUser &&
             !isGeneratingFile &&
             message.status !== "streaming" &&
             (message.content ||

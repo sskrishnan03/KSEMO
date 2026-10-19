@@ -903,13 +903,13 @@ html.ksemo-reduce-motion .ksemo-file-status-sweep {
   animation: ksemo-orb-roll 3s linear infinite;
 }
 
-/* Smooth central blue bloom, fading into the charcoal chat workspace. */
+/* Soft pearl bloom matched to KSEMO's charcoal and graphite palette. */
 .ksemo-voice-corner-glow {
   background: radial-gradient(
     ellipse 68% 78% at 50% 50%,
-    rgb(41 82 196 / 48%) 0%,
-    rgb(31 61 145 / 36%) 42%,
-    rgb(24 39 86 / 18%) 70%,
+    rgb(201 211 232 / 24%) 0%,
+    rgb(155 169 199 / 18%) 42%,
+    rgb(104 116 143 / 9%) 72%,
     transparent 100%
   );
 }
