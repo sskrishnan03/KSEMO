@@ -1072,7 +1072,7 @@ export const ChatComposer = memo(function ChatComposer({
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="ksemo-composer-attach size-10 shrink-0 rounded-full bg-transparent text-foreground transition-colors hover:bg-accent hover:text-foreground data-[state=open]:bg-accent data-[state=open]:text-foreground aria-expanded:bg-accent aria-expanded:text-foreground"
+                            className="ksemo-composer-attach size-10 shrink-0 rounded-full bg-transparent text-muted-foreground transition-colors hover:bg-accent hover:text-muted-foreground data-[state=open]:bg-accent data-[state=open]:text-muted-foreground aria-expanded:bg-accent aria-expanded:text-muted-foreground"
                             aria-label={
                               toolsOpen && !libraryOpen
                                 ? "Close attachment options"
@@ -1109,7 +1109,7 @@ export const ChatComposer = memo(function ChatComposer({
                       <DropdownMenuItem
                         onClick={() => fileInputRef.current?.click()}
                       >
-                        <Paperclip className="mr-2 size-4 -rotate-45 -scale-x-100 text-foreground" />{" "}
+                        <Paperclip className="mr-2 size-4 -rotate-45 -scale-x-100 text-muted-foreground" />{" "}
                         Upload files
                       </DropdownMenuItem>
                       {isMobile
@@ -1120,7 +1120,7 @@ export const ChatComposer = memo(function ChatComposer({
                                 cameraInputRef.current?.click();
                               }}
                             >
-                              <Camera className="mr-2 size-[17px] text-foreground" />
+                              <Camera className="mr-2 size-[17px] text-muted-foreground" />
                               Camera
                             </DropdownMenuItem>
                           )
@@ -1131,7 +1131,7 @@ export const ChatComposer = memo(function ChatComposer({
                                 onTakeScreenshot();
                               }}
                             >
-                              <Monitor className="mr-2 size-4 text-foreground" />
+                              <Monitor className="mr-2 size-4 text-muted-foreground" />
                               Take Screenshot
                             </DropdownMenuItem>
                           )}
@@ -1143,7 +1143,7 @@ export const ChatComposer = memo(function ChatComposer({
                       >
                         <Library
                           aria-hidden="true"
-                          className="mr-2 size-[17px] text-foreground"
+                          className="mr-2 size-[17px] text-muted-foreground"
                         />
                         Browse Library
                       </DropdownMenuItem>
@@ -1152,7 +1152,7 @@ export const ChatComposer = memo(function ChatComposer({
                           <DropdownMenuSubTrigger>
                             <FilePlus
                               size={17}
-                              className="mr-2 text-foreground"
+                              className="mr-2 text-muted-foreground"
                             />
                             Create Files
                           </DropdownMenuSubTrigger>
@@ -1186,7 +1186,7 @@ export const ChatComposer = memo(function ChatComposer({
                                 >
                                   <Icon
                                     className={cn(
-                                      "mr-2 size-[18px] shrink-0",
+                                      "mr-2 size-[18px] shrink-0 text-muted-foreground",
                                       option.mode === "xlsx" && "stroke-[1.5]"
                                     )}
                                   />

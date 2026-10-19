@@ -5899,7 +5899,7 @@ export default function Home({
                                     key={`${target.conversationId}-${targetIndex}`}
                                     type="button"
                                     onClick={() => selectConversation(target.conversationId)}
-                                    className="group inline-flex w-full min-w-0 items-start gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-accent/70 focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:w-auto md:max-w-48 md:items-center"
+                                className="group inline-flex w-full min-w-0 items-start gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-accent/70 focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:w-auto md:max-w-48 md:items-center"
                                     aria-label={`Open branch ${targetIndex + 1}: ${target.title.replace(/^Branch:\s*/, "")}`}
                                     onMouseEnter={event => {
                                       const viewport = event.currentTarget.querySelector<HTMLElement>(
@@ -5950,7 +5950,7 @@ export default function Home({
                                     <span
                                       data-branch-title
                                       className={cn(
-                                        "branch-title-window block min-w-0 flex-1 overflow-hidden font-medium leading-snug text-foreground md:flex-none",
+                                        "branch-title-window block min-w-0 flex-1 overflow-hidden font-medium leading-snug text-foreground md:flex-[0_1_auto] md:leading-normal",
                                         scrollingBranchTitle?.id ===
                                           `${message.id}:${target.conversationId}` &&
                                           "branch-title-window-active"

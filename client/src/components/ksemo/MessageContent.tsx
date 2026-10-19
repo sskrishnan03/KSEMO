@@ -523,7 +523,7 @@ export const MessageContent = memo(function MessageContent({
   if (message.role === "system" || message.role === "tool") return null;
 
   const actionClass =
-    "size-8 rounded-md text-foreground transition-colors hover:bg-accent hover:text-foreground";
+    "size-8 rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-muted-foreground";
   const action = (
     label: string,
     icon: React.ReactNode,
@@ -567,22 +567,6 @@ export const MessageContent = memo(function MessageContent({
   );
   const hasOverflowActions = canReadAloud || canRegenerate || canBranch;
   const actionsMenuLabel = "More message actions";
-
-  const renderStoppedNotice = () => (
-    <div
-      data-testid="stopped-response-notice"
-      className={cn(
-        "flex items-center gap-2 py-0.5 text-center text-sm text-muted-foreground select-none",
-        cleanContent ? "mt-3 mb-1.5" : "my-1.5"
-      )}
-    >
-      <div className="h-px flex-1 bg-border/70" />
-      <span className="shrink-0">
-        Response generation was interrupted
-      </span>
-      <div className="h-px flex-1 bg-border/70" />
-    </div>
-  );
 
   return (
     <>
@@ -807,20 +791,11 @@ export const MessageContent = memo(function MessageContent({
                       )}
                     </>
                   )}
-                  {isCancelled && renderStoppedNotice()}
                 </>
               ) : message.botAction ? (
-                <>
-                  <BotActionStatus action={message.botAction} />
-                  {isCancelled && renderStoppedNotice()}
-                </>
+                <BotActionStatus action={message.botAction} />
               ) : fileCreationNode ? (
-                <>
-                  <div className="my-2">{fileCreationNode}</div>
-                  {isCancelled && renderStoppedNotice()}
-                </>
-              ) : isCancelled ? (
-                renderStoppedNotice()
+                <div className="my-2">{fileCreationNode}</div>
               ) : (
                 <>
                   {message.status === "streaming" &&
@@ -842,6 +817,14 @@ export const MessageContent = memo(function MessageContent({
                       </div>
                     )}
                 </>
+              )}
+              {isCancelled && !cleanContent && (
+                <p
+                  data-testid="stopped-request-notice"
+                  className="mb-0 text-[15px] leading-6 text-muted-foreground"
+                >
+                  Request was interrupted by the user.
+                </p>
               )}
               {!isUser && (message.memoryUses?.length ?? 0) > 0 && (
                 <details className="mt-2 max-w-xl rounded-lg border border-border/70 px-3 py-2 text-xs text-muted-foreground">
@@ -1190,7 +1173,7 @@ export const MessageContent = memo(function MessageContent({
                               }}
                               aria-label="Try again"
                             >
-                              <RotateCcw className="size-4 text-foreground" />
+                              <RotateCcw className="size-4 text-muted-foreground" />
                               <span>Try again</span>
                             </DropdownMenuItem>
                           )}
@@ -1210,9 +1193,9 @@ export const MessageContent = memo(function MessageContent({
                               }
                             >
                               {isSpeaking ? (
-                                <Square className="size-4 fill-current text-foreground" />
+                                <Square className="size-4 fill-current text-muted-foreground" />
                               ) : (
-                                <Volume2 className="size-4 text-foreground" />
+                                <Volume2 className="size-4 text-muted-foreground" />
                               )}
                               <span>
                                 {isSpeaking ? "Stop reading" : "Read aloud"}
@@ -1241,7 +1224,7 @@ export const MessageContent = memo(function MessageContent({
                                   aria-hidden="true"
                                 />
                               ) : (
-                                <BranchSplitIcon className="size-4 text-foreground transition-colors group-hover/branch:text-foreground" />
+                                <BranchSplitIcon className="size-4 text-muted-foreground transition-colors group-hover/branch:text-muted-foreground" />
                               )}
                               <span>Branch in new chat</span>
                             </DropdownMenuItem>
@@ -1250,6 +1233,14 @@ export const MessageContent = memo(function MessageContent({
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
+                )}
+                {isCancelled && (
+                  <span
+                    data-testid="stopped-response-notice"
+                    className="ml-1 shrink-0 text-sm text-muted-foreground"
+                  >
+                    Interrupted
+                  </span>
                 )}
               </div>
             )}

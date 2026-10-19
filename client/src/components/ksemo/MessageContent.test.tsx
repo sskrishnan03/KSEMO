@@ -163,7 +163,7 @@ describe("MessageContent speech controls", () => {
     expect(markup).not.toContain(OVERFLOW_LABEL);
   });
 
-  it("renders a centered interrupted divider line and action bar when stopped with partial content", () => {
+  it("shows a compact interrupted label beside the action bar when stopped with partial content", () => {
     const markup = renderWithTooltip(
       createElement(MessageContent, {
         message: {
@@ -180,14 +180,15 @@ describe("MessageContent speech controls", () => {
         onDelete: () => undefined,
       })
     );
-    expect(markup).toContain("Response generation was interrupted");
+    expect(markup).toContain(">Interrupted</span>");
+    expect(markup).not.toContain("Response generation was interrupted");
     expect(markup).toContain('data-testid="stopped-response-notice"');
     expect(markup).toContain(OVERFLOW_LABEL);
     expect(markup).toContain('aria-label="Copy response"');
     expect(markup).not.toContain('aria-label="Share response"');
   });
 
-  it("renders centered interrupted divider line when stopped with no content", () => {
+  it("shows a compact interrupted label in the action row when stopped with no content", () => {
     const markup = renderWithTooltip(
       createElement(MessageContent, {
         message: {
@@ -202,7 +203,9 @@ describe("MessageContent speech controls", () => {
         onRegenerate: () => undefined,
       })
     );
-    expect(markup).toContain("Response generation was interrupted");
+    expect(markup).toContain("Request was interrupted by the user.");
+    expect(markup).toContain(">Interrupted</span>");
+    expect(markup).not.toContain("Response generation was interrupted");
     expect(markup).toContain('data-testid="stopped-response-notice"');
     expect(markup).toContain(OVERFLOW_LABEL);
     expect(markup).not.toContain('aria-label="Copy response"');
