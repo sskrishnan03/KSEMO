@@ -572,12 +572,12 @@ export const MessageContent = memo(function MessageContent({
     <div
       data-testid="stopped-response-notice"
       className={cn(
-        "flex items-center gap-3 py-2.5 select-none",
+        "flex items-center gap-2 py-0.5 text-center text-sm text-muted-foreground select-none",
         cleanContent ? "mt-3 mb-1.5" : "my-1.5"
       )}
     >
       <div className="h-px flex-1 bg-border/70" />
-      <span className="shrink-0 text-sm font-medium text-muted-foreground/90">
+      <span className="shrink-0">
         Response generation was interrupted
       </span>
       <div className="h-px flex-1 bg-border/70" />

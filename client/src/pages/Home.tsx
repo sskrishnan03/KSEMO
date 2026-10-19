@@ -5892,14 +5892,14 @@ export default function Home({
                                 id={`branch-list-${message.id}`}
                                 role="group"
                                 aria-label="Choose a branched chat"
-                                className="mx-auto mt-2 flex w-fit max-w-full animate-in fade-in slide-in-from-top-1 items-center overflow-x-auto rounded-xl border border-border/70 bg-muted/25 p-1 duration-150"
+                                className="mx-auto mt-2 flex max-h-44 w-full max-w-full animate-in fade-in slide-in-from-top-1 flex-col items-stretch overflow-x-hidden overflow-y-auto overscroll-contain rounded-xl border border-border/70 bg-muted/25 p-1 duration-150 md:max-h-none md:w-fit md:flex-row md:items-center md:overflow-x-auto md:overflow-y-hidden"
                               >
                                 {message.branchTargets!.map((target, targetIndex) => (
                                   <button
                                     key={`${target.conversationId}-${targetIndex}`}
                                     type="button"
                                     onClick={() => selectConversation(target.conversationId)}
-                                    className="group inline-flex min-w-0 max-w-48 items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-accent/70 focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                    className="group inline-flex w-full min-w-0 items-start gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-accent/70 focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:w-auto md:max-w-48 md:items-center"
                                     aria-label={`Open branch ${targetIndex + 1}: ${target.title.replace(/^Branch:\s*/, "")}`}
                                     onMouseEnter={event => {
                                       const viewport = event.currentTarget.querySelector<HTMLElement>(
@@ -5944,13 +5944,13 @@ export default function Home({
                                     }}
                                     onBlur={() => setScrollingBranchTitle(null)}
                                   >
-                                    <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-background/70 text-[10px] font-semibold text-muted-foreground transition-colors group-hover:text-blue-500">
+                                    <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-background/70 text-[10px] font-semibold text-muted-foreground transition-colors group-hover:text-blue-500 md:mt-0">
                                       {targetIndex + 1}
                                     </span>
                                     <span
                                       data-branch-title
                                       className={cn(
-                                        "branch-title-window block min-w-0 overflow-hidden font-medium text-foreground",
+                                        "branch-title-window block min-w-0 flex-1 overflow-hidden font-medium leading-snug text-foreground md:flex-none",
                                         scrollingBranchTitle?.id ===
                                           `${message.id}:${target.conversationId}` &&
                                           "branch-title-window-active"
@@ -5967,7 +5967,7 @@ export default function Home({
                                             : undefined
                                         }
                                         className={cn(
-                                          "inline-flex w-max whitespace-nowrap",
+                                          "block w-full whitespace-normal break-words md:inline-flex md:w-max md:whitespace-nowrap",
                                           scrollingBranchTitle?.id ===
                                             `${message.id}:${target.conversationId}` &&
                                             "animate-[ksemo-branch-title-marquee_5s_linear_infinite]"
@@ -5992,18 +5992,15 @@ export default function Home({
                               ))) && (
                             <div
                               role="note"
-                              className="!mt-0.5 flex items-center gap-2 py-0.5 text-center text-xs text-muted-foreground"
+                              className="!mt-0.5 flex items-center gap-2 py-0.5 text-center text-sm text-muted-foreground"
                             >
-                              <span className="h-px min-w-3 flex-1 bg-foreground/30" />
+                              <span className="h-px flex-1 bg-border/70" />
                               <ChatLine
-                                className="size-3.5 shrink-0"
+                                className="size-4 shrink-0"
                                 aria-hidden="true"
                               />
-                              <span>
-                                This is a shared KSEMO answer — continue the
-                                conversation below.
-                              </span>
-                              <span className="h-px min-w-3 flex-1 bg-foreground/30" />
+                              <span>This answer was shared by KSEMO</span>
+                              <span className="h-px flex-1 bg-border/70" />
                             </div>
                           )}
                       </Fragment>
