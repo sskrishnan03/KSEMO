@@ -5892,14 +5892,14 @@ export default function Home({
                                 id={`branch-list-${message.id}`}
                                 role="group"
                                 aria-label="Choose a branched chat"
-                                className="mx-auto mt-2 flex max-h-44 w-full max-w-full animate-in fade-in slide-in-from-top-1 flex-col items-stretch overflow-x-hidden overflow-y-auto overscroll-contain rounded-xl border border-border/70 bg-muted/25 p-1 duration-150 md:max-h-none md:w-fit md:flex-row md:items-center md:overflow-x-auto md:overflow-y-hidden"
+                                className="mx-auto mt-2 flex w-fit max-w-full animate-in fade-in slide-in-from-top-1 flex-row items-center overflow-x-auto overflow-y-hidden overscroll-x-contain rounded-xl border border-border/70 bg-muted/25 p-1 duration-150 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                               >
                                 {message.branchTargets!.map((target, targetIndex) => (
                                   <button
                                     key={`${target.conversationId}-${targetIndex}`}
                                     type="button"
                                     onClick={() => selectConversation(target.conversationId)}
-                                className="group inline-flex w-full min-w-0 items-start gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-accent/70 focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:w-auto md:max-w-48 md:items-center"
+                                    className="group inline-flex min-w-0 shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-accent/70 focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:max-w-48"
                                     aria-label={`Open branch ${targetIndex + 1}: ${target.title.replace(/^Branch:\s*/, "")}`}
                                     onMouseEnter={event => {
                                       const viewport = event.currentTarget.querySelector<HTMLElement>(
@@ -5944,13 +5944,13 @@ export default function Home({
                                     }}
                                     onBlur={() => setScrollingBranchTitle(null)}
                                   >
-                                    <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-background/70 text-[10px] font-semibold text-muted-foreground transition-colors group-hover:text-blue-500 md:mt-0">
+                                    <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-background/70 text-[10px] font-semibold text-muted-foreground transition-colors group-hover:text-blue-500">
                                       {targetIndex + 1}
                                     </span>
                                     <span
                                       data-branch-title
                                       className={cn(
-                                        "branch-title-window block min-w-0 flex-1 overflow-hidden font-medium leading-snug text-foreground md:flex-[0_1_auto] md:leading-normal",
+                                        "branch-title-window block min-w-0 overflow-hidden font-medium text-foreground",
                                         scrollingBranchTitle?.id ===
                                           `${message.id}:${target.conversationId}` &&
                                           "branch-title-window-active"
@@ -5967,7 +5967,7 @@ export default function Home({
                                             : undefined
                                         }
                                         className={cn(
-                                          "block w-full whitespace-normal break-words md:inline-flex md:w-max md:whitespace-nowrap",
+                                          "inline-flex w-max whitespace-nowrap",
                                           scrollingBranchTitle?.id ===
                                             `${message.id}:${target.conversationId}` &&
                                             "animate-[ksemo-branch-title-marquee_5s_linear_infinite]"
