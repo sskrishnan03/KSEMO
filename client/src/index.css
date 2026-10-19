@@ -612,6 +612,31 @@ html.ksemo-reduce-motion .loader-xs {
     transform: translateY(0) scale(1);
   }
 }
+
+@keyframes ksemo-branch-title-marquee {
+  0% {
+    transform: translateX(0);
+  }
+  80%,
+  100% {
+    transform: translateX(var(--branch-title-offset, 0px));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-\[ksemo-branch-title-marquee_5s_linear_infinite\] {
+    animation: none;
+  }
+}
+.branch-title-window-active {
+  mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    #000 10px,
+    #000 calc(100% - 10px),
+    transparent 100%
+  );
+}
 @media (prefers-reduced-motion: reduce) {
   .animate-\[ksemo-card-enter_300ms_ease-out\] {
     animation: none;

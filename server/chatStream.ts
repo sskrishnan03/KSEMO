@@ -357,6 +357,7 @@ export function registerChatStream(app: Express) {
             content: sharedAnswerContext,
             model: null,
             status: "completed",
+            metadata: { sharedAnswerAnchor: true },
             createdAt: sharedAnswerCreatedAt,
             updatedAt: sharedAnswerCreatedAt,
           });

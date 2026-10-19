@@ -120,6 +120,8 @@ export type InsertConversation = Partial<
 };
 
 export type MessageMetadata = {
+  /** Marks the original answer message carried into a continued shared-answer chat. */
+  sharedAnswerAnchor?: boolean;
   // Optional presentation outline state persisted on assistant messages
   // during the outline-before-PPT flow. See shared/presentationOutline.ts.
   [key: string]: unknown;

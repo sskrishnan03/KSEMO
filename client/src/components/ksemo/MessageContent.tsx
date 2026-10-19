@@ -79,6 +79,7 @@ type KsemoMessage = {
     title: string;
     targetMessageId?: string;
   }>;
+  sharedAnswerAnchor?: boolean;
   fileGeneration?: {
     stage: string;
     format: string;

@@ -60,6 +60,7 @@ import {
 } from "@/components/ui/tooltip";
 import React, {
   Fragment,
+  type CSSProperties,
   useCallback,
   useEffect,
   useMemo,
@@ -515,6 +516,7 @@ export default function Home({
             role: "assistant",
             content: sharedAnswer,
             status: "completed",
+            sharedAnswerAnchor: true,
           },
         ]
       : []
@@ -567,6 +569,12 @@ export default function Home({
     return () => cancelAnimationFrame(frame);
   }, [sidebarOpen, isMobile]);
   const [guestPromptOpen, setGuestPromptOpen] = useState(false);
+  const [expandedBranchMessageId, setExpandedBranchMessageId] =
+    useState<string | null>(null);
+  const [scrollingBranchTitle, setScrollingBranchTitle] = useState<{
+    id: string;
+    distance: number;
+  } | null>(null);
   const [composerValue, setComposerValue] = useState("");
   // Voice chat is entered explicitly from the empty-composer waveform button;
   // opening or refreshing the page always starts in ordinary chat.
@@ -1624,7 +1632,7 @@ export default function Home({
       isNearBottomRef.current = true;
       setShowJumpToLatest(false);
     }
-    const serverMessages = activeQuery.data.messages.map(message => {
+    const serverMessages = activeQuery.data.messages.map((message, messageIndex) => {
       const firstAttachment = message.attachments?.[0] as any;
       const rawExt = firstAttachment?.filename
         ? (firstAttachment.filename.split(".").pop() ?? "").toLowerCase()
@@ -1670,6 +1678,7 @@ export default function Home({
               childChatId?: string;
               childTitle?: string;
             }>;
+            sharedAnswerAnchor?: boolean;
           }
         | undefined;
       const restoredOutline = isPptOutlinePlan(metadata?.pptOutline?.outline)
@@ -1772,6 +1781,12 @@ export default function Home({
               )
             : []),
         ],
+        // Older shared-answer continuations predate the persisted metadata
+        // marker. They start with the shared answer as their first message, so
+        // retain the notice when those chats are reopened as regular chats.
+        sharedAnswerAnchor:
+          metadata?.sharedAnswerAnchor === true ||
+          (messageIndex === 0 && message.role === "assistant"),
         attachments: message.attachments,
         memoryUses: metadata?.memoryUses,
         // Rebuild completed fileGeneration with durable sources and metrics restored from attachment metadata
@@ -1966,13 +1981,34 @@ export default function Home({
     if (isEditSavingPreview) return editSavingPreviewMessages;
     if (isEditRegeneratedPreview) return editRegeneratedPreviewMessages;
     if (isMessagePreview) return messagePreviewMessages;
-    return chatMessages;
+    const currentTitleById = new Map(
+      (conversationQuery.data ?? []).map(conversation => [
+        conversation.id,
+        conversation.title,
+      ])
+    );
+    return chatMessages.map(message => ({
+      ...message,
+      branchOrigin: message.branchOrigin
+        ? {
+            ...message.branchOrigin,
+            title:
+              currentTitleById.get(message.branchOrigin.conversationId) ??
+              message.branchOrigin.title,
+          }
+        : undefined,
+      branchTargets: message.branchTargets?.map(target => ({
+        ...target,
+        title: currentTitleById.get(target.conversationId) ?? target.title,
+      })),
+    }));
   }, [
     isAttachedMessagePreview,
     isEditSavingPreview,
     isEditRegeneratedPreview,
     isMessagePreview,
     chatMessages,
+    conversationQuery.data,
   ]);
 
   const chatFiles = useMemo<ChatFile[]>(() => {
@@ -4226,6 +4262,8 @@ export default function Home({
   }
 
   function selectConversation(id: string) {
+    setExpandedBranchMessageId(null);
+    setScrollingBranchTitle(null);
     if (
       id !== activeConversationId &&
       (composerTag === "bot" || botVoiceOpenRef.current)
@@ -5230,6 +5268,7 @@ export default function Home({
             {/* Chat action menu has no place in a temporary chat, so the
                 three-dots button is hidden there entirely. */}
             {!guestMode &&
+              composerTag !== "bot" &&
               (((Boolean(activeConversationId) ||
                 visibleMessages.length > 0 ||
                 Boolean(shareTarget)) &&
@@ -5785,11 +5824,13 @@ export default function Home({
                                 },
                               ]
                             : []),
-                          ...(message.branchTargets ?? []).map(target => ({
-                            conversationId: target.conversationId,
-                            title: target.title.replace(/^Branch:\s*/, ""),
-                            direction: "To Branch",
-                          })),
+                          ...((message.branchTargets?.length ?? 0) > 1
+                            ? []
+                            : (message.branchTargets ?? []).map(target => ({
+                                conversationId: target.conversationId,
+                                title: target.title.replace(/^Branch:\s*/, ""),
+                                direction: "To Branch",
+                              }))),
                         ].map((link, index) => (
                           <div
                             key={`${link.conversationId}-${index}`}
@@ -5813,18 +5854,135 @@ export default function Home({
                             <span className="h-px min-w-3 flex-1 bg-foreground/30" />
                           </div>
                         ))}
-                        {isSharedAnswerPage &&
-                          sharedAnswerContinued &&
-                          messageIndex ===
-                            visibleMessages.findIndex(
-                              item =>
-                                item.role === "assistant" &&
-                                item.content === sharedAnswer
-                            ) && (
+                        {(message.branchTargets?.length ?? 0) > 1 && (
+                          <div className="!mt-0.5">
+                            <div className="flex min-w-0 items-center gap-1 py-0 text-sm">
+                              <span className="h-px min-w-3 flex-1 bg-foreground/30" />
+                              <BranchSplitIcon className="size-4 shrink-0 text-foreground" />
+                              <span className="shrink-0 text-foreground">Branched to</span>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setExpandedBranchMessageId(current =>
+                                    current === message.id ? null : message.id
+                                  )
+                                }
+                                className="shrink-0 font-medium text-blue-600 underline decoration-dotted decoration-blue-500 underline-offset-4 transition-colors hover:text-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:text-blue-400 dark:decoration-blue-400 dark:hover:text-blue-300"
+                                aria-expanded={expandedBranchMessageId === message.id}
+                                aria-controls={`branch-list-${message.id}`}
+                              >
+                                {message.branchTargets!.length} chats
+                              </button>
+                              <span className="h-px min-w-3 flex-1 bg-foreground/30" />
+                            </div>
+                            {expandedBranchMessageId === message.id && (
+                              <div
+                                id={`branch-list-${message.id}`}
+                                role="group"
+                                aria-label="Choose a branched chat"
+                                className="mx-auto mt-2 flex w-fit max-w-full animate-in fade-in slide-in-from-top-1 items-center overflow-x-auto rounded-xl border border-border/70 bg-muted/25 p-1 duration-150"
+                              >
+                                {message.branchTargets!.map((target, targetIndex) => (
+                                  <button
+                                    key={`${target.conversationId}-${targetIndex}`}
+                                    type="button"
+                                    onClick={() => selectConversation(target.conversationId)}
+                                    className="group inline-flex min-w-0 max-w-48 items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-accent/70 focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                    aria-label={`Open branch ${targetIndex + 1}: ${target.title.replace(/^Branch:\s*/, "")}`}
+                                    onMouseEnter={event => {
+                                      const viewport = event.currentTarget.querySelector<HTMLElement>(
+                                        "[data-branch-title]"
+                                      );
+                                      const title = viewport?.querySelector<HTMLElement>(
+                                        "[data-branch-title-text]"
+                                      );
+                                      const distance =
+                                        title && viewport
+                                          ? title.scrollWidth - viewport.clientWidth
+                                          : 0;
+                                      setScrollingBranchTitle(
+                                        distance > 1
+                                          ? {
+                                              id: `${message.id}:${target.conversationId}`,
+                                              distance,
+                                            }
+                                          : null
+                                      );
+                                    }}
+                                    onMouseLeave={() => setScrollingBranchTitle(null)}
+                                    onFocus={event => {
+                                      const viewport = event.currentTarget.querySelector<HTMLElement>(
+                                        "[data-branch-title]"
+                                      );
+                                      const title = viewport?.querySelector<HTMLElement>(
+                                        "[data-branch-title-text]"
+                                      );
+                                      const distance =
+                                        title && viewport
+                                          ? title.scrollWidth - viewport.clientWidth
+                                          : 0;
+                                      setScrollingBranchTitle(
+                                        distance > 1
+                                          ? {
+                                              id: `${message.id}:${target.conversationId}`,
+                                              distance,
+                                            }
+                                          : null
+                                      );
+                                    }}
+                                    onBlur={() => setScrollingBranchTitle(null)}
+                                  >
+                                    <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-background/70 text-[10px] font-semibold text-muted-foreground transition-colors group-hover:text-blue-500">
+                                      {targetIndex + 1}
+                                    </span>
+                                    <span
+                                      data-branch-title
+                                      className={cn(
+                                        "branch-title-window block min-w-0 overflow-hidden font-medium text-foreground",
+                                        scrollingBranchTitle?.id ===
+                                          `${message.id}:${target.conversationId}` &&
+                                          "branch-title-window-active"
+                                      )}
+                                    >
+                                      <span
+                                        data-branch-title-text
+                                        style={
+                                          scrollingBranchTitle?.id ===
+                                          `${message.id}:${target.conversationId}`
+                                            ? ({
+                                                "--branch-title-offset": `-${scrollingBranchTitle.distance}px`,
+                                              } as CSSProperties)
+                                            : undefined
+                                        }
+                                        className={cn(
+                                          "inline-flex w-max whitespace-nowrap",
+                                          scrollingBranchTitle?.id ===
+                                            `${message.id}:${target.conversationId}` &&
+                                            "animate-[ksemo-branch-title-marquee_5s_linear_infinite]"
+                                        )}
+                                      >
+                                        <span>{target.title.replace(/^Branch:\s*/, "")}</span>
+                                      </span>
+                                    </span>
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        {(message.sharedAnswerAnchor ||
+                          (isSharedAnswerPage &&
+                            messageIndex ===
+                              visibleMessages.findIndex(
+                                item =>
+                                  item.role === "assistant" &&
+                                  item.content === sharedAnswer
+                              ))) && (
                             <div
                               role="note"
-                              className="mt-1 flex items-center justify-center gap-2 py-0.5 text-center text-xs text-muted-foreground"
+                              className="!mt-0.5 flex items-center gap-2 py-0.5 text-center text-xs text-muted-foreground"
                             >
+                              <span className="h-px min-w-3 flex-1 bg-foreground/30" />
                               <ChatLine
                                 className="size-3.5 shrink-0"
                                 aria-hidden="true"
@@ -5833,6 +5991,7 @@ export default function Home({
                                 This is a shared KSEMO answer — continue the
                                 conversation below.
                               </span>
+                              <span className="h-px min-w-3 flex-1 bg-foreground/30" />
                             </div>
                           )}
                       </Fragment>
