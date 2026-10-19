@@ -903,6 +903,17 @@ html.ksemo-reduce-motion .ksemo-file-status-sweep {
   animation: ksemo-orb-roll 3s linear infinite;
 }
 
+/* Smooth central blue bloom, fading into the charcoal chat workspace. */
+.ksemo-voice-corner-glow {
+  background: radial-gradient(
+    ellipse 68% 78% at 50% 50%,
+    rgb(41 82 196 / 48%) 0%,
+    rgb(31 61 145 / 36%) 42%,
+    rgb(24 39 86 / 18%) 70%,
+    transparent 100%
+  );
+}
+
 /* A calm six-bar waveform that travels left to right on the idle voice-chat
    button, so the voice action reads as live audio instead of a static icon. */
 @keyframes ksemo-voice-ready-wave {

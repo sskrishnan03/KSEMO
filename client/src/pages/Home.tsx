@@ -4675,6 +4675,7 @@ export default function Home({
       window.localStorage?.setItem("ksemo:composer-tag", "chat");
     } catch {}
     stopGeneration(true);
+    resetStreamingTts();
     botVoice.cancel();
   });
   const stableOnTagChange = usePersistFn((tag: ComposerTag) => {
@@ -4692,6 +4693,7 @@ export default function Home({
       botVoiceOpenRef.current = false;
       if (wasBotVoiceOpen) {
         stopGeneration(true);
+        resetStreamingTts();
         botVoice.cancel();
       }
     }
@@ -5065,6 +5067,12 @@ export default function Home({
       />
 
       <main className="relative flex min-w-0 flex-1 flex-col lg:flex-row">
+        {composerTag === "bot" && !guestMode && !isTemporaryChat && (
+          <div
+            aria-hidden="true"
+            className="ksemo-voice-corner-glow pointer-events-none absolute inset-0 z-0"
+          />
+        )}
         {activePrimaryWorkspace === "library" ? (
           <LibraryWorkspace
             onClose={stableCloseWorkspace}
@@ -5158,26 +5166,29 @@ export default function Home({
               </div>
             )}
 
-            {/* Shared chat navbar */}
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-x-0 top-0 z-[15] h-12 bg-background backdrop-blur-md"
-            />
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-x-0 top-12 z-[15] h-3 bg-gradient-to-b from-background to-transparent"
-            />
-
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setSidebarOpen(true)}
-              className="absolute left-2 top-2 z-20 size-10 rounded-lg border-0 bg-transparent p-0 text-foreground/90 shadow-none transition-colors hover:bg-accent/80 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring active:bg-accent lg:hidden"
-              aria-label="Open conversations"
-              data-testid="mobile-sidebar-toggle"
-            >
-              <Sidebar2 size={20} strokeWidth={2} className="size-5" />
-            </Button>
+            {composerTag !== "bot" && (
+              <>
+                {/* Shared chat navbar */}
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-x-0 top-0 z-[15] h-12 bg-background backdrop-blur-md"
+                />
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-x-0 top-12 z-[15] h-3 bg-gradient-to-b from-background to-transparent"
+                />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setSidebarOpen(true)}
+                  className="absolute left-2 top-2 z-20 size-10 rounded-lg border-0 bg-transparent p-0 text-foreground/90 shadow-none transition-colors hover:bg-accent/80 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring active:bg-accent lg:hidden"
+                  aria-label="Open conversations"
+                  data-testid="mobile-sidebar-toggle"
+                >
+                  <Sidebar2 size={20} strokeWidth={2} className="size-5" />
+                </Button>
+              </>
+            )}
 
             {!guestMode &&
               composerTag !== "bot" &&
