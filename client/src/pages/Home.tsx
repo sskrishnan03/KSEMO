@@ -1030,7 +1030,58 @@ export default function Home({
     return () => setGuestModeActive(false);
   }, [guestMode]);
   const renameMutation = trpc.conversation.rename.useMutation({
-    onSuccess: () => utils.conversation.list.invalidate(),
+    onMutate: async ({ id, title }) => {
+      const input = { scope: "active" as const };
+      const activeInput = { id };
+      await utils.conversation.list.cancel(input);
+      await utils.conversation.get.cancel(activeInput);
+      const previous = utils.conversation.list.getData(input);
+      const previousActive = utils.conversation.get.getData(activeInput);
+      const renamedTitle = (currentTitle: string) =>
+        currentTitle.startsWith("Branch: ")
+          ? `Branch: ${title.replace(/^Branch:\s*/, "").slice(0, 112)}`
+          : title;
+      utils.conversation.list.setData(input, current =>
+        current?.map(conversation =>
+          conversation.id === id
+            ? {
+                ...conversation,
+                title: renamedTitle(conversation.title),
+              }
+            : conversation
+        )
+      );
+      utils.conversation.get.setData(activeInput, current =>
+        current
+          ? {
+              ...current,
+              conversation: {
+                ...current.conversation,
+                title: renamedTitle(current.conversation.title),
+              },
+            }
+          : current
+      );
+      return { previous, previousActive, activeInput };
+    },
+    onError: (_error, _variables, context) => {
+      if (context?.previous) {
+        utils.conversation.list.setData(
+          { scope: "active" },
+          context.previous
+        );
+      }
+      if (context?.previousActive) {
+        utils.conversation.get.setData(
+          context.activeInput,
+          context.previousActive
+        );
+      }
+    },
+    onSettled: (_data, _error, variables) => {
+      void utils.conversation.list.invalidate();
+      void utils.conversation.get.invalidate({ id: variables.id });
+    },
   });
   const archiveMutation = trpc.conversation.setArchived.useMutation({
     onSuccess: () => {
