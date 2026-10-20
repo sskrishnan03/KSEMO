@@ -6469,10 +6469,12 @@ const EmptyState = memo(function EmptyState({
                 greeting
               )}
             </p>
-            <span
-              className="ksemo-greeting-sweep"
-              aria-hidden="true"
-            />
+            {!temporary && (
+              <span
+                className="ksemo-greeting-sweep"
+                aria-hidden="true"
+              />
+            )}
           </div>
         </div>
       </div>
