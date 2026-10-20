@@ -6127,7 +6127,7 @@ export default function Home({
                 <div className="h-full min-h-0" aria-hidden="true" />
               ) : (
                 <EmptyState
-                  greeting={greeting}
+                  greeting={isTemporaryChat ? "Temporary chat" : greeting}
                   animationKey={greetingAnimationKey}
                   temporary={isTemporaryChat}
                   composer={
@@ -6455,7 +6455,19 @@ const EmptyState = memo(function EmptyState({
             className="relative mx-auto w-fit"
           >
             <p className="ksemo-greeting-rise whitespace-nowrap text-[clamp(1rem,4.8vw,1.375rem)] font-bold tracking-[-0.04em] text-foreground sm:tracking-[-0.025em]">
-              {greeting}
+              {temporary ? (
+                <span className="inline-flex items-center justify-center gap-2">
+                  <ChatRoundCall
+                    weight="Outline"
+                    size={26}
+                    aria-hidden="true"
+                    className="text-white"
+                  />
+                  <span>Temporary chat</span>
+                </span>
+              ) : (
+                greeting
+              )}
             </p>
             <span
               className="ksemo-greeting-sweep"
