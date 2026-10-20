@@ -19,7 +19,8 @@ export function CreateFileModeIcon({
       className={cn(
         className,
         colored && option.iconColor,
-        mode === "xlsx" && "stroke-[1.5]"
+        mode === "xlsx" && "stroke-[1.5]",
+        mode === "txt" && "stroke-[1.5]"
       )}
       style={colored ? { color: option.iconHex } : undefined}
       aria-hidden="true"
