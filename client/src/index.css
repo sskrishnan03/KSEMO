@@ -765,11 +765,19 @@ html.ksemo-reduce-motion .loader-xs {
   animation: ksemo-copy-tick-draw 150ms 25ms ease-out forwards;
 }
 @keyframes ksemo-copy-box-in {
-  from { transform: scale(0.78); transform-origin: center; }
-  to { transform: scale(1); transform-origin: center; }
+  from {
+    transform: scale(0.78);
+    transform-origin: center;
+  }
+  to {
+    transform: scale(1);
+    transform-origin: center;
+  }
 }
 @keyframes ksemo-copy-tick-draw {
-  to { stroke-dashoffset: 0; }
+  to {
+    stroke-dashoffset: 0;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .ksemo-copy-success-circle,
@@ -816,8 +824,7 @@ html.ksemo-reduce-motion .loader-xs {
         calc(-50% + var(--spark-x)),
         calc(-50% + var(--spark-y))
       )
-      scale(0.9)
-      rotate(var(--spark-angle));
+      scale(0.9) rotate(var(--spark-angle));
   }
 }
 .ksemo-feedback-spark-particle {
@@ -826,13 +833,22 @@ html.ksemo-reduce-motion .loader-xs {
   left: 50%;
   background: currentColor;
   filter: drop-shadow(0 0 3px currentColor) drop-shadow(0 0 1px currentColor);
-  animation: ksemo-feedback-spark-particle 520ms
-    cubic-bezier(0.2, 0.75, 0.3, 1) both;
+  animation: ksemo-feedback-spark-particle 520ms cubic-bezier(0.2, 0.75, 0.3, 1)
+    both;
 }
 .ksemo-feedback-spark-star {
   width: 6px;
   height: 6px;
-  clip-path: polygon(50% 0, 64% 36%, 100% 50%, 64% 64%, 50% 100%, 36% 64%, 0 50%, 36% 36%);
+  clip-path: polygon(
+    50% 0,
+    64% 36%,
+    100% 50%,
+    64% 64%,
+    50% 100%,
+    36% 64%,
+    0 50%,
+    36% 36%
+  );
 }
 .ksemo-feedback-spark-ray {
   width: 2px;
@@ -951,10 +967,222 @@ html.ksemo-reduce-motion .ksemo-shimmer-text {
   animation: ksemo-file-status-sweep-ltr 2s linear infinite;
 }
 
+.ksemo-file-writing-line {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  opacity: 0;
+  transition: opacity 100ms ease-out;
+}
+
+.ksemo-file-grid-cell {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  opacity: 0;
+}
+
+@keyframes ksemo-file-write {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.ksemo-file-cast-shadow {
+  opacity: 0;
+  transform: translate(-2px, -2px);
+  transition:
+    opacity 220ms ease-out,
+    transform 320ms cubic-bezier(0.2, 0.75, 0.25, 1);
+}
+
+.ksemo-created-file-art:hover .ksemo-file-cast-shadow,
+.ksemo-created-file-art:focus-visible .ksemo-file-cast-shadow {
+  opacity: 0.48;
+  transform: translate(2px, 2px);
+}
+
+.ksemo-file-writing-line-2 {
+  animation-delay: 420ms;
+}
+
+.ksemo-created-file-art:hover .ksemo-file-writing-line,
+.ksemo-created-file-art:focus-visible .ksemo-file-writing-line,
+.ksemo-created-file-art:hover .ksemo-file-grid-cell,
+.ksemo-created-file-art:focus-visible .ksemo-file-grid-cell {
+  opacity: 1;
+  animation: ksemo-file-write 380ms ease-out forwards;
+}
+
+.ksemo-created-file-art:hover .ksemo-file-grid-cell-5,
+.ksemo-created-file-art:focus-visible .ksemo-file-grid-cell-5 {
+  animation-delay: 760ms;
+}
+
+.ksemo-created-file-art:hover .ksemo-file-grid-cell-2,
+.ksemo-created-file-art:focus-visible .ksemo-file-grid-cell-2,
+.ksemo-created-file-art:hover .ksemo-file-grid-cell-4,
+.ksemo-created-file-art:focus-visible .ksemo-file-grid-cell-4,
+.ksemo-created-file-art:hover .ksemo-file-grid-cell-6,
+.ksemo-created-file-art:focus-visible .ksemo-file-grid-cell-6,
+.ksemo-created-file-art:hover .ksemo-file-grid-cell-8,
+.ksemo-created-file-art:focus-visible .ksemo-file-grid-cell-8 {
+  animation-delay: 920ms;
+}
+
+.ksemo-created-file-art:hover .ksemo-file-grid-cell-1,
+.ksemo-created-file-art:focus-visible .ksemo-file-grid-cell-1,
+.ksemo-created-file-art:hover .ksemo-file-grid-cell-3,
+.ksemo-created-file-art:focus-visible .ksemo-file-grid-cell-3,
+.ksemo-created-file-art:hover .ksemo-file-grid-cell-7,
+.ksemo-created-file-art:focus-visible .ksemo-file-grid-cell-7,
+.ksemo-created-file-art:hover .ksemo-file-grid-cell-9,
+.ksemo-created-file-art:focus-visible .ksemo-file-grid-cell-9 {
+  animation-delay: 1080ms;
+}
+
+.ksemo-created-file-art:hover .ksemo-file-writing-line-2,
+.ksemo-created-file-art:focus-visible .ksemo-file-writing-line-2 {
+  animation-delay: 380ms;
+}
+
+.ksemo-created-file-art:hover .ksemo-file-writing-line-3,
+.ksemo-created-file-art:focus-visible .ksemo-file-writing-line-3 {
+  animation-delay: 760ms;
+}
+
+.ksemo-created-file-art:hover .ksemo-file-writing-line-4,
+.ksemo-created-file-art:focus-visible .ksemo-file-writing-line-4 {
+  animation-delay: 1140ms;
+}
+
+.ksemo-ppt-chart {
+  opacity: 0;
+  transition: opacity 240ms ease-out;
+}
+
+.ksemo-created-file-art:hover .ksemo-ppt-chart,
+.ksemo-created-file-art:focus-visible .ksemo-ppt-chart {
+  opacity: 1;
+  transition-delay: 760ms;
+}
+
+.ksemo-created-file-art:hover .ksemo-pptx-bar-1,
+.ksemo-created-file-art:focus-visible .ksemo-pptx-bar-1 {
+  animation-delay: 820ms;
+}
+
+.ksemo-created-file-art:hover .ksemo-pptx-bar-2,
+.ksemo-created-file-art:focus-visible .ksemo-pptx-bar-2 {
+  animation-delay: 1000ms;
+}
+
+.ksemo-created-file-art:hover .ksemo-pptx-bar-3,
+.ksemo-created-file-art:focus-visible .ksemo-pptx-bar-3 {
+  animation-delay: 1180ms;
+}
+
+.ksemo-file-ready-dot {
+  animation: ksemo-file-ready-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes ksemo-file-ready-pulse {
+  50% {
+    box-shadow: 0 0 0 4px rgb(34 197 94 / 12%);
+  }
+}
+
 html.ksemo-reduce-motion .ksemo-file-status-sweep {
   animation: none;
   -webkit-mask-image: none;
   mask-image: none;
+}
+
+html.ksemo-reduce-motion .ksemo-file-writing-line,
+html.ksemo-reduce-motion .ksemo-created-file-art *,
+html.ksemo-reduce-motion .ksemo-file-ready-dot {
+  transition: none;
+  animation: none;
+}
+
+html.ksemo-reduce-motion .ksemo-file-writing-line {
+  opacity: 0;
+}
+
+/* Touch devices have no reliable hover; play the file artwork on arrival. */
+@media (hover: none) and (pointer: coarse) {
+  .ksemo-created-file-art .ksemo-file-cast-shadow {
+    opacity: 0.48;
+    transform: translate(2px, 2px);
+  }
+
+  .ksemo-created-file-art .ksemo-file-writing-line,
+  .ksemo-created-file-art .ksemo-file-grid-cell {
+    opacity: 1;
+    animation: ksemo-file-write 380ms ease-out forwards;
+  }
+
+  .ksemo-created-file-art .ksemo-file-writing-line-2 {
+    animation-delay: 380ms;
+  }
+
+  .ksemo-created-file-art .ksemo-file-writing-line-3 {
+    animation-delay: 760ms;
+  }
+
+  .ksemo-created-file-art .ksemo-file-writing-line-4 {
+    animation-delay: 1140ms;
+  }
+
+  .ksemo-created-file-art .ksemo-file-grid-cell-5 {
+    animation-delay: 760ms;
+  }
+
+  .ksemo-created-file-art :is(
+      .ksemo-file-grid-cell-2,
+      .ksemo-file-grid-cell-4,
+      .ksemo-file-grid-cell-6,
+      .ksemo-file-grid-cell-8
+    ) {
+    animation-delay: 920ms;
+  }
+
+  .ksemo-created-file-art :is(
+      .ksemo-file-grid-cell-1,
+      .ksemo-file-grid-cell-3,
+      .ksemo-file-grid-cell-7,
+      .ksemo-file-grid-cell-9
+    ) {
+    animation-delay: 1080ms;
+  }
+
+  .ksemo-created-file-art .ksemo-ppt-chart {
+    opacity: 1;
+    transition-delay: 760ms;
+  }
+
+  .ksemo-created-file-art .ksemo-pptx-bar-1 {
+    animation-delay: 820ms;
+  }
+
+  .ksemo-created-file-art .ksemo-pptx-bar-2 {
+    animation-delay: 1000ms;
+  }
+
+  .ksemo-created-file-art .ksemo-pptx-bar-3 {
+    animation-delay: 1180ms;
+  }
+}
+
+@media (hover: none) and (pointer: coarse) and (prefers-reduced-motion: reduce) {
+  .ksemo-created-file-art .ksemo-file-writing-line,
+  .ksemo-created-file-art .ksemo-file-grid-cell {
+    animation: none;
+    opacity: 1;
+    stroke-dashoffset: 0;
+  }
+
+  .ksemo-created-file-art .ksemo-ppt-chart {
+    transition: none;
+  }
 }
 
 /* Continuous inside rolling/swirling loop for Bot voice orbs */

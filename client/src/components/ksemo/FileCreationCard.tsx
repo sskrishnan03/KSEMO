@@ -1,13 +1,5 @@
 import type { DocFormat } from "@/lib/docFormats";
-import { Check, Eye } from "lucide-react";
-import React, {
-  memo,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import React, { memo, useCallback, useEffect, useMemo, useState } from "react";
 import type { FileBrandVariant } from "@/components/ksemo/FileBrandIcons";
 import { CreateFileModeIcon } from "./LibraryFileIcon";
 import { cn } from "@/lib/utils";
@@ -125,27 +117,35 @@ const FORMAT_CONFIGS: Record<
   },
 };
 
-const FORMAT_TO_VARIANT: Record<DocFormat, FileBrandVariant> = {
-  pdf: "pdf",
-  docx: "word",
-  xlsx: "excel",
-  pptx: "powerpoint",
-  txt: "text",
-  markdown: "text",
-  csv: "text",
-};
-
-// Brand colors for the file-type label: the extension text below the file
-// name wears the color of the format (red PDF, blue Word, green Excel,
-// orange PowerPoint, slate for text/spreadsheet).
-const FORMAT_TEXT_COLOR: Record<DocFormat, string> = {
-  pdf: "#E8504F",
-  docx: "#4F7DF2",
+// Keep each format's tile, filename surface, and hover shadow in one palette.
+const FORMAT_ACCENT_COLOR: Record<DocFormat, string> = {
+  pdf: "#E33135",
+  docx: "#1D4E89",
   xlsx: "#2FA06A",
   pptx: "#F0783A",
-  txt: "#9AA4B2",
-  markdown: "#9AA4B2",
-  csv: "#9AA4B2",
+  txt: "#778292",
+  markdown: "#778292",
+  csv: "#778292",
+};
+
+const FORMAT_SURFACE_COLOR: Record<DocFormat, string> = {
+  pdf: "#A9212A",
+  docx: "#17365F",
+  xlsx: "#1B5B3F",
+  pptx: "#A84D25",
+  txt: "#3F4854",
+  markdown: "#3F4854",
+  csv: "#3F4854",
+};
+
+const FORMAT_SHADOW_COLOR: Record<DocFormat, string> = {
+  pdf: "#64151B",
+  docx: "#102744",
+  xlsx: "#12402C",
+  pptx: "#783719",
+  txt: "#252B33",
+  markdown: "#252B33",
+  csv: "#252B33",
 };
 
 export function getLiveStatusPhrase(
@@ -255,7 +255,6 @@ export const FileCreationCard = memo(function FileCreationCard({
   errorMessage,
   researchSourceCount,
   defaultExpanded = false,
-  initialShowReady = false,
   code,
   initialShowCodeExpanded = false,
   initialShowCodeModal = false,
@@ -263,10 +262,6 @@ export const FileCreationCard = memo(function FileCreationCard({
   onOpenCode,
 }: FileCreationCardProps) {
   const { openPdf } = usePdfViewer();
-  const [showReady, setShowReady] = useState(initialShowReady);
-  const prevStageRef = useRef<FileCreationStage | null>(stage);
-  const stageRef = useRef<HTMLDivElement>(null);
-  const [stageWidth, setStageWidth] = useState(0);
 
   const cleanCode = useMemo(() => {
     return stripShebang(code || "");
@@ -277,50 +272,7 @@ export const FileCreationCard = memo(function FileCreationCard({
     return cleanCode.split("\n").length;
   }, [cleanCode]);
 
-  useEffect(() => {
-    // Measure the preview stage so the document preview can scale up to fill
-    // the available width (edge-to-edge) on any screen size.
-    const el = stageRef.current;
-    if (!el) return;
-    const update = () => setStageWidth(el.clientWidth);
-    update();
-    if (typeof ResizeObserver === "undefined") return;
-    const ro = new ResizeObserver(update);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-
-  useEffect(() => {
-    if (initialShowReady && stage === "completed") {
-      const timer = setTimeout(() => {
-        setShowReady(false);
-      }, 3500);
-      return () => clearTimeout(timer);
-    }
-  }, [initialShowReady, stage]);
-
-  useEffect(() => {
-    // Only show "Ready" if it just completed in this active session
-    // (i.e. transitioned from an in-progress stage to "completed").
-    // When opening an existing chat from history, stage is already "completed" on mount,
-    // so showReady remains false.
-    if (
-      prevStageRef.current &&
-      prevStageRef.current !== "completed" &&
-      prevStageRef.current !== "error" &&
-      stage === "completed"
-    ) {
-      setShowReady(true);
-      const timer = setTimeout(() => {
-        setShowReady(false);
-      }, 3500);
-      return () => clearTimeout(timer);
-    }
-    prevStageRef.current = stage;
-  }, [stage]);
-
   const config = FORMAT_CONFIGS[format] || FORMAT_CONFIGS.pdf;
-  const variant = FORMAT_TO_VARIANT[format] || "generic";
   const capabilityFormat =
     format === "markdown" || format === "csv" ? "txt" : format;
   const displayName = filename || `document.${format}`;
@@ -455,88 +407,197 @@ export const FileCreationCard = memo(function FileCreationCard({
     }
   };
 
+  const accent = FORMAT_ACCENT_COLOR[format] ?? "#778292";
+
   return (
-    <div
-      className={cn(
-        "my-2 w-full max-w-full",
-        code ? "max-w-[460px]" : "max-w-[440px] sm:max-w-[480px]"
-      )}
+    <button
+      data-testid="file-creation-completed"
+      type="button"
+      onClick={handleOpen}
+      aria-label={`Preview ${displayName}`}
+      className="ksemo-created-file-art group my-2 flex w-fit max-w-full cursor-pointer appearance-none items-center gap-0 border-0 bg-transparent p-0 text-left select-none animate-in fade-in-0 duration-300 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
     >
-      {/* ── Left Container: File Card (Original Size, 302px height) ── */}
-      <div
-        data-testid="file-creation-completed"
-        className={cn(
-          "h-[302px] max-h-[302px] min-w-0 w-full shrink-0 select-none animate-in fade-in-0 slide-in-from-bottom-2 zoom-in-95 duration-300 ease-out md:w-[460px]"
-        )}
+      <span
+        data-testid="file-preview-stage"
+        className="grid size-[124px] shrink-0 place-items-center rounded-2xl text-left"
+        style={{ backgroundColor: accent }}
       >
-        <div className="h-full flex flex-col overflow-hidden rounded-2xl border border-border/70 bg-card/70 shadow-sm backdrop-blur-sm dark:bg-card/60">
-          {/* Dark preview frame: hover reveals "Preview" with identical subtle blur overlay */}
-          <div
-            ref={stageRef}
-            data-testid="file-preview-stage"
-            role="button"
-            tabIndex={0}
-            onClick={handleOpen}
-            onKeyDown={e => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                handleOpen();
-              }
-            }}
-            aria-label={`Preview ${displayName}`}
-            className="group/preview relative flex-1 min-h-0 grid place-items-center overflow-hidden bg-neutral-900 bg-gradient-to-br from-white/[0.06] via-transparent to-transparent shadow-inner ring-1 ring-inset ring-white/5 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-          >
-            <FileDocumentPreview
-              format={format}
-              url={fileUrl}
-              displayName={displayName}
-              variant={variant}
-              availWidth={stageWidth}
-            />
-
-            {showReady && (
-              <span className="absolute top-2 right-2 flex items-center gap-1 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2 py-0.5 text-[10.5px] font-semibold text-emerald-600 dark:text-emerald-400 animate-in fade-in duration-200 backdrop-blur-xs">
-                <Check className="size-3 stroke-[2.5]" />
-                Ready
-              </span>
-            )}
-
-            {/* Hover overlay with matching subtle blur effect & classic Preview Eye icon */}
-            <div
-              data-testid="file-preview-overlay"
-              className="absolute inset-0 z-20 flex items-center justify-center bg-black/20 dark:bg-black/35 backdrop-blur-[1px] opacity-0 transition-opacity duration-150 group-hover/preview:opacity-100"
-            >
-              <span className="inline-flex items-center gap-1.5 rounded-xl border border-border/80 bg-card/95 px-3.5 py-1.5 text-xs font-semibold text-foreground shadow-sm transition-transform duration-150 group-hover/preview:scale-105 select-none">
-                <Eye className="size-3.5 text-foreground" />
-                Preview
-              </span>
-            </div>
-
-            {/* Short, strong fade at the bottom */}
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-card via-card/60 to-transparent" />
-          </div>
-
-          {/* File name (left) + Extension tag — static, separated from preview click */}
-          <div className="relative z-10 flex items-center justify-between gap-3 h-[62px] shrink-0 bg-card px-4 py-3 select-none">
-            <div className="min-w-0">
-              <p className="truncate text-[15px] font-semibold leading-snug text-foreground">
-                {displayName}
-              </p>
-              <p
-                className="mt-0.5 text-[11.5px] font-bold tracking-wide uppercase"
-                style={{
-                  color: FORMAT_TEXT_COLOR[format] ?? "#9AA4B2",
-                }}
-              >
-                {config.ext}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+        <DocumentFileGlyph format={format} label={config.ext} />
+      </span>
+      <span
+        className="flex min-w-[150px] max-w-[calc(100vw-124px)] items-center rounded-r-2xl px-4 py-3 text-white"
+        style={{ backgroundColor: FORMAT_SURFACE_COLOR[format] }}
+      >
+        <p className="max-w-full truncate whitespace-nowrap text-[15px] font-semibold leading-snug text-white">
+          {displayName}
+        </p>
+      </span>
+    </button>
   );
 });
+
+function DocumentFileGlyph({
+  format,
+  label,
+}: {
+  format: DocFormat;
+  label: string;
+}) {
+  const accent = FORMAT_ACCENT_COLOR[format] ?? "#778292";
+  return (
+    <span aria-hidden="true" className="block w-[104px] max-w-full">
+      <svg
+        className="ksemo-created-file-svg block h-auto w-full translate-x-[2px] overflow-visible"
+        viewBox="0 0 132 145"
+        fill="none"
+      >
+        <g className="ksemo-illustration-document">
+          <path
+            className="ksemo-file-cast-shadow"
+            d="M42 17h43l36 36v69c0 13-10 22-22 22H42c-13 0-22-9-22-22V39c0-13 9-22 22-22Z"
+            fill={FORMAT_SHADOW_COLOR[format]}
+          />
+          <path
+            d="M35 12h43l36 36v69c0 13-10 22-22 22H35c-13 0-22-9-22-22V34c0-13 9-22 22-22Z"
+            fill="#FFF"
+          />
+          <path
+            d="M78 12v18c0 12 9 21 21 21h15L78 12Z"
+            fill={accent}
+            fillOpacity=".18"
+          />
+          <path
+            d="M31 37h45"
+            className="ksemo-file-writing-line"
+            pathLength={1}
+            stroke={accent}
+            strokeOpacity=".3"
+            strokeWidth="3.2"
+            strokeLinecap="round"
+          />
+          <path
+            d="M31 45h42"
+            className="ksemo-file-writing-line ksemo-file-writing-line-2"
+            pathLength={1}
+            stroke={accent}
+            strokeOpacity=".3"
+            strokeWidth="3.2"
+            strokeLinecap="round"
+          />
+          <rect x="24" y="57" width="80" height="38" rx="6" fill={accent} />
+          <text
+            x="64"
+            y="83"
+            textAnchor="middle"
+            fill="#FFF"
+            fontFamily="Arial,sans-serif"
+            fontSize="22"
+            fontWeight="700"
+            letterSpacing=".2"
+          >
+            {label}
+          </text>
+          {format === "xlsx" ? (
+            <g
+              className="ksemo-file-grid"
+              fill="none"
+              stroke={accent}
+              strokeOpacity=".48"
+              strokeWidth=".9"
+            >
+              {Array.from({ length: 3 }, (_, row) =>
+                Array.from({ length: 3 }, (_, column) => {
+                  const cell = row * 3 + column + 1;
+                  return (
+                    <rect
+                      key={cell}
+                      className={`ksemo-file-grid-cell ksemo-file-grid-cell-${cell}`}
+                      x={41 + column * 16}
+                      y={101 + row * 10}
+                      width="14"
+                      height="8"
+                      rx="1.5"
+                      pathLength={1}
+                    />
+                  );
+                })
+              )}
+            </g>
+          ) : format === "pptx" ? (
+            <g>
+              <g className="ksemo-ppt-chart">
+                <circle
+                  cx="48"
+                  cy="115"
+                  r="12"
+                  fill={accent}
+                  fillOpacity=".1"
+                  stroke={accent}
+                  strokeOpacity=".38"
+                  strokeWidth="1"
+                />
+                <path
+                  d="M48 115V103A12 12 0 0 1 60 115Z"
+                  fill={accent}
+                  fillOpacity=".52"
+                />
+                <path
+                  d="M48 115V103M48 115h12"
+                  stroke={accent}
+                  strokeOpacity=".62"
+                  strokeWidth="1"
+                  strokeLinecap="round"
+                />
+              </g>
+              <g
+                fill="none"
+                stroke={accent}
+                strokeOpacity=".3"
+                strokeWidth="3.5"
+                strokeLinecap="round"
+              >
+                <path
+                  d="M66 106h25"
+                  className="ksemo-file-writing-line ksemo-pptx-bar-1"
+                  pathLength={1}
+                />
+                <path
+                  d="M66 115h25"
+                  className="ksemo-file-writing-line ksemo-pptx-bar-2"
+                  pathLength={1}
+                />
+                <path
+                  d="M66 124h25"
+                  className="ksemo-file-writing-line ksemo-pptx-bar-3"
+                  pathLength={1}
+                />
+              </g>
+            </g>
+          ) : (
+            <g
+              fill="none"
+              stroke={accent}
+              strokeOpacity=".3"
+              strokeWidth="3.2"
+              strokeLinecap="round"
+            >
+              <path
+                d="M31 103h42"
+                className="ksemo-file-writing-line ksemo-file-writing-line-3"
+                pathLength={1}
+              />
+              <path
+                d="M31 113h25"
+                className="ksemo-file-writing-line ksemo-file-writing-line-4"
+                pathLength={1}
+              />
+            </g>
+          )}
+        </g>
+      </svg>
+    </span>
+  );
+}
 
 // ── Document preview renderers (fixed miniature white pages) ─────────────────
 

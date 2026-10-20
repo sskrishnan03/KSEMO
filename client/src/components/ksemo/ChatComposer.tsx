@@ -1567,11 +1567,9 @@ export const ChatComposer = memo(function ChatComposer({
                     >
                       <Icon
                         className={cn(
-                          "mr-2 size-[18px] shrink-0",
-                          option.iconColor,
+                          "mr-2 size-[18px] shrink-0 text-muted-foreground",
                           option.mode === "xlsx" && "stroke-[1.5]"
                         )}
-                        style={{ color: option.iconHex }}
                       />
                       {option.title}
                       {isActive && (
