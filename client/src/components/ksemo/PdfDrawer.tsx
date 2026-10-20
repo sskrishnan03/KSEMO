@@ -3762,8 +3762,9 @@ export const PdfDrawer = memo(function PdfDrawer({
         <div className="flex min-w-0 items-center gap-2">
           <CreateFileModeIcon
             mode={fileMode}
+            colored={false}
             className={cn(
-              "size-[18px] shrink-0",
+              "size-[18px] shrink-0 text-muted-foreground",
               fileMode === "xlsx" && "stroke-[1.5]"
             )}
           />

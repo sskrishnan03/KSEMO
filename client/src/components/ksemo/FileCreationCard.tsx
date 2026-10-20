@@ -128,15 +128,7 @@ const FORMAT_ACCENT_COLOR: Record<DocFormat, string> = {
   csv: "#778292",
 };
 
-const FORMAT_SURFACE_COLOR: Record<DocFormat, string> = {
-  pdf: "#A9212A",
-  docx: "#17365F",
-  xlsx: "#1B5B3F",
-  pptx: "#A84D25",
-  txt: "#3F4854",
-  markdown: "#3F4854",
-  csv: "#3F4854",
-};
+const FILE_NAME_SURFACE_COLOR = "#343434";
 
 const FORMAT_SHADOW_COLOR: Record<DocFormat, string> = {
   pdf: "#64151B",
@@ -261,7 +253,7 @@ export const FileCreationCard = memo(function FileCreationCard({
   initialShowCodeDrawer = false,
   onOpenCode,
 }: FileCreationCardProps) {
-  const { openPdf } = usePdfViewer();
+  const { currentPdf, isOpen, openPdf, closePdf } = usePdfViewer();
 
   const cleanCode = useMemo(() => {
     return stripShebang(code || "");
@@ -276,6 +268,9 @@ export const FileCreationCard = memo(function FileCreationCard({
   const capabilityFormat =
     format === "markdown" || format === "csv" ? "txt" : format;
   const displayName = filename || `document.${format}`;
+  const isPreviewOpen = Boolean(
+    fileUrl && isOpen && currentPdf?.url === fileUrl
+  );
 
   const cleanBaseName = useMemo(() => {
     return displayName.replace(/\.\w+$/, "");
@@ -407,32 +402,93 @@ export const FileCreationCard = memo(function FileCreationCard({
     }
   };
 
+  const handleTogglePreview = () => {
+    if (!fileUrl) return;
+    if (isPreviewOpen) {
+      closePdf();
+      return;
+    }
+    handleOpen();
+  };
+
   const accent = FORMAT_ACCENT_COLOR[format] ?? "#778292";
 
   return (
-    <button
-      data-testid="file-creation-completed"
-      type="button"
-      onClick={handleOpen}
-      aria-label={`Preview ${displayName}`}
-      className="ksemo-created-file-art group my-2 flex w-fit max-w-full cursor-pointer appearance-none items-center gap-0 border-0 bg-transparent p-0 text-left select-none animate-in fade-in-0 duration-300 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
-    >
-      <span
-        data-testid="file-preview-stage"
-        className="grid size-[124px] shrink-0 place-items-center rounded-2xl text-left"
-        style={{ backgroundColor: accent }}
+    <div className="relative my-2 w-fit max-w-full">
+      <button
+        data-testid="file-creation-completed"
+        data-preview-open={isPreviewOpen || undefined}
+        type="button"
+        onClick={handleTogglePreview}
+        aria-label={`${isPreviewOpen ? "Close" : "Open"} ${displayName}`}
+        className="ksemo-created-file-art group flex w-fit max-w-full cursor-pointer appearance-none items-center gap-0 border-0 bg-transparent p-0 text-left select-none animate-in fade-in-0 duration-300 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
       >
-        <DocumentFileGlyph format={format} label={config.ext} />
-      </span>
-      <span
-        className="flex min-w-[150px] max-w-[calc(100vw-124px)] items-center rounded-r-2xl px-4 py-3 text-white"
-        style={{ backgroundColor: FORMAT_SURFACE_COLOR[format] }}
-      >
-        <p className="max-w-full truncate whitespace-nowrap text-[15px] font-semibold leading-snug text-white">
-          {displayName}
-        </p>
-      </span>
-    </button>
+        <span
+          data-testid="file-preview-stage"
+          className="grid size-[124px] shrink-0 place-items-center rounded-2xl text-left"
+          style={{ backgroundColor: accent }}
+        >
+          <DocumentFileGlyph format={format} label={config.ext} />
+        </span>
+        <span
+          className="ksemo-created-file-name relative isolate -translate-y-3 flex min-w-[150px] max-w-[calc(100vw-148px)] items-center overflow-hidden rounded-r-2xl px-4 py-3 text-white"
+          style={
+            {
+              backgroundColor: FILE_NAME_SURFACE_COLOR,
+              "--ksemo-file-accent": accent,
+            } as React.CSSProperties
+          }
+        >
+          <span className="relative z-[1] min-w-0 flex-1 truncate whitespace-nowrap text-[15px] leading-snug font-semibold text-white">
+            {displayName}
+          </span>
+        </span>
+        {fileUrl && (
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 24 24"
+            fill="none"
+            className="ksemo-file-open-arrow relative -top-3 ml-2 size-5 shrink-0"
+            style={{ color: accent }}
+          >
+            <path
+              d="M4 12h15m-6-6 6 6-6 6"
+              stroke="currentColor"
+              strokeWidth="2.4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        )}
+      </button>
+      {fileUrl && (
+        <div
+          role="group"
+          aria-label="File actions"
+          className="absolute top-[74px] left-[126px] inline-flex items-center rounded-l-none rounded-r-md border border-white/10 bg-[#343434] p-0.5"
+        >
+          <a
+            href={fileUrl}
+            download={displayName}
+            aria-label={`Download ${displayName}`}
+            className="inline-flex h-8 items-center gap-1.5 rounded-sm px-2.5 text-sm font-medium text-white transition-colors hover:bg-[#414141] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+          >
+            <span>Download</span>
+          </a>
+          <span aria-hidden="true" className="h-4 w-px bg-white/20" />
+          <button
+            type="button"
+            data-testid="file-creation-open-toggle"
+            onClick={handleTogglePreview}
+            aria-label={`${isPreviewOpen ? "Close" : "Open"} ${displayName}`}
+            aria-pressed={isPreviewOpen}
+            className="inline-flex h-8 items-center rounded-sm px-2.5 text-sm font-medium text-white transition-colors hover:bg-[#414141] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+          >
+            {isPreviewOpen ? "Close" : "Open"}
+          </button>
+        </div>
+      )}
+    </div>
   );
 });
 
