@@ -1005,67 +1005,6 @@ html.ksemo-reduce-motion .ksemo-shimmer-text {
   transform: translate(2px, 2px);
 }
 
-.ksemo-created-file-name::after {
-  position: absolute;
-  z-index: 0;
-  top: -20%;
-  bottom: -20%;
-  left: -60%;
-  width: 65%;
-  background: linear-gradient(
-    105deg,
-    transparent 0%,
-    color-mix(in srgb, var(--ksemo-file-accent) 48%, white 52%) 48%,
-    transparent 100%
-  );
-  content: "";
-  opacity: 0.28;
-  pointer-events: none;
-  transform: translateX(-120%);
-  animation: ksemo-file-name-sheen 3.8s ease-in-out infinite;
-}
-
-.ksemo-file-open-arrow {
-  opacity: 0;
-  filter: drop-shadow(0 1px 2px rgb(0 0 0 / 28%));
-  transform: translateX(-14px) scale(0.86);
-  transition:
-    opacity 180ms ease-out,
-    transform 340ms cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-
-.ksemo-created-file-art:hover .ksemo-file-open-arrow,
-.ksemo-created-file-art:focus-visible .ksemo-file-open-arrow {
-  opacity: 1;
-  transform: translateX(0);
-}
-
-.ksemo-created-file-art[data-preview-open="true"] .ksemo-file-open-arrow {
-  opacity: 1;
-  transform: translateX(0);
-}
-
-@keyframes ksemo-file-name-sheen {
-  0% {
-    transform: translateX(-120%);
-  }
-  48%,
-  100% {
-    transform: translateX(320%);
-  }
-}
-
-@keyframes ksemo-file-arrow-arrive {
-  from {
-    opacity: 0;
-    transform: translateX(-14px) scale(0.86);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0) scale(1);
-  }
-}
-
 .ksemo-file-writing-line-2 {
   animation-delay: 420ms;
 }
@@ -1189,13 +1128,6 @@ html.ksemo-reduce-motion .ksemo-file-writing-line {
   .ksemo-created-file-art .ksemo-file-cast-shadow {
     opacity: 0.48;
     transform: translate(2px, 2px);
-  }
-
-  .ksemo-created-file-art .ksemo-file-open-arrow {
-    opacity: 1;
-    transform: translateX(0);
-    animation: ksemo-file-arrow-arrive 420ms cubic-bezier(0.2, 0.8, 0.2, 1)
-      both;
   }
 
   .ksemo-created-file-art .ksemo-file-writing-line,

@@ -128,7 +128,15 @@ const FORMAT_ACCENT_COLOR: Record<DocFormat, string> = {
   csv: "#778292",
 };
 
-const FILE_NAME_SURFACE_COLOR = "#343434";
+const FORMAT_KIND: Record<DocFormat, string> = {
+  pdf: "Document",
+  docx: "Document",
+  xlsx: "Spreadsheet",
+  pptx: "Presentation",
+  txt: "Document",
+  markdown: "Document",
+  csv: "Spreadsheet",
+};
 
 const FORMAT_SHADOW_COLOR: Record<DocFormat, string> = {
   pdf: "#64151B",
@@ -414,80 +422,80 @@ export const FileCreationCard = memo(function FileCreationCard({
   const accent = FORMAT_ACCENT_COLOR[format] ?? "#778292";
 
   return (
-    <div className="relative my-2 w-fit max-w-full">
+    <div
+      data-preview-open={isPreviewOpen || undefined}
+      onClick={(event) => {
+        const target = event.target;
+        if (
+          target instanceof Element &&
+          target.closest("a, button, [role='group']")
+        ) {
+          return;
+        }
+        handleTogglePreview();
+      }}
+      className="ksemo-created-file-art group relative my-2 flex w-fit max-w-full cursor-pointer items-center"
+    >
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 -right-2 z-0 rounded-2xl border border-border bg-sidebar"
+      />
       <button
         data-testid="file-creation-completed"
-        data-preview-open={isPreviewOpen || undefined}
         type="button"
         onClick={handleTogglePreview}
         aria-label={`${isPreviewOpen ? "Close" : "Open"} ${displayName}`}
-        className="ksemo-created-file-art group flex w-fit max-w-full cursor-pointer appearance-none items-center gap-0 border-0 bg-transparent p-0 text-left select-none animate-in fade-in-0 duration-300 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+        className="relative z-10 grid size-[124px] shrink-0 cursor-pointer appearance-none place-items-center rounded-2xl border-0 p-0 text-left select-none animate-in fade-in-0 duration-300 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+        style={{ backgroundColor: accent }}
       >
-        <span
-          data-testid="file-preview-stage"
-          className="grid size-[124px] shrink-0 place-items-center rounded-2xl text-left"
-          style={{ backgroundColor: accent }}
-        >
+        <span data-testid="file-preview-stage" className="grid size-full place-items-center">
           <DocumentFileGlyph format={format} label={config.ext} />
         </span>
-        <span
-          className="ksemo-created-file-name relative isolate -translate-y-3 flex min-w-[150px] max-w-[calc(100vw-148px)] items-center overflow-hidden rounded-r-2xl px-4 py-3 text-white"
-          style={
-            {
-              backgroundColor: FILE_NAME_SURFACE_COLOR,
-              "--ksemo-file-accent": accent,
-            } as React.CSSProperties
-          }
-        >
-          <span className="relative z-[1] min-w-0 flex-1 truncate whitespace-nowrap text-[15px] leading-snug font-semibold text-white">
-            {displayName}
-          </span>
-        </span>
-        {fileUrl && (
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 24 24"
-            fill="none"
-            className="ksemo-file-open-arrow relative -top-3 ml-2 size-5 shrink-0"
-            style={{ color: accent }}
-          >
-            <path
-              d="M4 12h15m-6-6 6 6-6 6"
-              stroke="currentColor"
-              strokeWidth="2.4"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        )}
       </button>
-      {fileUrl && (
-        <div
-          role="group"
-          aria-label="File actions"
-          className="absolute top-[74px] left-[126px] inline-flex items-center rounded-l-none rounded-r-md border border-white/10 bg-[#343434] p-0.5"
-        >
-          <a
-            href={fileUrl}
-            download={displayName}
-            aria-label={`Download ${displayName}`}
-            className="inline-flex h-8 items-center gap-1.5 rounded-sm px-2.5 text-sm font-medium text-white transition-colors hover:bg-[#414141] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
-          >
-            <span>Download</span>
-          </a>
-          <span aria-hidden="true" className="h-4 w-px bg-white/20" />
+      <div
+        className="relative z-10 flex min-h-[124px] min-w-0 flex-col pb-1 pl-3 pr-1 pt-6"
+      >
+        <div className="relative z-[1] flex min-w-0 flex-col gap-1">
           <button
             type="button"
-            data-testid="file-creation-open-toggle"
             onClick={handleTogglePreview}
             aria-label={`${isPreviewOpen ? "Close" : "Open"} ${displayName}`}
-            aria-pressed={isPreviewOpen}
-            className="inline-flex h-8 items-center rounded-sm px-2.5 text-sm font-medium text-white transition-colors hover:bg-[#414141] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+            className="max-w-[min(52vw,520px)] cursor-pointer truncate whitespace-nowrap rounded-none bg-transparent p-0 text-left text-[15px] font-semibold leading-snug text-sidebar-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring"
           >
-            {isPreviewOpen ? "Close" : "Open"}
+            {displayName}
           </button>
+          <span className="min-w-0 truncate whitespace-nowrap text-sm font-semibold text-muted-foreground">
+            {config.ext} {FORMAT_KIND[format]}
+          </span>
         </div>
-      )}
+        {fileUrl && (
+          <div
+            role="group"
+            aria-label="File actions"
+            className="relative z-[1] -mr-2 mt-auto inline-flex shrink-0 self-end items-center rounded-lg border border-sidebar-border/70 bg-sidebar-accent p-0.5"
+          >
+            <a
+              href={fileUrl}
+              download={displayName}
+              aria-label={`Download ${displayName}`}
+              className="inline-flex h-9 items-center rounded-md px-3 text-sm font-medium text-sidebar-accent-foreground transition-colors hover:bg-sidebar hover:text-sidebar-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+            >
+              Download
+            </a>
+            <span aria-hidden="true" className="h-4 w-px bg-sidebar-border" />
+            <button
+              type="button"
+              data-testid="file-creation-open-toggle"
+              onClick={handleTogglePreview}
+              aria-label={`${isPreviewOpen ? "Close" : "Open"} ${displayName}`}
+              aria-pressed={isPreviewOpen}
+              className="inline-flex h-9 items-center rounded-md px-3 text-sm font-medium text-sidebar-accent-foreground transition-colors hover:bg-sidebar hover:text-sidebar-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+            >
+              {isPreviewOpen ? "Close" : "Open"}
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 });
