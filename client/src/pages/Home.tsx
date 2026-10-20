@@ -2566,6 +2566,7 @@ export default function Home({
       let buffer = "";
       const processEvents = (rawEvents: string[]) => {
         for (const rawEvent of rawEvents) {
+          if (streamEntry.stoppedByUser || controller.signal.aborted) return;
           const lines = rawEvent.split("\n");
           const eventName = lines
             .find(line => line.startsWith("event:"))
@@ -3645,6 +3646,19 @@ export default function Home({
         const assistantMessageId = stream.assistantMessageId;
         if (voiceOnly) stoppedVoiceMessageId = assistantMessageId;
         const conversationId = stream.conversationId;
+        if (assistantMessageId) {
+          const displayedText =
+            visibleResponseTextRef.current.get(assistantMessageId) ?? "";
+          pendingDeltasRef.current.delete(assistantMessageId);
+          setChatMessages(current =>
+            current.map(message =>
+              message.id === assistantMessageId ||
+              message.clientId === assistantMessageId
+                ? { ...message, content: displayedText, status: "cancelled" }
+                : message
+            )
+          );
+        }
         if (
           assistantMessageId &&
           conversationId &&
@@ -3652,7 +3666,6 @@ export default function Home({
         ) {
           const displayedText =
             visibleResponseTextRef.current.get(assistantMessageId) ?? "";
-          pendingDeltasRef.current.delete(assistantMessageId);
           // Start persistence in the click handler itself. The stream reader
           // may already be finished (while the UI is revealing text), and a
           // quick page refresh must not cancel the partial-answer save.
@@ -5198,8 +5211,8 @@ export default function Home({
                         botVoice.state === "listening" && !botVoice.isMuted
                       }
                       isSpeaking={isBotSpeakingAloud}
-                      isThinking={isGenerating}
                       levelRef={botVoice.levelRef}
+                      isThinking={isGenerating}
                       size={120}
                       halo={false}
                     />

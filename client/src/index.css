@@ -754,11 +754,11 @@ html.ksemo-reduce-motion .loader-xs {
 }
 .ksemo-copy-success-circle {
   fill: none;
-  stroke: #fff;
+  stroke: currentColor;
   animation: ksemo-copy-box-in 110ms ease-out both;
 }
 .ksemo-copy-success-tick {
-  stroke: #fff;
+  stroke: currentColor;
   stroke-width: 2.2;
   stroke-dasharray: 20;
   stroke-dashoffset: 20;
@@ -980,6 +980,40 @@ html.ksemo-reduce-motion .ksemo-file-status-sweep {
     rgb(104 116 143 / 9%) 72%,
     transparent 100%
   );
+}
+
+@keyframes ksemo-bot-orb-speaking {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  28% {
+    transform: scale(1.16);
+  }
+  56% {
+    transform: scale(0.98);
+  }
+  78% {
+    transform: scale(1.1);
+  }
+}
+
+.ksemo-bot-orb--listening {
+  transition: transform 70ms ease-out;
+}
+
+.ksemo-bot-orb--speaking {
+  animation: ksemo-bot-orb-speaking 680ms ease-in-out infinite;
+  transform-origin: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ksemo-bot-orb--listening,
+  .ksemo-bot-orb--speaking {
+    animation: none;
+    transition: none;
+    transform: none;
+  }
 }
 
 /* A calm six-bar waveform that travels left to right on the idle voice-chat
