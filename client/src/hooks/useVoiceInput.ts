@@ -52,19 +52,8 @@ export function useVoiceInput({
   const animFrameRef = useRef<number | null>(null);
   const lastAudioUpdateRef = useRef<number>(0);
   const smoothedAudioLevelRef = useRef(0);
-  const mutation = trpc.voice.transcribe.useMutation({
-    onSuccess: result => {
-      setState("idle");
-      setSeconds(0);
-      if (result.text.trim()) onTranscript(result.text.trim());
-      else onError("No speech was detected. Please try again.");
-    },
-    onError: error => {
-      setState("idle");
-      setSeconds(0);
-      onError(error.message || "KSEMO could not transcribe that recording.");
-    },
-  });
+  const transcriptionIdRef = useRef(0);
+  const mutation = trpc.voice.transcribe.useMutation();
 
   const releaseStream = useCallback(() => {
     if (animFrameRef.current) {
@@ -163,10 +152,32 @@ export function useVoiceInput({
           return;
         }
         setState("transcribing");
-        mutation.mutate({
-          audioBase64: await toBase64(recording),
-          mimeType: audioType,
-        });
+        const transcriptionId = ++transcriptionIdRef.current;
+        const audioBase64 = await toBase64(recording);
+        if (transcriptionId !== transcriptionIdRef.current) return;
+        mutation.mutate(
+          {
+            audioBase64,
+            mimeType: audioType,
+          },
+          {
+            onSuccess: result => {
+              if (transcriptionId !== transcriptionIdRef.current) return;
+              setState("idle");
+              setSeconds(0);
+              if (result.text.trim()) onTranscript(result.text.trim());
+              else onError("No speech was detected. Please try again.");
+            },
+            onError: error => {
+              if (transcriptionId !== transcriptionIdRef.current) return;
+              setState("idle");
+              setSeconds(0);
+              onError(
+                error.message || "KSEMO could not transcribe that recording."
+              );
+            },
+          }
+        );
       };
       recorder.start(250);
       setSeconds(0);
@@ -250,6 +261,9 @@ export function useVoiceInput({
   }, [state]);
 
   const cancel = useCallback(() => {
+    // Ignore any transcription response that belongs to the session being
+    // cancelled (for example, when switching between temporary and normal chat).
+    transcriptionIdRef.current += 1;
     chunksRef.current = [];
     if (recorderRef.current && recorderRef.current.state !== "inactive") {
       playRecordingCancel();

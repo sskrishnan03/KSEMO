@@ -39,6 +39,70 @@
     box-shadow 0.25s ease;
 }
 
+@keyframes ksemo-greeting-sweep {
+  0% {
+    left: 0;
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  82% {
+    opacity: 1;
+  }
+  100% {
+    left: calc(100% - 2rem);
+    opacity: 0;
+  }
+}
+
+@keyframes ksemo-greeting-rise {
+  from {
+    opacity: 0;
+    transform: translateY(-0.85rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.ksemo-greeting-rise {
+  animation: ksemo-greeting-rise 650ms ease-out both;
+}
+
+.ksemo-greeting-sweep {
+  position: absolute;
+  bottom: -0.12rem;
+  left: 0;
+  width: 2rem;
+  height: 2px;
+  border-radius: 9999px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    #8f00ff 18%,
+    #00b7eb 38%,
+    #00f0ff 58%,
+    #e0ffff 78%,
+    #ffffff 90%,
+    transparent
+  );
+  filter: drop-shadow(0 0 3px #00d4ff) drop-shadow(0 0 4px #8f00ff);
+  animation: ksemo-greeting-sweep 900ms ease-in-out 180ms both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ksemo-greeting-sweep {
+    display: none;
+  }
+  .ksemo-greeting-rise {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}
+
 .temp-mode .ksemo-composer-fade {
   background-image: linear-gradient(to top, var(--temp-surface), transparent);
 }
@@ -111,8 +175,8 @@
 
 .temp-mode .ksemo-dictation-pill {
   background-color: var(--temp-surface);
-  border-color: color-mix(in srgb, var(--temp-accent) 34%, transparent);
-  border-style: dashed;
+  border-color: var(--border);
+  border-style: solid;
   color: var(--foreground);
 }
 
@@ -131,6 +195,10 @@
     var(--temp-accent) 24%,
     var(--temp-surface)
   );
+}
+
+.temp-mode .ksemo-dictation-wave-bar {
+  background-color: var(--temp-accent);
 }
 
 .temp-mode .ksemo-dictation-transcribe,

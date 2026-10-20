@@ -165,7 +165,7 @@ export const DictateRecordingPill = memo(function DictateRecordingPill({
           return (
             <span
               key={index}
-              className="min-w-[2px] flex-1 rounded-full bg-foreground transition-[height,opacity] duration-200 ease-out"
+              className="ksemo-dictation-wave-bar min-w-[2px] flex-1 rounded-full bg-foreground transition-[height,opacity] duration-200 ease-out"
               style={{
                 height: `${height}px`,
                 opacity: amplitude ? 0.3 + amplitude * 0.7 : 0.32,
@@ -182,7 +182,7 @@ export const DictateRecordingPill = memo(function DictateRecordingPill({
               variant="ghost"
               size="icon"
               onClick={onStop}
-              className="ksemo-dictation-stop size-8 !rounded-lg bg-background/80 text-foreground shadow-xs hover:bg-destructive/10 hover:text-destructive transition-colors"
+              className="ksemo-dictation-stop size-8 !rounded-lg bg-background/80 text-foreground shadow-xs hover:bg-accent hover:text-foreground transition-colors"
               aria-label="Stop"
             >
               <Square className="size-2.5 fill-current" />

@@ -3701,6 +3701,7 @@ export default function Home({
   }
 
   function newChat() {
+    setGreetingAnimationKey(current => current + 1);
     if (composerTag === "bot" || botVoiceOpenRef.current) {
       botVoiceOpenRef.current = false;
       setComposerTag("chat");
@@ -4962,7 +4963,30 @@ export default function Home({
     setDeleteTarget(null);
   });
 
-  const greeting = useMemo(timeGreeting, []);
+  const [greetingHour, setGreetingHour] = useState(() => new Date().getHours());
+  const [greetingAnimationKey, setGreetingAnimationKey] = useState(0);
+  const greeting = useMemo(
+    () => timeGreeting(isTemporaryChat),
+    [isTemporaryChat, greetingHour]
+  );
+
+  useEffect(() => {
+    // Refresh at the next local-hour boundary so an open new-chat screen
+    // naturally gets a fresh greeting without needing a reload.
+    let timer: ReturnType<typeof setTimeout>;
+    const updateGreeting = () => {
+      setGreetingHour(new Date().getHours());
+      const now = new Date();
+      const nextHour = new Date(now);
+      nextHour.setHours(now.getHours() + 1, 0, 0, 0);
+      timer = setTimeout(updateGreeting, nextHour.getTime() - now.getTime());
+    };
+    const now = new Date();
+    const nextHour = new Date(now);
+    nextHour.setHours(now.getHours() + 1, 0, 0, 0);
+    timer = setTimeout(updateGreeting, nextHour.getTime() - now.getTime());
+    return () => clearTimeout(timer);
+  }, []);
 
   const renderComposer = (
     options: {
@@ -5259,9 +5283,13 @@ export default function Home({
                         }
                         aria-pressed={isTemporaryChat}
                         onClick={() => {
+                          // Dictation belongs to the current composer session;
+                          // discard it when entering or leaving temporary chat.
+                          voice.cancel();
                           const next = !isTemporaryChatRef.current;
                           isTemporaryChatRef.current = next;
                           setIsTemporaryChat(next);
+                          setGreetingAnimationKey(current => current + 1);
                           if (next) {
                             temporaryConversationIdsRef.current = new Set();
                             writeStoredTemporaryChat(user?.id, {
@@ -6069,6 +6097,7 @@ export default function Home({
               ) : (
                 <EmptyState
                   greeting={greeting}
+                  animationKey={greetingAnimationKey}
                   temporary={isTemporaryChat}
                   composer={
                     isMobile
@@ -6291,30 +6320,117 @@ export default function Home({
   );
 }
 
-function timeGreeting() {
-  const hour = new Date().getHours();
-  if (hour >= 5 && hour < 12) return "Hey, what's sparking today?";
-  if (hour >= 12 && hour < 17) return "Hey, what's your next move?";
-  if (hour >= 17 && hour < 21) return "Hey, what's on your mind?";
-  return "Hey, what are you thinking?";
+function timeGreeting(temporary = false) {
+  const now = new Date();
+  const hour = now.getHours();
+  const partOfDay = hour >= 5 && hour < 12 ? "morning" :
+    hour >= 12 && hour < 17 ? "afternoon" :
+      hour >= 17 && hour < 21 ? "evening" : "late";
+  const normalGreetings: Record<string, string[]> = {
+    morning: [
+      "Morning! What’s on your mind?",
+      "What are you looking forward to?",
+      "What would you love to make today?",
+      "Got a fresh idea to explore?",
+      "What can I make easier today?",
+      "Tell me what you’re curious about.",
+    ],
+    afternoon: [
+      "How’s your day going so far?",
+      "What would feel good to finish?",
+      "What’s taking up your thoughts?",
+      "Want to untangle something together?",
+      "What can I help with right now?",
+      "What are you excited to work on?",
+    ],
+    evening: [
+      "How did today treat you?",
+      "What’s still on your mind today?",
+      "Want to make tomorrow feel lighter?",
+      "What would you like to figure out?",
+      "Anything you’d like to talk through?",
+      "What’s one thing I can help with?",
+    ],
+    late: [
+      "Late-night thought? I’m listening.",
+      "What’s keeping your mind busy?",
+      "Want to talk an idea through?",
+      "What would help you unwind a bit?",
+      "Anything you want to get off your mind?",
+      "What can we make sense of tonight?",
+    ],
+  };
+  const temporaryGreetings: Record<string, string[]> = {
+    morning: [
+      "A quiet space for fresh ideas.",
+      "What’s on your mind this morning?",
+      "Need a little room to think?",
+      "What would you like to explore?",
+      "Let’s make space for your thoughts.",
+      "What can we figure out together?",
+    ],
+    afternoon: [
+      "A private space to think things through.",
+      "What would you like to talk through?",
+      "Need a moment to sort things out?",
+      "What’s on your mind right now?",
+      "Let’s explore that at your pace.",
+      "What can I help you untangle?",
+    ],
+    evening: [
+      "A little space, just for your thoughts.",
+      "What would you like to leave here?",
+      "Want to think something through?",
+      "What’s on your mind tonight?",
+      "Let’s make sense of it together.",
+      "What would feel good to talk about?",
+    ],
+    late: [
+      "A quiet place for late-night thoughts.",
+      "What’s on your mind tonight?",
+      "Need a space to think out loud?",
+      "What would you like to work through?",
+      "Let’s untangle that thought together.",
+      "What can I help you sort out?",
+    ],
+  };
+  // Change on the hour, with a day-based offset so the sequence does not feel
+  // identical every day while remaining stable during each hour.
+  const options = (temporary ? temporaryGreetings : normalGreetings)[partOfDay];
+  const dayOffset = Math.floor(
+    new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() /
+      86_400_000
+  );
+  return options[(dayOffset + hour) % options.length];
 }
 
 const EmptyState = memo(function EmptyState({
   greeting,
+  animationKey,
   composer,
   temporary = false,
 }: {
   greeting: string;
+  animationKey: number;
   composer: React.ReactNode;
   temporary?: boolean;
 }) {
   return (
-    <div className="mx-auto flex h-full w-full max-w-3xl flex-col px-0 pb-16 sm:px-5 sm:pb-4 lg:justify-center lg:pt-12">
-      <div className="flex min-h-0 flex-1 flex-col justify-center lg:flex-none">
-        <div className="mb-4 px-5 text-center sm:mb-5 sm:px-0">
-          <p className="text-[22px] font-bold tracking-[-0.04em] text-balance text-foreground sm:tracking-[-0.025em]">
-            {greeting}
-          </p>
+    <div className="mx-auto flex h-full w-full max-w-3xl flex-col justify-center gap-4 px-0 pb-16 sm:px-5 sm:pb-4 lg:pb-0">
+      <div>
+        <div className="px-5 text-center sm:px-0">
+          <div
+            key={`${temporary ? "temporary" : "normal"}-${animationKey}`}
+            className="relative mx-auto w-fit"
+          >
+            <p className="ksemo-greeting-rise whitespace-nowrap text-[clamp(1rem,4.8vw,1.375rem)] font-bold tracking-[-0.04em] text-foreground sm:tracking-[-0.025em]">
+              {greeting}
+            </p>
+            <span
+              className="ksemo-greeting-sweep"
+              aria-hidden="true"
+            />
+          </div>
         </div>
       </div>
       <div className="relative mx-auto w-full max-w-3xl">
