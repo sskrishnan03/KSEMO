@@ -149,6 +149,7 @@ export function LibraryWorkspace({
   const [shareNotice, setShareNotice] = useState<"success" | "error" | null>(
     null
   );
+  const [shareNoticeUrl, setShareNoticeUrl] = useState<string | null>(null);
   const shareNoticeTimerRef = useRef<number | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const { openPdf } = usePdfViewer();
@@ -370,22 +371,26 @@ export function LibraryWorkspace({
     }
   }
 
-  const showShareNotice = useCallback((status: "success" | "error") => {
-    if (shareNoticeTimerRef.current !== null) {
-      window.clearTimeout(shareNoticeTimerRef.current);
-    }
-    setShareNotice(status);
-    shareNoticeTimerRef.current = window.setTimeout(() => {
-      setShareNotice(null);
-      shareNoticeTimerRef.current = null;
-    }, 4000);
-  }, []);
+  const showShareNotice = useCallback(
+    (status: "success" | "error", url?: string) => {
+      if (shareNoticeTimerRef.current !== null) {
+        window.clearTimeout(shareNoticeTimerRef.current);
+      }
+      setShareNotice(status);
+      setShareNoticeUrl(url ?? null);
+      shareNoticeTimerRef.current = window.setTimeout(() => {
+        setShareNotice(null);
+        shareNoticeTimerRef.current = null;
+      }, 5000);
+    }, []
+  );
   const dismissShareNotice = useCallback(() => {
     if (shareNoticeTimerRef.current !== null) {
       window.clearTimeout(shareNoticeTimerRef.current);
       shareNoticeTimerRef.current = null;
     }
     setShareNotice(null);
+    setShareNoticeUrl(null);
   }, []);
   const requestShare = useCallback(
     async (file: LibraryWorkspaceFile) => {
@@ -417,7 +422,7 @@ export function LibraryWorkspace({
           }
         }
         await minimumLoading;
-        showShareNotice("success");
+        showShareNotice("success", shareUrl);
       } catch {
         showShareNotice("error");
       } finally {
@@ -569,6 +574,11 @@ export function LibraryWorkspace({
                     ? "File link copied. Ready to share."
                     : "Couldn't copy file link. Please try again."
                 }
+                href={
+                  shareNotice === "success"
+                    ? (shareNoticeUrl ?? undefined)
+                    : undefined
+                }
                 status={shareNotice}
                 onDismiss={dismissShareNotice}
               />
@@ -683,6 +693,11 @@ export function LibraryWorkspace({
                     shareNotice === "success"
                       ? "File link copied. Ready to share."
                       : "Couldn't copy file link. Please try again."
+                  }
+                  href={
+                    shareNotice === "success"
+                      ? (shareNoticeUrl ?? undefined)
+                      : undefined
                   }
                   status={shareNotice}
                   onDismiss={dismissShareNotice}

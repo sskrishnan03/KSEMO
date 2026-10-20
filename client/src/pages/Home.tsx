@@ -708,6 +708,7 @@ export default function Home({
     null
   );
   const [shareNoticeText, setShareNoticeText] = useState("");
+  const [shareNoticeUrl, setShareNoticeUrl] = useState<string | null>(null);
   const shareNoticeTimerRef = useRef<number | null>(null);
   useEffect(
     () => () => {
@@ -2269,7 +2270,7 @@ export default function Home({
     []
   );
 
-  function flushPendingDeltas() {
+  function flushPendingDeltas(characterLimit = 2) {
     if (deltaFlushRafRef.current) {
       cancelAnimationFrame(deltaFlushRafRef.current);
       deltaFlushRafRef.current = 0;
@@ -2278,7 +2279,7 @@ export default function Home({
     if (!queuedDeltas.size) return;
     const deltas = new Map<string, string>();
     const remainingDeltas = new Map<string, string>();
-    let characterBudget = 2;
+    let characterBudget = characterLimit;
     for (const [messageId, queuedText] of queuedDeltas) {
       if (characterBudget <= 0) {
         remainingDeltas.set(messageId, queuedText);
@@ -2332,18 +2333,12 @@ export default function Home({
     }
   }
 
-  async function drainPendingDeltas(shouldStop?: () => boolean) {
-    while (pendingDeltasRef.current.size && !shouldStop?.()) {
-      if (!deltaFlushRafRef.current) {
-        deltaFlushRafRef.current = requestAnimationFrame(() => {
-          deltaFlushRafRef.current = 0;
-          flushPendingDeltas();
-        });
-      }
-      await new Promise<void>(resolve =>
-        requestAnimationFrame(() => resolve())
-      );
-    }
+  function drainPendingDeltas(shouldStop?: () => boolean) {
+    if (shouldStop?.()) return;
+    // Streaming deltas have already been paced while arriving. Once the
+    // provider signals completion, reveal any final queued text immediately
+    // so the Stop button and thinking state don't linger behind a typewriter.
+    flushPendingDeltas(Number.POSITIVE_INFINITY);
   }
 
   function handleMessagesScroll() {
@@ -3045,7 +3040,7 @@ export default function Home({
     } else if (isViewingThisStream()) {
       // A completed response should finish revealing queued characters before
       // its status changes, so it does not jump ahead at the end.
-      await drainPendingDeltas(
+      drainPendingDeltas(
         () =>
           streamEntry.stoppedByUser ||
           stoppedStreamTurnIdsRef.current.has(turnSequence)
@@ -3643,6 +3638,9 @@ export default function Home({
       ) {
         stream.stoppedByUser = true;
         stoppedStreamTurnIdsRef.current.add(stream.turnId);
+        // Abort the fetch/provider immediately; persistence of the partial
+        // answer below is best-effort and must not delay the stop action.
+        stream.controller.abort();
         const assistantMessageId = stream.assistantMessageId;
         if (voiceOnly) stoppedVoiceMessageId = assistantMessageId;
         const conversationId = stream.conversationId;
@@ -3681,7 +3679,6 @@ export default function Home({
               console.error("Could not save the interrupted response", error)
             );
         }
-        stream.controller.abort();
         setStreams(current =>
           current.map(item =>
             item.turnId === stream.turnId ? { ...item, active: false } : item
@@ -3834,11 +3831,16 @@ export default function Home({
     return createPublicConversationUrl(window.location.origin, token);
   }
 
-  function showShareNotice(status: "success" | "error", message?: string) {
+  function showShareNotice(
+    status: "success" | "error",
+    message?: string,
+    url?: string
+  ) {
     if (shareNoticeTimerRef.current !== null) {
       window.clearTimeout(shareNoticeTimerRef.current);
     }
     setShareNotice(status);
+    setShareNoticeUrl(url ?? null);
     setShareNoticeText(
       message ??
         (status === "success"
@@ -3848,7 +3850,7 @@ export default function Home({
     shareNoticeTimerRef.current = window.setTimeout(() => {
       setShareNotice(null);
       shareNoticeTimerRef.current = null;
-    }, 4000);
+    }, 5000);
   }
 
   function dismissShareNotice() {
@@ -3857,10 +3859,13 @@ export default function Home({
       shareNoticeTimerRef.current = null;
     }
     setShareNotice(null);
+    setShareNoticeUrl(null);
   }
 
   async function copyConversationShareLink() {
-    showActionNotice("Chat link copied. Ready to share.");
+    const token = shareTarget?.shareToken ?? activeConversation?.shareToken;
+    const url = token ? conversationShareUrl(token) : undefined;
+    showActionNotice("Chat link copied. Ready to share.", url);
   }
 
   function openEmailShare() {
@@ -3905,7 +3910,7 @@ export default function Home({
         document.execCommand("copy");
         field.remove();
       }
-      showShareNotice("success", "Chat link copied. Ready to share.");
+      showShareNotice("success", "Chat link copied. Ready to share.", url);
     } catch {
       showShareNotice("error", "Couldn't copy chat link. Please try again.");
     } finally {
@@ -3942,7 +3947,11 @@ export default function Home({
         if (!copied) throw new Error("Clipboard copy failed");
       }
       await minimumLoading;
-      showShareNotice("success", "Answer link copied. Ready to share.");
+      showShareNotice(
+        "success",
+        "Answer link copied. Ready to share.",
+        answerUrl.toString()
+      );
     } catch {
       await minimumLoading;
       showShareNotice("error", "Couldn't copy answer link. Please try again.");
@@ -3975,7 +3984,7 @@ export default function Home({
       await utils.conversation.get.invalidate({ id: activeConversationId });
       await utils.conversation.list.invalidate();
       selectConversation(branch.id);
-      toast.success("Branched into a new chat from this response.");
+      showShareNotice("success", "Branched into a new chat from this response.");
     } catch {
       toast.error("Could not branch this response into a new chat.");
     }
@@ -5382,6 +5391,11 @@ export default function Home({
                     <div className="pointer-events-auto absolute right-2 top-11 animate-in fade-in slide-in-from-top-1 duration-200">
                       <ActionNotice
                         message={shareNoticeText}
+                        href={
+                          shareNotice === "success"
+                            ? (shareNoticeUrl ?? undefined)
+                            : undefined
+                        }
                         status={shareNotice}
                         onDismiss={dismissShareNotice}
                       />

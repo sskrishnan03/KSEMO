@@ -1,5 +1,5 @@
 import { toast } from "sonner";
-import { CircleX, X } from "lucide-react";
+import { CircleX, ExternalLink, X } from "lucide-react";
 
 export function CopySuccessIcon({
   className = "size-[17px]",
@@ -30,10 +30,12 @@ export function CopySuccessIcon({
 
 export function ActionNotice({
   message,
+  href,
   onDismiss,
   status = "success",
 }: {
   message: string;
+  href?: string;
   onDismiss: () => void;
   status?: "success" | "error";
 }) {
@@ -41,16 +43,26 @@ export function ActionNotice({
     <div
       role="status"
       aria-live="polite"
-      className="inline-flex w-max max-w-[min(24rem,calc(100vw-2rem))] items-center gap-3 rounded-lg bg-[#343434] px-4 py-3 text-white shadow-lg shadow-black/25"
+      className="inline-flex w-max max-w-[min(30rem,calc(100vw-1rem))] items-center gap-2 rounded-lg bg-[#343434] px-3 py-3 text-white shadow-lg shadow-black/25"
     >
       {status === "success" ? (
         <CopySuccessIcon className="size-[17px] shrink-0" />
       ) : (
         <CircleX className="size-4 shrink-0" aria-hidden="true" />
       )}
-      <p className="min-w-0 max-w-[min(20rem,calc(100vw-7rem))] whitespace-normal text-sm font-medium leading-5">
-        {message}
-      </p>
+      <div className="flex min-w-0 flex-1 items-center gap-2 text-sm font-normal leading-5">
+        <p className="shrink-0 whitespace-nowrap">{message}</p>
+        {href && (
+          <a
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-sky-300 underline decoration-sky-300/70 underline-offset-2 hover:text-sky-200"
+          >
+            Open <ExternalLink className="size-3.5" aria-hidden="true" />
+          </a>
+        )}
+      </div>
       <button
         type="button"
         onClick={onDismiss}
@@ -63,11 +75,15 @@ export function ActionNotice({
   );
 }
 
-export function showActionNotice(message: string) {
+export function showActionNotice(message: string, href?: string) {
   toast.custom(
     id => (
-      <ActionNotice message={message} onDismiss={() => toast.dismiss(id)} />
+      <ActionNotice
+        message={message}
+        href={href}
+        onDismiss={() => toast.dismiss(id)}
+      />
     ),
-    { duration: 4000 }
+    { duration: 5000 }
   );
 }

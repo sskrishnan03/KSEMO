@@ -765,8 +765,8 @@ html.ksemo-reduce-motion .loader-xs {
   animation: ksemo-copy-tick-draw 150ms 25ms ease-out forwards;
 }
 @keyframes ksemo-copy-box-in {
-  from { opacity: 0.5; transform: scale(0.78); transform-origin: center; }
-  to { opacity: 1; transform: scale(1); transform-origin: center; }
+  from { transform: scale(0.78); transform-origin: center; }
+  to { transform: scale(1); transform-origin: center; }
 }
 @keyframes ksemo-copy-tick-draw {
   to { stroke-dashoffset: 0; }
