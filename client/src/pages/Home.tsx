@@ -44,9 +44,9 @@ import {
 import { BranchSplitIcon } from "@/components/ksemo/BranchSplitIcon";
 import { Sidebar2 } from "reicon-react/icons/Sidebar2";
 import { ChatLine } from "reicon-react/icons/ChatLine";
+import { ChatRoundCall } from "reicon-react/icons/ChatRoundCall";
 import {
   ShareIcon,
-  TemporaryChatIcon,
   PinTackIcon,
   UnpinTackIcon,
   WinrarIcon,
@@ -5332,9 +5332,13 @@ export default function Home({
                         }}
                         className="ksemo-temp-toggle size-10 rounded-xl text-foreground transition-colors hover:bg-accent"
                       >
-                        <TemporaryChatIcon
-                          active={false}
-                          className="ksemo-temp-toggle-icon size-[26px]"
+                        <ChatRoundCall
+                          weight={isTemporaryChat ? "Filled" : "Outline"}
+                          size={26}
+                          className={cn(
+                            "ksemo-temp-toggle-icon size-[26px]",
+                            isTemporaryChat && "scale-[1.08]"
+                          )}
                         />
                       </Button>
                     </TooltipTrigger>
