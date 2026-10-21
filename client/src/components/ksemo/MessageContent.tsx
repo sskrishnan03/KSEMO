@@ -807,7 +807,7 @@ export const MessageContent = memo(function MessageContent({
                     !(message.attachments?.length && !isUser) && (
                       <div
                         aria-label="KSEMO is responding"
-                        className="inline-flex items-center gap-2"
+                        className="inline-flex items-center gap-1"
                       >
                         <ThinkingIndicator size={24} />
                         <span className="text-sm font-medium text-muted-foreground">

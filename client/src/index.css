@@ -81,14 +81,12 @@
   background: linear-gradient(
     90deg,
     transparent,
-    #8f00ff 18%,
-    #00b7eb 38%,
-    #00f0ff 58%,
-    #e0ffff 78%,
-    #ffffff 90%,
+    color-mix(in srgb, var(--greeting-highlight) 38%, transparent) 18%,
+    var(--greeting-highlight) 52%,
+    color-mix(in srgb, var(--greeting-highlight) 38%, transparent) 82%,
     transparent
   );
-  filter: drop-shadow(0 0 3px #00d4ff) drop-shadow(0 0 4px #8f00ff);
+  filter: drop-shadow(0 0 3px color-mix(in srgb, var(--greeting-highlight) 28%, transparent));
   animation: ksemo-greeting-sweep 900ms ease-in-out 180ms both;
 }
 
@@ -257,6 +255,7 @@
 
 :root {
   --radius: 0.85rem;
+  --greeting-highlight: #7656a6;
   --background: #f7f7f7;
   --foreground: #1a1a1a;
   --card: #ffffff;
@@ -287,6 +286,7 @@
 }
 
 .dark {
+  --greeting-highlight: #b69add;
   --background: #1c1c1c;
   --foreground: #ededed;
   --card: #222222;
@@ -641,6 +641,38 @@ html.ksemo-reduce-motion *::after {
 @keyframes ksemoloader {
   to {
     transform: rotate(1turn);
+  }
+}
+
+@keyframes ksemo-dot-loader-bob {
+  0%,
+  100% {
+    opacity: 0.6;
+    transform: translateY(0) scale(0.84);
+  }
+  50% {
+    opacity: 1;
+    transform: translateY(-4px) scale(1.16);
+  }
+}
+
+.ksemo-dot-loader-particle {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: ksemo-dot-loader-bob 900ms cubic-bezier(0.3, 0, 0.2, 1) infinite;
+}
+
+html.ksemo-reduce-motion .ksemo-dot-loader-particle {
+  animation: none;
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ksemo-dot-loader-particle {
+    animation: none;
+    opacity: 1;
+    transform: none;
   }
 }
 

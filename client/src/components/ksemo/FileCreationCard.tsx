@@ -18,6 +18,7 @@ import {
 } from "@shared/presentation";
 import { usePdfViewer, isViewableDocument } from "@/contexts/PdfViewerContext";
 import { isLightOrWhiteBorder } from "@/components/ksemo/PdfDrawer";
+import { ThinkingIndicator } from "@/components/ui/thinking-indicator";
 
 export type FileCreationStage =
   | "analyzing"
@@ -366,24 +367,31 @@ export const FileCreationCard = memo(function FileCreationCard({
         data-testid="file-creation-drafting"
         className="relative my-2 flex items-center gap-2.5 py-1 select-none motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-left-2 motion-safe:duration-300"
       >
-        <CreateFileModeIcon
-          mode={capabilityFormat}
-          className="size-5 shrink-0 select-none"
-        />
-        <span className="text-[13.5px] font-medium select-none text-muted-foreground">
-          {creatingPhrase}
-        </span>
+        <ThinkingIndicator size={24} className="shrink-0 opacity-80" />
         <div
-          aria-hidden="true"
-          className="ksemo-file-status-sweep pointer-events-none absolute inset-0 flex items-center gap-2.5 text-foreground"
+          className="relative flex items-center gap-2.5"
         >
           <CreateFileModeIcon
             mode={capabilityFormat}
-            className="size-5 shrink-0 select-none"
+            colored={false}
+            className="size-[18px] shrink-0 select-none text-white/75"
           />
-          <span className="text-[13.5px] font-medium select-none">
+          <span className="text-[15px] font-medium select-none text-white/75">
             {creatingPhrase}
           </span>
+          <div
+            aria-hidden="true"
+            className="ksemo-file-status-sweep pointer-events-none absolute inset-0 flex items-center gap-2.5 text-foreground"
+          >
+            <CreateFileModeIcon
+              mode={capabilityFormat}
+              colored={false}
+              className="size-[18px] shrink-0 select-none text-white/75"
+            />
+            <span className="text-[15px] font-medium select-none text-white/75">
+              {creatingPhrase}
+            </span>
+          </div>
         </div>
       </div>
     );
