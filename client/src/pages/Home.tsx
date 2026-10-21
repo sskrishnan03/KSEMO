@@ -762,9 +762,16 @@ export default function Home({
   // Imperative handle to the live streams so cleanup/new-chat/stop can abort the
   // right controllers without waiting for a render.
   const streamsRef = useRef(streams);
-  useEffect(() => {
-    streamsRef.current = streams;
-  }, [streams]);
+  const updateStreams = (update: React.SetStateAction<typeof streams>) => {
+    const nextStreams =
+      typeof update === "function"
+        ? (update as (current: typeof streams) => typeof streams)(
+            streamsRef.current
+          )
+        : update;
+    streamsRef.current = nextStreams;
+    setStreams(nextStreams);
+  };
   const messagesEndRef = useRef<HTMLDivElement>(null);
   // The chat pane is the scroll container; tracking closeness to the bottom lets
   // us auto-scroll during generation without fighting the user's scroll wheel.
@@ -2480,7 +2487,7 @@ export default function Home({
       stoppedByUser: false,
     };
     visibleResponseTextRef.current.set(streamEntry.assistantMessageId, "");
-    setStreams(current => [...current, streamEntry]);
+    updateStreams(current => [...current, streamEntry]);
     // True when the user is still viewing the conversation this stream writes to.
     const isViewingThisStream = () =>
       activeConversationIdRef.current === streamEntry.conversationId;
@@ -2603,7 +2610,7 @@ export default function Home({
             // Refresh the streams array so memoized consumers (e.g. the
             // sidebar's generating-id set) recompute with the newly assigned
             // conversation id.
-            setStreams(current => [...current]);
+            updateStreams(current => [...current]);
             if (temporary) {
               // Remember this conversation so it can be purged when the
               // temporary session ends. Never surface it in recents/history.
@@ -2688,6 +2695,20 @@ export default function Home({
             // reveal queue to drain.
             const completedMessageId =
               str(data.messageId) || streamEntry.assistantMessageId;
+            // The answer is finished even if the server is still doing title
+            // work before closing the SSE connection. Release the composer and
+            // stop the idle watchdog now; otherwise the Stop button can remain
+            // visible (and a follow-up send can be rejected) after the answer
+            // is already on screen.
+            streamEntry.active = false;
+            updateStreams(current =>
+              current.map(stream =>
+                stream.turnId === turnSequence
+                  ? { ...stream, active: false }
+                  : stream
+              )
+            );
+            clearInterval(watchdog);
             if (
               completedMessageId &&
               isViewingThisStream() &&
@@ -3064,7 +3085,7 @@ export default function Home({
     // The stream is finished for this conversation. Streams in other
     // conversations are left untouched.
     streamEntry.active = false;
-    setStreams(current =>
+    updateStreams(current =>
       current.map(stream =>
         stream.turnId === turnSequence ? { ...stream, active: false } : stream
       )
@@ -3679,7 +3700,7 @@ export default function Home({
               console.error("Could not save the interrupted response", error)
             );
         }
-        setStreams(current =>
+        updateStreams(current =>
           current.map(item =>
             item.turnId === stream.turnId ? { ...item, active: false } : item
           )
@@ -3755,7 +3776,7 @@ export default function Home({
     for (const stream of streamsRef.current) {
       if (stream.active && stream.conversationId === target) {
         stream.controller.abort();
-        setStreams(current =>
+        updateStreams(current =>
           current.map(item =>
             item.turnId === stream.turnId ? { ...item, active: false } : item
           )
@@ -5440,7 +5461,7 @@ export default function Home({
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="pointer-events-auto absolute right-2 top-2 hidden h-8 rounded-lg border border-border/50 bg-muted/70 px-3 text-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground lg:flex"
+                            className="pointer-events-auto absolute right-[3px] top-[3px] hidden h-9 rounded-lg border border-border/50 bg-muted/70 px-3 text-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground lg:flex"
                             aria-label="Share chat"
                             disabled={
                               !activeConversationId ||
@@ -6461,9 +6482,9 @@ const EmptyState = memo(function EmptyState({
                     weight="Outline"
                     size={26}
                     aria-hidden="true"
-                    className="text-white"
+                    className="text-[#b89aff]"
                   />
-                  <span>Temporary chat</span>
+                  <span className="text-[#b89aff]">Temporary chat</span>
                 </span>
               ) : (
                 greeting

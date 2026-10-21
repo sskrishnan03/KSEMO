@@ -21,23 +21,83 @@
   }
 }
 
-/* Temporary chat uses a clear spring-green accent against a charcoal surface. */
+/* Temporary chat keeps the normal chat palette, with a dashed composer edge. */
 .temp-mode {
-  --temp-accent: #b8e36b;
-  --temp-surface: #292b24;
-  --temp-placeholder: #c6d2aa;
+  --temp-accent: #b89aff;
 }
 
 .temp-mode .ksemo-composer-shell:not(.ksemo-help-composer-shell) {
-  background-color: var(--temp-surface);
-  border: 1px dashed color-mix(in srgb, var(--temp-accent) 34%, transparent);
-  box-shadow: none;
-  transition:
-    color 0.25s ease,
-    background-color 0.25s ease,
-    border-color 0.25s ease,
-    box-shadow 0.25s ease;
+  background-color: var(--popover);
+  border: 1px dashed color-mix(in srgb, var(--temp-accent) 60%, transparent);
 }
+
+.temp-mode .ksemo-user-message-bubble {
+  border: 1px dashed color-mix(in srgb, var(--temp-accent) 60%, transparent);
+}
+
+.temp-mode .ksemo-temp-toggle-icon {
+  color: var(--temp-accent);
+}
+
+.temp-mode .ksemo-temp-toggle,
+.temp-mode .ksemo-temp-toggle:hover,
+.temp-mode .ksemo-temp-toggle:focus-visible,
+.temp-mode .ksemo-temp-toggle:active {
+  border: 0;
+  outline: none;
+  box-shadow: none;
+}
+
+.temp-mode .ksemo-composer-placeholder {
+  color: color-mix(in srgb, var(--temp-accent) 72%, var(--muted-foreground));
+}
+
+.temp-mode .ksemo-composer-dictate {
+  color: var(--temp-accent);
+}
+
+.temp-mode .ksemo-composer-dictate:hover {
+  color: var(--temp-accent);
+}
+
+.temp-mode .ksemo-composer-attach {
+  color: var(--muted-foreground);
+}
+
+.temp-mode .ksemo-composer-attach:hover,
+.temp-mode .ksemo-composer-attach[data-state="open"],
+.temp-mode .ksemo-composer-attach[aria-expanded="true"] {
+  color: var(--temp-accent);
+}
+
+.temp-mode .ksemo-composer-send,
+.temp-mode .ksemo-composer-send:hover {
+  background-color: var(--muted);
+  color: var(--temp-accent);
+}
+
+.temp-mode .ksemo-composer-send:hover {
+  background-color: color-mix(in srgb, var(--temp-accent) 12%, var(--muted));
+}
+
+.temp-mode .ksemo-composer-send-ready,
+.temp-mode .ksemo-composer-send-ready:hover,
+.temp-mode .ksemo-response-stop,
+.temp-mode .ksemo-response-stop:hover {
+  background-color: var(--temp-accent);
+  color: #211833;
+}
+
+.temp-mode .ksemo-dictation-wave-bar {
+  background-color: var(--temp-accent);
+}
+
+.temp-mode .ksemo-dictation-stop,
+.temp-mode .ksemo-dictation-transcribe {
+  background-color: var(--temp-accent);
+  color: #211833;
+}
+
 
 @keyframes ksemo-greeting-sweep {
   0% {
@@ -81,9 +141,9 @@
   background: linear-gradient(
     90deg,
     transparent,
-    color-mix(in srgb, var(--greeting-highlight) 38%, transparent) 18%,
+    color-mix(in srgb, var(--greeting-highlight) 55%, white) 18%,
     var(--greeting-highlight) 52%,
-    color-mix(in srgb, var(--greeting-highlight) 38%, transparent) 82%,
+    color-mix(in srgb, var(--greeting-highlight) 55%, white) 82%,
     transparent
   );
   filter: drop-shadow(0 0 3px color-mix(in srgb, var(--greeting-highlight) 28%, transparent));
@@ -99,117 +159,6 @@
     opacity: 1;
     transform: none;
   }
-}
-
-.temp-mode .ksemo-composer-fade {
-  background-image: linear-gradient(to top, var(--temp-surface), transparent);
-}
-
-/* The help drawer is separate from the temporary chat composer. Keep its
-   input surface on the normal project palette while a temp chat is active. */
-.temp-mode .ksemo-help-composer-shell {
-  background-color: var(--popover);
-  border: 1px solid var(--border);
-  box-shadow: var(--tw-shadow, 0 1px 2px 0 rgb(0 0 0 / 0.05));
-}
-
-.temp-mode .ksemo-user-message-bubble {
-  border-style: dashed;
-  border-color: color-mix(in srgb, var(--temp-accent) 34%, transparent);
-  transition: border-color 0.25s ease;
-}
-
-.temp-mode .ksemo-composer-placeholder {
-  color: var(--temp-placeholder);
-  transition: color 0.25s ease;
-}
-
-.temp-mode .ksemo-composer-attach,
-.temp-mode .ksemo-composer-dictate {
-  color: var(--temp-accent);
-  transition: color 0.25s ease;
-}
-
-.temp-mode .ksemo-composer-send {
-  background-color: #393c33;
-  color: #aab19b;
-  transition:
-    color 0.25s ease,
-    background-color 0.25s ease,
-    box-shadow 0.25s ease;
-}
-
-.temp-mode .ksemo-composer-send-ready,
-.temp-mode .ksemo-composer-send-ready:hover {
-  background-color: var(--temp-accent);
-  color: #202319;
-  transition:
-    color 0.25s ease,
-    background-color 0.25s ease,
-    box-shadow 0.25s ease;
-}
-
-.temp-mode .ksemo-temp-toggle,
-.temp-mode .ksemo-temp-toggle:hover,
-.temp-mode .ksemo-temp-toggle:focus-visible,
-.temp-mode .ksemo-temp-toggle:active {
-  background-color: transparent;
-}
-
-.temp-mode .ksemo-temp-toggle-icon {
-  color: var(--temp-accent);
-  transition: color 0.25s ease;
-}
-
-.temp-mode .ksemo-temp-toggle,
-.temp-mode .ksemo-temp-toggle:hover,
-.temp-mode .ksemo-temp-toggle:focus-visible,
-.temp-mode .ksemo-temp-toggle:active,
-.temp-mode .ksemo-temp-toggle-icon {
-  background-color: transparent;
-  color: var(--temp-accent);
-  transition: color 0.25s ease;
-}
-
-.temp-mode .ksemo-dictation-pill {
-  background-color: var(--temp-surface);
-  border-color: var(--border);
-  border-style: solid;
-  color: var(--foreground);
-}
-
-.temp-mode .ksemo-dictation-stop {
-  background-color: color-mix(
-    in srgb,
-    var(--temp-accent) 12%,
-    var(--temp-surface)
-  );
-  color: var(--temp-accent);
-}
-
-.temp-mode .ksemo-dictation-stop:hover {
-  background-color: color-mix(
-    in srgb,
-    var(--temp-accent) 24%,
-    var(--temp-surface)
-  );
-}
-
-.temp-mode .ksemo-dictation-wave-bar {
-  background-color: var(--temp-accent);
-}
-
-.temp-mode .ksemo-dictation-transcribe,
-.temp-mode .ksemo-dictation-transcribe:hover,
-.temp-mode .ksemo-dictation-transcribe:focus-visible {
-  background-color: var(--temp-accent);
-  color: #202319;
-}
-
-.temp-mode .ksemo-response-stop,
-.temp-mode .ksemo-response-stop:hover {
-  background-color: var(--temp-accent);
-  color: #202319;
 }
 
 @theme {
@@ -255,7 +204,7 @@
 
 :root {
   --radius: 0.85rem;
-  --greeting-highlight: #7656a6;
+  --greeting-highlight: #b89aff;
   --background: #f7f7f7;
   --foreground: #1a1a1a;
   --card: #ffffff;
@@ -286,7 +235,7 @@
 }
 
 .dark {
-  --greeting-highlight: #b69add;
+  --greeting-highlight: #b89aff;
   --background: #1c1c1c;
   --foreground: #ededed;
   --card: #222222;
@@ -641,38 +590,6 @@ html.ksemo-reduce-motion *::after {
 @keyframes ksemoloader {
   to {
     transform: rotate(1turn);
-  }
-}
-
-@keyframes ksemo-dot-loader-bob {
-  0%,
-  100% {
-    opacity: 0.6;
-    transform: translateY(0) scale(0.84);
-  }
-  50% {
-    opacity: 1;
-    transform: translateY(-4px) scale(1.16);
-  }
-}
-
-.ksemo-dot-loader-particle {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: ksemo-dot-loader-bob 900ms cubic-bezier(0.3, 0, 0.2, 1) infinite;
-}
-
-html.ksemo-reduce-motion .ksemo-dot-loader-particle {
-  animation: none;
-  opacity: 1;
-  transform: none;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .ksemo-dot-loader-particle {
-    animation: none;
-    opacity: 1;
-    transform: none;
   }
 }
 
