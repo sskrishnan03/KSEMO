@@ -96,6 +96,16 @@
 .temp-mode .ksemo-dictation-transcribe {
   background-color: var(--temp-accent);
   color: #211833;
+  transition:
+    background-color 0.18s ease,
+    color 0.18s ease,
+    transform 0.18s ease;
+}
+
+.temp-mode .ksemo-dictation-stop:hover,
+.temp-mode .ksemo-dictation-transcribe:hover {
+  background-color: color-mix(in srgb, var(--temp-accent) 78%, white);
+  color: #211833;
 }
 
 
