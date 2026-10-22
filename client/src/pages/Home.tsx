@@ -2127,21 +2127,44 @@ export default function Home({
   useEffect(() => {
     if (!targetConversationId) return;
     if (loadedTargetConversationIdRef.current === targetConversationId) return;
-    loadedTargetConversationIdRef.current = targetConversationId;
-
-    utils.conversation.get
-      .fetch({ id: targetConversationId })
-      .then(data => {
-        if (!data?.conversation) return;
-        setActiveConversationId(targetConversationId);
-        activeConversationIdRef.current = targetConversationId;
-        if (user?.id) {
-          storeActiveConversationId(user.id, targetConversationId);
-          utils.conversation.list.invalidate();
-        }
-        requestComposerFocus();
-      })
-      .catch(() => {});
+    let cancelled = false;
+    let retryTimer: number | undefined;
+    let attempts = 0;
+    const retryQuietly = () => {
+      if (!cancelled && attempts < 3) {
+        retryTimer = window.setTimeout(loadTargetConversation, attempts * 500);
+      }
+    };
+    const loadTargetConversation = () => {
+      attempts += 1;
+      utils.conversation.get
+        .fetch({ id: targetConversationId })
+        .then(data => {
+          if (cancelled) return;
+          if (!data?.conversation) {
+            retryQuietly();
+            return;
+          }
+          loadedTargetConversationIdRef.current = targetConversationId;
+          setActiveConversationId(targetConversationId);
+          activeConversationIdRef.current = targetConversationId;
+          if (user?.id) {
+            storeActiveConversationId(user.id, targetConversationId);
+            utils.conversation.list.invalidate();
+          }
+          requestComposerFocus();
+        })
+        .catch(() => {
+          // Shared links can race initial session/cache setup. Retry briefly
+          // and quietly; the notification stays out of chat.
+          retryQuietly();
+        });
+    };
+    loadTargetConversation();
+    return () => {
+      cancelled = true;
+      if (retryTimer !== undefined) window.clearTimeout(retryTimer);
+    };
   }, [
     targetConversationId,
     user?.id,
@@ -3104,6 +3127,12 @@ export default function Home({
       : userStopped
         ? "cancelled"
         : "completed";
+    const isThisAssistantMessage = (message: KsemoMessage) =>
+      message.role === "assistant" &&
+      message.status === "streaming" &&
+      Boolean(streamEntry.assistantMessageId) &&
+      (message.id === streamEntry.assistantMessageId ||
+        message.clientId === streamEntry.assistantMessageId);
 
     // Only touch the visible conversation's messages if the user is actually
     // viewing it right now. If they switched away the server already owns the
@@ -3113,7 +3142,7 @@ export default function Home({
         if (userStopped) {
           setChatMessages(current =>
             current.map(message =>
-              message.role === "assistant" && message.status === "streaming"
+              isThisAssistantMessage(message)
                 ? {
                     ...message,
                     status: "cancelled",
@@ -3149,7 +3178,7 @@ export default function Home({
           // and mark the in-flight bubble as failed so Retry is available.
           setChatMessages(current =>
             current.map(message =>
-              message.role === "assistant" && message.status === "streaming"
+              isThisAssistantMessage(message)
                 ? { ...message, content: "", status: "failed" }
                 : message
             )
@@ -3173,7 +3202,7 @@ export default function Home({
       if (!isBotVoiceMode) {
         setChatMessages(current =>
           current.map(message =>
-            message.role === "assistant" && message.status === "streaming"
+            isThisAssistantMessage(message)
               ? {
                   ...message,
                   content: userStopped

@@ -398,7 +398,9 @@ export const ChatComposer = memo(function ChatComposer({
     [onBotVoice, onBotVoiceStop, onCancelRecording, onTagChange, onValueChange]
   );
 
-  const isEditorDisabled = isGenerating || isRecording || isTranscribing;
+  // Keep the editor usable during a response so users can prepare their next
+  // prompt. submit() keeps the text in place until generation is finished.
+  const isEditorDisabled = isRecording || isTranscribing;
   const displayedLibraryFiles = useMemo(
     () => filterLibraryItems(libraryFiles, libraryQuery),
     [libraryFiles, libraryQuery]
