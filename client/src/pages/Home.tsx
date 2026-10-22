@@ -2141,9 +2141,7 @@ export default function Home({
         }
         requestComposerFocus();
       })
-      .catch(() => {
-        toast.error("This shared conversation is unavailable or private.");
-      });
+      .catch(() => {});
   }, [
     targetConversationId,
     user?.id,

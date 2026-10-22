@@ -368,26 +368,14 @@ export const FileCreationCard = memo(function FileCreationCard({
         className="relative my-2 flex items-center gap-2.5 py-1 select-none motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-left-2 motion-safe:duration-300"
       >
         <ThinkingIndicator size={24} className="shrink-0 opacity-80" />
-        <div
-          className="relative flex items-center gap-2.5"
-        >
-          <CreateFileModeIcon
-            mode={capabilityFormat}
-            colored={false}
-            className="size-[18px] shrink-0 select-none text-white/75"
-          />
+        <div className="relative flex items-center gap-2.5">
           <span className="text-[15px] font-medium select-none text-white/75">
             {creatingPhrase}
           </span>
           <div
             aria-hidden="true"
-            className="ksemo-file-status-sweep pointer-events-none absolute inset-0 flex items-center gap-2.5 text-foreground"
+            className="ksemo-file-status-sweep pointer-events-none absolute inset-0 text-foreground"
           >
-            <CreateFileModeIcon
-              mode={capabilityFormat}
-              colored={false}
-              className="size-[18px] shrink-0 select-none text-white/75"
-            />
             <span className="text-[15px] font-medium select-none text-white/75">
               {creatingPhrase}
             </span>

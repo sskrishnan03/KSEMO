@@ -3036,7 +3036,16 @@ export const PdfDrawer = memo(function PdfDrawer({
     if (!isOpen) return;
     updateWidth();
     window.addEventListener("resize", updateWidth);
-    return () => window.removeEventListener("resize", updateWidth);
+    const container = scrollContainerRef.current;
+    const resizeObserver =
+      container && typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(updateWidth)
+        : null;
+    if (container) resizeObserver?.observe(container);
+    return () => {
+      window.removeEventListener("resize", updateWidth);
+      resizeObserver?.disconnect();
+    };
   }, [isOpen, updateWidth]);
 
   // PowerPoint 16:9 Canvas & Zoom Management (authentic PPT presentation scaling)
@@ -4086,9 +4095,9 @@ export const PdfDrawer = memo(function PdfDrawer({
                 data-testid="text-document-editor"
                 className="mx-auto my-4 flex flex-col bg-white text-neutral-900 dark:bg-card dark:text-foreground shadow-xl border border-border/80 rounded-sm min-h-[600px] transition-transform origin-top"
                 style={{
-                  maxWidth: "860px",
+                  maxWidth: isExpanded ? "none" : "860px",
                   width: "100%",
-                  zoom: scale !== 1.0 ? scale : undefined,
+                  zoom: !isExpanded && scale !== 1.0 ? scale : undefined,
                 }}
               >
                 <textarea
@@ -4104,9 +4113,12 @@ export const PdfDrawer = memo(function PdfDrawer({
             ) : (
               <div
                 data-testid="text-document-viewer"
-                className="mx-auto my-4 shadow-lg border border-border/80 min-h-[600px] select-text selection:bg-blue-500/30 transition-transform origin-top max-w-[860px] w-full rounded-sm p-6 sm:p-10 bg-white text-neutral-900 dark:bg-card dark:text-foreground"
+                className={cn(
+                  "mx-auto my-4 shadow-lg border border-border/80 min-h-[600px] select-text selection:bg-blue-500/30 transition-transform origin-top w-full rounded-sm p-6 sm:p-10 bg-white text-neutral-900 dark:bg-card dark:text-foreground",
+                  !isExpanded && "max-w-[860px]"
+                )}
                 style={{
-                  zoom: scale !== 1.0 ? scale : undefined,
+                  zoom: !isExpanded && scale !== 1.0 ? scale : undefined,
                 }}
               >
                 <pre className="whitespace-pre-wrap font-mono text-xs sm:text-[13px] leading-relaxed text-foreground/90 font-normal">
