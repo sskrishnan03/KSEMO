@@ -21,14 +21,79 @@
   }
 }
 
-/* Temporary chat keeps the normal chat palette, with a dashed composer edge. */
+/* Temporary chat uses a restrained purple frame around the existing dark chat. */
 .temp-mode {
-  --temp-accent: #b89aff;
+  --temp-accent: #a78bfa;
+  padding: 44px 8px 8px;
+  background: var(--temp-accent);
+}
+
+.temp-chat-main {
+  min-height: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 20px;
+  background: var(--background);
+  box-shadow: none;
+}
+
+.temp-chat-chrome {
+  position: absolute;
+  z-index: 100;
+  inset: 6px 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 32px;
+  padding: 0;
+  pointer-events: none;
+}
+
+.temp-chat-label,
+.temp-chat-close { pointer-events: auto; }
+
+.temp-chat-label {
+  margin-left: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #211832;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: .01em;
+}
+
+.temp-chat-label svg {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  color: #211832;
+}
+
+.temp-chat-close {
+  margin-right: 10px;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  color: #211832;
+}
+
+.temp-chat-close svg { width: 19px; height: 19px; }
+
+.temp-chat-close:hover { color: #100b19; background: rgb(255 255 255 / 22%); }
+
+@media (max-width: 640px) {
+  .temp-mode { padding: 42px 8px 8px; }
+  .temp-chat-main { border-radius: 16px; }
+  .temp-chat-chrome { inset: 6px 0 auto; height: 30px; padding: 0; }
+  .temp-chat-close { width: 30px; height: 30px; }
 }
 
 .temp-mode .ksemo-composer-shell:not(.ksemo-help-composer-shell) {
   background-color: var(--popover);
-  border: 1px dashed color-mix(in srgb, var(--temp-accent) 60%, transparent);
+  border-color: var(--border);
 }
 
 .temp-mode .ksemo-user-message-bubble {

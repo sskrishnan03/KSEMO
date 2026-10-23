@@ -18,6 +18,8 @@ import {
   getSharedAnswerByToken,
   getMessageForUser,
   listMessageVersionsForUser,
+  listMessageVersionsForMessages,
+  type MessageVersion,
   listMessageFilesForUser,
   attachFileToMessageForUser,
   getUserPreferences,
@@ -354,6 +356,13 @@ export const conversationRouter = router({
           });
         }
       }
+      const versionsByMessageId: Record<string, MessageVersion[]> =
+        isOwner && user
+          ? await listMessageVersionsForMessages(
+              items.map(message => message.id),
+              user.id
+            )
+          : {};
       return {
         conversation: {
           ...conversation,
@@ -362,6 +371,7 @@ export const conversationRouter = router({
         messages: await Promise.all(
           items.map(async message => ({
             ...message,
+            versions: versionsByMessageId[message.id] ?? [],
             attachments:
               isOwner && user
                 ? await listMessageFilesForUser(message.id, user.id)

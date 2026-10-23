@@ -209,6 +209,19 @@ export const DictateRecordingPill = memo(function DictateRecordingPill({
   );
 });
 
+function TranscribingStatus() {
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className="inline-flex h-10 shrink-0 items-center gap-2 px-2 text-sm font-normal text-[#a1a1aa]"
+    >
+      <span className="loader" style={{ width: 18 }} aria-hidden="true" />
+      <span>Transcribing</span>
+    </div>
+  );
+}
+
 export const ChatComposer = memo(function ChatComposer({
   onSend,
   onCancel,
@@ -1262,26 +1275,7 @@ export const ChatComposer = memo(function ChatComposer({
                             onTranscribe={onVoice}
                           />
                         ) : isTranscribing ? (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                disabled
-                                className="size-10 rounded-full bg-transparent text-foreground transition-colors"
-                                aria-label="Converting speech to text"
-                              >
-                                <div
-                                  className="loader"
-                                  style={{ width: 18 }}
-                                  aria-hidden
-                                />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent side="bottom">
-                              Transcribing…
-                            </TooltipContent>
-                          </Tooltip>
+                          <TranscribingStatus />
                         ) : (
                           <Tooltip>
                             <TooltipTrigger asChild>
@@ -1354,26 +1348,7 @@ export const ChatComposer = memo(function ChatComposer({
                             onTranscribe={onVoice}
                           />
                         ) : isTranscribing ? (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                disabled
-                                className="size-10 rounded-full bg-transparent text-foreground transition-colors"
-                                aria-label="Converting speech to text"
-                              >
-                                <div
-                                  className="loader"
-                                  style={{ width: 18 }}
-                                  aria-hidden
-                                />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent side="bottom">
-                              Transcribing…
-                            </TooltipContent>
-                          </Tooltip>
+                          <TranscribingStatus />
                         ) : (
                           <Tooltip>
                             <TooltipTrigger asChild>

@@ -9,6 +9,7 @@ import {
   listMessageFilesForUser,
   listMessagesForConversation,
   removeFollowingAssistantDuplicatesForUser,
+  saveMessageVersionForUser,
   updateStreamingMessageForUser,
   updateConversationForUser,
   updateMessage,
@@ -378,6 +379,7 @@ export function registerChatStream(app: Express) {
         body.regenerateAssistantMessageId ?? crypto.randomUUID();
       let historyForContext;
       if (body.regenerateAssistantMessageId) {
+        const requestedEditedContent = content;
         const existingMessages = await listMessagesForConversation(
           conversation.id
         );
@@ -398,9 +400,37 @@ export function registerChatStream(app: Express) {
             .json({ error: "The source response cannot be regenerated." });
           return;
         }
-        content = sourceUser.content;
+        // Edited-message regeneration sends the edited prompt explicitly. Use
+        // it here as the source of truth instead of relying on a separate
+        // message-edit write becoming visible to this request immediately.
+        if (
+          requestedEditedContent &&
+          requestedEditedContent.length > 16_000
+        ) {
+          res.status(400).json({
+            error: "A message between 1 and 16,000 characters is required.",
+          });
+          return;
+        }
+        content = requestedEditedContent || sourceUser.content;
+        if (content !== sourceUser.content) {
+          await updateMessage(sourceUser.id, { content });
+        }
+        const previousAssistant = existingMessages[assistantIndex];
+        if (previousAssistant.content.trim()) {
+          await saveMessageVersionForUser({
+            id: previousAssistant.id,
+            userId: user.id,
+            versionId: crypto.randomUUID(),
+            content: previousAssistant.content,
+          });
+        }
         userMessageId = sourceUser.id;
-        historyForContext = existingMessages.slice(0, assistantIndex);
+        historyForContext = existingMessages
+          .slice(0, assistantIndex)
+          .map(message =>
+            message.id === sourceUser.id ? { ...message, content } : message
+          );
         await removeFollowingAssistantDuplicatesForUser(
           body.regenerateAssistantMessageId,
           user.id

@@ -9,6 +9,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { getFileKind } from "@/lib/fileKinds";
@@ -19,6 +20,9 @@ import { LibraryFileIcon } from "./LibraryFileIcon";
 import { ThinkingIndicator } from "@/components/ui/thinking-indicator";
 import {
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Check,
   Copy,
   Download,
   ExternalLink,
@@ -36,7 +40,7 @@ import { ShareIcon } from "./icons";
 import { type MessageFeedbackValue } from "./MessageFeedback";
 import { usePersistFn } from "@/hooks/usePersistFn";
 import { useIsMobile } from "@/hooks/useIsMobile";
-import React, { memo, useEffect, useRef, useState } from "react";
+import React, { memo, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Streamdown, defaultRehypePlugins } from "streamdown";
 import { KsemoMarkdownCode } from "./code-block";
 import { sanitizeAssistantText } from "@/lib/sanitizeAssistant";
@@ -53,6 +57,7 @@ type KsemoMessage = {
   clientId?: string;
   role: "user" | "assistant" | "system" | "tool";
   content: string;
+  versions?: Array<{ content: string; createdAt?: Date | string }>;
   status?: "sending" | "streaming" | "completed" | "failed" | "cancelled";
   createdAt?: Date | string | number;
   attachments?: Array<{
@@ -350,10 +355,16 @@ export const MessageContent = memo(function MessageContent({
   onCancelEdit,
   fileCreationNode,
   sharedAnswerPreview = false,
+  responseVersionCount = 0,
+  responseVersionIndex = 0,
+  onResponseVersionChange,
 }: {
   message: KsemoMessage;
   fileCreationNode?: React.ReactNode;
   sharedAnswerPreview?: boolean;
+  responseVersionCount?: number;
+  responseVersionIndex?: number;
+  onResponseVersionChange?: (index: number) => void;
   onSpeak: (text: string, messageId: string) => void;
   onPause?: () => void;
   onResume?: () => void;
@@ -459,6 +470,8 @@ export const MessageContent = memo(function MessageContent({
   const [userExpanded, setUserExpanded] = useState(false);
   const [userLong, setUserLong] = useState(false);
   const userTextRef = useRef<HTMLParagraphElement | null>(null);
+  const editTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const editActionsRef = useRef<HTMLDivElement | null>(null);
   const isUser = message.role === "user";
   const images = (message.attachments ?? []).filter(f =>
     isImageFile(f.filename, f.mimeType)
@@ -491,6 +504,38 @@ export const MessageContent = memo(function MessageContent({
     const overflows = el.scrollHeight > el.clientHeight + 1;
     setUserLong(overflows);
   }, [isUser, message.content]);
+
+  useLayoutEffect(() => {
+    if (!isEditing || !editTextareaRef.current) return;
+    const textarea = editTextareaRef.current;
+    textarea.style.height = "0px";
+    textarea.style.height = `${textarea.scrollHeight}px`;
+  }, [isEditing, editValue, message.content]);
+
+  useLayoutEffect(() => {
+    if (!isEditing || !editTextareaRef.current) return;
+    const textarea = editTextareaRef.current;
+    const end = textarea.value.length;
+    textarea.focus();
+    textarea.setSelectionRange(end, end);
+    const frame = requestAnimationFrame(() => {
+      const scroller = textarea.closest<HTMLElement>('[aria-label="Conversation"]');
+      const actions = editActionsRef.current;
+      if (!scroller || !actions) return;
+      const view = scroller.getBoundingClientRect();
+      const controls = actions.getBoundingClientRect();
+      // Keep the edit controls clear of the floating jump-to-latest button and
+      // composer area, not merely inside the scroll viewport's final pixels.
+      const bottomOverflow = controls.bottom - (view.bottom - 72);
+      const topOverflow = controls.top - view.top;
+      if (bottomOverflow > 0) {
+        scroller.scrollTop += bottomOverflow;
+      } else if (topOverflow < 0) {
+        scroller.scrollTop += topOverflow;
+      }
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [isEditing, message.id]);
 
   // Stable across renders so the memoized feedback pair is not re-rendered on
   // every streaming flush.
@@ -571,13 +616,15 @@ export const MessageContent = memo(function MessageContent({
   return (
     <>
       <article
-        className={cn("group flex", isUser ? "justify-end" : "justify-start")}
+        className={cn("group flex w-full", isUser ? "justify-end" : "justify-start")}
       >
         <div
           className={cn(
             "min-w-0",
             isUser
-              ? "relative flex flex-col items-end w-fit max-w-[84%] sm:max-w-[82%]"
+              ? isEditing
+                ? "relative flex w-[84%] max-w-full flex-col items-end sm:w-[82%]"
+                : "relative flex flex-col items-end w-fit max-w-[84%] sm:max-w-[82%]"
               : "w-full"
           )}
         >
@@ -666,13 +713,44 @@ export const MessageContent = memo(function MessageContent({
                   ? cn(
                       "ksemo-user-message-bubble flex flex-col items-end rounded-2xl rounded-tr-md border border-border bg-muted px-3.5 py-2.5 text-[15px] leading-6 text-foreground shadow-sm",
                       isMobile && "ksemo-mobile-user-message",
+                      isEditing && "w-full",
                       isEditing && "ring-1 ring-primary/40 border-primary/40"
                     )
                   : "max-w-none rounded-tl-md bg-transparent px-0 py-0 text-foreground"
               )}
             >
               {isUser ? (
-                !userExpanded ? (
+                isEditing ? (
+                  <div className="w-full text-left">
+                    <textarea
+                      ref={editTextareaRef}
+                      autoFocus
+                      aria-label="Edit message"
+                      rows={1}
+                      value={editValue}
+                      onChange={event => onEditValueChange?.(event.target.value)}
+                      className="block min-h-0 w-full resize-none overflow-hidden bg-transparent p-0 text-left text-[15px] leading-6 text-foreground outline-none placeholder:text-muted-foreground"
+                    />
+                    <div ref={editActionsRef} className="-mr-2 -mb-1 mt-1 flex w-full justify-end gap-1">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button type="button" variant="ghost" size="icon-sm" className="size-8 rounded-md text-muted-foreground hover:bg-accent hover:text-foreground" aria-label="Cancel edit" onClick={onCancelEdit}>
+                            <X className="size-[18px]" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom">Cancel edit</TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button type="button" variant="ghost" size="icon-sm" className="size-8 rounded-md bg-white text-zinc-900 hover:bg-zinc-100 hover:text-zinc-950" aria-label="Save edit" onClick={onSaveEdit}>
+                            <Check className="size-[19px]" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom">Save edit</TooltipContent>
+                      </Tooltip>
+                    </div>
+                  </div>
+                ) : !userExpanded ? (
                   <div
                     role={userLong ? "button" : undefined}
                     tabIndex={userLong ? 0 : undefined}
@@ -957,7 +1035,7 @@ export const MessageContent = memo(function MessageContent({
             </div>
           ) : null}
 
-          {!hideActions && isUser && message.content && (
+          {!hideActions && isUser && message.content && !isEditing && (
             <div
               ref={mobileUserActionsRef}
               className={cn(
@@ -1049,6 +1127,58 @@ export const MessageContent = memo(function MessageContent({
               message.status === "cancelled" ||
               Boolean(fileCreationNode)) && (
               <div className="-ml-1 mt-1.5 flex items-center gap-1">
+                {!sharedAnswerPreview &&
+                  responseVersionCount > 1 &&
+                  onResponseVersionChange && (
+                    <div
+                      role="group"
+                      aria-label="Response versions"
+                      className="inline-flex shrink-0 items-center gap-1.5"
+                    >
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className={actionClass}
+                            disabled={responseVersionIndex <= 0}
+                            aria-label="Previous response"
+                            onClick={() =>
+                              onResponseVersionChange?.(responseVersionIndex - 1)
+                            }
+                          >
+                            <ChevronLeft className="size-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom">Previous response</TooltipContent>
+                      </Tooltip>
+                      <span
+                        className="min-w-8 whitespace-nowrap px-1 text-center text-[13px] leading-none tabular-nums text-muted-foreground"
+                        aria-live="polite"
+                      >
+                        {responseVersionIndex + 1} / {responseVersionCount}
+                      </span>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className={actionClass}
+                            disabled={responseVersionIndex >= responseVersionCount - 1}
+                            aria-label="Next response"
+                            onClick={() =>
+                              onResponseVersionChange?.(responseVersionIndex + 1)
+                            }
+                          >
+                            <ChevronRight className="size-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom">Next response</TooltipContent>
+                      </Tooltip>
+                    </div>
+                  )}
                 {message.content &&
                   action(
                     copied ? "Copied" : "Copy response",

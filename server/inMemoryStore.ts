@@ -786,6 +786,41 @@ class InMemoryStore {
     return this.messageVersions.get(messageId) || [];
   }
 
+  async saveMessageVersionForUser(input: {
+    id: string;
+    userId: number;
+    versionId: string;
+    content: string;
+  }): Promise<boolean> {
+    const msg = this.messages.get(input.id);
+    if (!msg) return false;
+    const conv = this.conversations.get(msg.conversationId);
+    if (!conv || conv.userId !== input.userId) return false;
+    const versions = this.messageVersions.get(input.id) || [];
+    if (versions[versions.length - 1]?.content !== input.content) {
+      versions.push({
+        id: input.versionId,
+        messageId: input.id,
+        content: input.content,
+        createdAt: new Date(),
+      });
+      this.messageVersions.set(input.id, versions);
+      this.requestPersist();
+    }
+    return true;
+  }
+
+  async listMessageVersionsForMessages(
+    messageIds: string[],
+    userId: number
+  ): Promise<Record<string, MessageVersion[]>> {
+    const versions: Record<string, MessageVersion[]> = {};
+    for (const id of messageIds) {
+      versions[id] = await this.listMessageVersionsForUser(id, userId);
+    }
+    return versions;
+  }
+
   async setMessageFeedbackForUser(input: {
     id: string;
     messageId: string;

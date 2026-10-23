@@ -866,6 +866,71 @@ export async function listMessageVersionsForUser(
   }));
 }
 
+export async function saveMessageVersionForUser(input: {
+  id: string;
+  userId: number;
+  versionId: string;
+  content: string;
+}): Promise<boolean> {
+  if (useMemoryFallback()) {
+    return inMemoryStore.saveMessageVersionForUser(input);
+  }
+  const existing = await getMessageForUser(input.id, input.userId);
+  if (!existing) return false;
+  const { data: latest, error: latestError } = await supabase
+    .from("message_versions")
+    .select("content")
+    .eq("message_id", input.id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (latestError) throwDb("saveMessageVersionForUser.latest", latestError);
+  if (latest?.content === input.content) return true;
+  const { error } = await supabase.from("message_versions").insert({
+    id: input.versionId,
+    message_id: input.id,
+    content: input.content,
+  });
+  if (error) throwDb("saveMessageVersionForUser", error);
+  return true;
+}
+
+export async function listMessageVersionsForMessages(
+  messageIds: string[],
+  userId: number
+): Promise<Record<string, MessageVersion[]>> {
+  const ids = Array.from(new Set(messageIds));
+  if (!ids.length) return {};
+  if (useMemoryFallback()) {
+    return inMemoryStore.listMessageVersionsForMessages(ids, userId);
+  }
+  const { data: owned, error: ownedError } = await supabase
+    .from("messages")
+    .select("id, conversations!inner(user_id)")
+    .in("id", ids)
+    .eq("conversations.user_id", userId);
+  if (ownedError) throwDb("listMessageVersionsForMessages.owner", ownedError);
+  const ownedIds = (owned ?? []).map((row: any) => row.id as string);
+  if (!ownedIds.length) return {};
+  const { data, error } = await supabase
+    .from("message_versions")
+    .select("id, message_id, content, created_at")
+    .in("message_id", ownedIds)
+    .order("created_at", { ascending: true });
+  if (error) throwDb("listMessageVersionsForMessages", error);
+  const versions: Record<string, MessageVersion[]> = {};
+  for (const row of data ?? []) {
+    const version = {
+      id: row.id,
+      messageId: row.message_id,
+      content: row.content,
+      createdAt: new Date(row.created_at),
+    };
+    (versions[version.messageId] ??= []).push(version);
+  }
+  return versions;
+}
+
 export async function setMessageFeedbackForUser(input: {
   id: string;
   messageId: string;

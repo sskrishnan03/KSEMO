@@ -521,6 +521,11 @@ export default function Home({
         ]
       : []
   );
+  const [assistantAnswerVersions, setAssistantAnswerVersions] = useState<
+    Record<string, Array<{ prompt: string; answer: string }>>
+  >({});
+  const [assistantAnswerVersionIndex, setAssistantAnswerVersionIndex] =
+    useState<Record<string, number>>({});
   const [sharedAnswerContinued, setSharedAnswerContinued] = useState(() => {
     if (!sharedAnswerToken || typeof window === "undefined") return false;
     try {
@@ -1807,6 +1812,7 @@ export default function Home({
             : message.content,
         status: message.status,
         createdAt: message.createdAt,
+        versions: message.versions,
         branchOrigin:
           typeof metadata?.parentBranch?.parentChatId === "string" &&
           typeof metadata.parentBranch.parentChatTitle === "string"
@@ -4049,18 +4055,19 @@ export default function Home({
       savedComposerDraftRef.current = composerValue;
     }
     setEditingMessage(message);
-    setComposerValue(message.content);
+    setEditValue(message.content);
   }
 
   function cancelEdit() {
     setEditingMessage(null);
+    setEditValue("");
     setComposerValue(savedComposerDraftRef.current);
     savedComposerDraftRef.current = "";
   }
 
   async function saveEditedMessage() {
     const message = editingMessage;
-    const content = composerValue.trim();
+    const content = editValue.trim();
     if (!message || !content) {
       cancelEdit();
       return;
@@ -4080,7 +4087,35 @@ export default function Home({
             content: editedContent,
           }),
         regenerate: (editedContent, assistantMessageId) => {
+          const previousAnswer = chatMessages.find(
+            item => item.id === assistantMessageId && item.role === "assistant"
+          );
+          if (previousAnswer?.content) {
+            const previousPrompt = chatMessages.find(
+              item => item.id === message.id && item.role === "user"
+            );
+            setAssistantAnswerVersions(current => {
+              const existing = current[assistantMessageId] ?? [];
+              if (existing[existing.length - 1]?.answer === previousAnswer.content) return current;
+              return {
+                ...current,
+                [assistantMessageId]: [
+                  ...existing,
+                  {
+                    prompt: previousPrompt?.content ?? message.content,
+                    answer: previousAnswer.content,
+                  },
+                ],
+              };
+            });
+            setAssistantAnswerVersionIndex(current => {
+              const next = { ...current };
+              delete next[assistantMessageId];
+              return next;
+            });
+          }
           setEditingMessage(null);
+          setEditValue("");
           setComposerValue(savedComposerDraftRef.current);
           savedComposerDraftRef.current = "";
           void sendMessage(editedContent, {
@@ -4091,6 +4126,7 @@ export default function Home({
         },
       });
       setEditingMessage(null);
+      setEditValue("");
       setComposerValue(savedComposerDraftRef.current);
       savedComposerDraftRef.current = "";
       setChatMessages(current =>
@@ -5042,8 +5078,8 @@ export default function Home({
   const [greetingHour, setGreetingHour] = useState(() => new Date().getHours());
   const [greetingAnimationKey, setGreetingAnimationKey] = useState(0);
   const greeting = useMemo(
-    () => timeGreeting(isTemporaryChat),
-    [isTemporaryChat, greetingHour]
+    () => timeGreeting(),
+    [greetingHour]
   );
 
   useEffect(() => {
@@ -5127,7 +5163,7 @@ export default function Home({
       onTakeScreenshot={guestMode ? undefined : stableCaptureScreenshot}
       hideVoiceInput={guestMode || Boolean(options.hideVoiceInput)}
       focusToken={composerFocusToken}
-      isEditingMessage={Boolean(editingMessage)}
+      isEditingMessage={false}
       onSaveEdit={stableEditAction}
       onCancelEdit={stableCancelEdit}
       temporary={isTemporaryChat}
@@ -5181,7 +5217,7 @@ export default function Home({
   return (
     <div
       className={cn(
-        "flex h-dvh overflow-hidden bg-background",
+        "relative flex h-dvh overflow-hidden bg-background",
         isTemporaryChat && "temp-mode"
       )}
       style={
@@ -5190,7 +5226,7 @@ export default function Home({
           : undefined
       }
     >
-      <ConversationSidebar
+      {!isTemporaryChat && <ConversationSidebar
         conversations={conversationQuery.data ?? []}
         activeConversationId={activeConversationId}
         generatingConversationIds={generatingConversationIds}
@@ -5215,9 +5251,33 @@ export default function Home({
         onLogout={stableHandleSignOut}
         user={user ?? {}}
         locked={guestMode}
-      />
-
-      <main className="relative flex min-w-0 flex-1 flex-col lg:flex-row">
+      />}
+      {isTemporaryChat && (
+        <div className="temp-chat-chrome" aria-label="Temporary Chat controls">
+            <div className="temp-chat-label">
+              <ChatRoundCall size={16} weight="Fill" aria-hidden="true" />
+              <span>Temporary Chat</span>
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => {
+                voice.cancel();
+                isTemporaryChatRef.current = false;
+                setIsTemporaryChat(false);
+                setGreetingAnimationKey(current => current + 1);
+                purgeTemporaryConversations({ preserveStreaming: true });
+                writeStoredTemporaryChat(user?.id, { active: false, activeConversationId: null, ids: [] });
+              }}
+              className="temp-chat-close"
+              aria-label="Exit temporary chat"
+            >
+              <X size={18} />
+            </Button>
+        </div>
+      )}
+      <main className={cn("relative flex min-w-0 flex-1 flex-col lg:flex-row", isTemporaryChat && "temp-chat-main") }>
         {composerTag === "bot" && !guestMode && !isTemporaryChat && (
           <div
             aria-hidden="true"
@@ -5342,6 +5402,7 @@ export default function Home({
             )}
 
             {!guestMode &&
+              !isTemporaryChat &&
               composerTag !== "bot" &&
               !activeConversationId &&
               visibleMessages.length === 0 && (
@@ -5895,6 +5956,66 @@ export default function Home({
                   )}
                 >
                   {visibleMessages.map((message, messageIndex) => {
+                    const pairedAssistant =
+                      message.role === "user"
+                        ? visibleMessages
+                            .slice(messageIndex + 1)
+                            .find(candidate => candidate.role === "assistant")
+                        : undefined;
+                    const pairedUser =
+                      message.role === "assistant"
+                        ? visibleMessages
+                            .slice(0, messageIndex)
+                            .reverse()
+                            .find(candidate => candidate.role === "user")
+                        : undefined;
+                    const responseVersionId =
+                      message.role === "assistant"
+                        ? message.id
+                        : pairedAssistant?.id;
+                    const versionSourceAssistant =
+                      message.role === "assistant" ? message : pairedAssistant;
+                    const versionSourceUser =
+                      message.role === "user" ? message : pairedUser;
+                    const persistedAnswerVersions = (
+                      versionSourceAssistant?.versions ?? []
+                    ).map((version, index) => ({
+                      answer: version.content,
+                      prompt:
+                        versionSourceUser?.versions?.[index]?.content ??
+                        versionSourceUser?.content ??
+                        "",
+                    }));
+                    const localAnswerVersions = responseVersionId
+                      ? assistantAnswerVersions[responseVersionId] ?? []
+                      : [];
+                    const answerVersions = [
+                      ...persistedAnswerVersions,
+                      ...localAnswerVersions.filter(
+                        localVersion =>
+                          !persistedAnswerVersions.some(
+                            persistedVersion =>
+                              persistedVersion.answer === localVersion.answer
+                          )
+                      ),
+                    ];
+                    const answerVersionIndex = responseVersionId
+                      ? assistantAnswerVersionIndex[responseVersionId] ??
+                        answerVersions.length
+                      : 0;
+                    const historicalVersion =
+                      answerVersionIndex < answerVersions.length
+                        ? answerVersions[answerVersionIndex]
+                        : undefined;
+                    const renderedMessage = historicalVersion
+                      ? {
+                          ...message,
+                          content:
+                            message.role === "assistant"
+                              ? historicalVersion.answer
+                              : historicalVersion.prompt,
+                        }
+                      : message;
                     const activeFileGen =
                       fileGeneration && fileGeneration.messageId === message.id
                         ? fileGeneration
@@ -5944,7 +6065,23 @@ export default function Home({
                     return (
                       <Fragment key={message.clientId ?? message.id}>
                         <MessageContent
-                          message={message}
+                          message={renderedMessage}
+                          responseVersionCount={answerVersions.length + 1}
+                          responseVersionIndex={answerVersionIndex}
+                          onResponseVersionChange={
+                            answerVersions.length > 0
+                              ? index =>
+                                  setAssistantAnswerVersionIndex(current => {
+                                    const next = { ...current };
+                                    if (index >= answerVersions.length) {
+                                      delete next[message.id];
+                                    } else {
+                                      next[message.id] = index;
+                                    }
+                                    return next;
+                                  })
+                              : undefined
+                          }
                           onFileOpen={() => setChatFilesOpen(false)}
                           responseStartedAt={
                             isGenerating && generatingMessageId === message.id
@@ -5991,7 +6128,7 @@ export default function Home({
                               : stableBranchFromMessage
                           }
                           onDelete={guestMode ? undefined : stableDeleteMessage}
-                          onFeedback={guestMode ? undefined : stableOnFeedback}
+                          onFeedback={guestMode || isTemporaryChat ? undefined : stableOnFeedback}
                           feedback={messageFeedback[message.id] ?? null}
                           sharedAnswerPreview={
                             isSharedAnswerPage &&
@@ -6195,7 +6332,7 @@ export default function Home({
                 <div className="h-full min-h-0" aria-hidden="true" />
               ) : (
                 <EmptyState
-                  greeting={isTemporaryChat ? "Temporary chat" : greeting}
+                  greeting={greeting}
                   animationKey={greetingAnimationKey}
                   temporary={isTemporaryChat}
                   composer={
@@ -6523,19 +6660,7 @@ const EmptyState = memo(function EmptyState({
             className="relative mx-auto w-fit"
           >
             <p className="ksemo-greeting-rise whitespace-nowrap text-[clamp(1rem,4.8vw,1.375rem)] font-bold tracking-[-0.04em] text-foreground sm:tracking-[-0.025em]">
-              {temporary ? (
-                <span className="inline-flex items-center justify-center gap-2">
-                  <ChatRoundCall
-                    weight="Outline"
-                    size={26}
-                    aria-hidden="true"
-                    className="text-[#b89aff]"
-                  />
-                  <span className="text-[#b89aff]">Temporary chat</span>
-                </span>
-              ) : (
-                greeting
-              )}
+              {greeting}
             </p>
             {!temporary && (
               <span
