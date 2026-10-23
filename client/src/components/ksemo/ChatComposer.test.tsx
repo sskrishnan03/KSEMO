@@ -107,11 +107,12 @@ describe("ChatComposer", () => {
     expect(markup).toContain("Dictate");
   });
 
-  it("renders single-word Stop and Transcribe tooltips when recording", () => {
+  it("renders single-word Cancel and Transcribe tooltips when recording", () => {
     const markup = renderWithTooltip(
       createElement(ChatComposer, { ...baseProps, isRecording: true })
     );
-    expect(markup).toContain("Stop");
+    expect(markup).toContain('aria-label="Cancel"');
+    expect(markup).toContain("Cancel");
     expect(markup).toContain("Transcribe");
     expect(markup).not.toContain("Discard");
   });

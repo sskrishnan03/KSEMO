@@ -183,12 +183,12 @@ export const DictateRecordingPill = memo(function DictateRecordingPill({
               size="icon"
               onClick={onStop}
               className="ksemo-dictation-stop size-8 !rounded-lg bg-background/80 text-foreground shadow-xs hover:bg-accent hover:text-foreground transition-colors"
-              aria-label="Stop"
+              aria-label="Cancel"
             >
-              <Square className="size-2.5 fill-current" />
+              <X className="size-4 stroke-[2.5]" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent side="bottom">Stop</TooltipContent>
+          <TooltipContent side="bottom">Cancel</TooltipContent>
         </Tooltip>
         <Tooltip>
           <TooltipTrigger asChild>
