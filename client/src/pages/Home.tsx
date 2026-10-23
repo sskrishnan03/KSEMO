@@ -704,6 +704,10 @@ export default function Home({
   const [sharingConversationId, setSharingConversationId] = useState<
     string | null
   >(null);
+  const [desktopConversationMenuOpen, setDesktopConversationMenuOpen] =
+    useState(false);
+  const [mobileConversationMenuOpen, setMobileConversationMenuOpen] =
+    useState(false);
   const [shareNotice, setShareNotice] = useState<"success" | "error" | null>(
     null
   );
@@ -3963,6 +3967,8 @@ export default function Home({
       showShareNotice("error", "Couldn't copy chat link. Please try again.");
     } finally {
       setSharingConversationId(null);
+      setDesktopConversationMenuOpen(false);
+      setMobileConversationMenuOpen(false);
     }
   }
 
@@ -5440,7 +5446,7 @@ export default function Home({
                 Boolean(shareNotice)) && (
                 <div className="pointer-events-none absolute inset-x-0 top-0 z-20 h-13">
                   {shareNotice && (
-                    <div className="pointer-events-auto absolute right-2 top-11 animate-in fade-in slide-in-from-top-1 duration-200">
+                    <div className="pointer-events-auto fixed right-3 top-[max(env(safe-area-inset-top),0.75rem)] z-[100] animate-in fade-in slide-in-from-top-1 duration-200">
                       <ActionNotice
                         message={shareNoticeText}
                         href={
@@ -5484,50 +5490,6 @@ export default function Home({
                     sideOffset={6}
                     anchor={
                       <div className="contents">
-                        {!chatFilesOpen && !isDocumentOpen && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="pointer-events-auto absolute right-[3px] top-[3px] hidden h-9 rounded-lg border border-border/50 bg-muted/70 px-3 text-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground lg:flex"
-                            aria-label="Share chat"
-                            disabled={
-                              !activeConversationId ||
-                              sharingConversationId === activeConversationId
-                            }
-                            onClick={() => {
-                              if (activeConversationId) {
-                                stableOnShareConversation(
-                                  activeConversation
-                                    ? {
-                                        id: activeConversationId,
-                                        title: activeConversation.title,
-                                        isPublic: activeConversation.isPublic,
-                                        shareToken:
-                                          activeConversation.shareToken,
-                                      }
-                                    : {
-                                        id: activeConversationId,
-                                        title: "this conversation",
-                                      }
-                                );
-                              }
-                            }}
-                          >
-                            <span className="inline-flex items-center gap-1.5 text-sm font-medium">
-                              {sharingConversationId ===
-                              activeConversationId ? (
-                                <span
-                                  className="loader loader-xs text-current"
-                                  role="status"
-                                  aria-label="Creating share link"
-                                />
-                              ) : (
-                                <ShareIcon className="size-[17px]" />
-                              )}
-                              Share
-                            </span>
-                          </Button>
-                        )}
                         <div className="pointer-events-auto absolute left-14 right-24 top-2 hidden lg:block lg:left-4">
                           <div className="inline-flex min-h-9 max-w-full items-center gap-1">
                             {activeConversation?.title.startsWith(
@@ -5541,7 +5503,10 @@ export default function Home({
                                 ""
                               ) || "New Chat"}
                             </span>
-                            <DropdownMenu>
+                            <DropdownMenu
+                              open={desktopConversationMenuOpen}
+                              onOpenChange={setDesktopConversationMenuOpen}
+                            >
                               <DropdownMenuTrigger asChild>
                                 <button
                                   type="button"
@@ -5561,7 +5526,7 @@ export default function Home({
                                 sideOffset={6}
                                 className="w-40 rounded-xl"
                               >
-                                {/* Best order: Pin, Archive, Export, View files, Delete */}
+                                {/* Frequent actions first; chat management and deletion last. */}
                                 <DropdownMenuItem
                                   disabled={!activeConversationId}
                                   onSelect={() => {
@@ -5586,19 +5551,43 @@ export default function Home({
                                 </DropdownMenuItem>
 
                                 <DropdownMenuItem
-                                  disabled={!activeConversationId}
-                                  onSelect={() => {
+                                  disabled={
+                                    !activeConversationId ||
+                                    sharingConversationId ===
+                                      activeConversationId
+                                  }
+                                  onSelect={event => {
+                                    event.preventDefault();
                                     if (activeConversationId) {
-                                      stableOnArchive({
-                                        id: activeConversationId,
-                                      });
-                                      newChat();
-                                      toast.success("Chat archived");
+                                      stableOnShareConversation(
+                                        activeConversation
+                                          ? {
+                                              id: activeConversationId,
+                                              title: activeConversation.title,
+                                              isPublic:
+                                                activeConversation.isPublic,
+                                              shareToken:
+                                                activeConversation.shareToken,
+                                            }
+                                          : {
+                                              id: activeConversationId,
+                                              title: "this conversation",
+                                            }
+                                      );
                                     }
                                   }}
                                 >
-                                  <Archive className="mr-2 size-4" />
-                                  Archive
+                                  {sharingConversationId ===
+                                  activeConversationId ? (
+                                    <span
+                                      className="loader loader-xs mr-2 text-current"
+                                      role="status"
+                                      aria-label="Creating share link"
+                                    />
+                                  ) : (
+                                    <ShareIcon className="mr-2 size-[17px]" />
+                                  )}
+                                  Share
                                 </DropdownMenuItem>
 
                                 <DropdownMenuSub>
@@ -5657,6 +5646,21 @@ export default function Home({
                                   View files
                                 </DropdownMenuItem>
 
+                                <DropdownMenuItem
+                                  disabled={!activeConversationId}
+                                  onSelect={() => {
+                                    if (activeConversationId) {
+                                      stableOnArchive({
+                                        id: activeConversationId,
+                                      });
+                                      newChat();
+                                      toast.success("Chat archived");
+                                    }
+                                  }}
+                                >
+                                  <Archive className="mr-2 size-4" />
+                                  Archive
+                                </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem
                                   disabled={!activeConversationId}
@@ -5691,7 +5695,10 @@ export default function Home({
                             >
                               {mobileConversationTitle}
                             </span>
-                            <DropdownMenu>
+                            <DropdownMenu
+                              open={mobileConversationMenuOpen}
+                              onOpenChange={setMobileConversationMenuOpen}
+                            >
                               <DropdownMenuTrigger asChild>
                                 <button
                                   type="button"
@@ -5711,7 +5718,6 @@ export default function Home({
                                     <DropdownMenuLabel className="max-w-44 whitespace-normal break-words text-foreground">
                                       {mobileConversationTitle}
                                     </DropdownMenuLabel>
-                                    <DropdownMenuSeparator />
                                   </>
                                 )}
                                 <DropdownMenuItem
@@ -5736,19 +5742,43 @@ export default function Home({
                                     : "Pin"}
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
-                                  disabled={!activeConversationId}
-                                  onSelect={() => {
+                                  disabled={
+                                    !activeConversationId ||
+                                    sharingConversationId ===
+                                      activeConversationId
+                                  }
+                                  onSelect={event => {
+                                    event.preventDefault();
                                     if (activeConversationId) {
-                                      stableOnArchive({
-                                        id: activeConversationId,
-                                      });
-                                      newChat();
-                                      toast.success("Chat archived");
+                                      stableOnShareConversation(
+                                        activeConversation
+                                          ? {
+                                              id: activeConversationId,
+                                              title: activeConversation.title,
+                                              isPublic:
+                                                activeConversation.isPublic,
+                                              shareToken:
+                                                activeConversation.shareToken,
+                                            }
+                                          : {
+                                              id: activeConversationId,
+                                              title: "this conversation",
+                                            }
+                                      );
                                     }
                                   }}
                                 >
-                                  <Archive className="mr-2 size-4" />
-                                  Archive
+                                  {sharingConversationId ===
+                                  activeConversationId ? (
+                                    <span
+                                      className="loader loader-xs mr-2 text-current"
+                                      role="status"
+                                      aria-label="Creating share link"
+                                    />
+                                  ) : (
+                                    <ShareIcon className="mr-2 size-[17px]" />
+                                  )}
+                                  Share
                                 </DropdownMenuItem>
                                 <DropdownMenuSub>
                                   <DropdownMenuSubTrigger
@@ -5797,35 +5827,25 @@ export default function Home({
                                   </DropdownMenuSubContent>
                                 </DropdownMenuSub>
                                 <DropdownMenuItem
-                                  disabled={!activeConversationId}
-                                  onSelect={() => {
-                                    if (activeConversationId) {
-                                      stableOnShareConversation(
-                                        activeConversation
-                                          ? {
-                                              id: activeConversationId,
-                                              title: activeConversation.title,
-                                              isPublic:
-                                                activeConversation.isPublic,
-                                              shareToken:
-                                                activeConversation.shareToken,
-                                            }
-                                          : {
-                                              id: activeConversationId,
-                                              title: "this conversation",
-                                            }
-                                      );
-                                    }
-                                  }}
-                                >
-                                  <ShareIcon className="mr-2 size-[17px]" />
-                                  Share
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
                                   onSelect={() => setChatFilesOpen(true)}
                                 >
                                   <WinrarIcon className="mr-2 size-4" />
                                   View files
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  disabled={!activeConversationId}
+                                  onSelect={() => {
+                                    if (activeConversationId) {
+                                      stableOnArchive({
+                                        id: activeConversationId,
+                                      });
+                                      newChat();
+                                      toast.success("Chat archived");
+                                    }
+                                  }}
+                                >
+                                  <Archive className="mr-2 size-4" />
+                                  Archive
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem

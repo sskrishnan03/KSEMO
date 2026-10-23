@@ -1121,7 +1121,8 @@ export const MessageContent = memo(function MessageContent({
                     ) : (
                       <ShareIcon className="size-4" />
                     ),
-                    () => void shareResponse()
+                    () => void shareResponse(),
+                    sharing
                   )}
                 {!sharedAnswerPreview && hasOverflowActions && (
                   <div className="relative inline-flex shrink-0">

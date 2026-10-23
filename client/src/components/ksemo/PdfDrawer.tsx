@@ -2902,6 +2902,7 @@ export const PdfDrawer = memo(function PdfDrawer({
 }) {
   const { currentPdf, isOpen, closePdf } = usePdfViewer();
   const [isExpanded, setIsExpanded] = useState(false);
+  const isFullWorkspace = layout === "library" || isExpanded;
   useEffect(() => {
     setIsExpanded(false);
   }, [isOpen, currentPdf?.url, layout]);
@@ -3752,12 +3753,14 @@ export const PdfDrawer = memo(function PdfDrawer({
       aria-modal="true"
       data-testid="pdf-drawer"
       className={cn(
-        "absolute z-40 flex flex-col rounded-2xl border border-border/80 bg-background text-foreground shadow-2xl overflow-hidden",
-        layout === "chat"
-          ? isExpanded
-            ? "inset-1"
-            : "inset-1 lg:inset-y-1 lg:left-[calc(50%+0.25rem)] lg:right-1"
-          : "inset-1",
+        "z-40 flex flex-col bg-background text-foreground overflow-hidden",
+        isFullWorkspace
+          ? "absolute inset-0 rounded-none border-0 shadow-none"
+          : cn(
+              "absolute inset-1 rounded-2xl border border-border/80 shadow-2xl",
+              layout === "chat" &&
+                "lg:inset-y-1 lg:left-[calc(50%+0.25rem)] lg:right-1"
+            ),
         layout === "chat"
           ? isExpanded
             ? "animate-in fade-in-0 zoom-in-95 duration-200 ease-out"
@@ -3766,7 +3769,7 @@ export const PdfDrawer = memo(function PdfDrawer({
       )}
     >
       {/* Top Header */}
-      <header className="flex h-12 shrink-0 items-center justify-between gap-2 border-b border-border bg-card px-3 sm:px-4">
+      <header className="flex h-12 shrink-0 items-center justify-between gap-2 border-b border-border bg-card pl-3 pr-0.5 sm:pl-4">
         {/* Left side: Matching Create Files icon, file name, and mobile Slides toggle */}
         <div className="flex min-w-0 items-center gap-2">
           <CreateFileModeIcon
@@ -3802,8 +3805,8 @@ export const PdfDrawer = memo(function PdfDrawer({
           )}
         </div>
 
-        {/* Right Side: Edit (text only), Download, then Cancel (only icons, with hover) */}
-        <div className="flex shrink-0 items-center gap-0.5">
+        {/* File actions use the Library's compact, light button treatment. */}
+        <div className="flex shrink-0 items-center gap-0 rounded-lg border border-border bg-card p-0.5 shadow-sm">
           {layout === "chat" && (
             <Tooltip>
               <TooltipTrigger asChild>
@@ -3814,9 +3817,9 @@ export const PdfDrawer = memo(function PdfDrawer({
                   data-testid="pdf-drawer-expand-btn"
                   aria-label={isExpanded ? "Collapse file panel" : "Expand file panel"}
                   aria-pressed={isExpanded}
-                  className="hidden size-8 rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground lg:flex"
+                  className="hidden size-8 rounded-lg text-foreground transition-colors hover:bg-accent hover:text-foreground lg:flex"
                 >
-                  {isExpanded ? <Minimize2 className="size-3.5" /> : <Maximize2 className="size-3.5" />}
+                  {isExpanded ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom" sideOffset={6}>
@@ -3824,7 +3827,6 @@ export const PdfDrawer = memo(function PdfDrawer({
               </TooltipContent>
             </Tooltip>
           )}
-          {/* Edit Text Button (Text Documents Only, NOT code) */}
           {!isCodeDoc &&
             isTextDoc &&
             currentPdf?.id &&
@@ -3834,22 +3836,21 @@ export const PdfDrawer = memo(function PdfDrawer({
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
-                    variant={isEditingText ? "default" : "ghost"}
+                    variant="ghost"
                     size="icon"
                     onClick={handleEditToggle}
                     data-testid="pdf-drawer-edit-btn"
                     aria-label={isEditingText ? "Done editing" : "Edit text"}
                     className={cn(
-                      "size-8 rounded-lg transition-colors",
-                      isEditingText
-                        ? "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 hover:text-primary-foreground"
-                        : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                      "size-8 rounded-lg text-foreground transition-colors hover:bg-accent hover:text-foreground",
+                      isEditingText &&
+                        "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground"
                     )}
                   >
                     {isEditingText ? (
-                      <Save className="size-3.5" />
+                      <Save className="size-4" />
                     ) : (
-                      <Pencil className="size-3.5" />
+                      <Pencil className="size-4" />
                     )}
                   </Button>
                 </TooltipTrigger>
@@ -3858,8 +3859,6 @@ export const PdfDrawer = memo(function PdfDrawer({
                 </TooltipContent>
               </Tooltip>
             )}
-
-          {/* Download Button (Icon Only, NOT code — code has download inside codeblock) */}
           {!isCodeDoc && (
             <Tooltip>
               <TooltipTrigger asChild>
@@ -3869,9 +3868,9 @@ export const PdfDrawer = memo(function PdfDrawer({
                   onClick={() => void handleDownloadFile()}
                   data-testid="pdf-drawer-download-btn"
                   aria-label="Download"
-                  className="size-8 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+                  className="size-8 rounded-lg text-foreground transition-colors hover:bg-accent hover:text-foreground"
                 >
-                  <Download className="size-3.5" />
+                  <Download className="size-4" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom" sideOffset={6}>
@@ -3879,8 +3878,6 @@ export const PdfDrawer = memo(function PdfDrawer({
               </TooltipContent>
             </Tooltip>
           )}
-
-          {/* Cancel Option (Icon Only, slightly larger, on the right side) */}
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -3889,7 +3886,7 @@ export const PdfDrawer = memo(function PdfDrawer({
                 onClick={closePdf}
                 data-testid="pdf-drawer-close-btn"
                 aria-label="Close"
-                className="size-8 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+                className="size-8 rounded-lg text-foreground transition-colors hover:bg-accent hover:text-foreground"
               >
                 <X className="size-4" />
               </Button>
@@ -3973,7 +3970,9 @@ export const PdfDrawer = memo(function PdfDrawer({
           ref={scrollContainerRef}
           className={cn(
             "h-full w-full",
-            isExcelDoc
+            isFullWorkspace
+              ? "overflow-y-auto p-0"
+              : isExcelDoc
               ? "p-0 overflow-hidden flex flex-col"
               : isCodeDoc
                 ? "overflow-y-auto p-2 sm:p-3"
@@ -4093,11 +4092,14 @@ export const PdfDrawer = memo(function PdfDrawer({
             (isEditingText ? (
               <div
                 data-testid="text-document-editor"
-                className="mx-auto my-4 flex flex-col bg-white text-neutral-900 dark:bg-card dark:text-foreground shadow-xl border border-border/80 rounded-sm min-h-[600px] transition-transform origin-top"
+                className={cn(
+                  "mx-auto flex flex-col bg-white text-neutral-900 dark:bg-card dark:text-foreground shadow-xl border border-border/80 rounded-sm min-h-[600px] transition-transform origin-top",
+                  isFullWorkspace ? "my-0" : "my-4"
+                )}
                 style={{
-                  maxWidth: isExpanded ? "none" : "860px",
+                  maxWidth: isFullWorkspace ? "none" : "860px",
                   width: "100%",
-                  zoom: !isExpanded && scale !== 1.0 ? scale : undefined,
+                  zoom: !isFullWorkspace && scale !== 1.0 ? scale : undefined,
                 }}
               >
                 <textarea
@@ -4114,11 +4116,12 @@ export const PdfDrawer = memo(function PdfDrawer({
               <div
                 data-testid="text-document-viewer"
                 className={cn(
-                  "mx-auto my-4 shadow-lg border border-border/80 min-h-[600px] select-text selection:bg-blue-500/30 transition-transform origin-top w-full rounded-sm p-6 sm:p-10 bg-white text-neutral-900 dark:bg-card dark:text-foreground",
-                  !isExpanded && "max-w-[860px]"
+                  "mx-auto shadow-lg border border-border/80 min-h-[600px] select-text selection:bg-blue-500/30 transition-transform origin-top w-full rounded-sm p-6 sm:p-10 bg-white text-neutral-900 dark:bg-card dark:text-foreground",
+                  isFullWorkspace ? "my-0" : "my-4",
+                  !isFullWorkspace && "max-w-[860px]"
                 )}
                 style={{
-                  zoom: !isExpanded && scale !== 1.0 ? scale : undefined,
+                  zoom: !isFullWorkspace && scale !== 1.0 ? scale : undefined,
                 }}
               >
                 <pre className="whitespace-pre-wrap font-mono text-xs sm:text-[13px] leading-relaxed text-foreground/90 font-normal">
