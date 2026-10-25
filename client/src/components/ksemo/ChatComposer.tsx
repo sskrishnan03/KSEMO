@@ -66,7 +66,7 @@ const BOT_ORB_HEADROOM = "pt-12";
 
 const CHAT_PLACEHOLDER = "Ask KSEMO anything...";
 const BOT_PLACEHOLDER = "Speak or type whatever you want...";
-const TEMP_PLACEHOLDER = "Start a temporary conversation...";
+const TEMP_PLACEHOLDER = "Whisper your thoughts...";
 
 const COMPACT_INPUT_MAX_HEIGHT = 192;
 const EXPANDED_INPUT_MAX_HEIGHT = 512;

@@ -21,11 +21,14 @@
   }
 }
 
-/* Ghost mode uses a purple top bar and purple accents inside the chat workspace. */
+/* Ghost mode splits ectoplasmic green and pale Ghost Blue across its accents. */
 .temp-mode {
-  --temp-accent: #a78bfa;
-  padding: 36px 12px 0;
+  --temp-accent: #86efac;
+  --temp-ice: #a5d8ff;
+  --temp-spectral: #244369;
+  padding: 32px 12px 0;
   background: var(--background);
+  animation: ghost-mode-enter 360ms cubic-bezier(.22, .8, .22, 1) both;
 }
 
 .temp-chat-main {
@@ -35,18 +38,16 @@
   border-radius: 20px;
   background: var(--background);
   box-shadow: none;
-  animation: ghost-workspace-enter 320ms cubic-bezier(.2, .75, .25, 1) both;
 }
 
 .temp-chat-curve {
   position: absolute;
   z-index: 2;
-  top: 36px;
+  top: 31px;
   left: 0;
   width: 100%;
-  height: 24px;
+  height: 25px;
   pointer-events: none;
-  animation: ghost-bar-enter 280ms cubic-bezier(.2, .75, .25, 1) both;
 }
 
 .temp-chat-chrome {
@@ -56,53 +57,37 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 36px;
+  height: 32px;
   padding: 0 8px;
-  background: var(--temp-accent);
+  background: linear-gradient(
+    90deg,
+    var(--temp-accent) 0%,
+    var(--temp-accent) 35%,
+    #96e7d0 50%,
+    var(--temp-ice) 65%,
+    var(--temp-ice) 100%
+  );
   border-radius: 0;
   pointer-events: none;
-  animation: ghost-bar-enter 280ms cubic-bezier(.2, .75, .25, 1) both;
 }
 
-.temp-mode-closing .temp-chat-main {
-  animation: ghost-workspace-exit 220ms ease-in both;
+.temp-mode-closing {
+  animation: ghost-mode-exit 220ms cubic-bezier(.4, 0, 1, 1) both;
 }
 
-.temp-mode-closing .temp-chat-chrome {
-  animation: ghost-bar-exit 180ms ease-in both;
+@keyframes ghost-mode-enter {
+  from { opacity: 0; transform: scale(.995); }
+  to { opacity: 1; transform: scale(1); }
 }
 
-.temp-mode-closing .temp-chat-curve {
-  animation: ghost-bar-exit 180ms ease-in both;
-}
-
-@keyframes ghost-workspace-enter {
-  from { opacity: 0; transform: translateY(10px) scale(.99); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
-}
-
-@keyframes ghost-workspace-exit {
-  from { opacity: 1; transform: translateY(0) scale(1); }
-  to { opacity: 0; transform: translateY(8px) scale(.99); }
-}
-
-@keyframes ghost-bar-enter {
-  from { opacity: 0; transform: translateY(-6px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes ghost-bar-exit {
-  from { opacity: 1; transform: translateY(0); }
-  to { opacity: 0; transform: translateY(-5px); }
+@keyframes ghost-mode-exit {
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0; transform: scale(.995); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .temp-chat-main,
-  .temp-chat-chrome,
-  .temp-chat-curve,
-  .temp-mode-closing .temp-chat-main,
-  .temp-mode-closing .temp-chat-chrome,
-  .temp-mode-closing .temp-chat-curve {
+  .temp-mode,
+  .temp-mode-closing {
     animation-duration: 1ms;
   }
 }
@@ -111,13 +96,17 @@
 .temp-chat-close { pointer-events: auto; }
 
 .temp-chat-label {
+  position: relative;
+  top: 5px;
   display: inline-flex;
+  align-self: center;
   align-items: center;
   gap: 8px;
-  color: #211832;
+  color: var(--temp-spectral);
   font-size: 16px;
   font-weight: 700;
   letter-spacing: .01em;
+  line-height: 22px;
 }
 
 .temp-ghost-icon {
@@ -147,14 +136,13 @@
 
 .temp-ghost-wave {
   fill: none;
-  stroke: var(--temp-accent);
+  stroke: url(#ghost-icon-wave-cutout);
   stroke-width: 1.9;
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-dasharray: 4 1.5;
   transform-box: fill-box;
   transform-origin: center;
-  filter: drop-shadow(0 0 1px rgb(167 139 250 / 55%));
   animation: temp-ghost-wave 1s linear infinite;
 }
 
@@ -163,12 +151,15 @@
 }
 
 .temp-chat-close {
+  position: relative;
+  top: 5px;
+  align-self: center;
   width: 32px;
-  height: 32px;
+  height: 28px;
   padding: 0;
   border: 0;
   border-radius: 7px;
-  color: #211832;
+  color: var(--temp-spectral);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -187,12 +178,12 @@
 
 @media (max-width: 640px) {
   .temp-mode {
-    padding: 34px 10px 0;
+    padding: 30px 10px 0;
   }
   .temp-chat-main { border-radius: 16px; }
-  .temp-chat-curve { top: 34px; height: 24px; }
-  .temp-chat-chrome { height: 34px; padding: 0 8px; }
-  .temp-chat-close { width: 30px; height: 30px; }
+  .temp-chat-curve { top: 29px; height: 25px; }
+  .temp-chat-chrome { height: 30px; padding: 0 8px; }
+  .temp-chat-close { width: 30px; height: 28px; }
 }
 
 .temp-mode .ksemo-composer-shell:not(.ksemo-help-composer-shell) {
@@ -201,7 +192,24 @@
 }
 
 .temp-mode .ksemo-user-message-bubble {
-  border: 1px dashed color-mix(in srgb, var(--temp-accent) 60%, transparent);
+  border: 1px dashed color-mix(in srgb, var(--temp-ice) 68%, transparent);
+}
+
+.temp-mode .temp-ghost-greeting {
+  display: inline-block;
+  color: transparent;
+  background-image: linear-gradient(
+    90deg,
+    var(--temp-accent) 0%,
+    var(--temp-accent) 35%,
+    #96e7d0 50%,
+    var(--temp-ice) 65%,
+    var(--temp-ice) 100%
+  );
+  background-size: 100% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 .temp-mode .ksemo-temp-toggle-icon {
@@ -217,17 +225,37 @@
   box-shadow: none;
 }
 
+.ksemo-composer-placeholder {
+  color: color-mix(in srgb, var(--muted-foreground) 76%, var(--background));
+  opacity: .88;
+}
+
 .temp-mode .ksemo-composer-placeholder {
-  color: color-mix(in srgb, var(--temp-accent) 72%, var(--muted-foreground));
+  display: inline-block;
+  color: transparent;
+  background-image: linear-gradient(
+    90deg,
+    var(--temp-accent) 0%,
+    var(--temp-accent) 35%,
+    #96e7d0 50%,
+    var(--temp-ice) 65%,
+    var(--temp-ice) 100%
+  );
+  background-size: 100% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: none;
+  opacity: .9;
 }
 
 .temp-mode .ksemo-composer-dictate,
 .temp-mode .ksemo-composer-dictate:hover {
-  color: var(--temp-accent);
+  color: var(--temp-ice);
 }
 
 .temp-mode .ksemo-composer-attach {
-  color: var(--muted-foreground);
+  color: var(--temp-accent);
 }
 
 .temp-mode .ksemo-composer-attach:hover,
@@ -239,33 +267,33 @@
 .temp-mode .ksemo-composer-send,
 .temp-mode .ksemo-composer-send:hover {
   background-color: var(--muted);
-  color: var(--temp-accent);
+  color: var(--temp-ice);
 }
 
 .temp-mode .ksemo-composer-send:hover {
-  background-color: color-mix(in srgb, var(--temp-accent) 12%, var(--muted));
+  background-color: color-mix(in srgb, var(--temp-ice) 18%, var(--muted));
 }
 
 .temp-mode .ksemo-composer-send-ready,
 .temp-mode .ksemo-composer-send-ready:hover,
 .temp-mode .ksemo-response-stop,
 .temp-mode .ksemo-response-stop:hover {
-  background-color: var(--temp-accent);
-  color: #211833;
+  background-color: var(--temp-ice);
+  color: var(--temp-spectral);
 }
 
 .temp-mode .ksemo-dictation-wave-bar {
-  background-color: var(--temp-accent);
+  background: linear-gradient(180deg, var(--temp-accent), var(--temp-ice));
 }
 
 .temp-mode .ksemo-dictation-transcribe {
-  background-color: var(--temp-accent);
-  color: #211833;
+  background-color: var(--temp-ice);
+  color: var(--temp-spectral);
 }
 
 .temp-mode .ksemo-dictation-transcribe:hover {
-  background-color: color-mix(in srgb, var(--temp-accent) 78%, white);
-  color: #211833;
+  background-color: color-mix(in srgb, var(--temp-ice) 78%, white);
+  color: var(--temp-spectral);
 }
 
 

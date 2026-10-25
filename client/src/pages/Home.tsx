@@ -444,7 +444,7 @@ function GhostModeIcon() {
 
     const chooseTarget = () => ({
       x: (Math.random() * 2 - 1) * 4.5,
-      y: (Math.random() * 2 - 1) * 3,
+      y: (Math.random() * 2 - 1) * 1,
       rotation: (Math.random() * 2 - 1) * 5,
     });
 
@@ -504,6 +504,22 @@ function GhostModeIcon() {
         color="#000000"
       />
       <svg className="temp-ghost-wave-overlay" viewBox="0 0 24 24">
+        <defs>
+          <linearGradient
+            id="ghost-icon-wave-cutout"
+            x1="0"
+            y1="0"
+            x2="24"
+            y2="0"
+            gradientUnits="userSpaceOnUse"
+          >
+            <stop offset="0%" stopColor="#86EFAC" />
+            <stop offset="35%" stopColor="#86EFAC" />
+            <stop offset="50%" stopColor="#96E7D0" />
+            <stop offset="65%" stopColor="#A5D8FF" />
+            <stop offset="100%" stopColor="#A5D8FF" />
+          </linearGradient>
+        </defs>
         <path
           className="temp-ghost-wave"
           d="M2 20.1V20.07C2 21.33 2.75 21.67 3.67 20.83L4.67 19.92C5.04 19.58 5.64 19.58 6.01 19.92L8.01 21.75C8.38 22.09 8.98 22.09 9.35 21.75L11.35 19.92C11.72 19.58 12.32 19.58 12.69 19.92L14.69 21.75C15.06 22.09 15.66 22.09 16.03 21.75L18.03 19.92C18.4 19.58 19 19.58 19.37 19.92L20.37 20.83C21.25 21.67 22 21.33 22 20.07"
@@ -5197,8 +5213,11 @@ export default function Home({
   const [greetingHour, setGreetingHour] = useState(() => new Date().getHours());
   const [greetingAnimationKey, setGreetingAnimationKey] = useState(0);
   const greeting = useMemo(
-    () => timeGreeting(),
-    [greetingHour]
+    () =>
+      isTemporaryChat
+        ? "A quiet space for thoughts to drift."
+        : timeGreeting(),
+    [greetingHour, isTemporaryChat]
   );
 
   useEffect(() => {
@@ -5398,8 +5417,24 @@ export default function Home({
           preserveAspectRatio="none"
           aria-hidden="true"
         >
+          <defs>
+            <linearGradient
+              id="ghost-mode-mint-ice-gradient"
+              x1="0"
+              y1="0"
+              x2="1440"
+              y2="0"
+              gradientUnits="userSpaceOnUse"
+            >
+              <stop offset="0%" stopColor="#86EFAC" />
+              <stop offset="35%" stopColor="#86EFAC" />
+              <stop offset="50%" stopColor="#96E7D0" />
+              <stop offset="65%" stopColor="#A5D8FF" />
+              <stop offset="100%" stopColor="#A5D8FF" />
+            </linearGradient>
+          </defs>
           <path
-            fill="var(--temp-accent)"
+            fill="url(#ghost-mode-mint-ice-gradient)"
             d="M0 0H1440V24A48 16 0 0 0 1392 8H48A48 16 0 0 0 0 24Z"
           />
         </svg>
@@ -6787,7 +6822,12 @@ const EmptyState = memo(function EmptyState({
             key={`${temporary ? "temporary" : "normal"}-${animationKey}`}
             className="relative mx-auto w-fit"
           >
-            <p className="ksemo-greeting-rise whitespace-nowrap text-[clamp(1rem,4.8vw,1.375rem)] font-bold tracking-[-0.04em] text-foreground sm:tracking-[-0.025em]">
+            <p
+              className={cn(
+                "ksemo-greeting-rise whitespace-nowrap text-[clamp(1rem,4.8vw,1.375rem)] font-bold tracking-[-0.04em] text-foreground sm:tracking-[-0.025em]",
+                temporary && "temp-ghost-greeting"
+              )}
+            >
               {greeting}
             </p>
           </div>
