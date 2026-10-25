@@ -44,7 +44,7 @@ import {
 import { BranchSplitIcon } from "@/components/ksemo/BranchSplitIcon";
 import { Sidebar2 } from "reicon-react/icons/Sidebar2";
 import { ChatLine } from "reicon-react/icons/ChatLine";
-import { ChatRoundCall } from "reicon-react/icons/ChatRoundCall";
+import { Ghost3 } from "reicon-react/icons/Ghost3";
 import {
   ShareIcon,
   PinTackIcon,
@@ -503,10 +503,12 @@ export default function Home({
     string | null
   >(null);
   const [isTemporaryChat, setIsTemporaryChat] = useState(false);
+  const [isTemporaryChatClosing, setIsTemporaryChatClosing] = useState(false);
   // Mirrors isTemporaryChat for use inside async stream callbacks, where the
   // captured state may be stale. Tracks which server conversations belong to
   // the current temporary session so they can be purged when it ends.
   const isTemporaryChatRef = useRef(false);
+  const temporaryChatCloseTimerRef = useRef<number | null>(null);
   const temporaryConversationIdsRef = useRef<Set<string>>(new Set());
   const [chatMessages, setChatMessages] = useState<KsemoMessage[]>(() =>
     sharedAnswer
@@ -1171,7 +1173,12 @@ export default function Home({
   };
   // Best-effort cleanup if the user navigates away mid-session.
   useEffect(() => {
-    return () => purgeTemporaryConversations();
+    return () => {
+      if (temporaryChatCloseTimerRef.current !== null) {
+        window.clearTimeout(temporaryChatCloseTimerRef.current);
+      }
+      purgeTemporaryConversations();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const messageEditMutation = trpc.message.edit.useMutation({
@@ -1235,6 +1242,30 @@ export default function Home({
       setComposerValue(current => (current ? `${current} ${text}` : text)),
     onError: () => {},
   });
+  const exitTemporaryChat = () => {
+    if (!isTemporaryChatRef.current || temporaryChatCloseTimerRef.current !== null) {
+      return;
+    }
+    voice.cancel();
+    setIsTemporaryChatClosing(true);
+    writeStoredTemporaryChat(user?.id, {
+      active: false,
+      activeConversationId: null,
+      ids: [],
+    });
+    temporaryChatCloseTimerRef.current = window.setTimeout(() => {
+      temporaryChatCloseTimerRef.current = null;
+      isTemporaryChatRef.current = false;
+      purgeTemporaryConversations({ preserveStreaming: true });
+      setChatMessages([]);
+      setActiveConversationId(null);
+      activeConversationIdRef.current = null;
+      setComposerValue("");
+      setGreetingAnimationKey(current => current + 1);
+      setIsTemporaryChat(false);
+      setIsTemporaryChatClosing(false);
+    }, 220);
+  };
   // Bot's own voice. Unlike the dictate pill this writes into the composer
   // continuously while you speak, then sends on its own once you go quiet — so
   // Bot can be driven hands-free without ever leaving the chat box.
@@ -5218,7 +5249,8 @@ export default function Home({
     <div
       className={cn(
         "relative flex h-dvh overflow-hidden bg-background",
-        isTemporaryChat && "temp-mode"
+        isTemporaryChat && "temp-mode",
+        isTemporaryChatClosing && "temp-mode-closing"
       )}
       style={
         isMobile && visualViewportHeight
@@ -5253,31 +5285,38 @@ export default function Home({
         locked={guestMode}
       />}
       {isTemporaryChat && (
-        <div className="temp-chat-chrome" aria-label="Temporary Chat controls">
+        <div className="temp-chat-chrome" aria-label="Ghost mode controls">
             <div className="temp-chat-label">
-              <ChatRoundCall size={16} weight="Fill" aria-hidden="true" />
-              <span>Temporary Chat</span>
+              <Ghost3 size={22} weight="Filled" color="#000000" aria-hidden="true" />
+              <span>Ghost mode</span>
             </div>
             <Button
               type="button"
               variant="ghost"
               size="icon-sm"
-              onClick={() => {
-                voice.cancel();
-                isTemporaryChatRef.current = false;
-                setIsTemporaryChat(false);
-                setGreetingAnimationKey(current => current + 1);
-                purgeTemporaryConversations({ preserveStreaming: true });
-                writeStoredTemporaryChat(user?.id, { active: false, activeConversationId: null, ids: [] });
-              }}
+              onClick={exitTemporaryChat}
               className="temp-chat-close"
-              aria-label="Exit temporary chat"
+              aria-label="Cancel Ghost mode"
+              title="Cancel"
             >
               <X size={18} />
             </Button>
         </div>
       )}
-      <main className={cn("relative flex min-w-0 flex-1 flex-col lg:flex-row", isTemporaryChat && "temp-chat-main") }>
+      {isTemporaryChat && (
+        <svg
+          className="temp-chat-curve"
+          viewBox="0 0 1440 24"
+          preserveAspectRatio="none"
+          aria-hidden="true"
+        >
+          <path
+            fill="var(--temp-accent)"
+            d="M0 0H1440V24A48 16 0 0 0 1392 8H48A48 16 0 0 0 0 24Z"
+          />
+        </svg>
+      )}
+      <main className={cn("relative flex min-w-0 flex-1 flex-col lg:flex-row", isTemporaryChat && "temp-chat-main z-[1]") }>
         {composerTag === "bot" && !guestMode && !isTemporaryChat && (
           <div
             aria-hidden="true"
@@ -5380,14 +5419,18 @@ export default function Home({
             {composerTag !== "bot" && (
               <>
                 {/* Shared chat navbar */}
-                <div
-                  aria-hidden="true"
-                  className="pointer-events-none absolute inset-x-0 top-0 z-[15] h-12 bg-background backdrop-blur-md"
-                />
-                <div
-                  aria-hidden="true"
-                  className="pointer-events-none absolute inset-x-0 top-12 z-[15] h-3 bg-gradient-to-b from-background to-transparent"
-                />
+                {!isTemporaryChat && (
+                  <>
+                    <div
+                      aria-hidden="true"
+                      className="pointer-events-none absolute inset-x-0 top-0 z-[15] h-12 bg-background backdrop-blur-md"
+                    />
+                    <div
+                      aria-hidden="true"
+                      className="pointer-events-none absolute inset-x-0 top-12 z-[15] h-3 bg-gradient-to-b from-background to-transparent"
+                    />
+                  </>
+                )}
                 <Button
                   variant="ghost"
                   size="icon"
@@ -5415,8 +5458,8 @@ export default function Home({
                         data-testid="temporary-chat-toggle"
                         aria-label={
                           isTemporaryChat
-                            ? "Exit temporary chat"
-                            : "Temporary chat"
+                            ? "Exit Ghost mode"
+                            : "Start Ghost mode"
                         }
                         aria-pressed={isTemporaryChat}
                         onClick={() => {
@@ -5428,6 +5471,7 @@ export default function Home({
                           setIsTemporaryChat(next);
                           setGreetingAnimationKey(current => current + 1);
                           if (next) {
+                            setIsTemporaryChatClosing(false);
                             temporaryConversationIdsRef.current = new Set();
                             writeStoredTemporaryChat(user?.id, {
                               active: true,
@@ -5447,20 +5491,11 @@ export default function Home({
                         }}
                         className="ksemo-temp-toggle size-10 rounded-xl text-foreground transition-colors hover:bg-accent"
                       >
-                        <ChatRoundCall
-                          weight={isTemporaryChat ? "Filled" : "Outline"}
-                          size={26}
-                          className={cn(
-                            "ksemo-temp-toggle-icon size-[26px]",
-                            isTemporaryChat && "scale-[1.08]"
-                          )}
-                        />
+                        <Ghost3 className="ksemo-temp-toggle-icon size-[22px]" />
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent side="bottom" sideOffset={6}>
-                      {isTemporaryChat
-                        ? "Exit temporary chat"
-                        : "Temporary chat"}
+                      Ghost mode
                     </TooltipContent>
                   </Tooltip>
                 </div>
@@ -5949,7 +5984,12 @@ export default function Home({
                 <div
                   ref={messagesBodyRef}
                   className={cn(
-                    "mx-auto max-w-3xl space-y-5 px-4 pt-16 sm:px-6 lg:pt-16",
+                    cn(
+                      "mx-auto max-w-3xl space-y-5 px-4 sm:px-6",
+                      isTemporaryChat
+                        ? "pt-16 lg:pt-16"
+                        : "pt-16 lg:pt-16"
+                    ),
                     composerTag === "bot" && !guestMode && !isTemporaryChat
                       ? "pb-[16rem]"
                       : "pb-3 sm:pb-4"
@@ -6662,12 +6702,6 @@ const EmptyState = memo(function EmptyState({
             <p className="ksemo-greeting-rise whitespace-nowrap text-[clamp(1rem,4.8vw,1.375rem)] font-bold tracking-[-0.04em] text-foreground sm:tracking-[-0.025em]">
               {greeting}
             </p>
-            {!temporary && (
-              <span
-                className="ksemo-greeting-sweep"
-                aria-hidden="true"
-              />
-            )}
           </div>
         </div>
       </div>

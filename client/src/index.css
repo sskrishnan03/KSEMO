@@ -21,11 +21,11 @@
   }
 }
 
-/* Temporary chat uses a restrained purple frame around the existing dark chat. */
+/* Ghost mode uses a purple top bar and purple accents inside the chat workspace. */
 .temp-mode {
   --temp-accent: #a78bfa;
-  padding: 44px 8px 8px;
-  background: var(--temp-accent);
+  padding: 36px 12px 0;
+  background: var(--background);
 }
 
 .temp-chat-main {
@@ -35,25 +35,82 @@
   border-radius: 20px;
   background: var(--background);
   box-shadow: none;
+  animation: ghost-workspace-enter 320ms cubic-bezier(.2, .75, .25, 1) both;
+}
+
+.temp-chat-curve {
+  position: absolute;
+  z-index: 2;
+  top: 36px;
+  left: 0;
+  width: 100%;
+  height: 24px;
+  pointer-events: none;
+  animation: ghost-bar-enter 280ms cubic-bezier(.2, .75, .25, 1) both;
 }
 
 .temp-chat-chrome {
   position: absolute;
   z-index: 100;
-  inset: 6px 0 auto;
+  inset: 0 0 auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 32px;
-  padding: 0;
+  height: 36px;
+  padding: 0 8px;
+  background: var(--temp-accent);
+  border-radius: 0;
   pointer-events: none;
+  animation: ghost-bar-enter 280ms cubic-bezier(.2, .75, .25, 1) both;
+}
+
+.temp-mode-closing .temp-chat-main {
+  animation: ghost-workspace-exit 220ms ease-in both;
+}
+
+.temp-mode-closing .temp-chat-chrome {
+  animation: ghost-bar-exit 180ms ease-in both;
+}
+
+.temp-mode-closing .temp-chat-curve {
+  animation: ghost-bar-exit 180ms ease-in both;
+}
+
+@keyframes ghost-workspace-enter {
+  from { opacity: 0; transform: translateY(10px) scale(.99); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes ghost-workspace-exit {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(8px) scale(.99); }
+}
+
+@keyframes ghost-bar-enter {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes ghost-bar-exit {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(-5px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .temp-chat-main,
+  .temp-chat-chrome,
+  .temp-chat-curve,
+  .temp-mode-closing .temp-chat-main,
+  .temp-mode-closing .temp-chat-chrome,
+  .temp-mode-closing .temp-chat-curve {
+    animation-duration: 1ms;
+  }
 }
 
 .temp-chat-label,
 .temp-chat-close { pointer-events: auto; }
 
 .temp-chat-label {
-  margin-left: 10px;
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -67,11 +124,10 @@
   width: 22px;
   height: 22px;
   flex: 0 0 22px;
-  color: #211832;
+  color: #000;
 }
 
 .temp-chat-close {
-  margin-right: 10px;
   width: 32px;
   height: 32px;
   padding: 0;
@@ -85,9 +141,12 @@
 .temp-chat-close:hover { color: #100b19; background: rgb(255 255 255 / 22%); }
 
 @media (max-width: 640px) {
-  .temp-mode { padding: 42px 8px 8px; }
+  .temp-mode {
+    padding: 34px 10px 0;
+  }
   .temp-chat-main { border-radius: 16px; }
-  .temp-chat-chrome { inset: 6px 0 auto; height: 30px; padding: 0; }
+  .temp-chat-curve { top: 34px; height: 24px; }
+  .temp-chat-chrome { height: 34px; padding: 0 8px; }
   .temp-chat-close { width: 30px; height: 30px; }
 }
 
@@ -117,10 +176,7 @@
   color: color-mix(in srgb, var(--temp-accent) 72%, var(--muted-foreground));
 }
 
-.temp-mode .ksemo-composer-dictate {
-  color: var(--temp-accent);
-}
-
+.temp-mode .ksemo-composer-dictate,
 .temp-mode .ksemo-composer-dictate:hover {
   color: var(--temp-accent);
 }
@@ -160,10 +216,6 @@
 .temp-mode .ksemo-dictation-transcribe {
   background-color: var(--temp-accent);
   color: #211833;
-  transition:
-    background-color 0.18s ease,
-    color 0.18s ease,
-    transform 0.18s ease;
 }
 
 .temp-mode .ksemo-dictation-transcribe:hover {
@@ -171,23 +223,6 @@
   color: #211833;
 }
 
-
-@keyframes ksemo-greeting-sweep {
-  0% {
-    left: 0;
-    opacity: 0;
-  }
-  12% {
-    opacity: 1;
-  }
-  82% {
-    opacity: 1;
-  }
-  100% {
-    left: calc(100% - 2rem);
-    opacity: 0;
-  }
-}
 
 @keyframes ksemo-greeting-rise {
   from {
@@ -204,29 +239,7 @@
   animation: ksemo-greeting-rise 650ms ease-out both;
 }
 
-.ksemo-greeting-sweep {
-  position: absolute;
-  bottom: -0.12rem;
-  left: 0;
-  width: 2rem;
-  height: 2px;
-  border-radius: 9999px;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    color-mix(in srgb, var(--greeting-highlight) 55%, white) 18%,
-    var(--greeting-highlight) 52%,
-    color-mix(in srgb, var(--greeting-highlight) 55%, white) 82%,
-    transparent
-  );
-  filter: drop-shadow(0 0 3px color-mix(in srgb, var(--greeting-highlight) 28%, transparent));
-  animation: ksemo-greeting-sweep 900ms ease-in-out 180ms both;
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .ksemo-greeting-sweep {
-    display: none;
-  }
   .ksemo-greeting-rise {
     animation: none;
     opacity: 1;
