@@ -177,7 +177,8 @@
 
 @media (max-width: 640px) {
   .temp-mode {
-    padding: 30px 10px 0;
+    /* Keep the mobile composer at the same full viewport width as normal chat. */
+    padding: 30px 0 0;
   }
   .temp-chat-main { border-radius: 16px; }
   .temp-chat-curve { top: 29px; height: 25px; }

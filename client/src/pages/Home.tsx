@@ -5558,16 +5558,18 @@ export default function Home({
                     />
                   </>
                 )}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setSidebarOpen(true)}
-                  className="absolute left-2 top-2 z-20 size-10 rounded-lg border-0 bg-transparent p-0 text-foreground/90 shadow-none transition-colors hover:bg-accent/80 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring active:bg-accent lg:hidden"
-                  aria-label="Open conversations"
-                  data-testid="mobile-sidebar-toggle"
-                >
-                  <Sidebar2 size={20} strokeWidth={2} className="size-5" />
-                </Button>
+                {!isTemporaryChat && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setSidebarOpen(true)}
+                    className="absolute left-2 top-2 z-20 size-10 rounded-lg border-0 bg-transparent p-0 text-foreground/90 shadow-none transition-colors hover:bg-accent/80 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring active:bg-accent lg:hidden"
+                    aria-label="Open conversations"
+                    data-testid="mobile-sidebar-toggle"
+                  >
+                    <Sidebar2 size={20} strokeWidth={2} className="size-5" />
+                  </Button>
+                )}
               </>
             )}
 
