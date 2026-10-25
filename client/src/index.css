@@ -28,7 +28,7 @@
   --temp-spectral: #244369;
   padding: 32px 12px 0;
   background: var(--background);
-  animation: ghost-mode-enter 360ms cubic-bezier(.22, .8, .22, 1) both;
+  animation: ghost-mode-enter 460ms cubic-bezier(.22, 1, .36, 1) both;
 }
 
 .temp-chat-main {
@@ -71,24 +71,23 @@
   pointer-events: none;
 }
 
-.temp-mode-closing {
-  animation: ghost-mode-exit 220ms cubic-bezier(.4, 0, 1, 1) both;
-}
+.temp-mode-closing { animation: ghost-mode-exit 340ms cubic-bezier(.4, 0, .8, 1) both; }
 
 @keyframes ghost-mode-enter {
-  from { opacity: 0; transform: scale(.995); }
-  to { opacity: 1; transform: scale(1); }
+  from { opacity: 0; transform: translateY(14px) scale(.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 @keyframes ghost-mode-exit {
-  from { opacity: 1; transform: scale(1); }
-  to { opacity: 0; transform: scale(.995); }
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(-8px) scale(.99); }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .temp-mode,
   .temp-mode-closing {
     animation-duration: 1ms;
+    animation-delay: 0ms;
   }
 }
 
@@ -216,6 +215,35 @@
   color: var(--temp-accent);
 }
 
+.ksemo-temp-toggle-ghosts {
+  position: relative;
+  display: block;
+  width: 22px;
+  height: 22px;
+}
+
+.ksemo-temp-toggle-ghost {
+  position: absolute;
+  inset: 0;
+  width: 22px;
+  height: 22px;
+  transition: opacity 120ms ease-out;
+}
+
+.ksemo-temp-toggle-ghost-filled { opacity: 0; }
+
+.ksemo-temp-toggle:hover .ksemo-temp-toggle-ghost-outline,
+.ksemo-temp-toggle:focus-visible .ksemo-temp-toggle-ghost-outline,
+.ksemo-temp-toggle.ksemo-touch-hover .ksemo-temp-toggle-ghost-outline {
+  opacity: 0;
+}
+
+.ksemo-temp-toggle:hover .ksemo-temp-toggle-ghost-filled,
+.ksemo-temp-toggle:focus-visible .ksemo-temp-toggle-ghost-filled,
+.ksemo-temp-toggle.ksemo-touch-hover .ksemo-temp-toggle-ghost-filled {
+  opacity: 1;
+}
+
 .temp-mode .ksemo-temp-toggle,
 .temp-mode .ksemo-temp-toggle:hover,
 .temp-mode .ksemo-temp-toggle:focus-visible,
@@ -230,38 +258,23 @@
   opacity: .88;
 }
 
-.temp-mode .ksemo-composer-placeholder {
-  display: inline-block;
-  color: transparent;
-  background-image: linear-gradient(
-    90deg,
-    var(--temp-accent) 0%,
-    var(--temp-accent) 35%,
-    #96e7d0 50%,
-    var(--temp-ice) 65%,
-    var(--temp-ice) 100%
-  );
-  background-size: 100% 100%;
-  background-clip: text;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  filter: none;
-  opacity: .9;
-}
-
-.temp-mode .ksemo-composer-dictate,
-.temp-mode .ksemo-composer-dictate:hover {
-  color: var(--temp-ice);
+.temp-mode .ksemo-composer-dictate {
+  color: var(--muted-foreground);
 }
 
 .temp-mode .ksemo-composer-attach {
-  color: var(--temp-accent);
+  color: var(--muted-foreground);
 }
 
+.temp-mode .ksemo-composer-dictate:hover,
+.temp-mode .ksemo-composer-dictate:focus-visible,
+.temp-mode .ksemo-composer-dictate.ksemo-touch-hover,
 .temp-mode .ksemo-composer-attach:hover,
+.temp-mode .ksemo-composer-attach:focus-visible,
+.temp-mode .ksemo-composer-attach.ksemo-touch-hover,
 .temp-mode .ksemo-composer-attach[data-state="open"],
 .temp-mode .ksemo-composer-attach[aria-expanded="true"] {
-  color: var(--temp-accent);
+  color: var(--foreground);
 }
 
 .temp-mode .ksemo-composer-send,
@@ -769,9 +782,7 @@ html.ksemo-reduce-motion .loader-xs {
     opacity: 0;
     transform: translateY(14px);
   }
-  60% {
-    opacity: 1;
-  }
+  60% { opacity: 1; }
   100% {
     opacity: 1;
     transform: translateY(0);

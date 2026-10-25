@@ -1087,7 +1087,7 @@ export const ChatComposer = memo(function ChatComposer({
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="ksemo-composer-attach size-10 shrink-0 rounded-full bg-transparent text-muted-foreground transition-colors hover:bg-accent hover:text-muted-foreground data-[state=open]:bg-accent data-[state=open]:text-muted-foreground aria-expanded:bg-accent aria-expanded:text-muted-foreground"
+                            className="ksemo-composer-attach size-10 shrink-0 rounded-full bg-transparent text-muted-foreground transition-colors hover:bg-accent hover:text-foreground data-[state=open]:bg-accent data-[state=open]:text-foreground aria-expanded:bg-accent aria-expanded:text-foreground"
                             aria-label={
                               toolsOpen && !libraryOpen
                                 ? "Close attachment options"
@@ -1284,7 +1284,7 @@ export const ChatComposer = memo(function ChatComposer({
                                 size="icon"
                                 onClick={onVoice}
                                 disabled={isTranscribing}
-                                className="ksemo-composer-dictate size-10 rounded-full bg-transparent text-foreground hover:bg-accent hover:text-foreground transition-colors"
+                                className="ksemo-composer-dictate size-10 rounded-full bg-transparent text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
                                 aria-label="Dictate"
                               >
                                 <Mic className="size-4.5" />
@@ -1357,7 +1357,7 @@ export const ChatComposer = memo(function ChatComposer({
                                 size="icon"
                                 onClick={onVoice}
                                 disabled={isTranscribing}
-                                className="ksemo-composer-dictate size-10 rounded-full bg-transparent text-foreground hover:bg-accent hover:text-foreground transition-colors"
+                                className="ksemo-composer-dictate size-10 rounded-full bg-transparent text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
                                 aria-label="Dictate"
                               >
                                 <Mic className="size-4.5" />

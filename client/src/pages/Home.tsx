@@ -1368,7 +1368,7 @@ export default function Home({
       setGreetingAnimationKey(current => current + 1);
       setIsTemporaryChat(false);
       setIsTemporaryChatClosing(false);
-    }, 220);
+    }, 340);
   };
   // Bot's own voice. Unlike the dictate pill this writes into the composer
   // continuously while you speak, then sends on its own once you go quiet — so
@@ -5397,17 +5397,21 @@ export default function Home({
             <GhostModeIcon />
             <span>Ghost mode</span>
           </div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            onClick={exitTemporaryChat}
-            className="temp-chat-close"
-            aria-label="Cancel Ghost mode"
-            title="Cancel"
-          >
-            <X size={19} strokeWidth={3} />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                onClick={exitTemporaryChat}
+                className="temp-chat-close"
+                aria-label="Cancel"
+              >
+                <X size={19} strokeWidth={3} />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" sideOffset={6}>Cancel</TooltipContent>
+          </Tooltip>
         </div>
       )}
       {isTemporaryChat && (
@@ -5614,7 +5618,10 @@ export default function Home({
                         }}
                         className="ksemo-temp-toggle size-10 rounded-xl text-foreground transition-colors hover:bg-accent"
                       >
-                        <Ghost3 className="ksemo-temp-toggle-icon size-[22px]" />
+                        <span className="ksemo-temp-toggle-ghosts" aria-hidden="true">
+                          <Ghost3 className="ksemo-temp-toggle-icon ksemo-temp-toggle-ghost ksemo-temp-toggle-ghost-outline" size={22} />
+                          <Ghost3 className="ksemo-temp-toggle-icon ksemo-temp-toggle-ghost ksemo-temp-toggle-ghost-filled" size={22} weight="Filled" />
+                        </span>
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent side="bottom" sideOffset={6}>
