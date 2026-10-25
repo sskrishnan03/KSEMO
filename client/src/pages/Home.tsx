@@ -425,6 +425,94 @@ function isSameTabReload(): boolean {
   return false;
 }
 
+function GhostModeIcon() {
+  const iconRef = useRef<HTMLSpanElement>(null);
+
+  useEffect(() => {
+    const icon = iconRef.current;
+    if (!icon) return;
+
+    const motionPreference = window.matchMedia(
+      "(prefers-reduced-motion: reduce)"
+    );
+    let frameId = 0;
+    let running = false;
+    let from = { x: 0, y: 0, rotation: 0 };
+    let target = from;
+    let legStartedAt = 0;
+    let legDuration = 0;
+
+    const chooseTarget = () => ({
+      x: (Math.random() * 2 - 1) * 4.5,
+      y: (Math.random() * 2 - 1) * 3,
+      rotation: (Math.random() * 2 - 1) * 5,
+    });
+
+    const animate = (now: number) => {
+      if (!running) return;
+      const progress = Math.min(1, (now - legStartedAt) / legDuration);
+      const eased = progress * progress * (3 - 2 * progress);
+      const x = from.x + (target.x - from.x) * eased;
+      const y = from.y + (target.y - from.y) * eased;
+      const rotation = from.rotation + (target.rotation - from.rotation) * eased;
+      icon.style.transform = `translate3d(${x.toFixed(2)}px, ${y.toFixed(2)}px, 0) rotate(${rotation.toFixed(2)}deg)`;
+
+      if (progress >= 1) {
+        from = target;
+        target = chooseTarget();
+        legStartedAt = now;
+        legDuration = 950 + Math.random() * 1150;
+      }
+      frameId = requestAnimationFrame(animate);
+    };
+
+    const start = () => {
+      if (running || motionPreference.matches) return;
+      running = true;
+      from = { x: 0, y: 0, rotation: 0 };
+      target = chooseTarget();
+      legStartedAt = performance.now();
+      legDuration = 950 + Math.random() * 1150;
+      frameId = requestAnimationFrame(animate);
+    };
+
+    const stop = () => {
+      running = false;
+      cancelAnimationFrame(frameId);
+      icon.style.transform = "";
+    };
+
+    const syncMotionPreference = () => {
+      if (motionPreference.matches) stop();
+      else start();
+    };
+
+    motionPreference.addEventListener("change", syncMotionPreference);
+    syncMotionPreference();
+    return () => {
+      motionPreference.removeEventListener("change", syncMotionPreference);
+      stop();
+    };
+  }, []);
+
+  return (
+    <span ref={iconRef} className="temp-ghost-icon" aria-hidden="true">
+      <Ghost3
+        className="temp-ghost-body"
+        size={22}
+        weight="Filled"
+        color="#000000"
+      />
+      <svg className="temp-ghost-wave-overlay" viewBox="0 0 24 24">
+        <path
+          className="temp-ghost-wave"
+          d="M2 20.1V20.07C2 21.33 2.75 21.67 3.67 20.83L4.67 19.92C5.04 19.58 5.64 19.58 6.01 19.92L8.01 21.75C8.38 22.09 8.98 22.09 9.35 21.75L11.35 19.92C11.72 19.58 12.32 19.58 12.69 19.92L14.69 21.75C15.06 22.09 15.66 22.09 16.03 21.75L18.03 19.92C18.4 19.58 19 19.58 19.37 19.92L20.37 20.83C21.25 21.67 22 21.33 22 20.07"
+        />
+      </svg>
+    </span>
+  );
+}
+
 export default function Home({
   sharedAnswer: sharedAnswerOverride,
   sharedAnswerToken,
@@ -5286,21 +5374,21 @@ export default function Home({
       />}
       {isTemporaryChat && (
         <div className="temp-chat-chrome" aria-label="Ghost mode controls">
-            <div className="temp-chat-label">
-              <Ghost3 size={22} weight="Filled" color="#000000" aria-hidden="true" />
-              <span>Ghost mode</span>
-            </div>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              onClick={exitTemporaryChat}
-              className="temp-chat-close"
-              aria-label="Cancel Ghost mode"
-              title="Cancel"
-            >
-              <X size={18} />
-            </Button>
+          <div className="temp-chat-label">
+            <GhostModeIcon />
+            <span>Ghost mode</span>
+          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            onClick={exitTemporaryChat}
+            className="temp-chat-close"
+            aria-label="Cancel Ghost mode"
+            title="Cancel"
+          >
+            <X size={19} strokeWidth={3} />
+          </Button>
         </div>
       )}
       {isTemporaryChat && (

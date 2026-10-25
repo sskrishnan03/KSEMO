@@ -115,16 +115,51 @@
   align-items: center;
   gap: 8px;
   color: #211832;
-  font-size: 15px;
-  font-weight: 600;
+  font-size: 16px;
+  font-weight: 700;
   letter-spacing: .01em;
 }
 
-.temp-chat-label svg {
+.temp-ghost-icon {
+  position: relative;
+  display: inline-block;
   width: 22px;
   height: 22px;
   flex: 0 0 22px;
-  color: #000;
+  will-change: transform;
+}
+
+.temp-ghost-body {
+  position: absolute;
+  inset: 0;
+  width: 22px;
+  height: 22px;
+}
+
+.temp-ghost-wave-overlay {
+  position: absolute;
+  inset: 0;
+  width: 22px;
+  height: 22px;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.temp-ghost-wave {
+  fill: none;
+  stroke: var(--temp-accent);
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 4 1.5;
+  transform-box: fill-box;
+  transform-origin: center;
+  filter: drop-shadow(0 0 1px rgb(167 139 250 / 55%));
+  animation: temp-ghost-wave 1s linear infinite;
+}
+
+@keyframes temp-ghost-wave {
+  to { stroke-dashoffset: -14; }
 }
 
 .temp-chat-close {
@@ -134,9 +169,19 @@
   border: 0;
   border-radius: 7px;
   color: #211832;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .temp-chat-close svg { width: 19px; height: 19px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .temp-ghost-wave {
+    animation-duration: 1ms;
+    animation-iteration-count: 1;
+  }
+}
 
 .temp-chat-close:hover { color: #100b19; background: rgb(255 255 255 / 22%); }
 
