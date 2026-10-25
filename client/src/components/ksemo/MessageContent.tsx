@@ -231,17 +231,9 @@ function formatMessageTimestamp(timestamp?: Date | string | number) {
     hour: "numeric",
     minute: "2-digit",
   }).format(date);
-  const dateKey = (value: Date) =>
-    `${value.getFullYear()}-${value.getMonth()}-${value.getDate()}`;
-  const now = new Date();
-  if (dateKey(date) === dateKey(now)) return `Today, ${time}`;
-  const yesterday = new Date(now);
-  yesterday.setDate(yesterday.getDate() - 1);
-  if (dateKey(date) === dateKey(yesterday)) return `Yesterday, ${time}`;
   const dateLabel = new Intl.DateTimeFormat(undefined, {
     month: "short",
     day: "numeric",
-    year: "numeric",
   }).format(date);
   return `${dateLabel}, ${time}`;
 }
@@ -403,50 +395,6 @@ export const MessageContent = memo(function MessageContent({
     null
   );
   const isMobile = useIsMobile();
-  const [showMobileUserActions, setShowMobileUserActions] = useState(false);
-  const mobileUserActionsRef = useRef<HTMLDivElement | null>(null);
-  const userLongPressTimerRef = useRef<number | null>(null);
-
-  useEffect(
-    () => () => {
-      if (userLongPressTimerRef.current !== null) {
-        window.clearTimeout(userLongPressTimerRef.current);
-      }
-    },
-    []
-  );
-
-  const startUserLongPress = () => {
-    if (!isMobile) return;
-    if (userLongPressTimerRef.current !== null) {
-      window.clearTimeout(userLongPressTimerRef.current);
-    }
-    userLongPressTimerRef.current = window.setTimeout(() => {
-      setShowMobileUserActions(true);
-      userLongPressTimerRef.current = null;
-    }, 450);
-  };
-
-  const cancelUserLongPress = () => {
-    if (userLongPressTimerRef.current !== null) {
-      window.clearTimeout(userLongPressTimerRef.current);
-      userLongPressTimerRef.current = null;
-    }
-  };
-
-  useEffect(() => {
-    if (!isMobile || !showMobileUserActions) return;
-
-    const dismissOnOutsidePress = (event: PointerEvent) => {
-      if (!mobileUserActionsRef.current?.contains(event.target as Node)) {
-        setShowMobileUserActions(false);
-      }
-    };
-
-    document.addEventListener("pointerdown", dismissOnOutsidePress);
-    return () =>
-      document.removeEventListener("pointerdown", dismissOnOutsidePress);
-  }, [isMobile, showMobileUserActions]);
 
   useEffect(() => {
     if (
@@ -700,13 +648,6 @@ export const MessageContent = memo(function MessageContent({
             : null}
           {(!isUser || message.content.trim().length > 0) && (
             <div
-              onPointerDown={isUser ? startUserLongPress : undefined}
-              onPointerUp={isUser ? cancelUserLongPress : undefined}
-              onPointerLeave={isUser ? cancelUserLongPress : undefined}
-              onPointerCancel={isUser ? cancelUserLongPress : undefined}
-              onContextMenu={
-                isUser && isMobile ? event => event.preventDefault() : undefined
-              }
               className={cn(
                 "text-[15px] leading-6",
                 isUser
@@ -1037,84 +978,32 @@ export const MessageContent = memo(function MessageContent({
 
           {!hideActions && isUser && message.content && !isEditing && (
             <div
-              ref={mobileUserActionsRef}
               className={cn(
-                "flex items-center gap-1 transition-opacity duration-150",
-                isMobile
-                  ? showMobileUserActions
-                    ? "absolute right-0 top-full z-30 mt-px animate-in fade-in slide-in-from-top-1 duration-150"
-                    : "hidden"
-                  : "mt-1.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
+                "mt-1.5 flex items-center justify-end gap-1 transition-opacity duration-150",
+                !isMobile &&
+                  "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
               )}
-              role={isMobile && showMobileUserActions ? "group" : undefined}
-              aria-label={
-                isMobile && showMobileUserActions
-                  ? "Message options"
-                  : undefined
-              }
+              role="group"
+              aria-label="Message options"
             >
-              {isMobile ? (
-                <div className="inline-flex min-w-[132px] flex-col items-stretch gap-0 rounded-lg border border-border/70 bg-popover p-1 text-popover-foreground shadow-md">
-                  {messageTimestamp && (
-                    <time className="flex w-full justify-start px-2.5 pt-[10px] pb-2 text-left text-[12.5px] leading-4 tabular-nums text-muted-foreground/80">
-                      {messageTimestamp}
-                    </time>
-                  )}
-                  {onEdit && !isEditing && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="h-10 w-full justify-start gap-1.5 rounded-md px-2 text-sm transition-transform active:scale-[0.98] active:bg-accent"
-                      onClick={() => {
-                        setShowMobileUserActions(false);
-                        onEdit(message);
-                      }}
-                    >
-                      <Pencil className="size-4" />
-                      Edit message
-                    </Button>
-                  )}
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-10 w-full justify-start gap-1.5 rounded-md px-2 text-sm transition-transform active:scale-[0.98] active:bg-accent"
-                    onClick={() => {
-                      setShowMobileUserActions(false);
-                      void copyMessage();
-                    }}
-                  >
-                    {copied ? (
-                      <CopySuccessIcon className="size-[17px]" />
-                    ) : (
-                      <Copy className="size-4" />
-                    )}
-                    Copy message
-                  </Button>
-                </div>
-              ) : (
-                <>
-                  {messageTimestamp && (
-                    <time className="mr-1 flex items-center px-1 text-[12.5px] leading-4 tabular-nums text-muted-foreground/80">
-                      {messageTimestamp}
-                    </time>
-                  )}
-                  {onEdit &&
-                    !isEditing &&
-                    action("Edit message", <Pencil className="size-4" />, () =>
-                      onEdit(message)
-                    )}
-                  {action(
-                    "Copy message",
-                    copied ? (
-                      <CopySuccessIcon className="size-[17px]" />
-                    ) : (
-                      <Copy className="size-4" />
-                    ),
-                    copyMessage
-                  )}
-                </>
+              {messageTimestamp && (
+                <time className="mr-1 flex items-center px-1 text-[12.5px] leading-4 tabular-nums text-muted-foreground/80">
+                  {messageTimestamp}
+                </time>
+              )}
+              {onEdit &&
+                !isEditing &&
+                action("Edit message", <Pencil className="size-4" />, () =>
+                  onEdit(message)
+                )}
+              {action(
+                "Copy message",
+                copied ? (
+                  <CopySuccessIcon className="size-[17px]" />
+                ) : (
+                  <Copy className="size-4" />
+                ),
+                copyMessage
               )}
             </div>
           )}
