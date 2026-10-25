@@ -356,6 +356,7 @@ function rememberNewChatIntent(userId: number): void {
 // "New Chat", or opening a saved conversation always ends temporary mode.
 type StoredTemporaryChat = {
   active: boolean;
+  savedPalette?: boolean;
   activeConversationId: string | null;
   ids: string[];
 };
@@ -371,6 +372,7 @@ function readStoredTemporaryChat(userId: string | number): StoredTemporaryChat {
       const parsed = JSON.parse(raw) as Partial<StoredTemporaryChat>;
       return {
         active: parsed.active === true,
+        savedPalette: parsed.savedPalette === true,
         activeConversationId:
           typeof parsed.activeConversationId === "string"
             ? parsed.activeConversationId
@@ -425,8 +427,17 @@ function isSameTabReload(): boolean {
   return false;
 }
 
-function GhostModeIcon() {
+function GhostModeIcon({
+  savedPalette = false,
+  size = 22,
+  splitColors = false,
+}: {
+  savedPalette?: boolean;
+  size?: number;
+  splitColors?: boolean;
+}) {
   const iconRef = useRef<HTMLSpanElement>(null);
+  const waveGradientId = `ghost-wave-${React.useId().replace(/:/g, "")}`;
 
   useEffect(() => {
     const icon = iconRef.current;
@@ -496,32 +507,60 @@ function GhostModeIcon() {
   }, []);
 
   return (
-    <span ref={iconRef} className="temp-ghost-icon" aria-hidden="true">
-      <Ghost3
-        className="temp-ghost-body"
-        size={22}
-        weight="Filled"
-        color="#000000"
-      />
-      <svg className="temp-ghost-wave-overlay" viewBox="0 0 24 24">
+    <span
+      ref={iconRef}
+      className="temp-ghost-icon"
+      style={{ width: size, height: size, flexBasis: size }}
+      aria-hidden="true"
+    >
+      {splitColors ? (
+        <>
+          <Ghost3
+            className="temp-ghost-body ghost-option-left-color"
+            size={size}
+            style={{ width: size, height: size }}
+            weight="Filled"
+          />
+          <Ghost3
+            className="temp-ghost-body ghost-option-right-color"
+            size={size}
+            style={{ width: size, height: size }}
+            weight="Filled"
+          />
+        </>
+      ) : (
+        <Ghost3
+          className="temp-ghost-body"
+          size={size}
+          style={{ width: size, height: size }}
+          weight="Filled"
+          color="#000000"
+        />
+      )}
+      <svg
+        className="temp-ghost-wave-overlay"
+        style={{ width: size, height: size }}
+        viewBox="0 0 24 24"
+      >
         <defs>
           <linearGradient
-            id="ghost-icon-wave-cutout"
+            id={waveGradientId}
             x1="0"
             y1="0"
             x2="24"
             y2="0"
             gradientUnits="userSpaceOnUse"
           >
-            <stop offset="0%" stopColor="#86EFAC" />
-            <stop offset="35%" stopColor="#86EFAC" />
-            <stop offset="50%" stopColor="#96E7D0" />
-            <stop offset="65%" stopColor="#A5D8FF" />
-            <stop offset="100%" stopColor="#A5D8FF" />
+            <stop offset="0%" stopColor={savedPalette ? "#FF6B5E" : "#86EFAC"} />
+            <stop offset="35%" stopColor={savedPalette ? "#FF6B5E" : "#86EFAC"} />
+            <stop offset="50%" stopColor={savedPalette ? "#FF9A78" : "#96E7D0"} />
+            <stop offset="65%" stopColor={savedPalette ? "#FFD2B8" : "#A5D8FF"} />
+            <stop offset="100%" stopColor={savedPalette ? "#FFD2B8" : "#A5D8FF"} />
           </linearGradient>
         </defs>
         <path
           className="temp-ghost-wave"
+          style={{ stroke: `url(#${waveGradientId})` }}
           d="M2 20.1V20.07C2 21.33 2.75 21.67 3.67 20.83L4.67 19.92C5.04 19.58 5.64 19.58 6.01 19.92L8.01 21.75C8.38 22.09 8.98 22.09 9.35 21.75L11.35 19.92C11.72 19.58 12.32 19.58 12.69 19.92L14.69 21.75C15.06 22.09 15.66 22.09 16.03 21.75L18.03 19.92C18.4 19.58 19 19.58 19.37 19.92L20.37 20.83C21.25 21.67 22 21.33 22 20.07"
         />
       </svg>
@@ -607,11 +646,14 @@ export default function Home({
     string | null
   >(null);
   const [isTemporaryChat, setIsTemporaryChat] = useState(false);
+  const [isSavedGhostChat, setIsSavedGhostChat] = useState(false);
   const [isTemporaryChatClosing, setIsTemporaryChatClosing] = useState(false);
   // Mirrors isTemporaryChat for use inside async stream callbacks, where the
   // captured state may be stale. Tracks which server conversations belong to
   // the current temporary session so they can be purged when it ends.
   const isTemporaryChatRef = useRef(false);
+  const isSavedGhostChatRef = useRef(false);
+  const isGhostMode = isTemporaryChat || isSavedGhostChat;
   const temporaryChatCloseTimerRef = useRef<number | null>(null);
   const temporaryConversationIdsRef = useRef<Set<string>>(new Set());
   const [chatMessages, setChatMessages] = useState<KsemoMessage[]>(() =>
@@ -1141,6 +1183,8 @@ export default function Home({
     setAttachmentNotices([]);
     isTemporaryChatRef.current = false;
     setIsTemporaryChat(false);
+    isSavedGhostChatRef.current = false;
+    setIsSavedGhostChat(false);
     temporaryConversationIdsRef.current.clear();
     setGuestPromptOpen(false);
     setSettingsOpen(false);
@@ -1360,6 +1404,8 @@ export default function Home({
     temporaryChatCloseTimerRef.current = window.setTimeout(() => {
       temporaryChatCloseTimerRef.current = null;
       isTemporaryChatRef.current = false;
+      isSavedGhostChatRef.current = false;
+      setIsSavedGhostChat(false);
       purgeTemporaryConversations({ preserveStreaming: true });
       setChatMessages([]);
       setActiveConversationId(null);
@@ -2247,6 +2293,8 @@ export default function Home({
       const stored = readStoredTemporaryChat(userId);
       isTemporaryChatRef.current = stored.active;
       setIsTemporaryChat(stored.active);
+      isSavedGhostChatRef.current = stored.active && stored.savedPalette === true;
+      setIsSavedGhostChat(stored.active && stored.savedPalette === true);
       temporaryConversationIdsRef.current = new Set(stored.ids);
       if (stored.active && stored.activeConversationId) {
         seededConversationIdRef.current = null;
@@ -2258,6 +2306,8 @@ export default function Home({
     } else {
       isTemporaryChatRef.current = false;
       setIsTemporaryChat(false);
+      isSavedGhostChatRef.current = false;
+      setIsSavedGhostChat(false);
       temporaryConversationIdsRef.current.clear();
       writeStoredTemporaryChat(userId, {
         active: false,
@@ -2386,7 +2436,7 @@ export default function Home({
   // sentinel so it always lands exactly on the last item of the thread.
   function scrollChatToEnd(mode: "auto" | "smooth") {
     const container = messagesContainerRef.current;
-    if (composerTag === "bot" && !guestMode && !isTemporaryChat && container) {
+    if (composerTag === "bot" && !guestMode && !isGhostMode && container) {
       // Voice mode reserves invisible space below the transcript for the
       // floating controls, so align to the padded scroll end instead of the
       // sentinel immediately before that space.
@@ -2786,6 +2836,7 @@ export default function Home({
               // to a normal chat.
               writeStoredTemporaryChat(user?.id, {
                 active: true,
+                savedPalette: isSavedGhostChatRef.current,
                 activeConversationId: conv.conversationId,
                 ids: Array.from(temporaryConversationIdsRef.current),
               });
@@ -3935,6 +3986,8 @@ export default function Home({
     purgeTemporaryConversations({ preserveStreaming: true });
     isTemporaryChatRef.current = false;
     setIsTemporaryChat(false);
+    isSavedGhostChatRef.current = false;
+    setIsSavedGhostChat(false);
     writeStoredTemporaryChat(user?.id, {
       active: false,
       activeConversationId: null,
@@ -4625,6 +4678,8 @@ export default function Home({
       purgeTemporaryConversations({ preserveStreaming: true });
       isTemporaryChatRef.current = false;
       setIsTemporaryChat(false);
+      isSavedGhostChatRef.current = false;
+      setIsSavedGhostChat(false);
       writeStoredTemporaryChat(user?.id, {
         active: false,
         activeConversationId: null,
@@ -5304,7 +5359,7 @@ export default function Home({
       isEditingMessage={false}
       onSaveEdit={stableEditAction}
       onCancelEdit={stableCancelEdit}
-      temporary={isTemporaryChat}
+      temporary={isGhostMode}
       guestMode={guestMode}
     />
   );
@@ -5357,6 +5412,7 @@ export default function Home({
       className={cn(
         "relative flex h-dvh overflow-hidden bg-background",
         isTemporaryChat && "temp-mode",
+        isSavedGhostChat && "ghost-saved-mode",
         isTemporaryChatClosing && "temp-mode-closing"
       )}
       style={
@@ -5365,7 +5421,7 @@ export default function Home({
           : undefined
       }
     >
-      {!isTemporaryChat && <ConversationSidebar
+      {!isGhostMode && <ConversationSidebar
         conversations={conversationQuery.data ?? []}
         activeConversationId={activeConversationId}
         generatingConversationIds={generatingConversationIds}
@@ -5391,12 +5447,51 @@ export default function Home({
         user={user ?? {}}
         locked={guestMode}
       />}
-      {isTemporaryChat && (
+      {isGhostMode && (
         <div className="temp-chat-chrome" aria-label="Ghost mode controls">
           <div className="temp-chat-label">
-            <GhostModeIcon />
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="temp-ghost-tooltip-trigger" tabIndex={0} aria-label="Ghost mode">
+                  <GhostModeIcon savedPalette={isSavedGhostChat} />
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" sideOffset={6}>Ghost mode</TooltipContent>
+            </Tooltip>
             <span>Ghost mode</span>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button type="button" variant="ghost" size="icon-sm" className="temp-chat-mode-trigger" aria-label="Choose Ghost mode palette">
+                  <ChevronDown size={18} strokeWidth={3} />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" sideOffset={8} className="w-80 rounded-2xl p-2">
+                <DropdownMenuItem className="items-center gap-3 rounded-xl px-3 py-2.5" onSelect={() => {
+                  isTemporaryChatRef.current = true;
+                  setIsTemporaryChat(true);
+                  isSavedGhostChatRef.current = false;
+                  setIsSavedGhostChat(false);
+                  setGreetingAnimationKey(current => current + 1);
+                  writeStoredTemporaryChat(user?.id, { active: true, savedPalette: false, activeConversationId: activeConversationIdRef.current, ids: Array.from(temporaryConversationIdsRef.current) });
+                }}>
+                  <span className="ghost-mode-option-icon"><GhostModeIcon size={28} splitColors /></span>
+                  <span className="flex min-w-0 flex-col gap-0.5"><span className="font-semibold">Quick</span><span className="max-w-56 text-xs leading-4 text-muted-foreground">A temporary chat that clears when you cancel.</span></span>
+                </DropdownMenuItem>
+                <DropdownMenuItem className="items-center gap-3 rounded-xl px-3 py-2.5" onSelect={() => {
+                  isTemporaryChatRef.current = true;
+                  setIsTemporaryChat(true);
+                  isSavedGhostChatRef.current = true;
+                  setIsSavedGhostChat(true);
+                  setGreetingAnimationKey(current => current + 1);
+                  writeStoredTemporaryChat(user?.id, { active: true, savedPalette: true, activeConversationId: activeConversationIdRef.current, ids: Array.from(temporaryConversationIdsRef.current) });
+                }}>
+                  <span className="ghost-mode-option-icon ghost-mode-option-icon-saved"><GhostModeIcon savedPalette size={28} splitColors /></span>
+                  <span className="flex min-w-0 flex-col gap-0.5"><span className="font-semibold">Private</span><span className="max-w-56 text-xs leading-4 text-muted-foreground">Hidden from history and cleared when you exit.</span></span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
+          <div className="temp-chat-actions">
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -5405,16 +5500,17 @@ export default function Home({
                 size="icon-sm"
                 onClick={exitTemporaryChat}
                 className="temp-chat-close"
-                aria-label="Cancel"
+                aria-label="Cancel Ghost mode"
               >
                 <X size={19} strokeWidth={3} />
               </Button>
             </TooltipTrigger>
             <TooltipContent side="bottom" sideOffset={6}>Cancel</TooltipContent>
           </Tooltip>
+          </div>
         </div>
       )}
-      {isTemporaryChat && (
+      {isGhostMode && (
         <svg
           className="temp-chat-curve"
           viewBox="0 0 1440 24"
@@ -5423,28 +5519,28 @@ export default function Home({
         >
           <defs>
             <linearGradient
-              id="ghost-mode-mint-ice-gradient"
+              id={isSavedGhostChat ? "ghost-mode-coral-peach-gradient" : "ghost-mode-mint-ice-gradient"}
               x1="0"
               y1="0"
               x2="1440"
               y2="0"
               gradientUnits="userSpaceOnUse"
             >
-              <stop offset="0%" stopColor="#86EFAC" />
-              <stop offset="35%" stopColor="#86EFAC" />
-              <stop offset="50%" stopColor="#96E7D0" />
-              <stop offset="65%" stopColor="#A5D8FF" />
-              <stop offset="100%" stopColor="#A5D8FF" />
+              <stop offset="0%" stopColor={isSavedGhostChat ? "#FF6B5E" : "#86EFAC"} />
+              <stop offset="35%" stopColor={isSavedGhostChat ? "#FF6B5E" : "#86EFAC"} />
+              <stop offset="50%" stopColor={isSavedGhostChat ? "#FF9A78" : "#96E7D0"} />
+              <stop offset="65%" stopColor={isSavedGhostChat ? "#FFD2B8" : "#A5D8FF"} />
+              <stop offset="100%" stopColor={isSavedGhostChat ? "#FFD2B8" : "#A5D8FF"} />
             </linearGradient>
           </defs>
           <path
-            fill="url(#ghost-mode-mint-ice-gradient)"
+            fill={isSavedGhostChat ? "url(#ghost-mode-coral-peach-gradient)" : "url(#ghost-mode-mint-ice-gradient)"}
             d="M0 0H1440V24A48 16 0 0 0 1392 8H48A48 16 0 0 0 0 24Z"
           />
         </svg>
       )}
-      <main className={cn("relative flex min-w-0 flex-1 flex-col lg:flex-row", isTemporaryChat && "temp-chat-main z-[1]") }>
-        {composerTag === "bot" && !guestMode && !isTemporaryChat && (
+      <main className={cn("relative flex min-w-0 flex-1 flex-col lg:flex-row", isGhostMode && "temp-chat-main z-[1]") }>
+        {composerTag === "bot" && !guestMode && !isGhostMode && (
           <div
             aria-hidden="true"
             className="ksemo-voice-corner-glow pointer-events-none absolute inset-0 z-0"
@@ -5474,7 +5570,7 @@ export default function Home({
                   : "lg:w-full"
             )}
           >
-            {composerTag === "bot" && !guestMode && !isTemporaryChat && (
+            {composerTag === "bot" && !guestMode && !isGhostMode && (
               <div className="pointer-events-none absolute inset-x-0 bottom-3 z-30 flex justify-center px-4 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
                 <div className="pointer-events-auto flex items-end justify-center gap-2 bg-transparent">
                   <div className="pointer-events-auto">
@@ -5546,7 +5642,7 @@ export default function Home({
             {composerTag !== "bot" && (
               <>
                 {/* Shared chat navbar */}
-                {!isTemporaryChat && (
+                {!isGhostMode && (
                   <>
                     <div
                       aria-hidden="true"
@@ -5558,7 +5654,7 @@ export default function Home({
                     />
                   </>
                 )}
-                {!isTemporaryChat && (
+                {!isGhostMode && (
                   <Button
                     variant="ghost"
                     size="icon"
@@ -5573,8 +5669,8 @@ export default function Home({
               </>
             )}
 
-            {!guestMode &&
-              !isTemporaryChat &&
+              {!guestMode &&
+              !isGhostMode &&
               composerTag !== "bot" &&
               !activeConversationId &&
               visibleMessages.length === 0 && (
@@ -5585,38 +5681,17 @@ export default function Home({
                         variant="ghost"
                         size="icon"
                         data-testid="temporary-chat-toggle"
-                        aria-label={
-                          isTemporaryChat
-                            ? "Exit Ghost mode"
-                            : "Start Ghost mode"
-                        }
-                        aria-pressed={isTemporaryChat}
+                        aria-label="Start Ghost mode"
                         onClick={() => {
-                          // Dictation belongs to the current composer session;
-                          // discard it when entering or leaving temporary chat.
                           voice.cancel();
-                          const next = !isTemporaryChatRef.current;
-                          isTemporaryChatRef.current = next;
-                          setIsTemporaryChat(next);
+                          isSavedGhostChatRef.current = false;
+                          setIsSavedGhostChat(false);
+                          isTemporaryChatRef.current = true;
+                          setIsTemporaryChat(true);
+                          setIsTemporaryChatClosing(false);
+                          temporaryConversationIdsRef.current = new Set();
+                          writeStoredTemporaryChat(user?.id, { active: true, savedPalette: false, activeConversationId: null, ids: [] });
                           setGreetingAnimationKey(current => current + 1);
-                          if (next) {
-                            setIsTemporaryChatClosing(false);
-                            temporaryConversationIdsRef.current = new Set();
-                            writeStoredTemporaryChat(user?.id, {
-                              active: true,
-                              activeConversationId: null,
-                              ids: [],
-                            });
-                          } else {
-                            purgeTemporaryConversations({
-                              preserveStreaming: true,
-                            });
-                            writeStoredTemporaryChat(user?.id, {
-                              active: false,
-                              activeConversationId: null,
-                              ids: [],
-                            });
-                          }
                         }}
                         className="ksemo-temp-toggle size-10 rounded-xl text-foreground transition-colors hover:bg-accent"
                       >
@@ -5626,9 +5701,7 @@ export default function Home({
                         </span>
                       </Button>
                     </TooltipTrigger>
-                    <TooltipContent side="bottom" sideOffset={6}>
-                      Ghost mode
-                    </TooltipContent>
+                    <TooltipContent side="bottom" sideOffset={2}>Ghost mode</TooltipContent>
                   </Tooltip>
                 </div>
               )}
@@ -6500,13 +6573,14 @@ export default function Home({
                   activeConversationId &&
                   !isGenerating) ? (
                 <Loading />
-              ) : composerTag === "bot" && !guestMode && !isTemporaryChat ? (
+              ) : composerTag === "bot" && !guestMode && !isGhostMode ? (
                 <div className="h-full min-h-0" aria-hidden="true" />
               ) : (
                 <EmptyState
                   greeting={greeting}
                   animationKey={greetingAnimationKey}
                   temporary={isTemporaryChat}
+                  ghostMode={isGhostMode}
                   composer={
                     isMobile
                       ? null
@@ -6817,24 +6891,26 @@ const EmptyState = memo(function EmptyState({
   animationKey,
   composer,
   temporary = false,
+  ghostMode = temporary,
 }: {
   greeting: string;
   animationKey: number;
   composer: React.ReactNode;
   temporary?: boolean;
+  ghostMode?: boolean;
 }) {
   return (
     <div className="mx-auto flex h-full w-full max-w-3xl flex-col justify-center gap-4 px-0 pb-16 sm:px-5 sm:pb-4 lg:pb-0">
       <div>
         <div className="px-5 text-center sm:px-0">
           <div
-            key={`${temporary ? "temporary" : "normal"}-${animationKey}`}
+            key={`${ghostMode ? "ghost" : "normal"}-${animationKey}`}
             className="relative mx-auto w-fit"
           >
             <p
               className={cn(
                 "ksemo-greeting-rise whitespace-nowrap text-[clamp(1rem,4.8vw,1.375rem)] font-bold tracking-[-0.04em] text-foreground sm:tracking-[-0.025em]",
-                temporary && "temp-ghost-greeting"
+                ghostMode && "temp-ghost-greeting"
               )}
             >
               {greeting}

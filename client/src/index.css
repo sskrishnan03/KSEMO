@@ -22,8 +22,9 @@
 }
 
 /* Ghost mode splits ectoplasmic green and pale Ghost Blue across its accents. */
-.temp-mode {
+:is(.temp-mode, .ghost-saved-mode) {
   --temp-accent: #86efac;
+  --temp-mid: #96e7d0;
   --temp-ice: #a5d8ff;
   --temp-spectral: #244369;
   padding: 32px 12px 0;
@@ -63,12 +64,36 @@
     90deg,
     var(--temp-accent) 0%,
     var(--temp-accent) 35%,
-    #96e7d0 50%,
+    var(--temp-mid) 50%,
     var(--temp-ice) 65%,
     var(--temp-ice) 100%
   );
   border-radius: 0;
   pointer-events: none;
+}
+
+.temp-chat-actions {
+  position: relative;
+  top: 5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  pointer-events: auto;
+}
+.temp-chat-actions .temp-chat-close { top: 0; }
+.temp-chat-actions > [data-slot="dropdown-menu"] { display: inline-flex; }
+.temp-chat-mode-trigger {
+  display: inline-flex;
+  width: auto;
+  min-width: 68px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 0 8px;
+  color: #000;
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .temp-mode-closing { animation: ghost-mode-exit 340ms cubic-bezier(.4, 0, .8, 1) both; }
@@ -85,14 +110,19 @@
 
 @media (prefers-reduced-motion: reduce) {
   .temp-mode,
-  .temp-mode-closing {
+  .ghost-saved-mode,
+  .temp-mode-closing,
+  .ghost-saved-mode.temp-mode-closing {
     animation-duration: 1ms;
     animation-delay: 0ms;
   }
 }
 
-.temp-chat-label,
-.temp-chat-close { pointer-events: auto; }
+.temp-chat-label { pointer-events: auto; }
+.temp-chat-close,
+.temp-chat-close:hover,
+.temp-chat-close:focus-visible,
+.temp-chat-close:active { pointer-events: auto; color: #000 !important; }
 
 .temp-chat-label {
   position: relative;
@@ -101,12 +131,34 @@
   align-self: center;
   align-items: center;
   gap: 8px;
-  color: var(--temp-spectral);
+  color: #000;
   font-size: 16px;
   font-weight: 700;
   letter-spacing: .01em;
   line-height: 22px;
 }
+.temp-ghost-tooltip-trigger {
+  display: inline-flex;
+  align-items: center;
+  cursor: help;
+  outline: none;
+}
+.temp-chat-mode-trigger,
+.temp-chat-mode-trigger:hover,
+.temp-chat-mode-trigger:focus-visible,
+.temp-chat-mode-trigger[data-state="open"] {
+  width: 30px;
+  height: 28px;
+  min-width: 30px;
+  margin-left: -5px;
+  padding: 0;
+  color: #000 !important;
+  background: transparent;
+  font-weight: 700;
+}
+.temp-chat-mode-trigger:hover,
+.temp-chat-mode-trigger:focus-visible,
+.temp-chat-mode-trigger[data-state="open"] { background: rgb(0 0 0 / 8%); }
 
 .temp-ghost-icon {
   position: relative;
@@ -122,6 +174,15 @@
   inset: 0;
   width: 22px;
   height: 22px;
+}
+
+.ghost-option-left-color {
+  color: var(--ghost-option-left, #86efac);
+  clip-path: inset(0 50% 0 0);
+}
+.ghost-option-right-color {
+  color: var(--ghost-option-right, #a5d8ff);
+  clip-path: inset(0 0 0 50%);
 }
 
 .temp-ghost-wave-overlay {
@@ -173,10 +234,10 @@
   }
 }
 
-.temp-chat-close:hover { color: #100b19; background: rgb(255 255 255 / 22%); }
+.temp-chat-close:hover { background: rgb(255 255 255 / 22%); }
 
 @media (max-width: 640px) {
-  .temp-mode {
+  :is(.temp-mode, .ghost-saved-mode) {
     /* Keep the mobile composer at the same full viewport width as normal chat. */
     padding: 30px 0 0;
   }
@@ -186,23 +247,23 @@
   .temp-chat-close { width: 30px; height: 28px; }
 }
 
-.temp-mode .ksemo-composer-shell:not(.ksemo-help-composer-shell) {
+:is(.temp-mode, .ghost-saved-mode) .ksemo-composer-shell:not(.ksemo-help-composer-shell) {
   background-color: var(--popover);
   border-color: var(--border);
 }
 
-.temp-mode .ksemo-user-message-bubble {
+:is(.temp-mode, .ghost-saved-mode) .ksemo-user-message-bubble {
   border: 1px dashed color-mix(in srgb, var(--temp-ice) 68%, transparent);
 }
 
-.temp-mode .temp-ghost-greeting {
+:is(.temp-mode, .ghost-saved-mode) .temp-ghost-greeting {
   display: inline-block;
   color: transparent;
   background-image: linear-gradient(
     90deg,
     var(--temp-accent) 0%,
     var(--temp-accent) 35%,
-    #96e7d0 50%,
+    var(--temp-mid) 50%,
     var(--temp-ice) 65%,
     var(--temp-ice) 100%
   );
@@ -212,7 +273,7 @@
   -webkit-text-fill-color: transparent;
 }
 
-.temp-mode .ksemo-temp-toggle-icon {
+:is(.temp-mode, .ghost-saved-mode) .ksemo-temp-toggle-icon {
   color: var(--temp-accent);
 }
 
@@ -233,6 +294,9 @@
 
 .ksemo-temp-toggle-ghost-filled { opacity: 0; }
 
+.ksemo-temp-toggle[data-state="open"] .ksemo-temp-toggle-ghost-outline { opacity: 0; }
+.ksemo-temp-toggle[data-state="open"] .ksemo-temp-toggle-ghost-filled { opacity: 1; }
+
 .ksemo-temp-toggle:hover .ksemo-temp-toggle-ghost-outline,
 .ksemo-temp-toggle:focus-visible .ksemo-temp-toggle-ghost-outline,
 .ksemo-temp-toggle.ksemo-touch-hover .ksemo-temp-toggle-ghost-outline {
@@ -245,10 +309,10 @@
   opacity: 1;
 }
 
-.temp-mode .ksemo-temp-toggle,
-.temp-mode .ksemo-temp-toggle:hover,
-.temp-mode .ksemo-temp-toggle:focus-visible,
-.temp-mode .ksemo-temp-toggle:active {
+:is(.temp-mode, .ghost-saved-mode) .ksemo-temp-toggle,
+:is(.temp-mode, .ghost-saved-mode) .ksemo-temp-toggle:hover,
+:is(.temp-mode, .ghost-saved-mode) .ksemo-temp-toggle:focus-visible,
+:is(.temp-mode, .ghost-saved-mode) .ksemo-temp-toggle:active {
   border: 0;
   outline: none;
   box-shadow: none;
@@ -259,57 +323,91 @@
   opacity: .88;
 }
 
-.temp-mode .ksemo-composer-dictate {
+:is(.temp-mode, .ghost-saved-mode) .ksemo-composer-dictate {
   color: var(--muted-foreground);
 }
 
-.temp-mode .ksemo-composer-attach {
+:is(.temp-mode, .ghost-saved-mode) .ksemo-composer-attach {
   color: var(--muted-foreground);
 }
 
-.temp-mode .ksemo-composer-dictate:hover,
-.temp-mode .ksemo-composer-dictate:focus-visible,
-.temp-mode .ksemo-composer-dictate.ksemo-touch-hover,
-.temp-mode .ksemo-composer-attach:hover,
-.temp-mode .ksemo-composer-attach:focus-visible,
-.temp-mode .ksemo-composer-attach.ksemo-touch-hover,
-.temp-mode .ksemo-composer-attach[data-state="open"],
-.temp-mode .ksemo-composer-attach[aria-expanded="true"] {
+:is(.temp-mode, .ghost-saved-mode) .ksemo-composer-dictate:hover,
+:is(.temp-mode, .ghost-saved-mode) .ksemo-composer-dictate:focus-visible,
+:is(.temp-mode, .ghost-saved-mode) .ksemo-composer-dictate.ksemo-touch-hover,
+:is(.temp-mode, .ghost-saved-mode) .ksemo-composer-attach:hover,
+:is(.temp-mode, .ghost-saved-mode) .ksemo-composer-attach:focus-visible,
+:is(.temp-mode, .ghost-saved-mode) .ksemo-composer-attach.ksemo-touch-hover,
+:is(.temp-mode, .ghost-saved-mode) .ksemo-composer-attach[data-state="open"],
+:is(.temp-mode, .ghost-saved-mode) .ksemo-composer-attach[aria-expanded="true"] {
   color: var(--foreground);
 }
 
-.temp-mode .ksemo-composer-send,
-.temp-mode .ksemo-composer-send:hover {
+:is(.temp-mode, .ghost-saved-mode) .ksemo-composer-send,
+:is(.temp-mode, .ghost-saved-mode) .ksemo-composer-send:hover {
   background-color: var(--muted);
   color: var(--temp-ice);
 }
 
-.temp-mode .ksemo-composer-send:hover {
+:is(.temp-mode, .ghost-saved-mode) .ksemo-composer-send:hover {
   background-color: color-mix(in srgb, var(--temp-ice) 18%, var(--muted));
 }
 
-.temp-mode .ksemo-composer-send-ready,
-.temp-mode .ksemo-composer-send-ready:hover,
-.temp-mode .ksemo-response-stop,
-.temp-mode .ksemo-response-stop:hover {
+:is(.temp-mode, .ghost-saved-mode) .ksemo-composer-send-ready,
+:is(.temp-mode, .ghost-saved-mode) .ksemo-composer-send-ready:hover,
+:is(.temp-mode, .ghost-saved-mode) .ksemo-response-stop,
+:is(.temp-mode, .ghost-saved-mode) .ksemo-response-stop:hover {
   background-color: var(--temp-ice);
   color: var(--temp-spectral);
 }
 
-.temp-mode .ksemo-dictation-wave-bar {
+:is(.temp-mode, .ghost-saved-mode) .ksemo-dictation-wave-bar {
   background: linear-gradient(180deg, var(--temp-accent), var(--temp-ice));
 }
 
-.temp-mode .ksemo-dictation-transcribe {
+:is(.temp-mode, .ghost-saved-mode) .ksemo-dictation-transcribe {
   background-color: var(--temp-ice);
   color: var(--temp-spectral);
 }
 
-.temp-mode .ksemo-dictation-transcribe:hover {
+:is(.temp-mode, .ghost-saved-mode) .ksemo-dictation-transcribe:hover {
   background-color: color-mix(in srgb, var(--temp-ice) 78%, white);
   color: var(--temp-spectral);
 }
 
+
+/* Saved ghost mode reuses the exact ghost layout with a coral and peach palette. */
+.ghost-saved-mode {
+  --temp-accent: #ff6b5e;
+  --temp-mid: #ff9a78;
+  --temp-ice: #ffd2b8;
+  --temp-spectral: #71352e;
+}
+.ghost-saved-mode.temp-mode-closing {
+  animation: ghost-mode-exit 340ms cubic-bezier(.4, 0, .8, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ghost-saved-mode,
+  .ghost-saved-mode.temp-mode-closing {
+    animation-duration: 1ms;
+    animation-delay: 0ms;
+  }
+}
+.ghost-mode-option-icon {
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  align-items: center;
+  justify-content: center;
+  --ghost-option-left: #86efac;
+  --ghost-option-right: #a5d8ff;
+}
+.ghost-mode-option-icon .temp-ghost-icon { overflow: visible; }
+.ghost-mode-option-icon .temp-ghost-wave-overlay { overflow: visible; }
+.ghost-mode-option-icon-saved {
+  --ghost-option-left: #ff6b5e;
+  --ghost-option-right: #ffd2b8;
+}
 
 @keyframes ksemo-greeting-rise {
   from {
