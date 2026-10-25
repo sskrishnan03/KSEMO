@@ -431,15 +431,18 @@ function GhostModeIcon({
   savedPalette = false,
   size = 22,
   splitColors = false,
+  shouldAnimate = true,
 }: {
   savedPalette?: boolean;
   size?: number;
   splitColors?: boolean;
+  shouldAnimate?: boolean;
 }) {
   const iconRef = useRef<HTMLSpanElement>(null);
   const waveGradientId = `ghost-wave-${React.useId().replace(/:/g, "")}`;
 
   useEffect(() => {
+    if (!shouldAnimate) return;
     const icon = iconRef.current;
     if (!icon) return;
 
@@ -459,7 +462,7 @@ function GhostModeIcon({
       rotation: (Math.random() * 2 - 1) * 5,
     });
 
-    const animate = (now: number) => {
+    const animateFrame = (now: number) => {
       if (!running) return;
       const progress = Math.min(1, (now - legStartedAt) / legDuration);
       const eased = progress * progress * (3 - 2 * progress);
@@ -474,7 +477,7 @@ function GhostModeIcon({
         legStartedAt = now;
         legDuration = 950 + Math.random() * 1150;
       }
-      frameId = requestAnimationFrame(animate);
+      frameId = requestAnimationFrame(animateFrame);
     };
 
     const start = () => {
@@ -484,7 +487,7 @@ function GhostModeIcon({
       target = chooseTarget();
       legStartedAt = performance.now();
       legDuration = 950 + Math.random() * 1150;
-      frameId = requestAnimationFrame(animate);
+      frameId = requestAnimationFrame(animateFrame);
     };
 
     const stop = () => {
@@ -504,7 +507,7 @@ function GhostModeIcon({
       motionPreference.removeEventListener("change", syncMotionPreference);
       stop();
     };
-  }, []);
+  }, [shouldAnimate]);
 
   return (
     <span
@@ -5456,40 +5459,11 @@ export default function Home({
                   <GhostModeIcon savedPalette={isSavedGhostChat} />
                 </span>
               </TooltipTrigger>
-              <TooltipContent side="bottom" sideOffset={6}>Ghost mode</TooltipContent>
+              <TooltipContent side="bottom" sideOffset={6}>
+                {isSavedGhostChat ? "Ghost Private" : "Quick chat"}
+              </TooltipContent>
             </Tooltip>
-            <span>Ghost mode</span>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button type="button" variant="ghost" size="icon-sm" className="temp-chat-mode-trigger" aria-label="Choose Ghost mode palette">
-                  <ChevronDown size={18} strokeWidth={3} />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" sideOffset={8} className="w-80 rounded-2xl p-2">
-                <DropdownMenuItem className="items-center gap-3 rounded-xl px-3 py-2.5" onSelect={() => {
-                  isTemporaryChatRef.current = true;
-                  setIsTemporaryChat(true);
-                  isSavedGhostChatRef.current = false;
-                  setIsSavedGhostChat(false);
-                  setGreetingAnimationKey(current => current + 1);
-                  writeStoredTemporaryChat(user?.id, { active: true, savedPalette: false, activeConversationId: activeConversationIdRef.current, ids: Array.from(temporaryConversationIdsRef.current) });
-                }}>
-                  <span className="ghost-mode-option-icon"><GhostModeIcon size={28} splitColors /></span>
-                  <span className="flex min-w-0 flex-col gap-0.5"><span className="font-semibold">Quick</span><span className="max-w-56 text-xs leading-4 text-muted-foreground">A temporary chat that clears when you cancel.</span></span>
-                </DropdownMenuItem>
-                <DropdownMenuItem className="items-center gap-3 rounded-xl px-3 py-2.5" onSelect={() => {
-                  isTemporaryChatRef.current = true;
-                  setIsTemporaryChat(true);
-                  isSavedGhostChatRef.current = true;
-                  setIsSavedGhostChat(true);
-                  setGreetingAnimationKey(current => current + 1);
-                  writeStoredTemporaryChat(user?.id, { active: true, savedPalette: true, activeConversationId: activeConversationIdRef.current, ids: Array.from(temporaryConversationIdsRef.current) });
-                }}>
-                  <span className="ghost-mode-option-icon ghost-mode-option-icon-saved"><GhostModeIcon savedPalette size={28} splitColors /></span>
-                  <span className="flex min-w-0 flex-col gap-0.5"><span className="font-semibold">Private</span><span className="max-w-56 text-xs leading-4 text-muted-foreground">Hidden from history and cleared when you exit.</span></span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <span>{isSavedGhostChat ? "Ghost Private" : "Quick chat"}</span>
           </div>
           <div className="temp-chat-actions">
           <Tooltip>
@@ -5500,12 +5474,14 @@ export default function Home({
                 size="icon-sm"
                 onClick={exitTemporaryChat}
                 className="temp-chat-close"
-                aria-label="Cancel Ghost mode"
+                aria-label={isSavedGhostChat ? "Exit Ghost Private" : "Cancel Quick chat"}
               >
                 <X size={19} strokeWidth={3} />
               </Button>
             </TooltipTrigger>
-            <TooltipContent side="bottom" sideOffset={6}>Cancel</TooltipContent>
+            <TooltipContent side="bottom" sideOffset={6}>
+              {isSavedGhostChat ? "Exit" : "Cancel and clear"}
+            </TooltipContent>
           </Tooltip>
           </div>
         </div>
@@ -5675,24 +5651,13 @@ export default function Home({
               !activeConversationId &&
               visibleMessages.length === 0 && (
                 <div className="absolute right-2 top-2 z-20">
-                  <Tooltip>
-                    <TooltipTrigger asChild>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
                       <Button
                         variant="ghost"
                         size="icon"
                         data-testid="temporary-chat-toggle"
-                        aria-label="Start Ghost mode"
-                        onClick={() => {
-                          voice.cancel();
-                          isSavedGhostChatRef.current = false;
-                          setIsSavedGhostChat(false);
-                          isTemporaryChatRef.current = true;
-                          setIsTemporaryChat(true);
-                          setIsTemporaryChatClosing(false);
-                          temporaryConversationIdsRef.current = new Set();
-                          writeStoredTemporaryChat(user?.id, { active: true, savedPalette: false, activeConversationId: null, ids: [] });
-                          setGreetingAnimationKey(current => current + 1);
-                        }}
+                        aria-label="Choose Ghost mode"
                         className="ksemo-temp-toggle size-10 rounded-xl text-foreground transition-colors hover:bg-accent"
                       >
                         <span className="ksemo-temp-toggle-ghosts" aria-hidden="true">
@@ -5700,9 +5665,38 @@ export default function Home({
                           <Ghost3 className="ksemo-temp-toggle-icon ksemo-temp-toggle-ghost ksemo-temp-toggle-ghost-filled" size={22} weight="Filled" />
                         </span>
                       </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom" sideOffset={2}>Ghost mode</TooltipContent>
-                  </Tooltip>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" sideOffset={8} className="w-80 rounded-xl p-1.5">
+                      <DropdownMenuItem className="items-center gap-2.5 rounded-lg px-2.5 py-2" onSelect={() => {
+                        voice.cancel();
+                        isSavedGhostChatRef.current = false;
+                        setIsSavedGhostChat(false);
+                        isTemporaryChatRef.current = true;
+                        setIsTemporaryChat(true);
+                        setIsTemporaryChatClosing(false);
+                        temporaryConversationIdsRef.current = new Set();
+                        writeStoredTemporaryChat(user?.id, { active: true, savedPalette: false, activeConversationId: null, ids: [] });
+                        setGreetingAnimationKey(current => current + 1);
+                      }}>
+                        <span className="ghost-mode-option-icon"><GhostModeIcon size={24} splitColors /></span>
+                        <span className="flex min-w-0 flex-col gap-0.5"><span className="text-sm font-semibold leading-5">Quick chat</span><span className="whitespace-nowrap text-xs leading-4 text-muted-foreground">Temporary chat for now.</span></span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem className="mt-1 items-center gap-2.5 rounded-lg px-2.5 py-2" onSelect={() => {
+                        voice.cancel();
+                        isSavedGhostChatRef.current = true;
+                        setIsSavedGhostChat(true);
+                        isTemporaryChatRef.current = true;
+                        setIsTemporaryChat(true);
+                        setIsTemporaryChatClosing(false);
+                        temporaryConversationIdsRef.current = new Set();
+                        writeStoredTemporaryChat(user?.id, { active: true, savedPalette: true, activeConversationId: null, ids: [] });
+                        setGreetingAnimationKey(current => current + 1);
+                      }}>
+                        <span className="ghost-mode-option-icon ghost-mode-option-icon-saved"><GhostModeIcon savedPalette size={24} splitColors /></span>
+                        <span className="flex min-w-0 flex-col gap-0.5"><span className="text-sm font-semibold leading-5">Ghost Private</span><span className="whitespace-nowrap text-xs leading-4 text-muted-foreground">A private space for personal conversations.</span></span>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               )}
 
@@ -6368,7 +6362,7 @@ export default function Home({
                           }
                           onShare={guestMode ? undefined : stableShareMessage}
                           onBranch={
-                            guestMode || !activeConversationId
+                            guestMode || isGhostMode || !activeConversationId
                               ? undefined
                               : stableBranchFromMessage
                           }
@@ -6581,6 +6575,7 @@ export default function Home({
                   animationKey={greetingAnimationKey}
                   temporary={isTemporaryChat}
                   ghostMode={isGhostMode}
+                  privateMode={isSavedGhostChat}
                   composer={
                     isMobile
                       ? null
@@ -6892,13 +6887,34 @@ const EmptyState = memo(function EmptyState({
   composer,
   temporary = false,
   ghostMode = temporary,
+  privateMode = false,
 }: {
   greeting: string;
   animationKey: number;
   composer: React.ReactNode;
   temporary?: boolean;
   ghostMode?: boolean;
+  privateMode?: boolean;
 }) {
+  const [showPrivateInfo, setShowPrivateInfo] = useState(false);
+  const privateInfoRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!showPrivateInfo) return;
+    const dismissOutside = (event: PointerEvent) => {
+      if (!privateInfoRef.current?.contains(event.target as Node)) {
+        setShowPrivateInfo(false);
+      }
+    };
+    const dismissOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setShowPrivateInfo(false);
+    };
+    document.addEventListener("pointerdown", dismissOutside);
+    document.addEventListener("keydown", dismissOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", dismissOutside);
+      document.removeEventListener("keydown", dismissOnEscape);
+    };
+  }, [showPrivateInfo]);
   return (
     <div className="mx-auto flex h-full w-full max-w-3xl flex-col justify-center gap-4 px-0 pb-16 sm:px-5 sm:pb-4 lg:pb-0">
       <div>
@@ -6921,9 +6937,30 @@ const EmptyState = memo(function EmptyState({
       <div className="relative mx-auto w-full max-w-3xl">
         {composer}
         {temporary && (
-          <p className="pointer-events-none absolute inset-x-0 top-full mt-[-8px] px-5 text-center text-[13px] font-medium leading-snug text-muted-foreground sm:px-0 animate-in fade-in duration-200">
-            This conversation won't be saved to your chat history.
-          </p>
+          <div ref={privateInfoRef} className="pointer-events-auto absolute inset-x-0 top-full mt-[-8px] px-5 text-center text-[13px] font-medium leading-snug text-muted-foreground sm:px-0 animate-in fade-in duration-200">
+            {privateMode ? (
+              <>
+                <span>Your Ghost Private chat won’t appear in your chat history. </span>
+                <span className="relative inline-block">
+                  <button
+                    type="button"
+                    className="font-semibold text-muted-foreground underline underline-offset-2 hover:text-foreground"
+                    aria-expanded={showPrivateInfo}
+                    onClick={() => setShowPrivateInfo(open => !open)}
+                  >
+                    Learn more
+                  </button>
+                  {showPrivateInfo && (
+                    <span className="absolute right-0 top-full z-50 mt-3 block w-[min(19rem,calc(100vw-2rem))] rounded-xl border border-border bg-popover px-4 py-3.5 text-left text-[13px] font-normal leading-5 text-popover-foreground shadow-lg">
+                      Ghost Private chats stay out of your history for up to 15 days. Continue chatting to keep a conversation active; it is cleared when the 15-day limit is reached.
+                    </span>
+                  )}
+                </span>
+              </>
+            ) : (
+              "This conversation won't be saved to your chat history."
+            )}
+          </div>
         )}
       </div>
     </div>
