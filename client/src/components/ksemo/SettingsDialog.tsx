@@ -30,6 +30,14 @@ import { useTheme, type ThemeMode } from "@/contexts/ThemeContext";
 import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
 import { createPublicConversationUrl } from "@/lib/ksemoInteraction";
+import {
+  clearPrivatePin,
+  readPrivateChatEntries,
+  readPrivatePinRecord,
+  setPrivatePin,
+  verifyPrivatePin,
+  writePrivateChatEntries,
+} from "@/lib/privateChatLock";
 import { ConfirmDeleteDialog } from "./ConfirmDeleteDialog";
 import {
   ArchiveRestore,
@@ -57,6 +65,7 @@ import {
 import React, { memo, useEffect, useMemo, useRef, useState } from "react";
 import { Trash6Icon } from "./icons";
 import { MemorySection } from "./MemorySection";
+import { PinEntryCard } from "./PinEntryCard";
 
 type Preferences =
   | {
@@ -146,11 +155,6 @@ const settingsSearchIndex: Array<{
   {
     tab: "security",
     label: "Password",
-    hint: "Security",
-  },
-  {
-    tab: "security",
-    label: "Two-factor authentication",
     hint: "Security",
   },
   {
@@ -914,6 +918,54 @@ function SecuritySection({ user }: { user: User }) {
   const isGoogle = user.loginMethod === "google";
   const hasPassword =
     user.loginMethod === "password" || user.loginMethod === "email";
+  const [pinConfigured, setPinConfigured] = useState(() =>
+    user.id == null ? false : Boolean(readPrivatePinRecord(user.id))
+  );
+  const [currentPinDigits, setCurrentPinDigits] = useState<4 | 6>(() =>
+    user.id == null ? 4 : readPrivatePinRecord(user.id)?.digits ?? 4
+  );
+  const [pinDialog, setPinDialog] = useState<"create" | "reset" | null>(null);
+  const [pinEntry, setPinEntry] = useState("");
+  const [pinError, setPinError] = useState("");
+
+  useEffect(() => {
+    if (user.id == null) return;
+    const record = readPrivatePinRecord(user.id);
+    setPinConfigured(Boolean(record));
+    if (record) setCurrentPinDigits(record.digits);
+  }, [user.id]);
+
+  const submitPinDialog = async (enteredPin = pinEntry) => {
+    if (user.id == null || !pinDialog) return;
+    setPinError("");
+    const expectedDigits = pinDialog === "create" ? 4 : currentPinDigits;
+    if (!/^\d+$/.test(enteredPin) || enteredPin.length !== expectedDigits) {
+      setPinError(`Enter all ${expectedDigits} digits.`);
+      return;
+    }
+    if (pinDialog === "create") {
+      await setPrivatePin(user.id, enteredPin, 4);
+      setPinConfigured(true);
+      setCurrentPinDigits(4);
+    } else {
+      if (!(await verifyPrivatePin(user.id, enteredPin))) {
+        setPinError("That PIN is incorrect.");
+        return;
+      }
+      clearPrivatePin(user.id);
+      const unlocked = readPrivateChatEntries(user.id).map(chat => ({
+        ...chat,
+        locked: false,
+      }));
+      writePrivateChatEntries(user.id, unlocked);
+      window.dispatchEvent(new Event("ksemo:private-chat-lock-updated"));
+      setPinConfigured(false);
+      setCurrentPinDigits(4);
+    }
+    setPinDialog(null);
+    setPinEntry("");
+    setPinError("");
+  };
 
   return (
     <div className="space-y-4">
@@ -959,15 +1011,59 @@ function SecuritySection({ user }: { user: User }) {
             </div>
           )}
         </div>
-        <div className="flex items-center gap-3 px-4 py-3.5">
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium">Two-factor authentication</p>
-            <p className="mt-0.5 truncate text-xs text-muted-foreground">
-              Add an extra layer of security to your account.
-            </p>
+        <div className="border-t border-border px-4 py-4">
+          <div className="flex items-center gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium">Locked chats</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {pinConfigured ? "Manage your 4-digit lock PIN." : "Create a 4-digit PIN to lock chats."}
+              </p>
+            </div>
+            <Button
+              type="button"
+              className="inline-flex h-7 min-w-[6rem] shrink-0 items-center justify-center rounded-lg bg-foreground px-2.5 text-center text-[11px] font-semibold text-background transition-opacity hover:opacity-90"
+              onClick={() => {
+                setPinDialog(pinConfigured ? "reset" : "create");
+                setPinEntry("");
+                setPinError("");
+              }}
+            >
+              {pinConfigured ? "Reset PIN" : "Create PIN"}
+            </Button>
           </div>
-          <span className={pillClass}>Coming soon</span>
         </div>
+        <Dialog
+          open={Boolean(pinDialog)}
+          onOpenChange={open => {
+            if (!open) {
+              setPinDialog(null);
+              setPinEntry("");
+              setPinError("");
+            }
+          }}
+        >
+          <DialogContent showCloseButton={false} className="w-auto max-w-none border-0 bg-transparent p-0 shadow-none">
+            <DialogHeader className="sr-only">
+              <DialogTitle>{pinDialog === "reset" ? "Reset PIN" : "Create PIN"}</DialogTitle>
+              <DialogDescription>Enter the PIN for locked chats.</DialogDescription>
+            </DialogHeader>
+            <PinEntryCard
+              title={pinDialog === "reset" ? "Enter PIN" : "Create PIN"}
+              description={pinDialog === "reset" ? "Enter your current PIN to reset chat locks." : "Choose a 4-digit PIN for locked chats."}
+              value={pinEntry}
+              length={pinDialog === "reset" ? currentPinDigits : 4}
+              onChange={setPinEntry}
+              onComplete={value => void submitPinDialog(value)}
+              ariaLabel={pinDialog === "reset" ? "Current PIN" : "New PIN"}
+              onClose={() => {
+                setPinDialog(null);
+                setPinEntry("");
+                setPinError("");
+              }}
+              error={pinError}
+            />
+          </DialogContent>
+        </Dialog>
         <SettingRow
           title="Session"
           description="You are signed in on this device. Sessions expire after 1 year."

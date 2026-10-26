@@ -147,11 +147,11 @@
 .temp-chat-mode-trigger:hover,
 .temp-chat-mode-trigger:focus-visible,
 .temp-chat-mode-trigger[data-state="open"] {
-  width: 30px;
+  width: auto;
   height: 28px;
-  min-width: 30px;
+  min-width: 0;
   margin-left: -5px;
-  padding: 0;
+  padding: 0 6px;
   color: #000 !important;
   background: transparent;
   font-weight: 700;
@@ -159,6 +159,26 @@
 .temp-chat-mode-trigger:hover,
 .temp-chat-mode-trigger:focus-visible,
 .temp-chat-mode-trigger[data-state="open"] { background: rgb(0 0 0 / 8%); }
+.temp-chat-menu-trigger,
+.temp-chat-menu-trigger:hover,
+.temp-chat-menu-trigger:focus-visible,
+.temp-chat-menu-trigger[data-state="open"] {
+  display: inline-flex;
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
+  align-items: center;
+  justify-content: center;
+  margin-left: -5px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  color: #000 !important;
+  background: transparent;
+}
+.temp-chat-menu-trigger:hover,
+.temp-chat-menu-trigger:focus-visible,
+.temp-chat-menu-trigger[data-state="open"] { background: rgb(0 0 0 / 8%); }
 
 .temp-ghost-icon {
   position: relative;
