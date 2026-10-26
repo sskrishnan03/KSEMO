@@ -180,6 +180,26 @@
 .temp-chat-menu-trigger:focus-visible,
 .temp-chat-menu-trigger[data-state="open"] { background: rgb(0 0 0 / 8%); }
 
+.ghost-private-menu-enter {
+  transform-origin: top left;
+  animation: ghost-private-menu-in 180ms cubic-bezier(.2, .75, .25, 1) both;
+}
+.ghost-private-options-enter {
+  animation: ghost-private-options-in 160ms cubic-bezier(.2, .75, .25, 1) 35ms both;
+}
+@keyframes ghost-private-menu-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes ghost-private-options-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ghost-private-menu-enter,
+  .ghost-private-options-enter { animation-duration: 1ms; animation-delay: 0ms; }
+}
+
 .temp-ghost-icon {
   position: relative;
   display: inline-block;

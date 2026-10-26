@@ -45,7 +45,7 @@ import { isMailerConfigured, sendFeedbackEmail } from "../_core/mailer";
 import { generateFile, type FileFormat } from "../fileGeneration";
 import { planPresentationOutline, regenerateSingleSlide, buildOutlineMetadata } from "../docgen/presentation/outline";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
-import { typeAfterVoiceSession } from "../conversationTypes";
+import { EPHEMERAL_TITLE_PREFIX, typeAfterVoiceSession } from "../conversationTypes";
 import type { KsemoFile } from "../../supabase-schema/04-types";
 import { setInterruptedResponseOverride } from "../interruptedResponse";
 
@@ -386,12 +386,37 @@ export const conversationRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       const conversation = await requireConversation(input.id, ctx.user.id);
-      const title = conversation.title.startsWith("Branch: ")
+      const isPrivate = conversation.title.startsWith(EPHEMERAL_TITLE_PREFIX);
+      const untaggedTitle = isPrivate
+        ? conversation.title.slice(EPHEMERAL_TITLE_PREFIX.length)
+        : conversation.title;
+      const branchPrefix = untaggedTitle.startsWith("Branch: ") ? "Branch: " : "";
+      const renamedTitle = branchPrefix
         ? `Branch: ${input.title.replace(/^Branch:\s*/, "").slice(0, 112)}`
         : input.title;
+      const title = `${isPrivate ? EPHEMERAL_TITLE_PREFIX : ""}${renamedTitle}`;
       return updateConversationForUser(input.id, ctx.user.id, {
         title,
       });
+    }),
+  moveToPrivate: protectedProcedure
+    .input(z.object({ id: conversationId }))
+    .mutation(async ({ ctx, input }) => {
+      const conversation = await requireConversation(input.id, ctx.user.id);
+      const title = conversation.title.startsWith(EPHEMERAL_TITLE_PREFIX)
+        ? conversation.title
+        : `${EPHEMERAL_TITLE_PREFIX}${conversation.title}`;
+      const updated = await updateConversationForUser(input.id, ctx.user.id, {
+        title,
+        isPinned: false,
+        isArchived: false,
+        isPublic: false,
+        shareToken: null,
+      });
+      if (!updated) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Conversation not found" });
+      }
+      return { success: true } as const;
     }),
   setPinned: protectedProcedure
     .input(z.object({ id: conversationId, isPinned: z.boolean() }))

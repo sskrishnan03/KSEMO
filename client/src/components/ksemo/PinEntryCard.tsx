@@ -23,7 +23,7 @@ export function PinEntryCard({
   error?: string;
 }) {
   return (
-    <section className="relative flex w-[min(18rem,calc(100vw-3rem))] flex-col items-center gap-4 rounded-2xl bg-[#242424] px-5 py-6 text-center text-white shadow-lg">
+    <section className="relative flex w-[min(16rem,calc(100vw-3rem))] flex-col items-center gap-4 rounded-2xl bg-[#242424] px-5 py-6 text-center text-white shadow-lg">
       <button
         type="button"
         aria-label="Close PIN entry"

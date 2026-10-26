@@ -871,7 +871,12 @@ class InMemoryStore {
     const results: any[] = [];
     for (const msg of this.messages.values()) {
       const conv = this.conversations.get(msg.conversationId);
-      if (!conv || conv.userId !== userId || conv.deletedAt !== null) continue;
+      if (
+        !conv ||
+        conv.userId !== userId ||
+        conv.deletedAt !== null ||
+        isEphemeralConversationTitle(conv.title)
+      ) continue;
       if (msg.content.toLowerCase().includes(q)) {
         results.push({
           message_id: msg.id,
@@ -894,7 +899,11 @@ class InMemoryStore {
     if (!q) return [];
     const results: any[] = [];
     for (const conv of this.conversations.values()) {
-      if (conv.userId !== userId || conv.deletedAt !== null) continue;
+      if (
+        conv.userId !== userId ||
+        conv.deletedAt !== null ||
+        isEphemeralConversationTitle(conv.title)
+      ) continue;
       if (conv.title.toLowerCase().includes(q)) {
         results.push({
           conversation_id: conv.id,

@@ -91,7 +91,7 @@ export function PinDigitsInput({
             const focusIndex = replaceDigit(index, digits.slice(0, length - index));
             inputs.current[focusIndex]?.focus();
           }}
-          className={`${appearance === "ghost" ? (length === 6 ? "size-9 text-base" : "h-12 w-9 text-lg") : (length === 6 ? "size-9 text-base" : "h-12 w-11 text-lg")} ${appearance === "ghost" ? "rounded-xl bg-[#141414] text-white focus:bg-[#141414] focus-visible:ring-1 focus-visible:ring-sky-500" : "rounded-lg bg-muted/60 text-foreground focus:bg-accent/70"} text-center font-semibold outline-none transition-colors`}
+          className={`${appearance === "ghost" ? (length === 6 ? "size-9 text-base" : "h-12 w-9 text-lg") : (length === 6 ? "size-9 text-base" : "h-12 w-11 text-lg")} ${appearance === "ghost" ? "rounded-xl border-b border-border/80 bg-[#141414] text-white focus:bg-[#141414] focus-visible:border-b-foreground/50 focus-visible:ring-0" : "rounded-lg bg-muted/60 text-foreground focus:bg-accent/70"} text-center font-semibold outline-none transition-colors`}
         />
       ))}
     </div>

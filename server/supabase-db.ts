@@ -1004,7 +1004,7 @@ export async function searchConversationMessages(
     p_query: query,
   });
   if (error) throwDb("searchConversationMessages", error);
-  return (data || []).map((row: any) => ({
+  return (data || []).filter((row: any) => !isEphemeralConversationTitle(row.conversation_title)).map((row: any) => ({
     messageId: row.message_id,
     conversationId: row.conversation_id,
     conversationTitle: row.conversation_title,
@@ -1026,7 +1026,7 @@ export async function searchConversationTitles(
     p_query: query,
   });
   if (error) throwDb("searchConversationTitles", error);
-  return (data || []).map((row: any) => ({
+  return (data || []).filter((row: any) => !isEphemeralConversationTitle(row.title)).map((row: any) => ({
     id: row.id,
     title: row.title,
     createdAt: row.created_at ? new Date(row.created_at) : undefined,

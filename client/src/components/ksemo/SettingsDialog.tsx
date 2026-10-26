@@ -1042,7 +1042,7 @@ function SecuritySection({ user }: { user: User }) {
             }
           }}
         >
-          <DialogContent showCloseButton={false} className="w-auto max-w-none border-0 bg-transparent p-0 shadow-none">
+          <DialogContent showCloseButton={false} overlayClassName="z-[85]" className="z-[90] w-auto max-w-none border-0 bg-transparent p-0 shadow-none">
             <DialogHeader className="sr-only">
               <DialogTitle>{pinDialog === "reset" ? "Reset PIN" : "Create PIN"}</DialogTitle>
               <DialogDescription>Enter the PIN for locked chats.</DialogDescription>

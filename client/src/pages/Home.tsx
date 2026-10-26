@@ -80,6 +80,7 @@ import React, {
   type CSSProperties,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -445,6 +446,65 @@ function isSameTabReload(): boolean {
   return false;
 }
 
+function GhostPrivateChatTitle({ title }: { title: string }) {
+  const viewportRef = useRef<HTMLSpanElement>(null);
+  const titleRef = useRef<HTMLSpanElement>(null);
+  const [overflowDistance, setOverflowDistance] = useState(0);
+  const [isHovered, setIsHovered] = useState(false);
+
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    const titleElement = titleRef.current;
+    if (!viewport || !titleElement) return;
+
+    const measure = () => {
+      setOverflowDistance(Math.max(0, titleElement.scrollWidth - viewport.clientWidth));
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(viewport);
+    observer.observe(titleElement);
+    return () => observer.disconnect();
+  }, [title]);
+
+  useEffect(() => {
+    const titleElement = titleRef.current;
+    if (!titleElement || !isHovered || overflowDistance <= 0 || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    const travelDuration = (overflowDistance / 18) * 1000;
+    const startPauseDuration = 350;
+    const endPauseDuration = 1500;
+    const totalDuration = travelDuration + startPauseDuration + endPauseDuration;
+    const startPauseOffset = startPauseDuration / totalDuration;
+    const endOffset = (startPauseDuration + travelDuration) / totalDuration;
+    const animation = titleElement.animate(
+      [
+        { transform: "translateX(0)" },
+        { transform: "translateX(0)", offset: startPauseOffset },
+        { transform: `translateX(-${overflowDistance}px)`, offset: endOffset },
+        { transform: `translateX(-${overflowDistance}px)` },
+      ],
+      { duration: totalDuration, iterations: Infinity, easing: "linear" }
+    );
+    return () => animation.cancel();
+  }, [isHovered, overflowDistance]);
+
+  return (
+    <span
+      ref={viewportRef}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      className="min-w-0 flex-1 overflow-hidden whitespace-nowrap text-sm font-medium text-white"
+      style={isHovered && overflowDistance > 0 ? {
+        WebkitMaskImage: "linear-gradient(to right, transparent, black 8px, black calc(100% - 8px), transparent)",
+        maskImage: "linear-gradient(to right, transparent, black 8px, black calc(100% - 8px), transparent)",
+      } : undefined}
+    >
+      <span ref={titleRef} className="inline-block whitespace-nowrap">{title}</span>
+    </span>
+  );
+}
+
 function GhostModeIcon({
   savedPalette = false,
   size = 22,
@@ -686,6 +746,8 @@ export default function Home({
   const [privateChatMenuPosition, setPrivateChatMenuPosition] = useState({ left: 8, top: 40 });
   const [privateChatSearch, setPrivateChatSearch] = useState("");
   const [privateChatOptionsOpenId, setPrivateChatOptionsOpenId] = useState<string | null>(null);
+  const [privateChatDismissedOptionsId, setPrivateChatDismissedOptionsId] = useState<string | null>(null);
+  const [movingToPrivateId, setMovingToPrivateId] = useState<string | null>(null);
   const [privateChatRenameId, setPrivateChatRenameId] = useState<string | null>(null);
   const [privateChatRenameValue, setPrivateChatRenameValue] = useState("");
   const [privatePinDialog, setPrivatePinDialog] = useState<{
@@ -695,12 +757,12 @@ export default function Home({
   const [privatePinDigits, setPrivatePinDigits] = useState<4 | 6>(4);
   const [privatePinValue, setPrivatePinValue] = useState("");
   const [privatePinError, setPrivatePinError] = useState("");
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!privateChatMenuOpen) return;
     const updatePosition = () => {
       const rect = privateChatMenuTriggerRef.current?.getBoundingClientRect();
       if (rect) {
-        const menuWidth = Math.min(448, window.innerWidth - 16);
+        const menuWidth = Math.min(293, window.innerWidth - 16);
         const left = Math.max(8, Math.min(rect.left, window.innerWidth - menuWidth - 8));
         setPrivateChatMenuPosition({ left, top: rect.bottom + 12 });
       }
@@ -1236,8 +1298,10 @@ export default function Home({
     activeQuery.data?.conversation,
     conversationQuery.data,
   ]);
+  const activeConversationTitle = privateChatTitleForDisplay(activeConversation?.title ?? "New Chat");
+  const isActiveBranchConversation = activeConversationTitle.startsWith("Branch: ");
   const mobileConversationTitle =
-    activeConversation?.title.replace(/^Branch:\s*/, "") || "New Chat";
+    activeConversationTitle.replace(/^Branch:\s*/, "") || "New Chat";
   const mobileConversationTitleRef = useRef<HTMLSpanElement>(null);
   const [
     mobileConversationTitleOverflows,
@@ -1341,10 +1405,17 @@ export default function Home({
       await utils.conversation.get.cancel(activeInput);
       const previous = utils.conversation.list.getData(input);
       const previousActive = utils.conversation.get.getData(activeInput);
-      const renamedTitle = (currentTitle: string) =>
-        currentTitle.startsWith("Branch: ")
+      const renamedTitle = (currentTitle: string) => {
+        const isPrivate = currentTitle.startsWith("ksemo-ephemeral::");
+        const visibleTitle = isPrivate
+          ? currentTitle.slice("ksemo-ephemeral::".length)
+          : currentTitle;
+        const branchPrefix = visibleTitle.startsWith("Branch: ") ? "Branch: " : "";
+        const nextTitle = branchPrefix
           ? `Branch: ${title.replace(/^Branch:\s*/, "").slice(0, 112)}`
           : title;
+        return `${isPrivate ? "ksemo-ephemeral::" : ""}${nextTitle}`;
+      };
       utils.conversation.list.setData(input, current =>
         current?.map(conversation =>
           conversation.id === id
@@ -1383,6 +1454,12 @@ export default function Home({
       }
     },
     onSettled: (_data, _error, variables) => {
+      void utils.conversation.list.invalidate();
+      void utils.conversation.get.invalidate({ id: variables.id });
+    },
+  });
+  const moveToPrivateMutation = trpc.conversation.moveToPrivate.useMutation({
+    onSuccess: (_result, variables) => {
       void utils.conversation.list.invalidate();
       void utils.conversation.get.invalidate({ id: variables.id });
     },
@@ -1527,7 +1604,10 @@ export default function Home({
       setComposerValue(current => (current ? `${current} ${text}` : text)),
     onError: () => {},
   });
-  const openPrivateChat = (entry: PrivateChatEntry) => {
+  const openPrivateChat = (
+    entry: PrivateChatEntry,
+    entries: PrivateChatEntry[] = privateChatEntries
+  ) => {
     if (entry.locked) {
       setPrivatePinDialog({ chatId: entry.id, action: "unlock" });
       setPrivatePinDigits(readPrivatePinRecord(user!.id!)?.digits ?? 4);
@@ -1539,7 +1619,7 @@ export default function Home({
     setIsTemporaryChat(true);
     isSavedGhostChatRef.current = true;
     setIsSavedGhostChat(true);
-    temporaryConversationIdsRef.current = new Set(privateChatEntries.map(chat => chat.id));
+    temporaryConversationIdsRef.current = new Set(entries.map(chat => chat.id));
     seededConversationIdRef.current = null;
     setSeededConversationId(null);
     setChatMessages([]);
@@ -1561,6 +1641,31 @@ export default function Home({
       activeConversationId: entry.id,
       ids: Array.from(temporaryConversationIdsRef.current),
     });
+  };
+  const moveConversationToPrivate = async (conversation: { id: string; title: string }) => {
+    if (guestMode || user?.id == null) {
+      toast.error("Sign in to move chats to Private.");
+      return;
+    }
+    setMovingToPrivateId(conversation.id);
+    try {
+      await moveToPrivateMutation.mutateAsync({ id: conversation.id });
+      const entry: PrivateChatEntry = {
+        id: conversation.id,
+        title: privateChatTitleForDisplay(conversation.title),
+        locked: false,
+        updatedAt: Date.now(),
+      };
+      const nextEntries = [entry, ...privateChatEntries.filter(chat => chat.id !== entry.id)];
+      setPrivateChatEntries(nextEntries);
+      writePrivateChatEntries(user.id, nextEntries);
+      setMovingToPrivateId(null);
+      openPrivateChat(entry, nextEntries);
+      showPrivateMoveNotice("success", "Chat moved to Private.");
+    } catch {
+      setMovingToPrivateId(null);
+      showPrivateMoveNotice("error", "Could not move this chat to Private.");
+    }
   };
   const savePrivateChatRename = (chat: PrivateChatEntry) => {
     const title = privateChatRenameValue.trim();
@@ -4390,6 +4495,22 @@ export default function Home({
     }, 5000);
   }
 
+  function showPrivateMoveNotice(
+    status: "success" | "error",
+    message: string
+  ) {
+    toast.custom(
+      id => (
+        <ActionNotice
+          message={message}
+          status={status}
+          onDismiss={() => toast.dismiss(id)}
+        />
+      ),
+      { duration: 5000, position: "bottom-right" }
+    );
+  }
+
   function dismissShareNotice() {
     if (shareNoticeTimerRef.current !== null) {
       window.clearTimeout(shareNoticeTimerRef.current);
@@ -5411,6 +5532,10 @@ export default function Home({
         title: conversation.title,
       })
   );
+  const stableOnMoveToPrivate = usePersistFn(
+    (conversation: { id: string; title: string }) =>
+      void moveConversationToPrivate(conversation)
+  );
   const stableOnSearch = usePersistFn(() => {
     if (guestMode) {
       setGuestPromptOpen(true);
@@ -5789,11 +5914,11 @@ export default function Home({
       {isSavedGhostChat && privateChatMenuOpen && (
         <aside
           ref={privateChatPanelRef}
-          className="fixed z-40 flex max-h-[calc(100dvh-3rem)] w-fit max-w-[calc(100vw-1rem)] flex-col gap-2"
+          className="ghost-private-menu-enter fixed z-40 flex max-h-[calc(100dvh-3rem)] w-fit max-w-[calc(100vw-1rem)] flex-col gap-2"
           style={{ left: privateChatMenuPosition.left, top: privateChatMenuPosition.top }}
           aria-label="Ghost Private chat options"
         >
-          <nav className="flex w-[min(20rem,calc(100vw-1rem))] shrink-0 flex-row gap-0 overflow-hidden rounded-xl border border-white/10 bg-[#303030] p-1 text-white shadow-lg" aria-label="Ghost Private sections">
+          <nav className="ghost-private-options-enter flex w-[min(293px,calc(100vw-1rem))] shrink-0 flex-row gap-0 overflow-hidden rounded-xl border border-white/10 bg-[#303030] p-1 text-white shadow-lg" aria-label="Ghost Private sections">
               <button type="button" onMouseEnter={() => { setPrivateChatOptionsOpenId(null); setPrivatePinDialog(null); setPrivateChatPanel("chats"); setPrivateChatSearch(""); }} onFocus={() => { setPrivateChatOptionsOpenId(null); setPrivatePinDialog(null); setPrivateChatPanel("chats"); setPrivateChatSearch(""); }} onClick={() => { setPrivateChatOptionsOpenId(null); setPrivatePinDialog(null); setPrivateChatPanel("chats"); setPrivateChatSearch(""); }} className={cn("flex h-9 flex-1 items-center justify-center gap-1.5 rounded-l-lg px-2 text-sm font-medium transition-colors", privateChatPanel === "chats" ? "bg-[#3b3b3b] text-white" : "bg-[#303030] text-white hover:bg-[#3b3b3b]")}>
                 <ChatLine aria-hidden="true" className="size-[18px]" /> Chats
               </button>
@@ -5802,7 +5927,7 @@ export default function Home({
               </button>
           </nav>
           {privateChatPanel && (
-          <div className="flex h-[min(30rem,calc(100dvh-7rem))] w-[min(32rem,calc(100vw-1rem))] min-w-0 flex-col overflow-hidden rounded-xl border border-white/10 bg-[#303030] text-white shadow-lg">
+          <div className="flex h-[min(30rem,calc(100dvh-7rem))] w-[min(293px,calc(100vw-1rem))] min-w-0 flex-col overflow-hidden rounded-xl border border-white/10 bg-[#303030] text-white shadow-lg">
           <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-transparent">
           {privatePinDialog ? (
             <div className="grid min-h-0 flex-1 place-items-center p-4">
@@ -5820,8 +5945,7 @@ export default function Home({
             </div>
           ) : (
             <>
-              <div className="flex h-14 shrink-0 items-center gap-1 border-b border-white/10 px-4">
-                <h2 className="max-w-28 shrink-0 truncate text-base font-semibold">{privateChatPanel === "locked" ? "Locked chats" : "Chats"}</h2>
+              <div className="flex h-14 shrink-0 items-center gap-2 border-b border-white/10 px-3">
                 <div className="relative min-w-0 flex-1">
                     <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/60" />
                     <input
@@ -5837,8 +5961,8 @@ export default function Home({
                 {privateChatPanel === "chats" && (
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Button type="button" variant="ghost" size="sm" className="h-9 shrink-0 gap-1.5 rounded-lg bg-[#383838] px-3 text-xs text-white hover:bg-[#414141] hover:text-white" aria-label="New Ghost Private chat" onClick={() => { setPrivateChatOptionsOpenId(null); setPrivateChatPanel("chats"); startNewPrivateChat(true); }}>
-                        <Plus size={15} /> New chat
+                      <Button type="button" variant="ghost" size="icon" className="size-9 shrink-0 rounded-lg bg-[#383838] text-white hover:bg-[#414141] hover:text-white" aria-label="New Ghost Private chat" onClick={() => { setPrivateChatOptionsOpenId(null); setPrivateChatPanel(null); setPrivateChatMenuOpen(false); startNewPrivateChat(true); }}>
+                        <Plus size={17} />
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent side="bottom">Start a new Ghost Private chat</TooltipContent>
@@ -5846,17 +5970,22 @@ export default function Home({
                 )}
               </div>
               <div className="min-h-0 flex-1 overflow-y-auto p-2">
+                <div className="space-y-0.5">
                 {privateChatEntries
                   .filter(chat => privateChatPanel === "locked" ? chat.locked : !chat.locked)
                   .filter(chat => chat.title.toLocaleLowerCase().includes(privateChatSearch.trim().toLocaleLowerCase()))
                   .map(chat => (
-                    <div key={chat.id} className={cn("group flex items-center gap-1 rounded-lg border-b border-white/10 px-2 py-2 text-white transition-colors last:border-b-0", privateChatOptionsOpenId === chat.id ? "bg-white/15" : "hover:bg-white/10 focus-within:bg-white/10")}>
+                    <div key={chat.id} onMouseLeave={() => setPrivateChatDismissedOptionsId(id => id === chat.id ? null : id)} className={cn("group flex items-center gap-1 rounded-lg px-1 py-0.5 text-white transition-colors", privateChatOptionsOpenId === chat.id ? "bg-[#3b3b3b]" : "hover:bg-[#3b3b3b] focus-within:bg-[#3b3b3b]")}>
                       {privateChatRenameId === chat.id ? (
-                        <div className="flex min-w-0 flex-1 items-center gap-1.5" onClick={event => event.stopPropagation()}>
+                        <div className="flex w-full min-w-0 flex-1 items-center gap-0.5" onClick={event => event.stopPropagation()}>
                           <input
                             autoFocus
                             value={privateChatRenameValue}
                             onChange={event => setPrivateChatRenameValue(event.target.value)}
+                            onFocus={event => {
+                              const end = event.currentTarget.value.length;
+                              event.currentTarget.setSelectionRange(end, end);
+                            }}
                             onKeyDown={event => {
                               if (event.key === "Enter") {
                                 event.preventDefault();
@@ -5867,18 +5996,18 @@ export default function Home({
                               }
                             }}
                             aria-label="Rename chat"
-                            className="h-8 min-w-0 flex-1 rounded-md bg-transparent px-2 text-sm text-white outline-none focus:bg-white/10"
+                            className="h-8 min-w-0 flex-1 bg-transparent px-2 text-sm text-white outline-none"
                           />
-                          <Button type="button" variant="ghost" size="icon" className="size-7 shrink-0 rounded-md text-white hover:bg-white/10 hover:text-white" aria-label="Save chat name" title="Save" onClick={() => savePrivateChatRename(chat)}>
-                            <Check size={15} />
-                          </Button>
-                          <Button type="button" variant="ghost" size="icon" className="size-7 shrink-0 rounded-md text-white hover:bg-white/10 hover:text-white" aria-label="Cancel rename" title="Cancel" onClick={() => { setPrivateChatRenameId(null); setPrivateChatRenameValue(""); }}>
+                          <Button type="button" variant="ghost" size="icon" className="h-7 w-8 shrink-0 !rounded-md text-white hover:!rounded-md hover:bg-white/10 hover:text-white focus-visible:!rounded-md focus-visible:bg-white/10" aria-label="Cancel rename" title="Cancel" onClick={() => { setPrivateChatRenameId(null); setPrivateChatRenameValue(""); }}>
                             <X size={15} />
+                          </Button>
+                          <Button type="button" variant="ghost" size="icon" className="h-7 w-8 shrink-0 !rounded-md text-white hover:!rounded-md hover:bg-white/10 hover:text-white focus-visible:!rounded-md focus-visible:bg-white/10" aria-label="Save chat name" title="Save" onClick={() => savePrivateChatRename(chat)}>
+                            <Check size={15} />
                           </Button>
                         </div>
                       ) : (
-                        <button type="button" className="flex min-w-0 flex-1 items-center gap-2.5 text-left" onClick={event => { event.stopPropagation(); openPrivateChat(chat); }}>
-                          <span className="relative flex size-9 shrink-0 items-center justify-center rounded-lg bg-[#383838] text-white">
+                        <button type="button" className="flex h-10 min-w-0 flex-1 items-center gap-2.5 px-1 text-left" onClick={event => { event.stopPropagation(); openPrivateChat(chat); }}>
+                          <span className="relative flex size-8 shrink-0 items-center justify-center rounded-lg bg-[#383838] text-white">
                             <ChatLine aria-hidden="true" className="size-[22px]" />
                             {chat.locked ? (
                               <span className="absolute -bottom-1 -right-1 flex size-5 items-center justify-center rounded-full border border-white/20 bg-[#242424] text-white shadow-sm">
@@ -5890,24 +6019,29 @@ export default function Home({
                               </span>
                             )}
                           </span>
-                          <span className="min-w-0 flex-1">
-                            <span className="block truncate text-sm font-medium text-white">{chat.title}</span>
-                            <span className="mt-0.5 block text-xs text-white/65">
-                              {new Date(chat.updatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
-                            </span>
-                          </span>
+                          <GhostPrivateChatTitle title={chat.title} />
                         </button>
                       )}
-                      <DropdownMenu open={privateChatOptionsOpenId === chat.id} onOpenChange={open => setPrivateChatOptionsOpenId(open ? chat.id : null)}>
+                      {privateChatRenameId !== chat.id && <DropdownMenu open={privateChatOptionsOpenId === chat.id} onOpenChange={open => {
+                        if (open) {
+                          setPrivateChatDismissedOptionsId(null);
+                          setPrivateChatOptionsOpenId(chat.id);
+                        } else {
+                          setPrivateChatOptionsOpenId(id => id === chat.id ? null : id);
+                          setPrivateChatDismissedOptionsId(chat.id);
+                        }
+                      }}>
                         <DropdownMenuTrigger asChild>
-                          <Button type="button" variant="ghost" size="icon" className="mr-1.5 size-8 shrink-0 rounded-md text-white/70 opacity-0 transition-[opacity,background-color,color] duration-150 hover:bg-white/10 hover:text-white group-hover:text-white/85 focus-visible:bg-white/10 focus-visible:text-white group-hover:opacity-100 group-focus-within:opacity-100 data-[state=open]:bg-white/10 data-[state=open]:opacity-100 max-lg:opacity-100" aria-label={`Chat options for ${chat.locked ? "locked chat" : chat.title}`} title="Chat options" onClick={event => event.stopPropagation()}>
+                          <Button type="button" variant="ghost" size="icon" className={cn("mr-1.5 size-8 shrink-0 rounded-md text-white/70 transition-[opacity,background-color,color] duration-150 hover:bg-white/10 hover:text-white focus-visible:bg-white/10 focus-visible:text-white data-[state=open]:bg-white/10 data-[state=open]:opacity-100", privateChatDismissedOptionsId === chat.id ? "opacity-0" : "opacity-0 group-hover:text-white/85 group-hover:opacity-100 group-focus-within:opacity-100 max-lg:opacity-100")} aria-label={`Chat options for ${chat.locked ? "locked chat" : chat.title}`} title="Chat options" onClick={event => event.stopPropagation()}>
                             <MoreHorizontal size={16} />
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent data-private-chat-actions align="end" className="w-48 rounded-xl border border-white/10 bg-[#303030] p-1 text-white shadow-xl">
-                          <DropdownMenuItem className="gap-2 text-white hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white" onSelect={() => { setPrivateChatRenameId(chat.id); setPrivateChatRenameValue(chat.title); }}>
-                            <Pencil size={15} className="text-white" /> Rename
-                          </DropdownMenuItem>
+                        <DropdownMenuContent data-private-chat-actions align="end" className="w-36 rounded-xl border border-white/10 bg-[#303030] p-1 text-white shadow-xl">
+                          {!chat.locked && (
+                            <DropdownMenuItem className="gap-2 text-white hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white" onSelect={() => { setPrivateChatRenameId(chat.id); setPrivateChatRenameValue(chat.title); }}>
+                              <Pencil size={15} className="text-white" /> Rename
+                            </DropdownMenuItem>
+                          )}
                           <DropdownMenuItem className="gap-2 text-white hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white" onSelect={() => requestPrivateChatLock(chat)}>
                             {chat.locked ? <UnlockKeyhole size={15} className="text-white" /> : <LockKeyhole size={15} className="text-white" />}
                             {chat.locked ? "Unlock chat" : "Lock chat"}
@@ -5917,9 +6051,10 @@ export default function Home({
                             <Trash6Icon className="size-4 shrink-0 text-destructive" /> Delete
                           </DropdownMenuItem>
                         </DropdownMenuContent>
-                      </DropdownMenu>
+                      </DropdownMenu>}
                     </div>
                   ))}
+                </div>
                 {privateChatEntries.filter(chat => privateChatPanel === "locked" ? chat.locked : !chat.locked).filter(chat => chat.title.toLocaleLowerCase().includes(privateChatSearch.trim().toLocaleLowerCase())).length === 0 && (
                   <p className="px-3 py-8 text-center text-xs text-muted-foreground">
                     {privateChatSearch ? "No chats match your search." : privateChatPanel === "locked" ? "No locked chats yet." : "Your Ghost Private chats will appear here."}
@@ -6201,7 +6336,8 @@ export default function Home({
                       />
                     </div>
                   )}
-                  <ShareConversationDialog
+                  {!isGhostMode && (
+                    <ShareConversationDialog
                     open={false}
                     onOpenChange={stableShareOnOpenChange}
                     title={
@@ -6234,16 +6370,11 @@ export default function Home({
                       <div className="contents">
                         <div className="pointer-events-auto absolute left-14 right-24 top-2 hidden lg:block lg:left-4">
                           <div className="inline-flex min-h-9 max-w-full items-center gap-1">
-                            {activeConversation?.title.startsWith(
-                              "Branch: "
-                            ) && (
+                            {isActiveBranchConversation && (
                               <BranchSplitIcon className="size-4 shrink-0 text-foreground" />
                             )}
                             <span className="min-w-0 max-w-[calc(100%-2rem)] whitespace-normal break-words text-sm font-semibold leading-4 text-foreground">
-                              {activeConversation?.title.replace(
-                                /^Branch:\s*/,
-                                ""
-                              ) || "New Chat"}
+                              {mobileConversationTitle}
                             </span>
                             <DropdownMenu
                               open={desktopConversationMenuOpen}
@@ -6266,7 +6397,7 @@ export default function Home({
                               <DropdownMenuContent
                                 align="end"
                                 sideOffset={6}
-                                className="w-40 rounded-xl"
+                                className="w-48 rounded-xl"
                               >
                                 {/* Frequent actions first; chat management and deletion last. */}
                                 <DropdownMenuItem
@@ -6291,6 +6422,7 @@ export default function Home({
                                     ? "Unpin"
                                     : "Pin"}
                                 </DropdownMenuItem>
+                                <DropdownMenuSeparator />
 
                                 <DropdownMenuItem
                                   disabled={
@@ -6387,6 +6519,7 @@ export default function Home({
                                   <WinrarIcon className="mr-2 size-4" />
                                   View files
                                 </DropdownMenuItem>
+                                <DropdownMenuSeparator />
 
                                 <DropdownMenuItem
                                   disabled={!activeConversationId}
@@ -6403,6 +6536,26 @@ export default function Home({
                                   <Archive className="mr-2 size-4" />
                                   Archive
                                 </DropdownMenuItem>
+                                {!isGhostMode && !isActiveBranchConversation && activeConversationId && (
+                                  <DropdownMenuItem
+                                    disabled={movingToPrivateId === activeConversationId}
+                                    className="whitespace-nowrap"
+                                    onSelect={event => {
+                                      event.preventDefault();
+                                      stableOnMoveToPrivate({
+                                        id: activeConversationId,
+                                        title: activeConversationTitle,
+                                      });
+                                    }}
+                                  >
+                                    {movingToPrivateId === activeConversationId ? (
+                                      <span className="loader loader-xs mr-2 text-current" role="status" aria-label="Moving to Private" />
+                                    ) : (
+                                      <Ghost3 className="mr-2 size-4" />
+                                    )}
+                                    <span>{movingToPrivateId === activeConversationId ? "Moving to Private…" : "Move to Private"}</span>
+                                  </DropdownMenuItem>
+                                )}
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem
                                   disabled={!activeConversationId}
@@ -6426,9 +6579,7 @@ export default function Home({
                         </div>
                         {!chatFilesOpen && (
                           <div className="pointer-events-auto absolute left-[4.5rem] right-2 top-2 flex h-10 min-w-0 items-center justify-end gap-1.5 lg:hidden">
-                            {activeConversation?.title.startsWith(
-                              "Branch: "
-                            ) && (
+                            {isActiveBranchConversation && (
                               <BranchSplitIcon className="size-4 shrink-0 text-foreground" />
                             )}
                             <span
@@ -6453,7 +6604,7 @@ export default function Home({
                               <DropdownMenuContent
                                 align="end"
                                 sideOffset={6}
-                                className="w-fit min-w-44 max-w-[calc(100vw-1rem)] rounded-xl lg:hidden"
+                                className="w-fit min-w-48 max-w-[calc(100vw-1rem)] rounded-xl lg:hidden"
                               >
                                 {mobileConversationTitleOverflows && (
                                   <>
@@ -6483,6 +6634,7 @@ export default function Home({
                                     ? "Unpin"
                                     : "Pin"}
                                 </DropdownMenuItem>
+                                <DropdownMenuSeparator />
                                 <DropdownMenuItem
                                   disabled={
                                     !activeConversationId ||
@@ -6574,6 +6726,7 @@ export default function Home({
                                   <WinrarIcon className="mr-2 size-4" />
                                   View files
                                 </DropdownMenuItem>
+                                <DropdownMenuSeparator />
                                 <DropdownMenuItem
                                   disabled={!activeConversationId}
                                   onSelect={() => {
@@ -6589,6 +6742,26 @@ export default function Home({
                                   <Archive className="mr-2 size-4" />
                                   Archive
                                 </DropdownMenuItem>
+                                {!isGhostMode && !isActiveBranchConversation && activeConversationId && (
+                                  <DropdownMenuItem
+                                    disabled={movingToPrivateId === activeConversationId}
+                                    className="whitespace-nowrap"
+                                    onSelect={event => {
+                                      event.preventDefault();
+                                      stableOnMoveToPrivate({
+                                        id: activeConversationId,
+                                        title: activeConversationTitle,
+                                      });
+                                    }}
+                                  >
+                                    {movingToPrivateId === activeConversationId ? (
+                                      <span className="loader loader-xs mr-2 text-current" role="status" aria-label="Moving to Private" />
+                                    ) : (
+                                      <Ghost3 className="mr-2 size-4" />
+                                    )}
+                                    <span>{movingToPrivateId === activeConversationId ? "Moving to Private…" : "Move to Private"}</span>
+                                  </DropdownMenuItem>
+                                )}
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem
                                   disabled={!activeConversationId}
@@ -6612,7 +6785,8 @@ export default function Home({
                         )}
                       </div>
                     }
-                  />
+                    />
+                  )}
                 </div>
               )}
             <section
