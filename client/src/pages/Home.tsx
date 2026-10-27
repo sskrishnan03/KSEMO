@@ -496,8 +496,10 @@ function GhostPrivateChatTitle({ title }: { title: string }) {
       onMouseLeave={() => setIsHovered(false)}
       className="min-w-0 flex-1 overflow-hidden whitespace-nowrap text-sm font-medium text-white"
       style={isHovered && overflowDistance > 0 ? {
-        WebkitMaskImage: "linear-gradient(to right, transparent, black 8px, black calc(100% - 8px), transparent)",
-        maskImage: "linear-gradient(to right, transparent, black 8px, black calc(100% - 8px), transparent)",
+        WebkitMaskImage: "linear-gradient(to right, transparent 0, black 14px, black calc(100% - 14px), transparent 100%)",
+        maskImage: "linear-gradient(to right, transparent 0, black 14px, black calc(100% - 14px), transparent 100%)",
+        WebkitMaskRepeat: "no-repeat",
+        maskRepeat: "no-repeat",
       } : undefined}
     >
       <span ref={titleRef} className="inline-block whitespace-nowrap">{title}</span>
@@ -820,41 +822,14 @@ export default function Home({
   const temporaryConversationIdsRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     if (user?.id == null) return;
-    const entries = readPrivateChatEntries(user.id);
-    const cutoff = Date.now() - 15 * 24 * 60 * 60 * 1000;
-    const expired = entries.filter(entry => entry.updatedAt < cutoff);
-    const active = entries.filter(entry => entry.updatedAt >= cutoff);
-    if (expired.length) {
-      for (const entry of expired) {
-        void utils.client.conversation.remove.mutate({ id: entry.id });
-      }
-      writePrivateChatEntries(user.id, active);
-    }
-    setPrivateChatEntries(active);
-  }, [user?.id, utils.client]);
+    setPrivateChatEntries(readPrivateChatEntries(user.id));
+  }, [user?.id]);
   useEffect(() => {
     if (user?.id == null) return;
     const syncPrivateChats = () => setPrivateChatEntries(readPrivateChatEntries(user.id));
     window.addEventListener("ksemo:private-chat-lock-updated", syncPrivateChats);
     return () => window.removeEventListener("ksemo:private-chat-lock-updated", syncPrivateChats);
   }, [user?.id]);
-  useEffect(() => {
-    if (user?.id == null || privateChatEntries.length === 0) return;
-    const expiresAt = Math.min(...privateChatEntries.map(entry => entry.updatedAt)) + 15 * 24 * 60 * 60 * 1000;
-    const timer = window.setTimeout(() => {
-      const cutoff = Date.now() - 15 * 24 * 60 * 60 * 1000;
-      const expired = privateChatEntries.filter(entry => entry.updatedAt < cutoff);
-      const active = privateChatEntries.filter(entry => entry.updatedAt >= cutoff);
-      for (const entry of expired) {
-        void utils.client.conversation.remove.mutate({ id: entry.id });
-      }
-      if (expired.length) {
-        setPrivateChatEntries(active);
-        writePrivateChatEntries(user.id, active);
-      }
-    }, Math.max(1, expiresAt - Date.now()));
-    return () => window.clearTimeout(timer);
-  }, [privateChatEntries, user?.id, utils.client]);
   const [chatMessages, setChatMessages] = useState<KsemoMessage[]>(() =>
     sharedAnswer
       ? [
@@ -5692,10 +5667,12 @@ export default function Home({
   const [greetingAnimationKey, setGreetingAnimationKey] = useState(0);
   const greeting = useMemo(
     () =>
-      isTemporaryChat
-        ? "A quiet space for thoughts to drift."
-        : timeGreeting(),
-    [greetingHour, isTemporaryChat]
+      isSavedGhostChat
+        ? "What would you like to discuss privately?"
+        : isTemporaryChat
+          ? "What’s on your mind?"
+          : timeGreeting(),
+    [greetingHour, isSavedGhostChat, isTemporaryChat]
   );
 
   useEffect(() => {
@@ -5783,6 +5760,7 @@ export default function Home({
       onSaveEdit={stableEditAction}
       onCancelEdit={stableCancelEdit}
       temporary={isGhostMode}
+      privateMode={isSavedGhostChat}
       guestMode={guestMode}
     />
   );
@@ -7537,7 +7515,7 @@ const EmptyState = memo(function EmptyState({
     };
   }, [showPrivateInfo]);
   return (
-    <div className="mx-auto flex h-full w-full max-w-3xl flex-col justify-center gap-4 px-0 pb-16 sm:px-5 sm:pb-4 lg:pb-0">
+    <div className="mx-auto flex h-full w-full max-w-3xl flex-col justify-center gap-4 px-0 pb-16 sm:px-5 sm:pb-4 lg:gap-3 lg:pb-0">
       <div>
         <div className="px-5 text-center sm:px-0">
           <div
@@ -7546,7 +7524,7 @@ const EmptyState = memo(function EmptyState({
           >
             <p
               className={cn(
-                "ksemo-greeting-rise whitespace-nowrap text-[clamp(1rem,4.8vw,1.375rem)] font-bold tracking-[-0.04em] text-foreground sm:tracking-[-0.025em]",
+                "ksemo-greeting-rise whitespace-nowrap text-[clamp(1rem,6.1vw,1.75rem)] font-normal tracking-[-0.04em] text-foreground sm:tracking-[-0.025em]",
                 ghostMode && "temp-ghost-greeting"
               )}
             >
@@ -7559,28 +7537,30 @@ const EmptyState = memo(function EmptyState({
         {composer}
         {temporary && (
           <div ref={privateInfoRef} className="pointer-events-auto absolute inset-x-0 top-full mt-[-8px] px-5 text-center text-[13px] font-medium leading-snug text-muted-foreground sm:px-0 animate-in fade-in duration-200">
-            {privateMode ? (
-              <>
-                <span>Your Ghost Private chat won’t appear in your chat history. </span>
-                <span className="relative inline-block">
-                  <button
-                    type="button"
-                    className="font-semibold text-muted-foreground underline underline-offset-2 hover:text-foreground"
-                    aria-expanded={showPrivateInfo}
-                    onClick={() => setShowPrivateInfo(open => !open)}
-                  >
-                    Learn more
-                  </button>
+            <div className="relative">
+              {privateMode ? (
+                <>
+                  <span>Private chats stay separate from your regular history. </span>
+                  <span className="inline-block">
+                    <button
+                      type="button"
+                      className="font-semibold text-muted-foreground underline underline-offset-2 hover:text-foreground"
+                      aria-expanded={showPrivateInfo}
+                      onClick={() => setShowPrivateInfo(open => !open)}
+                    >
+                      Learn more
+                    </button>
+                  </span>
                   {showPrivateInfo && (
-                    <span className="absolute right-0 top-full z-50 mt-3 block w-[min(19rem,calc(100vw-2rem))] rounded-xl border border-border bg-popover px-4 py-3.5 text-left text-[13px] font-normal leading-5 text-popover-foreground shadow-lg">
-                      Ghost Private chats stay out of your history for up to 15 days. Continue chatting to keep a conversation active; it is cleared when the 15-day limit is reached.
-                    </span>
+                    <div className="absolute left-1/2 top-full z-50 mt-3 w-[min(19rem,calc(100vw-2rem))] -translate-x-1/2 rounded-xl border border-border bg-popover px-4 py-3.5 text-left text-[13px] font-normal leading-5 text-popover-foreground shadow-lg">
+                      Ghost Private chats stay separate from your regular history and remain saved until you delete them.
+                    </div>
                   )}
-                </span>
-              </>
-            ) : (
-              "This conversation won't be saved to your chat history."
-            )}
+                </>
+              ) : (
+                "This conversation won't be saved to your chat history."
+              )}
+            </div>
           </div>
         )}
       </div>

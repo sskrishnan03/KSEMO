@@ -64,9 +64,10 @@ export const getLibrarySubmenuClass = (isCentered: boolean) =>
     never crowds whatever sits above. The circle is the voice-chat button. */
 const BOT_ORB_HEADROOM = "pt-12";
 
-const CHAT_PLACEHOLDER = "Ask KSEMO anything...";
+const CHAT_PLACEHOLDER = "Ask KSEMO anything";
 const BOT_PLACEHOLDER = "Speak or type whatever you want...";
-const TEMP_PLACEHOLDER = "Whisper your thoughts...";
+const TEMP_PLACEHOLDER = "Start a quick chat";
+const PRIVATE_PLACEHOLDER = "Write a private message";
 
 const COMPACT_INPUT_MAX_HEIGHT = 192;
 const EXPANDED_INPUT_MAX_HEIGHT = 512;
@@ -266,6 +267,7 @@ export const ChatComposer = memo(function ChatComposer({
   onCancelEdit,
   focusToken = 0,
   temporary = false,
+  privateMode = false,
   guestMode = false,
   activeTag: propActiveTag,
   onTagChange,
@@ -348,6 +350,8 @@ export const ChatComposer = memo(function ChatComposer({
   focusToken?: number;
   /** Temporary ("incognito") chat: renders a soft white glow around the input. */
   temporary?: boolean;
+  /** Saved Ghost Private chat, distinct from a Quick Chat. */
+  privateMode?: boolean;
   /** Signed-out guest mode: disables attachments, voice, and create-file tools. */
   guestMode?: boolean;
 }) {
@@ -751,7 +755,8 @@ export const ChatComposer = memo(function ChatComposer({
   return (
     <div
       className={cn(
-        "mx-auto w-full max-w-3xl px-4 pt-2",
+        "mx-auto w-full px-4 pt-2",
+        isCentered ? "max-w-2xl" : "max-w-3xl",
         compactBottomSpacing ? "pb-5" : "pb-4"
       )}
     >
@@ -765,7 +770,7 @@ export const ChatComposer = memo(function ChatComposer({
       <div className="relative">
         <div
           className={cn(
-            "ksemo-composer-shell relative rounded-[20px] border border-border bg-popover p-1.5 shadow-sm text-popover-foreground transition-all duration-200"
+            "ksemo-composer-shell relative rounded-[20px] border border-border bg-popover px-2 py-[7px] shadow-sm text-popover-foreground transition-all duration-200"
           )}
         >
           {isDragActive && (
@@ -1043,7 +1048,9 @@ export const ChatComposer = memo(function ChatComposer({
                     {isEditingMessage
                       ? "Edit your message…"
                       : temporary
-                        ? TEMP_PLACEHOLDER
+                        ? privateMode
+                          ? PRIVATE_PLACEHOLDER
+                          : TEMP_PLACEHOLDER
                         : botActive
                           ? BOT_PLACEHOLDER
                           : CHAT_PLACEHOLDER}
@@ -1116,7 +1123,7 @@ export const ChatComposer = memo(function ChatComposer({
                             ? "bottom"
                             : "top"
                       }
-                      sideOffset={8}
+                      sideOffset={9}
                       alignOffset={-8}
                       collisionPadding={12}
                       className="ksemo-tools-menu w-48 rounded-xl max-h-[16rem] overflow-y-auto"

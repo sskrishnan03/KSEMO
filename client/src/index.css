@@ -359,8 +359,8 @@
 }
 
 .ksemo-composer-placeholder {
-  color: color-mix(in srgb, var(--muted-foreground) 76%, var(--background));
-  opacity: .88;
+  color: color-mix(in srgb, var(--muted-foreground) 90%, var(--background));
+  opacity: 1;
 }
 
 :is(.temp-mode, .ghost-saved-mode) .ksemo-composer-dictate {
