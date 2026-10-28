@@ -39,7 +39,9 @@ const plans = [
     features: [
       [MessageCircle, "More messages for longer sessions"],
       [FileUp, "More uploads and larger documents"],
-      [FileText, "Create Word, PDF, and presentation files"],
+      [FileText, "Create Word and PDF documents"],
+      [FileText, "Create Excel spreadsheets"],
+      [FileText, "Create PowerPoint presentations"],
       [AudioLines, "Voice conversations"],
       [Zap, "Faster access at busy times"],
     ] as const,
@@ -96,11 +98,14 @@ export default function UpgradePage() {
       <p className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
         Plan includes
       </p>
-      <ul className="flex flex-1 flex-col justify-center gap-5 text-sm">
+      <ul className="flex flex-1 flex-col justify-center gap-4 text-xs sm:gap-5 sm:text-sm">
         {plan.features.map(([Icon, label]) => (
-          <li key={label} className="flex items-center gap-3 leading-5">
+          <li
+            key={label}
+            className="flex items-center gap-2 whitespace-nowrap leading-5 sm:gap-3"
+          >
             <Icon
-              className="size-[18px] shrink-0 text-muted-foreground"
+              className="size-4 shrink-0 text-muted-foreground sm:size-[18px]"
               aria-hidden="true"
             />
             <span>{label}</span>
