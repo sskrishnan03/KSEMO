@@ -7176,17 +7176,21 @@ export default function Home({
                   ghostMode={isGhostMode}
                   privateMode={isSavedGhostChat}
                   composer={
-                    renderComposer({
-                      menuPlacement: isMobile ? "above" : "below",
-                      isCentered: true,
-                      compactBottomSpacing: false,
-                      initialToolsOpen: isLibraryPreview,
-                    })
+                    isMobile
+                      ? null
+                      : renderComposer({
+                          menuPlacement: isMobile ? "above" : "below",
+                          isCentered: true,
+                          compactBottomSpacing: false,
+                          initialToolsOpen: isLibraryPreview,
+                        })
                   }
                 />
               )}
             </section>
-            {(visibleMessages.length > 0 || composerTag === "bot") && (
+            {(visibleMessages.length > 0 ||
+              isMobile ||
+              composerTag === "bot") && (
               <div
                 className={cn(
                   "z-10",
@@ -7491,6 +7495,10 @@ const EmptyState = memo(function EmptyState({
   ghostMode?: boolean;
   privateMode?: boolean;
 }) {
+  const isMobile = useIsMobile();
+  const mobileGhostGreeting = privateMode
+    ? "Your private space"
+    : "Quick temporary chat";
   const [showPrivateInfo, setShowPrivateInfo] = useState(false);
   const privateInfoRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -7522,10 +7530,11 @@ const EmptyState = memo(function EmptyState({
             <p
               className={cn(
                 "ksemo-greeting-rise whitespace-nowrap text-[clamp(1.25rem,6vw,1.5rem)] font-normal tracking-[-0.04em] text-foreground md:text-[clamp(1rem,6.1vw,1.75rem)] md:tracking-[-0.025em]",
+                  isMobile && ghostMode && "text-[18px] tracking-[-0.035em]",
                 ghostMode && "temp-ghost-greeting"
               )}
             >
-              {greeting}
+              {isMobile && ghostMode ? mobileGhostGreeting : greeting}
             </p>
           </div>
         </div>
