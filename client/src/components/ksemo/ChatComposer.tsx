@@ -769,6 +769,7 @@ export const ChatComposer = memo(function ChatComposer({
     <div
       className={cn(
         "mx-auto w-full px-4 pt-2",
+        isMobile && "px-3.5",
         isCentered ? "max-w-2xl" : "max-w-3xl",
         compactBottomSpacing ? "pb-5" : "pb-4"
       )}
@@ -783,7 +784,8 @@ export const ChatComposer = memo(function ChatComposer({
       <div className="relative">
         <div
           className={cn(
-            "ksemo-composer-shell relative rounded-[20px] border border-border bg-popover px-2 py-[7px] shadow-sm text-popover-foreground transition-all duration-200"
+            "ksemo-composer-shell relative rounded-[20px] border border-border bg-popover px-2 py-[7px] shadow-sm text-popover-foreground transition-all duration-200",
+            isMobile && "py-[9px]"
           )}
         >
           {isDragActive && (
