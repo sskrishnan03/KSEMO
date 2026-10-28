@@ -7851,7 +7851,9 @@ export default function Home({
                   ) : (
                     <>
                       {isMobile && visibleMessages.length === 0 && (
-                        <div className="pb-2">{upgradeEntry}</div>
+                        <div className="flex justify-center pb-2">
+                          {upgradeEntry}
+                        </div>
                       )}
                       {composerElement}
                     </>
