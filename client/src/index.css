@@ -1477,9 +1477,7 @@ html.ksemo-reduce-motion .ksemo-file-writing-line {
 .ksemo-voice-corner-glow {
   background: radial-gradient(
     ellipse 68% 78% at 50% 50%,
-    rgb(201 211 232 / 24%) 0%,
-    rgb(155 169 199 / 18%) 42%,
-    rgb(104 116 143 / 9%) 72%,
+    rgb(201 211 232 / 20%) 0%,
     transparent 100%
   );
 }
@@ -1487,27 +1485,24 @@ html.ksemo-reduce-motion .ksemo-file-writing-line {
 /* A localized, static voice-chat-like backdrop for the empty chat greeting
    and composer. The EmptyState only renders before the first response. */
 .empty-chat-new-accent {
-  filter: blur(28px);
+  filter: blur(36px);
   background: radial-gradient(
-    ellipse 48% 42% at 50% 50%,
-    rgb(255 255 255 / 20%) 0%,
-    rgb(210 218 231 / 12%) 35%,
+    ellipse 64% 54% at 50% 48%,
+    rgb(255 255 255 / 28%) 0%,
     transparent 100%
   );
 }
 .temp-mode .empty-chat-new-accent {
   background: radial-gradient(
-    ellipse 48% 42% at 50% 50%,
-    color-mix(in srgb, var(--temp-ice) 20%, transparent) 0%,
-    color-mix(in srgb, var(--temp-mid) 12%, transparent) 35%,
+    ellipse 64% 54% at 50% 48%,
+    color-mix(in srgb, var(--temp-ice) 28%, transparent) 0%,
     transparent 100%
   );
 }
 .ghost-saved-mode .empty-chat-new-accent {
   background: radial-gradient(
-    ellipse 48% 42% at 50% 50%,
-    color-mix(in srgb, var(--temp-ice) 20%, transparent) 0%,
-    color-mix(in srgb, var(--temp-accent) 12%, transparent) 35%,
+    ellipse 64% 54% at 50% 48%,
+    color-mix(in srgb, var(--temp-ice) 28%, transparent) 0%,
     transparent 100%
   );
 }
