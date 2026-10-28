@@ -399,6 +399,8 @@ export const SettingsDialog = memo(function SettingsDialog({
   onOpenConversation?: (conversationId: string) => void;
   initialTab?: SettingsTab;
 }) {
+  const [mobileSheetExpanded, setMobileSheetExpanded] = useState(false);
+  const mobileSheetTouchStartRef = useRef<number | null>(null);
   const [activeTab, setActiveTab] = useState<SettingsTab>(
     initialTab || "account"
   );
@@ -472,6 +474,9 @@ export const SettingsDialog = memo(function SettingsDialog({
   useEffect(() => {
     if (open) changeTab("account");
   }, [open]);
+  useEffect(() => {
+    if (!open) setMobileSheetExpanded(false);
+  }, [open]);
 
   const sectionContent = (
     <>
@@ -523,7 +528,36 @@ export const SettingsDialog = memo(function SettingsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent showCloseButton={false} className="flex h-[70dvh] w-[60vw] !max-w-none max-md:h-[min(85dvh,560px)] max-md:w-[calc(100%-1rem)] flex-col gap-0 overflow-hidden rounded-2xl p-0">
+      <DialogContent
+        showCloseButton={false}
+        className={cn(
+          "flex h-[70dvh] w-[60vw] !max-w-none flex-col gap-0 overflow-hidden rounded-2xl p-0 transition-[height,border-radius] duration-300 ease-out max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:top-auto max-md:left-0 max-md:translate-x-0 max-md:translate-y-0 max-md:w-full max-md:!max-w-none max-md:rounded-b-none max-md:border-x-0 max-md:border-b-0 max-md:data-[state=open]:slide-in-from-bottom-8 max-md:data-[state=closed]:slide-out-to-bottom-8",
+          mobileSheetExpanded
+            ? "max-md:!h-dvh max-md:rounded-t-none"
+            : "max-md:h-[88dvh] max-md:rounded-t-[28px]"
+        )}
+      >
+        <div
+          className="hidden shrink-0 justify-center py-2.5 max-md:flex"
+          onTouchStart={event => {
+            mobileSheetTouchStartRef.current = event.touches[0]?.clientY ?? null;
+          }}
+          onTouchEnd={event => {
+            const start = mobileSheetTouchStartRef.current;
+            mobileSheetTouchStartRef.current = null;
+            if (start == null) return;
+            const delta = start - (event.changedTouches[0]?.clientY ?? start);
+            if (delta > 35) {
+              setMobileSheetExpanded(true);
+            } else if (delta < -35) {
+              if (mobileSheetExpanded) setMobileSheetExpanded(false);
+              else onOpenChange(false);
+            }
+          }}
+          aria-hidden="true"
+        >
+          <span className="h-1.5 w-12 rounded-full bg-muted-foreground/35" />
+        </div>
         <TooltipProvider delayDuration={150}>
         <DialogHeader className="sr-only">
           <DialogTitle>Settings</DialogTitle>
