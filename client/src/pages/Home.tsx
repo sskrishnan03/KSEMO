@@ -7176,21 +7176,17 @@ export default function Home({
                   ghostMode={isGhostMode}
                   privateMode={isSavedGhostChat}
                   composer={
-                    isMobile
-                      ? null
-                      : renderComposer({
-                          menuPlacement: isMobile ? "above" : "below",
-                          isCentered: true,
-                          compactBottomSpacing: false,
-                          initialToolsOpen: isLibraryPreview,
-                        })
+                    renderComposer({
+                      menuPlacement: isMobile ? "above" : "below",
+                      isCentered: true,
+                      compactBottomSpacing: false,
+                      initialToolsOpen: isLibraryPreview,
+                    })
                   }
                 />
               )}
             </section>
-            {(visibleMessages.length > 0 ||
-              isMobile ||
-              composerTag === "bot") && (
+            {(visibleMessages.length > 0 || composerTag === "bot") && (
               <div
                 className={cn(
                   "z-10",
