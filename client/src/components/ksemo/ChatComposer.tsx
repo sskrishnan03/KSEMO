@@ -374,7 +374,9 @@ export const ChatComposer = memo(function ChatComposer({
   const [libraryOpen, setLibraryOpen] = useState(initialLibraryOpen);
   const [toolsOpen, setToolsOpen] = useState(initialToolsOpen);
   const [mobileToolsOpen, setMobileToolsOpen] = useState(false);
-  const [mobileToolsPage, setMobileToolsPage] = useState<"main" | "create">("main");
+  const [mobileToolsPage, setMobileToolsPage] = useState<"main" | "create">(
+    "main"
+  );
   const [libraryQuery, setLibraryQuery] = useState("");
   const [isDragActive, setIsDragActive] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -1202,7 +1204,9 @@ export const ChatComposer = memo(function ChatComposer({
                                   <span className="mb-2.5 flex size-14 items-center justify-center rounded-full bg-muted text-foreground">
                                     <Camera className="size-7" />
                                   </span>
-                                  <span className="text-base font-medium">Camera</span>
+                                  <span className="text-base font-medium">
+                                    Camera
+                                  </span>
                                 </button>
                                 <button
                                   type="button"
@@ -1215,7 +1219,9 @@ export const ChatComposer = memo(function ChatComposer({
                                   <span className="mb-2.5 flex size-14 items-center justify-center rounded-full bg-muted text-foreground">
                                     <ImageIcon className="size-7" />
                                   </span>
-                                  <span className="text-base font-medium">Photos</span>
+                                  <span className="text-base font-medium">
+                                    Photos
+                                  </span>
                                 </button>
                                 <button
                                   type="button"
@@ -1228,7 +1234,9 @@ export const ChatComposer = memo(function ChatComposer({
                                   <span className="mb-2.5 flex size-14 items-center justify-center rounded-full bg-muted text-foreground">
                                     <FileText className="size-7" />
                                   </span>
-                                  <span className="text-base font-medium">Files</span>
+                                  <span className="text-base font-medium">
+                                    Files
+                                  </span>
                                 </button>
                               </div>
                               <div className="mt-3 space-y-2">
@@ -1241,11 +1249,18 @@ export const ChatComposer = memo(function ChatComposer({
                                   className="flex min-h-[68px] w-full items-center gap-4 rounded-2xl border border-border/50 bg-card px-4 text-left transition-colors hover:bg-accent active:bg-accent"
                                 >
                                   <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-muted text-foreground">
-                                    <Library aria-hidden="true" className="size-5" />
+                                    <Library
+                                      aria-hidden="true"
+                                      className="size-5"
+                                    />
                                   </span>
                                   <span className="min-w-0 flex-1">
-                                    <span className="block text-base font-medium">Browse Library</span>
-                                    <span className="block text-sm text-muted-foreground">Add a saved file</span>
+                                    <span className="block text-base font-medium">
+                                      Browse Library
+                                    </span>
+                                    <span className="block text-sm text-muted-foreground">
+                                      Add a saved file
+                                    </span>
                                   </span>
                                   <ChevronRight className="size-5 shrink-0 text-muted-foreground" />
                                 </button>
@@ -1258,8 +1273,12 @@ export const ChatComposer = memo(function ChatComposer({
                                     <FilePlus size={20} />
                                   </span>
                                   <span className="min-w-0 flex-1">
-                                    <span className="block text-base font-medium">Create files</span>
-                                    <span className="block text-sm text-muted-foreground">PDF, Word, Excel, and more</span>
+                                    <span className="block text-base font-medium">
+                                      Create files
+                                    </span>
+                                    <span className="block text-sm text-muted-foreground">
+                                      PDF, Word, Excel, and more
+                                    </span>
                                   </span>
                                   <ChevronRight className="size-5 shrink-0 text-muted-foreground" />
                                 </button>
@@ -1267,7 +1286,9 @@ export const ChatComposer = memo(function ChatComposer({
                             </>
                           ) : (
                             <div className="space-y-2">
-                              {CAPABILITY_SECTIONS.find(section => section.id === "create")?.options.map(option => {
+                              {CAPABILITY_SECTIONS.find(
+                                section => section.id === "create"
+                              )?.options.map(option => {
                                 const Icon = option.icon;
                                 const isActive = activeMode === option.mode;
                                 return (
@@ -1275,7 +1296,9 @@ export const ChatComposer = memo(function ChatComposer({
                                     type="button"
                                     key={option.mode}
                                     onClick={() => {
-                                      onModeChange?.(isActive ? null : option.mode);
+                                      onModeChange?.(
+                                        isActive ? null : option.mode
+                                      );
                                       setMobileToolsOpen(false);
                                     }}
                                     className="flex min-h-[68px] w-full items-center gap-4 rounded-2xl border border-border/50 bg-card px-4 text-left transition-colors hover:bg-accent active:bg-accent"
@@ -1284,22 +1307,18 @@ export const ChatComposer = memo(function ChatComposer({
                                       <Icon className="size-5" />
                                     </span>
                                     <span className="min-w-0 flex-1">
-                                      <span className="block text-base font-medium">{option.title}</span>
-                                      <span
-                                        className={cn(
-                                          "block text-sm text-muted-foreground",
-                                          (option.mode === "xlsx" || option.mode === "pptx") &&
-                                            "whitespace-nowrap text-xs"
-                                        )}
-                                      >
-                                        {option.mode === "xlsx"
-                                          ? "Excel spreadsheet (.xlsx)"
-                                          : option.mode === "pptx"
-                                            ? "PowerPoint slides (.pptx)"
-                                            : option.description}
+                                      <span className="block text-base font-medium">
+                                        {option.title}
+                                      </span>
+                                      <span className="block text-sm text-muted-foreground">
+                                        {option.description}
                                       </span>
                                     </span>
-                                    {isActive ? <Check className="size-5 shrink-0" /> : <ChevronRight className="size-5 shrink-0 text-muted-foreground" />}
+                                    {isActive ? (
+                                      <Check className="size-5 shrink-0" />
+                                    ) : (
+                                      <ChevronRight className="size-5 shrink-0 text-muted-foreground" />
+                                    )}
                                   </button>
                                 );
                               })}

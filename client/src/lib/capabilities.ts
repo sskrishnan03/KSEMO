@@ -11,10 +11,7 @@ import { createElement } from "react";
 import { Table2, FileText } from "lucide-react";
 import { DocumentText } from "reicon-react/icons/DocumentText";
 import { FilePdf } from "reicon-react/icons/FilePdf";
-import type {
-  CapabilityMode,
-  CreateMode,
-} from "@shared/capabilities";
+import type { CapabilityMode, CreateMode } from "@shared/capabilities";
 
 export type CapabilityKind = "create";
 
@@ -86,7 +83,7 @@ const CREATE: CapabilityOption[] = [
     mode: "xlsx",
     kind: "create",
     title: "Excel",
-    description: "Create a structured Excel spreadsheet.",
+    description: "Create an Excel spreadsheet.",
     icon: Table2,
     iconColor: "text-emerald-600",
     iconHex: "#059669",
@@ -98,7 +95,7 @@ const CREATE: CapabilityOption[] = [
     mode: "pptx",
     kind: "create",
     title: "PowerPoint",
-    description: "Create a professional PowerPoint presentation.",
+    description: "Create a PowerPoint presentation.",
     icon: PowerPointClockIcon,
     iconColor: "text-orange-500",
     iconHex: "#f97316",
@@ -124,13 +121,9 @@ export const CAPABILITY_SECTIONS: Array<{
   id: "create";
   heading: string;
   options: CapabilityOption[];
-}> = [
-  { id: "create", heading: "CREATE", options: CREATE },
-];
+}> = [{ id: "create", heading: "CREATE", options: CREATE }];
 
-export const ALL_CAPABILITIES: CapabilityOption[] = [
-  ...CREATE,
-];
+export const ALL_CAPABILITIES: CapabilityOption[] = [...CREATE];
 
 const MODE_INDEX = new Map<CapabilityMode, CapabilityOption>(
   ALL_CAPABILITIES.map(option => [option.mode, option])
