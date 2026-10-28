@@ -1285,7 +1285,19 @@ export const ChatComposer = memo(function ChatComposer({
                                     </span>
                                     <span className="min-w-0 flex-1">
                                       <span className="block text-base font-medium">{option.title}</span>
-                                      <span className="block text-sm text-muted-foreground">{option.description}</span>
+                                      <span
+                                        className={cn(
+                                          "block text-sm text-muted-foreground",
+                                          (option.mode === "xlsx" || option.mode === "pptx") &&
+                                            "whitespace-nowrap text-xs"
+                                        )}
+                                      >
+                                        {option.mode === "xlsx"
+                                          ? "Excel spreadsheet (.xlsx)"
+                                          : option.mode === "pptx"
+                                            ? "PowerPoint slides (.pptx)"
+                                            : option.description}
+                                      </span>
                                     </span>
                                     {isActive ? <Check className="size-5 shrink-0" /> : <ChevronRight className="size-5 shrink-0 text-muted-foreground" />}
                                   </button>

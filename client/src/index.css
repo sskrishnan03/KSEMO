@@ -1483,6 +1483,10 @@ html.ksemo-reduce-motion .ksemo-file-writing-line {
 }
 
 @media (max-width: 640px) {
+  .empty-chat-new-accent {
+    clip-path: inset(-4rem 0);
+  }
+
   .ksemo-voice-corner-glow {
     background: radial-gradient(
       ellipse 76% 42% at 50% 58%,

@@ -7520,7 +7520,7 @@ const EmptyState = memo(function EmptyState({
   }, [showPrivateInfo]);
   return (
     <div className="relative isolate mx-auto flex h-full w-full max-w-3xl flex-col justify-center gap-4 px-0 pb-16 sm:px-5 sm:pb-4 lg:gap-3 lg:pb-0">
-      <div aria-hidden="true" className="empty-chat-new-accent pointer-events-none absolute left-1/2 top-1/2 z-0 h-[min(30rem,72vh)] w-[calc(100%+5rem)] -translate-x-1/2 -translate-y-1/2 sm:w-[calc(100%+12rem)]" />
+      <div aria-hidden="true" className="empty-chat-new-accent pointer-events-none absolute left-1/2 top-1/2 z-0 h-[min(30rem,72vh)] w-full -translate-x-1/2 -translate-y-1/2 sm:w-[calc(100%+12rem)]" />
       <div className="relative z-10">
         <div className="px-5 text-center sm:px-0">
           <div
@@ -7529,8 +7529,8 @@ const EmptyState = memo(function EmptyState({
           >
             <p
               className={cn(
-                "ksemo-greeting-rise whitespace-nowrap text-[clamp(1.25rem,6vw,1.5rem)] font-normal tracking-[-0.04em] text-foreground md:text-[clamp(1rem,6.1vw,1.75rem)] md:tracking-[-0.025em]",
-                  isMobile && ghostMode && "text-[18px] tracking-[-0.035em]",
+                "ksemo-greeting-rise text-[clamp(1.25rem,6vw,1.5rem)] font-normal tracking-[-0.04em] text-foreground md:text-[clamp(1rem,6.1vw,1.75rem)] md:tracking-[-0.025em]",
+                isMobile ? "max-w-full whitespace-normal text-balance" : "whitespace-nowrap",
                 ghostMode && "temp-ghost-greeting"
               )}
             >
