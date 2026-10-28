@@ -7495,6 +7495,12 @@ const EmptyState = memo(function EmptyState({
   ghostMode?: boolean;
   privateMode?: boolean;
 }) {
+  const isMobile = useIsMobile();
+  const mobileGreeting = privateMode
+    ? "A private chat"
+    : temporary
+      ? "Quick chat, just us"
+      : "Good to see you";
   const [showPrivateInfo, setShowPrivateInfo] = useState(false);
   const privateInfoRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -7524,11 +7530,11 @@ const EmptyState = memo(function EmptyState({
           >
             <p
               className={cn(
-                "ksemo-greeting-rise whitespace-nowrap text-[clamp(1rem,6.1vw,1.75rem)] font-normal tracking-[-0.04em] text-foreground sm:tracking-[-0.025em]",
+                "ksemo-greeting-rise whitespace-nowrap text-[clamp(1.25rem,6vw,1.5rem)] font-normal tracking-[-0.04em] text-foreground md:text-[clamp(1rem,6.1vw,1.75rem)] md:tracking-[-0.025em]",
                 ghostMode && "temp-ghost-greeting"
               )}
             >
-              {greeting}
+              {isMobile ? mobileGreeting : greeting}
             </p>
           </div>
         </div>

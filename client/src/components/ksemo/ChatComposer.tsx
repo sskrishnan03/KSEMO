@@ -11,6 +11,12 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import {
   Tooltip,
@@ -25,10 +31,14 @@ import { type PresentationConfig } from "@shared/presentation";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { PptConfigStrip } from "./PptConfigStrip";
 import {
+  ArrowLeft,
   ArrowUp,
   Check,
   Camera,
   ChevronDown,
+  ChevronRight,
+  FileText,
+  Image as ImageIcon,
   Loader2,
   Maximize2,
   Mic,
@@ -358,10 +368,13 @@ export const ChatComposer = memo(function ChatComposer({
   const editorRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
   const libraryPanelRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
   const [libraryOpen, setLibraryOpen] = useState(initialLibraryOpen);
   const [toolsOpen, setToolsOpen] = useState(initialToolsOpen);
+  const [mobileToolsOpen, setMobileToolsOpen] = useState(false);
+  const [mobileToolsPage, setMobileToolsPage] = useState<"main" | "create">("main");
   const [libraryQuery, setLibraryQuery] = useState("");
   const [isDragActive, setIsDragActive] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -823,6 +836,15 @@ export const ChatComposer = memo(function ChatComposer({
             className="sr-only"
             aria-label="Take a photo with your camera"
           />
+          <input
+            ref={photoInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            onChange={selectFile}
+            className="sr-only"
+            aria-label="Choose photos"
+          />
           {visibleAttachmentNotices.length > 0 && (
             <div className="mx-1 mb-0.5 flex items-center gap-2 overflow-x-auto px-2 pt-2 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {visibleAttachmentNotices.map(item => {
@@ -1083,7 +1105,199 @@ export const ChatComposer = memo(function ChatComposer({
             >
               {/* Left Side Controls */}
               <div className="flex items-center gap-2">
-                {!isEditingMessage && !guestMode && !botActive && (
+                {!isEditingMessage && !guestMode && !botActive && isMobile && (
+                  <>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => {
+                        setMobileToolsPage("main");
+                        setMobileToolsOpen(true);
+                      }}
+                      className="ksemo-composer-attach size-10 shrink-0 rounded-full bg-transparent text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                      aria-label="Add to chat"
+                    >
+                      <Plus className="size-5" />
+                    </Button>
+                    <Dialog
+                      open={mobileToolsOpen}
+                      onOpenChange={setMobileToolsOpen}
+                    >
+                      <DialogContent
+                        showCloseButton={false}
+                        overlayClassName="bg-black/55"
+                        className="fixed inset-x-0 bottom-0 top-auto z-[80] flex max-h-[min(82dvh,46rem)] w-full max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden rounded-t-[28px] rounded-b-none border border-border bg-background p-0 text-foreground shadow-2xl duration-300 data-[state=open]:slide-in-from-bottom-8 data-[state=closed]:slide-out-to-bottom-8"
+                      >
+                        <DialogTitle className="sr-only">
+                          {mobileToolsPage === "main"
+                            ? "Add to chat"
+                            : "Create files"}
+                        </DialogTitle>
+                        <DialogDescription className="sr-only">
+                          {mobileToolsPage === "main"
+                            ? "Choose a camera, photo, file, library item, or file creation tool."
+                            : "Choose a file type to create."}
+                        </DialogDescription>
+                        <div className="flex justify-center pt-2.5">
+                          <span className="h-1.5 w-12 rounded-full bg-muted-foreground/30" />
+                        </div>
+                        <div className="relative flex h-16 shrink-0 items-center justify-between px-5">
+                          {mobileToolsPage === "create" ? (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setMobileToolsPage("main")}
+                              className="size-10 rounded-xl text-foreground hover:bg-accent"
+                              aria-label="Back to add options"
+                            >
+                              <ArrowLeft className="size-5" />
+                            </Button>
+                          ) : (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setMobileToolsOpen(false)}
+                              className="size-10 rounded-xl text-foreground hover:bg-accent"
+                              aria-label="Close add options"
+                            >
+                              <X className="size-5" />
+                            </Button>
+                          )}
+                          <h2 className="pointer-events-none absolute left-1/2 -translate-x-1/2 text-lg font-semibold">
+                            {mobileToolsPage === "main"
+                              ? "Add to chat"
+                              : "Create files"}
+                          </h2>
+                          {mobileToolsPage === "create" ? (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setMobileToolsOpen(false)}
+                              className="size-10 rounded-xl text-foreground hover:bg-accent"
+                              aria-label="Close add options"
+                            >
+                              <X className="size-5" />
+                            </Button>
+                          ) : (
+                            <span className="size-10" aria-hidden="true" />
+                          )}
+                        </div>
+                        <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)]">
+                          {mobileToolsPage === "main" ? (
+                            <>
+                              <div className="grid grid-cols-3 gap-3">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setMobileToolsOpen(false);
+                                    cameraInputRef.current?.click();
+                                  }}
+                                  className="flex h-32 min-w-0 flex-col items-center justify-center rounded-2xl border border-border/50 bg-card px-2 text-center transition-colors hover:bg-accent active:bg-accent"
+                                >
+                                  <span className="mb-2.5 flex size-14 items-center justify-center rounded-full bg-muted text-foreground">
+                                    <Camera className="size-7" />
+                                  </span>
+                                  <span className="text-base font-medium">Camera</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setMobileToolsOpen(false);
+                                    photoInputRef.current?.click();
+                                  }}
+                                  className="flex h-32 min-w-0 flex-col items-center justify-center rounded-2xl border border-border/50 bg-card px-2 text-center transition-colors hover:bg-accent active:bg-accent"
+                                >
+                                  <span className="mb-2.5 flex size-14 items-center justify-center rounded-full bg-muted text-foreground">
+                                    <ImageIcon className="size-7" />
+                                  </span>
+                                  <span className="text-base font-medium">Photos</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setMobileToolsOpen(false);
+                                    fileInputRef.current?.click();
+                                  }}
+                                  className="flex h-32 min-w-0 flex-col items-center justify-center rounded-2xl border border-border/50 bg-card px-2 text-center transition-colors hover:bg-accent active:bg-accent"
+                                >
+                                  <span className="mb-2.5 flex size-14 items-center justify-center rounded-full bg-muted text-foreground">
+                                    <FileText className="size-7" />
+                                  </span>
+                                  <span className="text-base font-medium">Files</span>
+                                </button>
+                              </div>
+                              <div className="mt-3 space-y-2">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setMobileToolsOpen(false);
+                                    setLibraryOpen(true);
+                                  }}
+                                  className="flex min-h-[68px] w-full items-center gap-4 rounded-2xl border border-border/50 bg-card px-4 text-left transition-colors hover:bg-accent active:bg-accent"
+                                >
+                                  <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-muted text-foreground">
+                                    <Library aria-hidden="true" className="size-5" />
+                                  </span>
+                                  <span className="min-w-0 flex-1">
+                                    <span className="block text-base font-medium">Browse Library</span>
+                                    <span className="block text-sm text-muted-foreground">Add a saved file</span>
+                                  </span>
+                                  <ChevronRight className="size-5 shrink-0 text-muted-foreground" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setMobileToolsPage("create")}
+                                  className="flex min-h-[68px] w-full items-center gap-4 rounded-2xl border border-border/50 bg-card px-4 text-left transition-colors hover:bg-accent active:bg-accent"
+                                >
+                                  <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-muted text-foreground">
+                                    <FilePlus size={20} />
+                                  </span>
+                                  <span className="min-w-0 flex-1">
+                                    <span className="block text-base font-medium">Create files</span>
+                                    <span className="block text-sm text-muted-foreground">PDF, Word, Excel, and more</span>
+                                  </span>
+                                  <ChevronRight className="size-5 shrink-0 text-muted-foreground" />
+                                </button>
+                              </div>
+                            </>
+                          ) : (
+                            <div className="space-y-2">
+                              {CAPABILITY_SECTIONS.find(section => section.id === "create")?.options.map(option => {
+                                const Icon = option.icon;
+                                const isActive = activeMode === option.mode;
+                                return (
+                                  <button
+                                    type="button"
+                                    key={option.mode}
+                                    onClick={() => {
+                                      onModeChange?.(isActive ? null : option.mode);
+                                      setMobileToolsOpen(false);
+                                    }}
+                                    className="flex min-h-[68px] w-full items-center gap-4 rounded-2xl border border-border/50 bg-card px-4 text-left transition-colors hover:bg-accent active:bg-accent"
+                                  >
+                                    <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-muted text-foreground">
+                                      <Icon className="size-5" />
+                                    </span>
+                                    <span className="min-w-0 flex-1">
+                                      <span className="block text-base font-medium">{option.title}</span>
+                                      <span className="block text-sm text-muted-foreground">{option.description}</span>
+                                    </span>
+                                    {isActive ? <Check className="size-5 shrink-0" /> : <ChevronRight className="size-5 shrink-0 text-muted-foreground" />}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  </>
+                )}
+                {!isEditingMessage && !guestMode && !botActive && !isMobile && (
                   <DropdownMenu
                     open={toolsOpen && !libraryOpen}
                     onOpenChange={setToolsOpen}
