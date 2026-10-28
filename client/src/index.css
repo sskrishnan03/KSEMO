@@ -576,6 +576,17 @@
   --sidebar-ring: #b3b3b3;
 }
 
+/* Match text selection to KSEMO's neutral light and dark theme. */
+::selection {
+  color: var(--foreground);
+  background: color-mix(in oklab, var(--foreground) 28%, var(--background));
+}
+
+::-moz-selection {
+  color: var(--foreground);
+  background: color-mix(in oklab, var(--foreground) 28%, var(--background));
+}
+
 @layer base {
   * {
     @apply border-border outline-none;
@@ -806,9 +817,6 @@ html.dark .shiki span {
   color: var(--shiki-dark);
 }
 
-.ksemo-code-body ::selection {
-  background: color-mix(in oklab, var(--foreground) 18%, transparent);
-}
 .ksemo-code-body,
 .ksemo-code-body pre {
   scrollbar-width: thin;
