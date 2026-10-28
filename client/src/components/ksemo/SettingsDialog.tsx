@@ -537,12 +537,20 @@ export const SettingsDialog = memo(function SettingsDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         showCloseButton={false}
+        onOpenAutoFocus={event => {
+          if (window.matchMedia("(max-width: 767px)").matches) {
+            event.preventDefault();
+          }
+        }}
         style={
           { "--mobile-settings-sheet-height": `${mobileSheetHeight}dvh` } as React.CSSProperties
         }
         onPointerDown={event => {
           const target = event.target;
-          if (!(target instanceof Element) || !target.closest("[data-settings-sheet-drag]")) return;
+          if (!(target instanceof Element)) return;
+          if (target.closest("button, input, textarea, select, a, [role='button']")) return;
+          const scroller = target.closest<HTMLElement>("[data-settings-sheet-scroll]");
+          if (scroller && scroller.scrollTop > 0) return;
           if (event.pointerType === "mouse" && event.button !== 0) return;
           mobileSheetDragStartRef.current = {
             y: event.clientY,
@@ -574,21 +582,13 @@ export const SettingsDialog = memo(function SettingsDialog({
           setMobileSheetDragging(false);
         }}
         className={cn(
-          "flex h-[70dvh] w-[60vw] !max-w-none flex-col gap-0 overflow-hidden rounded-2xl p-0 max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:top-auto max-md:left-0 max-md:translate-x-0 max-md:translate-y-0 max-md:w-full max-md:!max-w-none max-md:rounded-b-none max-md:border-x-0 max-md:border-b-0 max-md:data-[state=open]:slide-in-from-bottom-8 max-md:data-[state=closed]:slide-out-to-bottom-8",
+          "flex h-[70dvh] w-[60vw] !max-w-none flex-col gap-0 overflow-hidden rounded-2xl p-0 max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:top-auto max-md:left-0 max-md:translate-x-0 max-md:translate-y-0 max-md:w-full max-md:!max-w-none max-md:rounded-b-none max-md:border-x-0 max-md:border-b-0 max-md:data-[state=open]:slide-in-from-bottom-8 max-md:data-[state=closed]:slide-out-to-bottom-8 max-md:h-[var(--mobile-settings-sheet-height)]",
           mobileSheetDragging
             ? "max-md:transition-none"
             : "max-md:transition-[height,border-radius] max-md:duration-200 max-md:ease-out",
-          mobileSheetHeight >= 99 ? "max-md:rounded-t-none" : "max-md:rounded-t-[28px]",
-          "max-md:h-[var(--mobile-settings-sheet-height)]"
+          mobileSheetHeight >= 99 ? "max-md:rounded-t-none" : "max-md:rounded-t-[28px]"
         )}
       >
-        <div
-          data-settings-sheet-drag
-          className="hidden shrink-0 cursor-grab touch-none select-none justify-center py-2.5 active:cursor-grabbing max-md:flex"
-          aria-hidden="true"
-        >
-          <span className="h-1.5 w-12 rounded-full bg-muted-foreground/35" />
-        </div>
         <TooltipProvider delayDuration={150}>
         <DialogHeader className="sr-only">
           <DialogTitle>Settings</DialogTitle>
@@ -697,6 +697,7 @@ export const SettingsDialog = memo(function SettingsDialog({
               </button>
             </DialogPrimitive.Close>
             <div
+              data-settings-sheet-scroll
               className={
                 activeTab === "data" && dataWorkspace
                   ? "flex min-h-0 flex-1 flex-col overflow-hidden"

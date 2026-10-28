@@ -375,6 +375,11 @@ export const ChatComposer = memo(function ChatComposer({
   const [toolsOpen, setToolsOpen] = useState(initialToolsOpen);
   const [mobileToolsOpen, setMobileToolsOpen] = useState(false);
   const [mobileToolsPage, setMobileToolsPage] = useState<"main" | "create">("main");
+  const [mobileToolsHeight, setMobileToolsHeight] = useState(72);
+  const [mobileToolsDragging, setMobileToolsDragging] = useState(false);
+  const mobileToolsDragStartRef = useRef<{ y: number; height: number } | null>(
+    null
+  );
   const [libraryQuery, setLibraryQuery] = useState("");
   const [isDragActive, setIsDragActive] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -1122,12 +1127,65 @@ export const ChatComposer = memo(function ChatComposer({
                     </Button>
                     <Dialog
                       open={mobileToolsOpen}
-                      onOpenChange={setMobileToolsOpen}
+                      onOpenChange={open => {
+                        setMobileToolsOpen(open);
+                        if (!open) {
+                          setMobileToolsHeight(72);
+                          setMobileToolsDragging(false);
+                          mobileToolsDragStartRef.current = null;
+                        }
+                      }}
                     >
                       <DialogContent
                         showCloseButton={false}
                         overlayClassName="bg-black/55"
-                        className="fixed inset-x-0 bottom-0 top-auto z-[80] flex max-h-[min(82dvh,46rem)] w-full max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden rounded-t-[28px] rounded-b-none border border-border bg-background p-0 text-foreground shadow-2xl duration-300 data-[state=open]:slide-in-from-bottom-8 data-[state=closed]:slide-out-to-bottom-8"
+                        style={
+                          { "--mobile-tools-sheet-height": `${mobileToolsHeight}dvh` } as React.CSSProperties
+                        }
+                        onPointerDown={event => {
+                          const target = event.target;
+                          if (!(target instanceof Element)) return;
+                          if (target.closest("button, input, textarea, select, a, [role='button']")) return;
+                          const scroller = target.closest<HTMLElement>("[data-mobile-tools-scroll]");
+                          if (scroller && scroller.scrollTop > 0) return;
+                          if (event.pointerType === "mouse" && event.button !== 0) return;
+                          mobileToolsDragStartRef.current = {
+                            y: event.clientY,
+                            height: mobileToolsHeight,
+                          };
+                          setMobileToolsDragging(true);
+                          event.currentTarget.setPointerCapture(event.pointerId);
+                        }}
+                        onPointerMove={event => {
+                          const start = mobileToolsDragStartRef.current;
+                          if (!start) return;
+                          const deltaVh = ((start.y - event.clientY) / window.innerHeight) * 100;
+                          setMobileToolsHeight(Math.min(100, Math.max(35, start.height + deltaVh)));
+                        }}
+                        onPointerUp={event => {
+                          const start = mobileToolsDragStartRef.current;
+                          if (!start) return;
+                          const deltaVh = ((start.y - event.clientY) / window.innerHeight) * 100;
+                          mobileToolsDragStartRef.current = null;
+                          setMobileToolsDragging(false);
+                          if (start.height + deltaVh < 27) {
+                            setMobileToolsOpen(false);
+                            setMobileToolsHeight(72);
+                            return;
+                          }
+                          setMobileToolsHeight(Math.min(100, Math.max(35, start.height + deltaVh)));
+                        }}
+                        onPointerCancel={() => {
+                          mobileToolsDragStartRef.current = null;
+                          setMobileToolsDragging(false);
+                        }}
+                        className={cn(
+                          "fixed inset-x-0 bottom-0 top-auto z-[80] flex h-[var(--mobile-tools-sheet-height)] w-full max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden rounded-t-[28px] rounded-b-none border border-border bg-background p-0 text-foreground data-[state=open]:slide-in-from-bottom-8 data-[state=closed]:slide-out-to-bottom-8",
+                          mobileToolsDragging
+                            ? "transition-none"
+                            : "transition-[height,border-radius] duration-200 ease-out",
+                          mobileToolsHeight >= 99 && "rounded-t-none"
+                        )}
                       >
                         <DialogTitle className="sr-only">
                           {mobileToolsPage === "main"
@@ -1139,10 +1197,7 @@ export const ChatComposer = memo(function ChatComposer({
                             ? "Choose a camera, photo, file, library item, or file creation tool."
                             : "Choose a file type to create."}
                         </DialogDescription>
-                        <div className="flex justify-center pt-2.5">
-                          <span className="h-1.5 w-12 rounded-full bg-muted-foreground/30" />
-                        </div>
-                        <div className="relative flex h-16 shrink-0 items-center justify-between px-5">
+                        <div className="relative flex h-16 shrink-0 touch-none select-none items-center justify-between px-5">
                           {mobileToolsPage === "create" ? (
                             <Button
                               type="button"
@@ -1155,38 +1210,16 @@ export const ChatComposer = memo(function ChatComposer({
                               <ArrowLeft className="size-5" />
                             </Button>
                           ) : (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => setMobileToolsOpen(false)}
-                              className="size-10 rounded-xl text-foreground hover:bg-accent"
-                              aria-label="Close add options"
-                            >
-                              <X className="size-5" />
-                            </Button>
+                            <span className="size-10" aria-hidden="true" />
                           )}
                           <h2 className="pointer-events-none absolute left-1/2 -translate-x-1/2 text-lg font-semibold">
                             {mobileToolsPage === "main"
                               ? "Add to chat"
                               : "Create files"}
                           </h2>
-                          {mobileToolsPage === "create" ? (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => setMobileToolsOpen(false)}
-                              className="size-10 rounded-xl text-foreground hover:bg-accent"
-                              aria-label="Close add options"
-                            >
-                              <X className="size-5" />
-                            </Button>
-                          ) : (
-                            <span className="size-10" aria-hidden="true" />
-                          )}
+                          <span className="size-10" aria-hidden="true" />
                         </div>
-                        <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)]">
+                        <div data-mobile-tools-scroll className="min-h-0 flex-1 overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)]">
                           {mobileToolsPage === "main" ? (
                             <>
                               <div className="grid grid-cols-3 gap-3">
