@@ -143,10 +143,9 @@ export default function UpgradePage() {
               role="tab"
               aria-selected={selectedPlan === plan.name}
               onClick={() => setSelectedPlan(plan.name)}
-              className={`rounded-lg px-1 py-2 text-xs font-medium transition ${selectedPlan === plan.name ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"}`}
+              className={`h-11 rounded-lg px-2 text-sm font-semibold transition ${selectedPlan === plan.name ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
             >
-              {plan.name}{" "}
-              <span className="block text-[10px]">{plan.price}</span>
+              {plan.name}
             </button>
           ))}
         </div>
