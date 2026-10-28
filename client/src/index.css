@@ -1482,6 +1482,16 @@ html.ksemo-reduce-motion .ksemo-file-writing-line {
   );
 }
 
+@media (max-width: 640px) {
+  .ksemo-voice-corner-glow {
+    background: radial-gradient(
+      ellipse 76% 42% at 50% 58%,
+      rgb(201 211 232 / 15%) 0%,
+      transparent 100%
+    );
+  }
+}
+
 /* A localized, static voice-chat-like backdrop for the empty chat greeting
    and composer. The EmptyState only renders before the first response. */
 .empty-chat-new-accent {
