@@ -7176,21 +7176,17 @@ export default function Home({
                   ghostMode={isGhostMode}
                   privateMode={isSavedGhostChat}
                   composer={
-                    isMobile
-                      ? null
-                      : renderComposer({
-                          menuPlacement: isMobile ? "above" : "below",
-                          isCentered: true,
-                          compactBottomSpacing: false,
-                          initialToolsOpen: isLibraryPreview,
-                        })
+                    renderComposer({
+                      menuPlacement: isMobile ? "above" : "below",
+                      isCentered: true,
+                      compactBottomSpacing: false,
+                      initialToolsOpen: isLibraryPreview,
+                    })
                   }
                 />
               )}
             </section>
-            {(visibleMessages.length > 0 ||
-              isMobile ||
-              composerTag === "bot") && (
+            {(visibleMessages.length > 0 || composerTag === "bot") && (
               <div
                 className={cn(
                   "z-10",
@@ -7495,12 +7491,6 @@ const EmptyState = memo(function EmptyState({
   ghostMode?: boolean;
   privateMode?: boolean;
 }) {
-  const isMobile = useIsMobile();
-  const mobileGreeting = privateMode
-    ? "A private chat"
-    : temporary
-      ? "Quick chat, just us"
-      : "Good to see you";
   const [showPrivateInfo, setShowPrivateInfo] = useState(false);
   const privateInfoRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -7535,7 +7525,7 @@ const EmptyState = memo(function EmptyState({
                 ghostMode && "temp-ghost-greeting"
               )}
             >
-              {isMobile ? mobileGreeting : greeting}
+              {greeting}
             </p>
           </div>
         </div>
