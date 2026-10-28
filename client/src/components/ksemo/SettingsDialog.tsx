@@ -399,8 +399,11 @@ export const SettingsDialog = memo(function SettingsDialog({
   onOpenConversation?: (conversationId: string) => void;
   initialTab?: SettingsTab;
 }) {
-  const [mobileSheetExpanded, setMobileSheetExpanded] = useState(false);
-  const mobileSheetTouchStartRef = useRef<number | null>(null);
+  const [mobileSheetHeight, setMobileSheetHeight] = useState(72);
+  const [mobileSheetDragging, setMobileSheetDragging] = useState(false);
+  const mobileSheetDragStartRef = useRef<{ y: number; height: number } | null>(
+    null
+  );
   const [activeTab, setActiveTab] = useState<SettingsTab>(
     initialTab || "account"
   );
@@ -475,7 +478,11 @@ export const SettingsDialog = memo(function SettingsDialog({
     if (open) changeTab("account");
   }, [open]);
   useEffect(() => {
-    if (!open) setMobileSheetExpanded(false);
+    if (!open) {
+      setMobileSheetHeight(72);
+      setMobileSheetDragging(false);
+      mobileSheetDragStartRef.current = null;
+    }
   }, [open]);
 
   const sectionContent = (
@@ -530,30 +537,54 @@ export const SettingsDialog = memo(function SettingsDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         showCloseButton={false}
+        style={
+          { "--mobile-settings-sheet-height": `${mobileSheetHeight}dvh` } as React.CSSProperties
+        }
+        onPointerDown={event => {
+          const target = event.target;
+          if (!(target instanceof Element) || !target.closest("[data-settings-sheet-drag]")) return;
+          if (event.pointerType === "mouse" && event.button !== 0) return;
+          mobileSheetDragStartRef.current = {
+            y: event.clientY,
+            height: mobileSheetHeight,
+          };
+          setMobileSheetDragging(true);
+          event.currentTarget.setPointerCapture(event.pointerId);
+        }}
+        onPointerMove={event => {
+          const start = mobileSheetDragStartRef.current;
+          if (!start) return;
+          const deltaVh = ((start.y - event.clientY) / window.innerHeight) * 100;
+          setMobileSheetHeight(Math.min(100, Math.max(35, start.height + deltaVh)));
+        }}
+        onPointerUp={event => {
+          const start = mobileSheetDragStartRef.current;
+          if (!start) return;
+          const deltaVh = ((start.y - event.clientY) / window.innerHeight) * 100;
+          mobileSheetDragStartRef.current = null;
+          setMobileSheetDragging(false);
+          if (start.height + deltaVh < 27) {
+            onOpenChange(false);
+            return;
+          }
+          setMobileSheetHeight(Math.min(100, Math.max(35, start.height + deltaVh)));
+        }}
+        onPointerCancel={() => {
+          mobileSheetDragStartRef.current = null;
+          setMobileSheetDragging(false);
+        }}
         className={cn(
-          "flex h-[70dvh] w-[60vw] !max-w-none flex-col gap-0 overflow-hidden rounded-2xl p-0 transition-[height,border-radius] duration-300 ease-out max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:top-auto max-md:left-0 max-md:translate-x-0 max-md:translate-y-0 max-md:w-full max-md:!max-w-none max-md:rounded-b-none max-md:border-x-0 max-md:border-b-0 max-md:data-[state=open]:slide-in-from-bottom-8 max-md:data-[state=closed]:slide-out-to-bottom-8",
-          mobileSheetExpanded
-            ? "max-md:!h-dvh max-md:rounded-t-none"
-            : "max-md:h-[88dvh] max-md:rounded-t-[28px]"
+          "flex h-[70dvh] w-[60vw] !max-w-none flex-col gap-0 overflow-hidden rounded-2xl p-0 max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:top-auto max-md:left-0 max-md:translate-x-0 max-md:translate-y-0 max-md:w-full max-md:!max-w-none max-md:rounded-b-none max-md:border-x-0 max-md:border-b-0 max-md:data-[state=open]:slide-in-from-bottom-8 max-md:data-[state=closed]:slide-out-to-bottom-8",
+          mobileSheetDragging
+            ? "max-md:transition-none"
+            : "max-md:transition-[height,border-radius] max-md:duration-200 max-md:ease-out",
+          mobileSheetHeight >= 99 ? "max-md:rounded-t-none" : "max-md:rounded-t-[28px]",
+          "max-md:h-[var(--mobile-settings-sheet-height)]"
         )}
       >
         <div
-          className="hidden shrink-0 justify-center py-2.5 max-md:flex"
-          onTouchStart={event => {
-            mobileSheetTouchStartRef.current = event.touches[0]?.clientY ?? null;
-          }}
-          onTouchEnd={event => {
-            const start = mobileSheetTouchStartRef.current;
-            mobileSheetTouchStartRef.current = null;
-            if (start == null) return;
-            const delta = start - (event.changedTouches[0]?.clientY ?? start);
-            if (delta > 35) {
-              setMobileSheetExpanded(true);
-            } else if (delta < -35) {
-              if (mobileSheetExpanded) setMobileSheetExpanded(false);
-              else onOpenChange(false);
-            }
-          }}
+          data-settings-sheet-drag
+          className="hidden shrink-0 cursor-grab touch-none select-none justify-center py-2.5 active:cursor-grabbing max-md:flex"
           aria-hidden="true"
         >
           <span className="h-1.5 w-12 rounded-full bg-muted-foreground/35" />
@@ -570,22 +601,16 @@ export const SettingsDialog = memo(function SettingsDialog({
             same title, the same search bar, and the same option buttons with
             the same hover and active states */}
         <div className="shrink-0 border-b border-border bg-sidebar md:hidden">
-          <div className="flex h-11 items-center justify-between gap-2 px-3">
+          <div
+            data-settings-sheet-drag
+            className="flex h-11 cursor-grab touch-none select-none items-center gap-2 px-3 active:cursor-grabbing"
+          >
             <div className="flex min-w-0 items-center gap-2">
               <Settings className="size-4 shrink-0 text-muted-foreground" />
               <span className="truncate text-sm font-semibold tracking-[-0.02em]">
                 Settings
               </span>
             </div>
-            <DialogPrimitive.Close asChild>
-              <button
-                type="button"
-                className="flex size-7 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                aria-label="Close settings"
-              >
-                <X className="size-4" />
-              </button>
-            </DialogPrimitive.Close>
           </div>
           <div className="px-3 pb-1">
             <SettingsSearch onSelect={changeTab} />
