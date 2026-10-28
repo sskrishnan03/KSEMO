@@ -7521,8 +7521,9 @@ const EmptyState = memo(function EmptyState({
     };
   }, [showPrivateInfo]);
   return (
-    <div className="mx-auto flex h-full w-full max-w-3xl flex-col justify-center gap-4 px-0 pb-16 sm:px-5 sm:pb-4 lg:gap-3 lg:pb-0">
-      <div>
+    <div className="relative isolate mx-auto flex h-full w-full max-w-3xl flex-col justify-center gap-4 px-0 pb-16 sm:px-5 sm:pb-4 lg:gap-3 lg:pb-0">
+      <div aria-hidden="true" className="empty-chat-new-accent pointer-events-none absolute left-1/2 top-1/2 z-0 h-[24rem] w-[calc(100%+5rem)] -translate-x-1/2 -translate-y-1/2 sm:w-[calc(100%+8rem)]" />
+      <div className="relative z-10">
         <div className="px-5 text-center sm:px-0">
           <div
             key={`${ghostMode ? "ghost" : "normal"}-${animationKey}`}
@@ -7539,7 +7540,7 @@ const EmptyState = memo(function EmptyState({
           </div>
         </div>
       </div>
-      <div className="relative mx-auto w-full max-w-3xl">
+      <div className="relative z-10 mx-auto w-full max-w-3xl">
         {composer}
         {temporary && (
           <div ref={privateInfoRef} className="pointer-events-auto absolute inset-x-0 top-full mt-[-8px] px-5 text-center text-[13px] font-medium leading-snug text-muted-foreground sm:px-0 animate-in fade-in duration-200">

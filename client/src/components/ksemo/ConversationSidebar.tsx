@@ -584,34 +584,32 @@ export const ConversationSidebar = memo(function ConversationSidebar({
                     Get help
                     <ExternalLink className="ml-auto size-3.5 text-muted-foreground" />
                   </DropdownMenuItem>
-                  {!isMobile && (
-                    <DropdownMenuSub>
-                      <DropdownMenuSubTrigger className="focus-visible:ring-0 focus-visible:outline-none">
-                        <ElementPlus size={16} className="mr-2" />
-                        Learn more
-                      </DropdownMenuSubTrigger>
-                      <DropdownMenuSubContent
-                        sideOffset={6}
-                        collisionPadding={12}
-                        className="w-44 rounded-xl"
+                  <DropdownMenuSub>
+                    <DropdownMenuSubTrigger className="focus-visible:ring-0 focus-visible:outline-none">
+                      <ElementPlus size={16} className="mr-2" />
+                      Learn more
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent
+                      sideOffset={6}
+                      collisionPadding={12}
+                      className="w-44 rounded-xl"
+                    >
+                      <DropdownMenuItem
+                        onClick={() => onSupport("privacy")}
+                        className="focus-visible:ring-0 focus-visible:outline-none"
                       >
-                        <DropdownMenuItem
-                          onClick={() => onSupport("privacy")}
-                          className="focus-visible:ring-0 focus-visible:outline-none"
-                        >
-                          <ShieldCheck className="mr-2 size-4" />
-                          Privacy Policy
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => onSupport("terms")}
-                          className="focus-visible:ring-0 focus-visible:outline-none"
-                        >
-                          <FileText className="mr-2 size-4" />
-                          Terms of Service
-                        </DropdownMenuItem>
-                      </DropdownMenuSubContent>
-                    </DropdownMenuSub>
-                  )}
+                        <ShieldCheck className="mr-2 size-4" />
+                        Privacy Policy
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => onSupport("terms")}
+                        className="focus-visible:ring-0 focus-visible:outline-none"
+                      >
+                        <FileText className="mr-2 size-4" />
+                        Terms of Service
+                      </DropdownMenuItem>
+                    </DropdownMenuSubContent>
+                  </DropdownMenuSub>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={onLogout} variant="destructive">
                     <LogOut className="mr-2 size-4" /> Sign out
