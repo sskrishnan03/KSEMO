@@ -458,7 +458,9 @@ function GhostPrivateChatTitle({ title }: { title: string }) {
     if (!viewport || !titleElement) return;
 
     const measure = () => {
-      setOverflowDistance(Math.max(0, titleElement.scrollWidth - viewport.clientWidth));
+      setOverflowDistance(
+        Math.max(0, titleElement.scrollWidth - viewport.clientWidth)
+      );
     };
     measure();
     const observer = new ResizeObserver(measure);
@@ -469,12 +471,19 @@ function GhostPrivateChatTitle({ title }: { title: string }) {
 
   useEffect(() => {
     const titleElement = titleRef.current;
-    if (!titleElement || !isHovered || overflowDistance <= 0 || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if (
+      !titleElement ||
+      !isHovered ||
+      overflowDistance <= 0 ||
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    )
+      return;
 
     const travelDuration = (overflowDistance / 18) * 1000;
     const startPauseDuration = 350;
     const endPauseDuration = 1500;
-    const totalDuration = travelDuration + startPauseDuration + endPauseDuration;
+    const totalDuration =
+      travelDuration + startPauseDuration + endPauseDuration;
     const startPauseOffset = startPauseDuration / totalDuration;
     const endOffset = (startPauseDuration + travelDuration) / totalDuration;
     const animation = titleElement.animate(
@@ -495,14 +504,22 @@ function GhostPrivateChatTitle({ title }: { title: string }) {
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       className="min-w-0 flex-1 overflow-hidden whitespace-nowrap text-sm font-medium text-white"
-      style={isHovered && overflowDistance > 0 ? {
-        WebkitMaskImage: "linear-gradient(to right, transparent 0, black 14px, black calc(100% - 14px), transparent 100%)",
-        maskImage: "linear-gradient(to right, transparent 0, black 14px, black calc(100% - 14px), transparent 100%)",
-        WebkitMaskRepeat: "no-repeat",
-        maskRepeat: "no-repeat",
-      } : undefined}
+      style={
+        isHovered && overflowDistance > 0
+          ? {
+              WebkitMaskImage:
+                "linear-gradient(to right, transparent 0, black 14px, black calc(100% - 14px), transparent 100%)",
+              maskImage:
+                "linear-gradient(to right, transparent 0, black 14px, black calc(100% - 14px), transparent 100%)",
+              WebkitMaskRepeat: "no-repeat",
+              maskRepeat: "no-repeat",
+            }
+          : undefined
+      }
     >
-      <span ref={titleRef} className="inline-block whitespace-nowrap">{title}</span>
+      <span ref={titleRef} className="inline-block whitespace-nowrap">
+        {title}
+      </span>
     </span>
   );
 }
@@ -550,7 +567,8 @@ function GhostModeIcon({
       const eased = progress * progress * (3 - 2 * progress);
       const x = from.x + (target.x - from.x) * eased;
       const y = from.y + (target.y - from.y) * eased;
-      const rotation = from.rotation + (target.rotation - from.rotation) * eased;
+      const rotation =
+        from.rotation + (target.rotation - from.rotation) * eased;
       icon.style.transform = `translate3d(${x.toFixed(2)}px, ${y.toFixed(2)}px, 0) rotate(${rotation.toFixed(2)}deg)`;
 
       if (progress >= 1) {
@@ -599,10 +617,12 @@ function GhostModeIcon({
         width: size,
         height: size,
         flexBasis: size,
-        ...(splitColors ? {
-          "--ghost-option-left": savedPalette ? "#ff6b5e" : "#86efac",
-          "--ghost-option-right": savedPalette ? "#ffd2b8" : "#a5d8ff",
-        } as React.CSSProperties : {}),
+        ...(splitColors
+          ? ({
+              "--ghost-option-left": savedPalette ? "#ff6b5e" : "#86efac",
+              "--ghost-option-right": savedPalette ? "#ffd2b8" : "#a5d8ff",
+            } as React.CSSProperties)
+          : {}),
       }}
       aria-hidden="true"
     >
@@ -630,33 +650,50 @@ function GhostModeIcon({
           color="#000000"
         />
       )}
-      {showWave && <svg
-        className="temp-ghost-wave-overlay"
-        style={{ width: size, height: size }}
-        viewBox="0 0 24 24"
-      >
-        <defs>
-          <linearGradient
-            id={waveGradientId}
-            x1="0"
-            y1="0"
-            x2="24"
-            y2="0"
-            gradientUnits="userSpaceOnUse"
-          >
-            <stop offset="0%" stopColor={savedPalette ? "#FF6B5E" : "#86EFAC"} />
-            <stop offset="35%" stopColor={savedPalette ? "#FF6B5E" : "#86EFAC"} />
-            <stop offset="50%" stopColor={savedPalette ? "#FF9A78" : "#96E7D0"} />
-            <stop offset="65%" stopColor={savedPalette ? "#FFD2B8" : "#A5D8FF"} />
-            <stop offset="100%" stopColor={savedPalette ? "#FFD2B8" : "#A5D8FF"} />
-          </linearGradient>
-        </defs>
-        <path
-          className="temp-ghost-wave"
-          style={{ stroke: `url(#${waveGradientId})` }}
-          d="M2 20.1V20.07C2 21.33 2.75 21.67 3.67 20.83L4.67 19.92C5.04 19.58 5.64 19.58 6.01 19.92L8.01 21.75C8.38 22.09 8.98 22.09 9.35 21.75L11.35 19.92C11.72 19.58 12.32 19.58 12.69 19.92L14.69 21.75C15.06 22.09 15.66 22.09 16.03 21.75L18.03 19.92C18.4 19.58 19 19.58 19.37 19.92L20.37 20.83C21.25 21.67 22 21.33 22 20.07"
-        />
-      </svg>}
+      {showWave && (
+        <svg
+          className="temp-ghost-wave-overlay"
+          style={{ width: size, height: size }}
+          viewBox="0 0 24 24"
+        >
+          <defs>
+            <linearGradient
+              id={waveGradientId}
+              x1="0"
+              y1="0"
+              x2="24"
+              y2="0"
+              gradientUnits="userSpaceOnUse"
+            >
+              <stop
+                offset="0%"
+                stopColor={savedPalette ? "#FF6B5E" : "#86EFAC"}
+              />
+              <stop
+                offset="35%"
+                stopColor={savedPalette ? "#FF6B5E" : "#86EFAC"}
+              />
+              <stop
+                offset="50%"
+                stopColor={savedPalette ? "#FF9A78" : "#96E7D0"}
+              />
+              <stop
+                offset="65%"
+                stopColor={savedPalette ? "#FFD2B8" : "#A5D8FF"}
+              />
+              <stop
+                offset="100%"
+                stopColor={savedPalette ? "#FFD2B8" : "#A5D8FF"}
+              />
+            </linearGradient>
+          </defs>
+          <path
+            className="temp-ghost-wave"
+            style={{ stroke: `url(#${waveGradientId})` }}
+            d="M2 20.1V20.07C2 21.33 2.75 21.67 3.67 20.83L4.67 19.92C5.04 19.58 5.64 19.58 6.01 19.92L8.01 21.75C8.38 22.09 8.98 22.09 9.35 21.75L11.35 19.92C11.72 19.58 12.32 19.58 12.69 19.92L14.69 21.75C15.06 22.09 15.66 22.09 16.03 21.75L18.03 19.92C18.4 19.58 19 19.58 19.37 19.92L20.37 20.83C21.25 21.67 22 21.33 22 20.07"
+          />
+        </svg>
+      )}
     </span>
   );
 }
@@ -740,17 +777,31 @@ export default function Home({
   >(null);
   const [isTemporaryChat, setIsTemporaryChat] = useState(false);
   const [isSavedGhostChat, setIsSavedGhostChat] = useState(false);
-  const [privateChatEntries, setPrivateChatEntries] = useState<PrivateChatEntry[]>([]);
-  const [privateChatPanel, setPrivateChatPanel] = useState<"chats" | "locked" | null>(null);
+  const [privateChatEntries, setPrivateChatEntries] = useState<
+    PrivateChatEntry[]
+  >([]);
+  const [privateChatPanel, setPrivateChatPanel] = useState<
+    "chats" | "locked" | null
+  >(null);
   const [privateChatMenuOpen, setPrivateChatMenuOpen] = useState(false);
   const privateChatPanelRef = useRef<HTMLElement | null>(null);
   const privateChatMenuTriggerRef = useRef<HTMLButtonElement | null>(null);
-  const [privateChatMenuPosition, setPrivateChatMenuPosition] = useState({ left: 8, top: 40 });
+  const [privateChatMenuPosition, setPrivateChatMenuPosition] = useState({
+    left: 8,
+    top: 40,
+  });
   const [privateChatSearch, setPrivateChatSearch] = useState("");
-  const [privateChatOptionsOpenId, setPrivateChatOptionsOpenId] = useState<string | null>(null);
-  const [privateChatDismissedOptionsId, setPrivateChatDismissedOptionsId] = useState<string | null>(null);
-  const [movingToPrivateId, setMovingToPrivateId] = useState<string | null>(null);
-  const [privateChatRenameId, setPrivateChatRenameId] = useState<string | null>(null);
+  const [privateChatOptionsOpenId, setPrivateChatOptionsOpenId] = useState<
+    string | null
+  >(null);
+  const [privateChatDismissedOptionsId, setPrivateChatDismissedOptionsId] =
+    useState<string | null>(null);
+  const [movingToPrivateId, setMovingToPrivateId] = useState<string | null>(
+    null
+  );
+  const [privateChatRenameId, setPrivateChatRenameId] = useState<string | null>(
+    null
+  );
   const [privateChatRenameValue, setPrivateChatRenameValue] = useState("");
   const [privatePinDialog, setPrivatePinDialog] = useState<{
     chatId: string;
@@ -765,7 +816,10 @@ export default function Home({
       const rect = privateChatMenuTriggerRef.current?.getBoundingClientRect();
       if (rect) {
         const menuWidth = Math.min(293, window.innerWidth - 16);
-        const left = Math.max(8, Math.min(rect.left, window.innerWidth - menuWidth - 8));
+        const left = Math.max(
+          8,
+          Math.min(rect.left, window.innerWidth - menuWidth - 8)
+        );
         setPrivateChatMenuPosition({ left, top: rect.bottom + 12 });
       }
     };
@@ -780,8 +834,12 @@ export default function Home({
         event.target instanceof Element &&
         (event.target.closest("[data-private-chat-actions]") ||
           event.target.closest("[data-private-panel-toggle]"))
-      ) return;
-      if (event.target instanceof Node && !privateChatPanelRef.current?.contains(event.target)) {
+      )
+        return;
+      if (
+        event.target instanceof Node &&
+        !privateChatPanelRef.current?.contains(event.target)
+      ) {
         if (privateChatOptionsOpenId) {
           setPrivateChatOptionsOpenId(null);
           return;
@@ -826,9 +884,17 @@ export default function Home({
   }, [user?.id]);
   useEffect(() => {
     if (user?.id == null) return;
-    const syncPrivateChats = () => setPrivateChatEntries(readPrivateChatEntries(user.id));
-    window.addEventListener("ksemo:private-chat-lock-updated", syncPrivateChats);
-    return () => window.removeEventListener("ksemo:private-chat-lock-updated", syncPrivateChats);
+    const syncPrivateChats = () =>
+      setPrivateChatEntries(readPrivateChatEntries(user.id));
+    window.addEventListener(
+      "ksemo:private-chat-lock-updated",
+      syncPrivateChats
+    );
+    return () =>
+      window.removeEventListener(
+        "ksemo:private-chat-lock-updated",
+        syncPrivateChats
+      );
   }, [user?.id]);
   const [chatMessages, setChatMessages] = useState<KsemoMessage[]>(() =>
     sharedAnswer
@@ -896,8 +962,9 @@ export default function Home({
     return () => cancelAnimationFrame(frame);
   }, [sidebarOpen, isMobile]);
   const [guestPromptOpen, setGuestPromptOpen] = useState(false);
-  const [expandedBranchMessageId, setExpandedBranchMessageId] =
-    useState<string | null>(null);
+  const [expandedBranchMessageId, setExpandedBranchMessageId] = useState<
+    string | null
+  >(null);
   const [scrollingBranchTitle, setScrollingBranchTitle] = useState<{
     id: string;
     distance: number;
@@ -1273,8 +1340,11 @@ export default function Home({
     activeQuery.data?.conversation,
     conversationQuery.data,
   ]);
-  const activeConversationTitle = privateChatTitleForDisplay(activeConversation?.title ?? "New Chat");
-  const isActiveBranchConversation = activeConversationTitle.startsWith("Branch: ");
+  const activeConversationTitle = privateChatTitleForDisplay(
+    activeConversation?.title ?? "New Chat"
+  );
+  const isActiveBranchConversation =
+    activeConversationTitle.startsWith("Branch: ");
   const mobileConversationTitle =
     activeConversationTitle.replace(/^Branch:\s*/, "") || "New Chat";
   const mobileConversationTitleRef = useRef<HTMLSpanElement>(null);
@@ -1385,7 +1455,9 @@ export default function Home({
         const visibleTitle = isPrivate
           ? currentTitle.slice("ksemo-ephemeral::".length)
           : currentTitle;
-        const branchPrefix = visibleTitle.startsWith("Branch: ") ? "Branch: " : "";
+        const branchPrefix = visibleTitle.startsWith("Branch: ")
+          ? "Branch: "
+          : "";
         const nextTitle = branchPrefix
           ? `Branch: ${title.replace(/^Branch:\s*/, "").slice(0, 112)}`
           : title;
@@ -1416,10 +1488,7 @@ export default function Home({
     },
     onError: (_error, _variables, context) => {
       if (context?.previous) {
-        utils.conversation.list.setData(
-          { scope: "active" },
-          context.previous
-        );
+        utils.conversation.list.setData({ scope: "active" }, context.previous);
       }
       if (context?.previousActive) {
         utils.conversation.get.setData(
@@ -1617,7 +1686,10 @@ export default function Home({
       ids: Array.from(temporaryConversationIdsRef.current),
     });
   };
-  const moveConversationToPrivate = async (conversation: { id: string; title: string }) => {
+  const moveConversationToPrivate = async (conversation: {
+    id: string;
+    title: string;
+  }) => {
     if (guestMode || user?.id == null) {
       toast.error("Sign in to move chats to Private.");
       return;
@@ -1631,7 +1703,10 @@ export default function Home({
         locked: false,
         updatedAt: Date.now(),
       };
-      const nextEntries = [entry, ...privateChatEntries.filter(chat => chat.id !== entry.id)];
+      const nextEntries = [
+        entry,
+        ...privateChatEntries.filter(chat => chat.id !== entry.id),
+      ];
       setPrivateChatEntries(nextEntries);
       writePrivateChatEntries(user.id, nextEntries);
       setMovingToPrivateId(null);
@@ -1645,7 +1720,11 @@ export default function Home({
   const savePrivateChatRename = (chat: PrivateChatEntry) => {
     const title = privateChatRenameValue.trim();
     if (title) {
-      const next = privateChatEntries.map(entry => entry.id === chat.id ? { ...entry, title, updatedAt: Date.now() } : entry);
+      const next = privateChatEntries.map(entry =>
+        entry.id === chat.id
+          ? { ...entry, title, updatedAt: Date.now() }
+          : entry
+      );
       setPrivateChatEntries(next);
       if (user?.id != null) writePrivateChatEntries(user.id, next);
       renameMutation.mutate({ id: chat.id, title });
@@ -1658,7 +1737,9 @@ export default function Home({
     setIsTemporaryChat(true);
     isSavedGhostChatRef.current = true;
     setIsSavedGhostChat(true);
-    temporaryConversationIdsRef.current = new Set(privateChatEntries.map(chat => chat.id));
+    temporaryConversationIdsRef.current = new Set(
+      privateChatEntries.map(chat => chat.id)
+    );
     seededConversationIdRef.current = null;
     setSeededConversationId(null);
     setChatMessages([]);
@@ -1707,7 +1788,9 @@ export default function Home({
   };
   const submitPrivatePin = async (enteredPin = privatePinValue) => {
     if (!privatePinDialog || user?.id == null) return;
-    const entry = privateChatEntries.find(chat => chat.id === privatePinDialog.chatId);
+    const entry = privateChatEntries.find(
+      chat => chat.id === privatePinDialog.chatId
+    );
     if (!entry) return;
     setPrivatePinError("");
     if (privatePinDialog.action === "lock") {
@@ -1740,7 +1823,10 @@ export default function Home({
     setPrivatePinValue("");
   };
   const exitTemporaryChat = () => {
-    if (!isTemporaryChatRef.current || temporaryChatCloseTimerRef.current !== null) {
+    if (
+      !isTemporaryChatRef.current ||
+      temporaryChatCloseTimerRef.current !== null
+    ) {
       return;
     }
     const endingSavedPrivate = isSavedGhostChatRef.current;
@@ -2237,190 +2323,200 @@ export default function Home({
       isNearBottomRef.current = true;
       setShowJumpToLatest(false);
     }
-    const serverMessages = activeQuery.data.messages.map((message, messageIndex) => {
-      const firstAttachment = message.attachments?.[0] as any;
-      const rawExt = firstAttachment?.filename
-        ? (firstAttachment.filename.split(".").pop() ?? "").toLowerCase()
-        : "";
-      const format = rawExt === "md" ? "markdown" : rawExt;
-      const hasGeneratedFile =
-        (message as Record<string, unknown>).fileGeneration !== undefined ||
-        (message.role === "assistant" &&
-          (message.status === "completed" || message.status === "cancelled") &&
-          (message.attachments ?? []).length > 0);
-      const fileGeneration = (message as Record<string, unknown>)
-        .fileGeneration as
-        | {
-            stage: string;
-            format: string;
-            status: "processing" | "created" | "error";
-            message?: string;
-            researchSourceCount?: number;
-            sources?: FileSource[];
-            metrics?: FileMetrics;
-            code?: string;
-          }
-        | undefined;
+    const serverMessages = activeQuery.data.messages.map(
+      (message, messageIndex) => {
+        const firstAttachment = message.attachments?.[0] as any;
+        const rawExt = firstAttachment?.filename
+          ? (firstAttachment.filename.split(".").pop() ?? "").toLowerCase()
+          : "";
+        const format = rawExt === "md" ? "markdown" : rawExt;
+        const hasGeneratedFile =
+          (message as Record<string, unknown>).fileGeneration !== undefined ||
+          (message.role === "assistant" &&
+            (message.status === "completed" ||
+              message.status === "cancelled") &&
+            (message.attachments ?? []).length > 0);
+        const fileGeneration = (message as Record<string, unknown>)
+          .fileGeneration as
+          | {
+              stage: string;
+              format: string;
+              status: "processing" | "created" | "error";
+              message?: string;
+              researchSourceCount?: number;
+              sources?: FileSource[];
+              metrics?: FileMetrics;
+              code?: string;
+            }
+          | undefined;
 
-      const metadata = (message as Record<string, unknown>).metadata as
-        | {
-            pptOutline?: { outline?: unknown };
-            memoryUses?: Array<{
-              id: string;
-              content: string;
-              category?: string;
-              sourceConversationId?: string | null;
-            }>;
-            branchOrigin?: { conversationId?: string; title?: string };
-            branchTargets?: Array<{ conversationId?: string; title?: string }>;
-            parentBranch?: {
-              parentChatId?: string;
-              parentChatTitle?: string;
-              branchedAtMessageId?: string;
-            };
-            branches?: Array<{
-              targetMessageId?: string;
-              childChatId?: string;
-              childTitle?: string;
-            }>;
-            sharedAnswerAnchor?: boolean;
-          }
-        | undefined;
-      const restoredOutline = isPptOutlinePlan(metadata?.pptOutline?.outline)
-        ? (metadata!.pptOutline!.outline as PptOutlinePlan)
-        : undefined;
+        const metadata = (message as Record<string, unknown>).metadata as
+          | {
+              pptOutline?: { outline?: unknown };
+              memoryUses?: Array<{
+                id: string;
+                content: string;
+                category?: string;
+                sourceConversationId?: string | null;
+              }>;
+              branchOrigin?: { conversationId?: string; title?: string };
+              branchTargets?: Array<{
+                conversationId?: string;
+                title?: string;
+              }>;
+              parentBranch?: {
+                parentChatId?: string;
+                parentChatTitle?: string;
+                branchedAtMessageId?: string;
+              };
+              branches?: Array<{
+                targetMessageId?: string;
+                childChatId?: string;
+                childTitle?: string;
+              }>;
+              sharedAnswerAnchor?: boolean;
+            }
+          | undefined;
+        const restoredOutline = isPptOutlinePlan(metadata?.pptOutline?.outline)
+          ? (metadata!.pptOutline!.outline as PptOutlinePlan)
+          : undefined;
 
-      let persistedSources: FileSource[] | undefined = fileGeneration?.sources;
-      let persistedMetrics: FileMetrics | undefined = fileGeneration?.metrics;
-      let persistedFormat: string | undefined = fileGeneration?.format;
-      let persistedCode: string | undefined = fileGeneration?.code;
+        let persistedSources: FileSource[] | undefined =
+          fileGeneration?.sources;
+        let persistedMetrics: FileMetrics | undefined = fileGeneration?.metrics;
+        let persistedFormat: string | undefined = fileGeneration?.format;
+        let persistedCode: string | undefined = fileGeneration?.code;
 
-      if (
-        firstAttachment?.metadata &&
-        typeof firstAttachment.metadata === "object"
-      ) {
         if (
-          Array.isArray(firstAttachment.metadata.sources) &&
-          firstAttachment.metadata.sources.length > 0
+          firstAttachment?.metadata &&
+          typeof firstAttachment.metadata === "object"
         ) {
-          persistedSources = firstAttachment.metadata.sources;
-        }
-        if (firstAttachment.metadata.metrics) {
-          persistedMetrics = firstAttachment.metadata.metrics;
-        }
-        if (firstAttachment.metadata.format) {
-          persistedFormat = firstAttachment.metadata.format;
-        }
-        if (typeof (firstAttachment.metadata as any).code === "string") {
-          persistedCode = (firstAttachment.metadata as any).code;
-        }
-      } else if (
-        firstAttachment?.contentText &&
-        typeof firstAttachment.contentText === "string"
-      ) {
-        try {
-          const parsed = JSON.parse(firstAttachment.contentText);
-          if (parsed && typeof parsed === "object") {
-            if (Array.isArray(parsed.sources) && parsed.sources.length > 0) {
-              persistedSources = parsed.sources;
-            }
-            if (parsed.metrics) {
-              persistedMetrics = parsed.metrics;
-            }
-            if (parsed.format) {
-              persistedFormat = parsed.format;
-            }
-            if (typeof parsed.code === "string") {
-              persistedCode = parsed.code;
-            }
+          if (
+            Array.isArray(firstAttachment.metadata.sources) &&
+            firstAttachment.metadata.sources.length > 0
+          ) {
+            persistedSources = firstAttachment.metadata.sources;
           }
-        } catch {}
-      }
+          if (firstAttachment.metadata.metrics) {
+            persistedMetrics = firstAttachment.metadata.metrics;
+          }
+          if (firstAttachment.metadata.format) {
+            persistedFormat = firstAttachment.metadata.format;
+          }
+          if (typeof (firstAttachment.metadata as any).code === "string") {
+            persistedCode = (firstAttachment.metadata as any).code;
+          }
+        } else if (
+          firstAttachment?.contentText &&
+          typeof firstAttachment.contentText === "string"
+        ) {
+          try {
+            const parsed = JSON.parse(firstAttachment.contentText);
+            if (parsed && typeof parsed === "object") {
+              if (Array.isArray(parsed.sources) && parsed.sources.length > 0) {
+                persistedSources = parsed.sources;
+              }
+              if (parsed.metrics) {
+                persistedMetrics = parsed.metrics;
+              }
+              if (parsed.format) {
+                persistedFormat = parsed.format;
+              }
+              if (typeof parsed.code === "string") {
+                persistedCode = parsed.code;
+              }
+            }
+          } catch {}
+        }
 
-      return {
-        id: message.id,
-        role: message.role,
-        content:
-          message.status === "cancelled" &&
-          /^I[’']m sorry, I couldn[’']t generate a response\.?$/i.test(
-            message.content.trim()
-          )
-            ? ""
-            : message.content,
-        status: message.status,
-        createdAt: message.createdAt,
-        versions: message.versions,
-        branchOrigin:
-          typeof metadata?.parentBranch?.parentChatId === "string" &&
-          typeof metadata.parentBranch.parentChatTitle === "string"
-            ? {
-                conversationId: metadata.parentBranch.parentChatId,
-                title: metadata.parentBranch.parentChatTitle,
-                branchedAtMessageId: metadata.parentBranch.branchedAtMessageId,
-              }
-            : typeof metadata?.branchOrigin?.conversationId === "string" &&
-                typeof metadata.branchOrigin.title === "string"
+        return {
+          id: message.id,
+          role: message.role,
+          content:
+            message.status === "cancelled" &&
+            /^I[’']m sorry, I couldn[’']t generate a response\.?$/i.test(
+              message.content.trim()
+            )
+              ? ""
+              : message.content,
+          status: message.status,
+          createdAt: message.createdAt,
+          versions: message.versions,
+          branchOrigin:
+            typeof metadata?.parentBranch?.parentChatId === "string" &&
+            typeof metadata.parentBranch.parentChatTitle === "string"
               ? {
-                  conversationId: metadata.branchOrigin.conversationId,
-                  title: metadata.branchOrigin.title,
+                  conversationId: metadata.parentBranch.parentChatId,
+                  title: metadata.parentBranch.parentChatTitle,
+                  branchedAtMessageId:
+                    metadata.parentBranch.branchedAtMessageId,
                 }
-              : undefined,
-        branchTargets: [
-          ...(Array.isArray(metadata?.branches)
-            ? metadata.branches
-                .filter(
-                  target =>
-                    typeof target?.childChatId === "string" &&
-                    typeof target.childTitle === "string"
+              : typeof metadata?.branchOrigin?.conversationId === "string" &&
+                  typeof metadata.branchOrigin.title === "string"
+                ? {
+                    conversationId: metadata.branchOrigin.conversationId,
+                    title: metadata.branchOrigin.title,
+                  }
+                : undefined,
+          branchTargets: [
+            ...(Array.isArray(metadata?.branches)
+              ? metadata.branches
+                  .filter(
+                    target =>
+                      typeof target?.childChatId === "string" &&
+                      typeof target.childTitle === "string"
+                  )
+                  .map(target => ({
+                    conversationId: target.childChatId!,
+                    title: target.childTitle!,
+                    targetMessageId: target.targetMessageId,
+                  }))
+              : []),
+            ...(Array.isArray(metadata?.branchTargets)
+              ? metadata.branchTargets.filter(
+                  (
+                    target
+                  ): target is { conversationId: string; title: string } =>
+                    typeof target?.conversationId === "string" &&
+                    typeof target.title === "string"
                 )
-                .map(target => ({
-                  conversationId: target.childChatId!,
-                  title: target.childTitle!,
-                  targetMessageId: target.targetMessageId,
-                }))
-            : []),
-          ...(Array.isArray(metadata?.branchTargets)
-            ? metadata.branchTargets.filter(
-                (target): target is { conversationId: string; title: string } =>
-                  typeof target?.conversationId === "string" &&
-                  typeof target.title === "string"
-              )
-            : []),
-        ],
-        // Older shared-answer continuations predate the persisted metadata
-        // marker. They start with the shared answer as their first message, so
-        // retain the notice when those chats are reopened as regular chats.
-        sharedAnswerAnchor:
-          metadata?.sharedAnswerAnchor === true ||
-          (messageIndex === 0 && message.role === "assistant"),
-        attachments: message.attachments,
-        memoryUses: metadata?.memoryUses,
-        // Rebuild completed fileGeneration with durable sources and metrics restored from attachment metadata
-        fileGeneration:
-          fileGeneration ??
-          (hasGeneratedFile
-            ? {
-                stage: "completed",
-                format:
-                  (persistedFormat as DocFormat) ||
-                  (format as DocFormat) ||
-                  "pdf",
-                status: "created" as const,
-                sources: persistedSources,
-                metrics: persistedMetrics,
-                code: persistedCode,
-              }
-            : restoredOutline
+              : []),
+          ],
+          // Older shared-answer continuations predate the persisted metadata
+          // marker. They start with the shared answer as their first message, so
+          // retain the notice when those chats are reopened as regular chats.
+          sharedAnswerAnchor:
+            metadata?.sharedAnswerAnchor === true ||
+            (messageIndex === 0 && message.role === "assistant"),
+          attachments: message.attachments,
+          memoryUses: metadata?.memoryUses,
+          // Rebuild completed fileGeneration with durable sources and metrics restored from attachment metadata
+          fileGeneration:
+            fileGeneration ??
+            (hasGeneratedFile
               ? {
-                  stage: "outline",
-                  format: "pptx",
-                  status: "processing" as const,
-                  message: "Outline ready — review & approve",
-                  outline: restoredOutline,
+                  stage: "completed",
+                  format:
+                    (persistedFormat as DocFormat) ||
+                    (format as DocFormat) ||
+                    "pdf",
+                  status: "created" as const,
+                  sources: persistedSources,
+                  metrics: persistedMetrics,
+                  code: persistedCode,
                 }
-              : undefined),
-      };
-    });
+              : restoredOutline
+                ? {
+                    stage: "outline",
+                    format: "pptx",
+                    status: "processing" as const,
+                    message: "Outline ready — review & approve",
+                    outline: restoredOutline,
+                  }
+                : undefined),
+        };
+      }
+    );
     // A still-generating turn owns content the database does not have yet:
     // graft the live stream state onto the snapshot so switching back into a
     // generating conversation rebuilds the in-flight answer exactly where it
@@ -2649,7 +2745,8 @@ export default function Home({
       const stored = readStoredTemporaryChat(userId);
       isTemporaryChatRef.current = stored.active;
       setIsTemporaryChat(stored.active);
-      isSavedGhostChatRef.current = stored.active && stored.savedPalette === true;
+      isSavedGhostChatRef.current =
+        stored.active && stored.savedPalette === true;
       setIsSavedGhostChat(stored.active && stored.savedPalette === true);
       temporaryConversationIdsRef.current = new Set(stored.ids);
       if (stored.active && stored.activeConversationId) {
@@ -3204,7 +3301,10 @@ export default function Home({
                   updatedAt: Date.now(),
                 };
                 setPrivateChatEntries(current => {
-                  const next = [entry, ...current.filter(chat => chat.id !== entry.id)];
+                  const next = [
+                    entry,
+                    ...current.filter(chat => chat.id !== entry.id),
+                  ];
                   writePrivateChatEntries(user.id, next);
                   return next;
                 });
@@ -4353,7 +4453,8 @@ export default function Home({
     // nothing lingers, and return to normal chat. A temp chat whose response
     // is still generating is kept until its stream settles (see sendMessage).
     const keepGhostPrivate = isSavedGhostChatRef.current;
-    if (!keepGhostPrivate) purgeTemporaryConversations({ preserveStreaming: true });
+    if (!keepGhostPrivate)
+      purgeTemporaryConversations({ preserveStreaming: true });
     isTemporaryChatRef.current = keepGhostPrivate;
     setIsTemporaryChat(keepGhostPrivate);
     isSavedGhostChatRef.current = keepGhostPrivate;
@@ -4362,7 +4463,9 @@ export default function Home({
       active: keepGhostPrivate,
       savedPalette: keepGhostPrivate,
       activeConversationId: null,
-      ids: keepGhostPrivate ? Array.from(temporaryConversationIdsRef.current) : [],
+      ids: keepGhostPrivate
+        ? Array.from(temporaryConversationIdsRef.current)
+        : [],
     });
     // Starting a fresh chat aborts any stream targeting the current view so the
     // composer is free, but never touches background streams in other chats.
@@ -4470,10 +4573,7 @@ export default function Home({
     }, 5000);
   }
 
-  function showPrivateMoveNotice(
-    status: "success" | "error",
-    message: string
-  ) {
+  function showPrivateMoveNotice(status: "success" | "error", message: string) {
     toast.custom(
       id => (
         <ActionNotice
@@ -4619,7 +4719,10 @@ export default function Home({
       await utils.conversation.get.invalidate({ id: activeConversationId });
       await utils.conversation.list.invalidate();
       selectConversation(branch.id);
-      showShareNotice("success", "Branched into a new chat from this response.");
+      showShareNotice(
+        "success",
+        "Branched into a new chat from this response."
+      );
     } catch {
       toast.error("Could not branch this response into a new chat.");
     }
@@ -4671,7 +4774,10 @@ export default function Home({
             );
             setAssistantAnswerVersions(current => {
               const existing = current[assistantMessageId] ?? [];
-              if (existing[existing.length - 1]?.answer === previousAnswer.content) return current;
+              if (
+                existing[existing.length - 1]?.answer === previousAnswer.content
+              )
+                return current;
               return {
                 ...current,
                 [assistantMessageId]: [
@@ -5063,7 +5169,8 @@ export default function Home({
     // stream settles, so their in-flight answer is never deleted mid-write.
     if (isTemporaryChatRef.current) {
       const leavingGhostPrivate = isSavedGhostChatRef.current;
-      if (!leavingGhostPrivate) purgeTemporaryConversations({ preserveStreaming: true });
+      if (!leavingGhostPrivate)
+        purgeTemporaryConversations({ preserveStreaming: true });
       isTemporaryChatRef.current = false;
       setIsTemporaryChat(false);
       isSavedGhostChatRef.current = false;
@@ -5648,8 +5755,13 @@ export default function Home({
     if (!deleteTarget) return;
     if (deleteTarget.kind === "conversation") {
       permanentDeleteMutation.mutate({ id: deleteTarget.id });
-      if (user?.id != null && privateChatEntries.some(chat => chat.id === deleteTarget.id)) {
-        const next = privateChatEntries.filter(chat => chat.id !== deleteTarget.id);
+      if (
+        user?.id != null &&
+        privateChatEntries.some(chat => chat.id === deleteTarget.id)
+      ) {
+        const next = privateChatEntries.filter(
+          chat => chat.id !== deleteTarget.id
+        );
         setPrivateChatEntries(next);
         writePrivateChatEntries(user.id, next);
       }
@@ -5765,6 +5877,24 @@ export default function Home({
     />
   );
   const composerElement = renderComposer();
+  const showUpgradeEntry =
+    !guestMode &&
+    !isGhostMode &&
+    !activeConversationId &&
+    visibleMessages.length === 0 &&
+    !activePrimaryWorkspace;
+  const upgradeEntry = showUpgradeEntry ? (
+    <button
+      type="button"
+      onClick={() => setLocation("/upgrade")}
+      className="mx-auto inline-flex h-9 items-center gap-2 rounded-full border border-border/70 bg-card/80 px-4 text-sm font-medium text-muted-foreground shadow-sm transition hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      aria-label="Free plan. Upgrade"
+    >
+      <span>Free plan</span>
+      <span aria-hidden="true">·</span>
+      <span className="font-semibold text-foreground">Upgrade</span>
+    </button>
+  ) : null;
 
   if (loading || (pendingOAuthReturnRef.current && authReturnHolding)) {
     // Coming back from the Google account picker, hold the "Signing you in"
@@ -5822,38 +5952,44 @@ export default function Home({
           : undefined
       }
     >
-      {!isGhostMode && <ConversationSidebar
-        conversations={conversationQuery.data ?? []}
-        activeConversationId={activeConversationId}
-        generatingConversationIds={generatingConversationIds}
-        open={sidebarOpen}
-        collapsed={sidebarCollapsed}
-        onClose={stableOnCloseSidebar}
-        onToggleCollapsed={stableOnToggleCollapsed}
-        onNew={stableNewChat}
-        onSelect={stableSelectConversation}
-        onRename={stableOnRename}
-        onRenameSubmit={stableRenameSubmit}
-        onPin={stableOnPin}
-        onArchive={stableOnArchive}
-        onShare={stableOnShareConversation}
-        onExport={stableOnExport}
-        onDelete={stableOnDelete}
-        onSearch={stableOnSearch}
-        onWorkspace={stableOnWorkspace}
-        previewSupportOpen={isProfileSupportPreview}
-        onSettings={stableOnSettings}
-        onSupport={stableOnSupport}
-        onLogout={stableHandleSignOut}
-        user={user ?? {}}
-        locked={guestMode}
-      />}
+      {!isGhostMode && (
+        <ConversationSidebar
+          conversations={conversationQuery.data ?? []}
+          activeConversationId={activeConversationId}
+          generatingConversationIds={generatingConversationIds}
+          open={sidebarOpen}
+          collapsed={sidebarCollapsed}
+          onClose={stableOnCloseSidebar}
+          onToggleCollapsed={stableOnToggleCollapsed}
+          onNew={stableNewChat}
+          onSelect={stableSelectConversation}
+          onRename={stableOnRename}
+          onRenameSubmit={stableRenameSubmit}
+          onPin={stableOnPin}
+          onArchive={stableOnArchive}
+          onShare={stableOnShareConversation}
+          onExport={stableOnExport}
+          onDelete={stableOnDelete}
+          onSearch={stableOnSearch}
+          onWorkspace={stableOnWorkspace}
+          previewSupportOpen={isProfileSupportPreview}
+          onSettings={stableOnSettings}
+          onSupport={stableOnSupport}
+          onLogout={stableHandleSignOut}
+          user={user ?? {}}
+          locked={guestMode}
+        />
+      )}
       {isGhostMode && (
         <div className="temp-chat-chrome" aria-label="Ghost mode controls">
           <div className="temp-chat-label">
             <Tooltip>
               <TooltipTrigger asChild>
-                <span className="temp-ghost-tooltip-trigger" tabIndex={0} aria-label="Ghost mode">
+                <span
+                  className="temp-ghost-tooltip-trigger"
+                  tabIndex={0}
+                  aria-label="Ghost mode"
+                >
                   <GhostModeIcon savedPalette={isSavedGhostChat} />
                 </span>
               </TooltipTrigger>
@@ -5863,29 +5999,52 @@ export default function Home({
             </Tooltip>
             <span>{isSavedGhostChat ? "Ghost Private" : "Quick chat"}</span>
             {isSavedGhostChat ? (
-              <button ref={privateChatMenuTriggerRef} type="button" data-private-panel-toggle className="temp-chat-menu-trigger" aria-label="Open Ghost Private chats" aria-expanded={privateChatMenuOpen} onClick={() => { setPrivatePinDialog(null); setPrivateChatSearch(""); setPrivateChatOptionsOpenId(null); if (privateChatMenuOpen) { setPrivateChatMenuOpen(false); setPrivateChatPanel(null); } else { setPrivateChatPanel(null); setPrivateChatMenuOpen(true); } }}>
+              <button
+                ref={privateChatMenuTriggerRef}
+                type="button"
+                data-private-panel-toggle
+                className="temp-chat-menu-trigger"
+                aria-label="Open Ghost Private chats"
+                aria-expanded={privateChatMenuOpen}
+                onClick={() => {
+                  setPrivatePinDialog(null);
+                  setPrivateChatSearch("");
+                  setPrivateChatOptionsOpenId(null);
+                  if (privateChatMenuOpen) {
+                    setPrivateChatMenuOpen(false);
+                    setPrivateChatPanel(null);
+                  } else {
+                    setPrivateChatPanel(null);
+                    setPrivateChatMenuOpen(true);
+                  }
+                }}
+              >
                 <ChevronDown size={18} strokeWidth={2.5} />
               </button>
             ) : null}
           </div>
           <div className="temp-chat-actions">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                onClick={exitTemporaryChat}
-                className="temp-chat-close"
-                aria-label={isSavedGhostChat ? "Exit Ghost Private" : "Cancel Quick chat"}
-              >
-                <X size={19} strokeWidth={3} />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom" sideOffset={6}>
-              {isSavedGhostChat ? "Exit" : "Cancel and clear"}
-            </TooltipContent>
-          </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={exitTemporaryChat}
+                  className="temp-chat-close"
+                  aria-label={
+                    isSavedGhostChat
+                      ? "Exit Ghost Private"
+                      : "Cancel Quick chat"
+                  }
+                >
+                  <X size={19} strokeWidth={3} />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" sideOffset={6}>
+                {isSavedGhostChat ? "Exit" : "Cancel and clear"}
+              </TooltipContent>
+            </Tooltip>
           </div>
         </div>
       )}
@@ -5893,156 +6052,406 @@ export default function Home({
         <aside
           ref={privateChatPanelRef}
           className="ghost-private-menu-enter fixed z-40 flex max-h-[calc(100dvh-3rem)] w-fit max-w-[calc(100vw-1rem)] flex-col gap-2"
-          style={{ left: privateChatMenuPosition.left, top: privateChatMenuPosition.top }}
+          style={{
+            left: privateChatMenuPosition.left,
+            top: privateChatMenuPosition.top,
+          }}
           aria-label="Ghost Private chat options"
         >
-          <nav className="ghost-private-options-enter flex w-[min(293px,calc(100vw-1rem))] shrink-0 flex-row gap-0 overflow-hidden rounded-xl border border-white/10 bg-[#303030] p-1 text-white shadow-lg" aria-label="Ghost Private sections">
-              <button type="button" onMouseEnter={() => { setPrivateChatOptionsOpenId(null); setPrivatePinDialog(null); setPrivateChatPanel("chats"); setPrivateChatSearch(""); }} onFocus={() => { setPrivateChatOptionsOpenId(null); setPrivatePinDialog(null); setPrivateChatPanel("chats"); setPrivateChatSearch(""); }} onClick={() => { setPrivateChatOptionsOpenId(null); setPrivatePinDialog(null); setPrivateChatPanel("chats"); setPrivateChatSearch(""); }} className={cn("flex h-9 flex-1 items-center justify-center gap-1.5 rounded-l-lg px-2 text-sm font-medium transition-colors", privateChatPanel === "chats" ? "bg-[#3b3b3b] text-white" : "bg-[#303030] text-white hover:bg-[#3b3b3b]")}>
-                <ChatLine aria-hidden="true" className="size-[18px]" /> Chats
-              </button>
-              <button type="button" onMouseEnter={() => { setPrivateChatOptionsOpenId(null); setPrivatePinDialog(null); setPrivateChatPanel("locked"); setPrivateChatSearch(""); }} onFocus={() => { setPrivateChatOptionsOpenId(null); setPrivatePinDialog(null); setPrivateChatPanel("locked"); setPrivateChatSearch(""); }} onClick={() => { setPrivateChatOptionsOpenId(null); setPrivatePinDialog(null); setPrivateChatPanel("locked"); setPrivateChatSearch(""); }} className={cn("flex h-9 flex-1 items-center justify-center gap-1.5 rounded-r-lg px-2 text-sm font-medium transition-colors", privateChatPanel === "locked" ? "bg-[#3b3b3b] text-white" : "bg-[#303030] text-white hover:bg-[#3b3b3b]")}>
-                <Lock2 aria-hidden="true" className="size-[18px]" /> Locked chats
-              </button>
+          <nav
+            className="ghost-private-options-enter flex w-[min(293px,calc(100vw-1rem))] shrink-0 flex-row gap-0 overflow-hidden rounded-xl border border-white/10 bg-[#303030] p-1 text-white shadow-lg"
+            aria-label="Ghost Private sections"
+          >
+            <button
+              type="button"
+              onMouseEnter={() => {
+                setPrivateChatOptionsOpenId(null);
+                setPrivatePinDialog(null);
+                setPrivateChatPanel("chats");
+                setPrivateChatSearch("");
+              }}
+              onFocus={() => {
+                setPrivateChatOptionsOpenId(null);
+                setPrivatePinDialog(null);
+                setPrivateChatPanel("chats");
+                setPrivateChatSearch("");
+              }}
+              onClick={() => {
+                setPrivateChatOptionsOpenId(null);
+                setPrivatePinDialog(null);
+                setPrivateChatPanel("chats");
+                setPrivateChatSearch("");
+              }}
+              className={cn(
+                "flex h-9 flex-1 items-center justify-center gap-1.5 rounded-l-lg px-2 text-sm font-medium transition-colors",
+                privateChatPanel === "chats"
+                  ? "bg-[#3b3b3b] text-white"
+                  : "bg-[#303030] text-white hover:bg-[#3b3b3b]"
+              )}
+            >
+              <ChatLine aria-hidden="true" className="size-[18px]" /> Chats
+            </button>
+            <button
+              type="button"
+              onMouseEnter={() => {
+                setPrivateChatOptionsOpenId(null);
+                setPrivatePinDialog(null);
+                setPrivateChatPanel("locked");
+                setPrivateChatSearch("");
+              }}
+              onFocus={() => {
+                setPrivateChatOptionsOpenId(null);
+                setPrivatePinDialog(null);
+                setPrivateChatPanel("locked");
+                setPrivateChatSearch("");
+              }}
+              onClick={() => {
+                setPrivateChatOptionsOpenId(null);
+                setPrivatePinDialog(null);
+                setPrivateChatPanel("locked");
+                setPrivateChatSearch("");
+              }}
+              className={cn(
+                "flex h-9 flex-1 items-center justify-center gap-1.5 rounded-r-lg px-2 text-sm font-medium transition-colors",
+                privateChatPanel === "locked"
+                  ? "bg-[#3b3b3b] text-white"
+                  : "bg-[#303030] text-white hover:bg-[#3b3b3b]"
+              )}
+            >
+              <Lock2 aria-hidden="true" className="size-[18px]" /> Locked chats
+            </button>
           </nav>
           {privateChatPanel && (
-          <div className="flex h-[min(30rem,calc(100dvh-7rem))] w-[min(293px,calc(100vw-1rem))] min-w-0 flex-col overflow-hidden rounded-xl border border-white/10 bg-[#303030] text-white shadow-lg">
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-transparent">
-          {privatePinDialog ? (
-            <div className="grid min-h-0 flex-1 place-items-center p-4">
-              <PinEntryCard
-                title={privatePinDialog.action === "unlock" ? "Enter PIN" : "Create PIN"}
-                description={privatePinDialog.action === "unlock" ? "Enter your PIN to open this chat." : "Choose a 4-digit PIN to lock this chat."}
-                value={privatePinValue}
-                length={privatePinDigits}
-                onChange={setPrivatePinValue}
-                onComplete={value => void submitPrivatePin(value)}
-                ariaLabel="Ghost Private PIN"
-                onClose={() => { setPrivatePinDialog(null); setPrivatePinValue(""); setPrivatePinError(""); }}
-                error={privatePinError}
-              />
-            </div>
-          ) : (
-            <>
-              <div className="flex h-14 shrink-0 items-center gap-2 border-b border-white/10 px-3">
-                <div className="relative min-w-0 flex-1">
-                    <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/60" />
-                    <input
-                      type="search"
-                      value={privateChatSearch}
-                      onChange={event => setPrivateChatSearch(event.target.value)}
-                      placeholder={privateChatPanel === "locked" ? "Search locked chats" : "Search chats"}
-                      aria-label={privateChatPanel === "locked" ? "Search locked chats" : "Search Ghost Private chats"}
-                      title={privateChatPanel === "locked" ? "Search locked chats" : "Search Ghost Private chats"}
-                      className="h-9 w-full min-w-0 rounded-lg bg-[#383838] pl-9 pr-2 text-sm text-white outline-none placeholder:text-white/60 focus:bg-[#414141]"
+            <div className="flex h-[min(30rem,calc(100dvh-7rem))] w-[min(293px,calc(100vw-1rem))] min-w-0 flex-col overflow-hidden rounded-xl border border-white/10 bg-[#303030] text-white shadow-lg">
+              <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-transparent">
+                {privatePinDialog ? (
+                  <div className="grid min-h-0 flex-1 place-items-center p-4">
+                    <PinEntryCard
+                      title={
+                        privatePinDialog.action === "unlock"
+                          ? "Enter PIN"
+                          : "Create PIN"
+                      }
+                      description={
+                        privatePinDialog.action === "unlock"
+                          ? "Enter your PIN to open this chat."
+                          : "Choose a 4-digit PIN to lock this chat."
+                      }
+                      value={privatePinValue}
+                      length={privatePinDigits}
+                      onChange={setPrivatePinValue}
+                      onComplete={value => void submitPrivatePin(value)}
+                      ariaLabel="Ghost Private PIN"
+                      onClose={() => {
+                        setPrivatePinDialog(null);
+                        setPrivatePinValue("");
+                        setPrivatePinError("");
+                      }}
+                      error={privatePinError}
                     />
-                </div>
-                {privateChatPanel === "chats" && (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button type="button" variant="ghost" size="icon" className="size-9 shrink-0 rounded-lg bg-[#383838] text-white hover:bg-[#414141] hover:text-white" aria-label="New Ghost Private chat" onClick={() => { setPrivateChatOptionsOpenId(null); setPrivateChatPanel(null); setPrivateChatMenuOpen(false); startNewPrivateChat(true); }}>
-                        <Plus size={17} />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom">Start a new Ghost Private chat</TooltipContent>
-                  </Tooltip>
-                )}
-              </div>
-              <div className="min-h-0 flex-1 overflow-y-auto p-2">
-                <div className="space-y-0.5">
-                {privateChatEntries
-                  .filter(chat => privateChatPanel === "locked" ? chat.locked : !chat.locked)
-                  .filter(chat => chat.title.toLocaleLowerCase().includes(privateChatSearch.trim().toLocaleLowerCase()))
-                  .map(chat => (
-                    <div key={chat.id} onMouseLeave={() => setPrivateChatDismissedOptionsId(id => id === chat.id ? null : id)} className={cn("group flex items-center gap-1 rounded-lg px-1 py-0.5 text-white transition-colors", privateChatOptionsOpenId === chat.id ? "bg-[#3b3b3b]" : "hover:bg-[#3b3b3b] focus-within:bg-[#3b3b3b]")}>
-                      {privateChatRenameId === chat.id ? (
-                        <div className="flex w-full min-w-0 flex-1 items-center gap-0.5" onClick={event => event.stopPropagation()}>
-                          <input
-                            autoFocus
-                            value={privateChatRenameValue}
-                            onChange={event => setPrivateChatRenameValue(event.target.value)}
-                            onFocus={event => {
-                              const end = event.currentTarget.value.length;
-                              event.currentTarget.setSelectionRange(end, end);
-                            }}
-                            onKeyDown={event => {
-                              if (event.key === "Enter") {
-                                event.preventDefault();
-                                savePrivateChatRename(chat);
-                              } else if (event.key === "Escape") {
-                                setPrivateChatRenameId(null);
-                                setPrivateChatRenameValue("");
-                              }
-                            }}
-                            aria-label="Rename chat"
-                            className="h-8 min-w-0 flex-1 bg-transparent px-2 text-sm text-white outline-none"
-                          />
-                          <Button type="button" variant="ghost" size="icon" className="h-7 w-8 shrink-0 !rounded-md text-white hover:!rounded-md hover:bg-white/10 hover:text-white focus-visible:!rounded-md focus-visible:bg-white/10" aria-label="Cancel rename" title="Cancel" onClick={() => { setPrivateChatRenameId(null); setPrivateChatRenameValue(""); }}>
-                            <X size={15} />
-                          </Button>
-                          <Button type="button" variant="ghost" size="icon" className="h-7 w-8 shrink-0 !rounded-md text-white hover:!rounded-md hover:bg-white/10 hover:text-white focus-visible:!rounded-md focus-visible:bg-white/10" aria-label="Save chat name" title="Save" onClick={() => savePrivateChatRename(chat)}>
-                            <Check size={15} />
-                          </Button>
-                        </div>
-                      ) : (
-                        <button type="button" className="flex h-10 min-w-0 flex-1 items-center gap-2.5 px-1 text-left" onClick={event => { event.stopPropagation(); openPrivateChat(chat); }}>
-                          <span className="relative flex size-8 shrink-0 items-center justify-center rounded-lg bg-[#383838] text-white">
-                            <ChatLine aria-hidden="true" className="size-[22px]" />
-                            {chat.locked ? (
-                              <span className="absolute -bottom-1 -right-1 flex size-5 items-center justify-center rounded-full border border-white/20 bg-[#242424] text-white shadow-sm">
-                                <Lock2 aria-hidden="true" className="size-3.5" />
-                              </span>
-                            ) : (
-                              <span className="absolute -bottom-1 -right-1 flex size-5 items-center justify-center rounded-full border border-white/20 bg-[#242424] shadow-sm">
-                                <GhostModeIcon savedPalette size={15} splitColors shouldAnimate={false} showWave={false} />
-                              </span>
-                            )}
-                          </span>
-                          <GhostPrivateChatTitle title={chat.title} />
-                        </button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex h-14 shrink-0 items-center gap-2 border-b border-white/10 px-3">
+                      <div className="relative min-w-0 flex-1">
+                        <Search
+                          size={15}
+                          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/60"
+                        />
+                        <input
+                          type="search"
+                          value={privateChatSearch}
+                          onChange={event =>
+                            setPrivateChatSearch(event.target.value)
+                          }
+                          placeholder={
+                            privateChatPanel === "locked"
+                              ? "Search locked chats"
+                              : "Search chats"
+                          }
+                          aria-label={
+                            privateChatPanel === "locked"
+                              ? "Search locked chats"
+                              : "Search Ghost Private chats"
+                          }
+                          title={
+                            privateChatPanel === "locked"
+                              ? "Search locked chats"
+                              : "Search Ghost Private chats"
+                          }
+                          className="h-9 w-full min-w-0 rounded-lg bg-[#383838] pl-9 pr-2 text-sm text-white outline-none placeholder:text-white/60 focus:bg-[#414141]"
+                        />
+                      </div>
+                      {privateChatPanel === "chats" && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="size-9 shrink-0 rounded-lg bg-[#383838] text-white hover:bg-[#414141] hover:text-white"
+                              aria-label="New Ghost Private chat"
+                              onClick={() => {
+                                setPrivateChatOptionsOpenId(null);
+                                setPrivateChatPanel(null);
+                                setPrivateChatMenuOpen(false);
+                                startNewPrivateChat(true);
+                              }}
+                            >
+                              <Plus size={17} />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom">
+                            Start a new Ghost Private chat
+                          </TooltipContent>
+                        </Tooltip>
                       )}
-                      {privateChatRenameId !== chat.id && <DropdownMenu open={privateChatOptionsOpenId === chat.id} onOpenChange={open => {
-                        if (open) {
-                          setPrivateChatDismissedOptionsId(null);
-                          setPrivateChatOptionsOpenId(chat.id);
-                        } else {
-                          setPrivateChatOptionsOpenId(id => id === chat.id ? null : id);
-                          setPrivateChatDismissedOptionsId(chat.id);
-                        }
-                      }}>
-                        <DropdownMenuTrigger asChild>
-                          <Button type="button" variant="ghost" size="icon" className={cn("mr-1.5 size-8 shrink-0 rounded-md text-white/70 transition-[opacity,background-color,color] duration-150 hover:bg-white/10 hover:text-white focus-visible:bg-white/10 focus-visible:text-white data-[state=open]:bg-white/10 data-[state=open]:opacity-100", privateChatDismissedOptionsId === chat.id ? "opacity-0" : "opacity-0 group-hover:text-white/85 group-hover:opacity-100 group-focus-within:opacity-100 max-lg:opacity-100")} aria-label={`Chat options for ${chat.locked ? "locked chat" : chat.title}`} title="Chat options" onClick={event => event.stopPropagation()}>
-                            <MoreHorizontal size={16} />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent data-private-chat-actions align="end" className="w-36 rounded-xl border border-white/10 bg-[#303030] p-1 text-white shadow-xl">
-                          {!chat.locked && (
-                            <DropdownMenuItem className="gap-2 text-white hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white" onSelect={() => { setPrivateChatRenameId(chat.id); setPrivateChatRenameValue(chat.title); }}>
-                              <Pencil size={15} className="text-white" /> Rename
-                            </DropdownMenuItem>
-                          )}
-                          <DropdownMenuItem className="gap-2 text-white hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white" onSelect={() => requestPrivateChatLock(chat)}>
-                            {chat.locked ? <UnlockKeyhole size={15} className="text-white" /> : <LockKeyhole size={15} className="text-white" />}
-                            {chat.locked ? "Unlock chat" : "Lock chat"}
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator className="bg-white/10" />
-                          <DropdownMenuItem className="gap-2 text-destructive hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive" onSelect={() => stableOnDelete({ id: chat.id, title: chat.title })}>
-                            <Trash6Icon className="size-4 shrink-0 text-destructive" /> Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>}
                     </div>
-                  ))}
-                </div>
-                {privateChatEntries.filter(chat => privateChatPanel === "locked" ? chat.locked : !chat.locked).filter(chat => chat.title.toLocaleLowerCase().includes(privateChatSearch.trim().toLocaleLowerCase())).length === 0 && (
-                  <p className="px-3 py-8 text-center text-xs text-muted-foreground">
-                    {privateChatSearch ? "No chats match your search." : privateChatPanel === "locked" ? "No locked chats yet." : "Your Ghost Private chats will appear here."}
-                  </p>
+                    <div className="min-h-0 flex-1 overflow-y-auto p-2">
+                      <div className="space-y-0.5">
+                        {privateChatEntries
+                          .filter(chat =>
+                            privateChatPanel === "locked"
+                              ? chat.locked
+                              : !chat.locked
+                          )
+                          .filter(chat =>
+                            chat.title
+                              .toLocaleLowerCase()
+                              .includes(
+                                privateChatSearch.trim().toLocaleLowerCase()
+                              )
+                          )
+                          .map(chat => (
+                            <div
+                              key={chat.id}
+                              onMouseLeave={() =>
+                                setPrivateChatDismissedOptionsId(id =>
+                                  id === chat.id ? null : id
+                                )
+                              }
+                              className={cn(
+                                "group flex items-center gap-1 rounded-lg px-1 py-0.5 text-white transition-colors",
+                                privateChatOptionsOpenId === chat.id
+                                  ? "bg-[#3b3b3b]"
+                                  : "hover:bg-[#3b3b3b] focus-within:bg-[#3b3b3b]"
+                              )}
+                            >
+                              {privateChatRenameId === chat.id ? (
+                                <div
+                                  className="flex w-full min-w-0 flex-1 items-center gap-0.5"
+                                  onClick={event => event.stopPropagation()}
+                                >
+                                  <input
+                                    autoFocus
+                                    value={privateChatRenameValue}
+                                    onChange={event =>
+                                      setPrivateChatRenameValue(
+                                        event.target.value
+                                      )
+                                    }
+                                    onFocus={event => {
+                                      const end =
+                                        event.currentTarget.value.length;
+                                      event.currentTarget.setSelectionRange(
+                                        end,
+                                        end
+                                      );
+                                    }}
+                                    onKeyDown={event => {
+                                      if (event.key === "Enter") {
+                                        event.preventDefault();
+                                        savePrivateChatRename(chat);
+                                      } else if (event.key === "Escape") {
+                                        setPrivateChatRenameId(null);
+                                        setPrivateChatRenameValue("");
+                                      }
+                                    }}
+                                    aria-label="Rename chat"
+                                    className="h-8 min-w-0 flex-1 bg-transparent px-2 text-sm text-white outline-none"
+                                  />
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-8 shrink-0 !rounded-md text-white hover:!rounded-md hover:bg-white/10 hover:text-white focus-visible:!rounded-md focus-visible:bg-white/10"
+                                    aria-label="Cancel rename"
+                                    title="Cancel"
+                                    onClick={() => {
+                                      setPrivateChatRenameId(null);
+                                      setPrivateChatRenameValue("");
+                                    }}
+                                  >
+                                    <X size={15} />
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-8 shrink-0 !rounded-md text-white hover:!rounded-md hover:bg-white/10 hover:text-white focus-visible:!rounded-md focus-visible:bg-white/10"
+                                    aria-label="Save chat name"
+                                    title="Save"
+                                    onClick={() => savePrivateChatRename(chat)}
+                                  >
+                                    <Check size={15} />
+                                  </Button>
+                                </div>
+                              ) : (
+                                <button
+                                  type="button"
+                                  className="flex h-10 min-w-0 flex-1 items-center gap-2.5 px-1 text-left"
+                                  onClick={event => {
+                                    event.stopPropagation();
+                                    openPrivateChat(chat);
+                                  }}
+                                >
+                                  <span className="relative flex size-8 shrink-0 items-center justify-center rounded-lg bg-[#383838] text-white">
+                                    <ChatLine
+                                      aria-hidden="true"
+                                      className="size-[22px]"
+                                    />
+                                    {chat.locked ? (
+                                      <span className="absolute -bottom-1 -right-1 flex size-5 items-center justify-center rounded-full border border-white/20 bg-[#242424] text-white shadow-sm">
+                                        <Lock2
+                                          aria-hidden="true"
+                                          className="size-3.5"
+                                        />
+                                      </span>
+                                    ) : (
+                                      <span className="absolute -bottom-1 -right-1 flex size-5 items-center justify-center rounded-full border border-white/20 bg-[#242424] shadow-sm">
+                                        <GhostModeIcon
+                                          savedPalette
+                                          size={15}
+                                          splitColors
+                                          shouldAnimate={false}
+                                          showWave={false}
+                                        />
+                                      </span>
+                                    )}
+                                  </span>
+                                  <GhostPrivateChatTitle title={chat.title} />
+                                </button>
+                              )}
+                              {privateChatRenameId !== chat.id && (
+                                <DropdownMenu
+                                  open={privateChatOptionsOpenId === chat.id}
+                                  onOpenChange={open => {
+                                    if (open) {
+                                      setPrivateChatDismissedOptionsId(null);
+                                      setPrivateChatOptionsOpenId(chat.id);
+                                    } else {
+                                      setPrivateChatOptionsOpenId(id =>
+                                        id === chat.id ? null : id
+                                      );
+                                      setPrivateChatDismissedOptionsId(chat.id);
+                                    }
+                                  }}
+                                >
+                                  <DropdownMenuTrigger asChild>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      className={cn(
+                                        "mr-1.5 size-8 shrink-0 rounded-md text-white/70 transition-[opacity,background-color,color] duration-150 hover:bg-white/10 hover:text-white focus-visible:bg-white/10 focus-visible:text-white data-[state=open]:bg-white/10 data-[state=open]:opacity-100",
+                                        privateChatDismissedOptionsId ===
+                                          chat.id
+                                          ? "opacity-0"
+                                          : "opacity-0 group-hover:text-white/85 group-hover:opacity-100 group-focus-within:opacity-100 max-lg:opacity-100"
+                                      )}
+                                      aria-label={`Chat options for ${chat.locked ? "locked chat" : chat.title}`}
+                                      title="Chat options"
+                                      onClick={event => event.stopPropagation()}
+                                    >
+                                      <MoreHorizontal size={16} />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent
+                                    data-private-chat-actions
+                                    align="end"
+                                    className="w-36 rounded-xl border border-white/10 bg-[#303030] p-1 text-white shadow-xl"
+                                  >
+                                    {!chat.locked && (
+                                      <DropdownMenuItem
+                                        className="gap-2 text-white hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white"
+                                        onSelect={() => {
+                                          setPrivateChatRenameId(chat.id);
+                                          setPrivateChatRenameValue(chat.title);
+                                        }}
+                                      >
+                                        <Pencil
+                                          size={15}
+                                          className="text-white"
+                                        />{" "}
+                                        Rename
+                                      </DropdownMenuItem>
+                                    )}
+                                    <DropdownMenuItem
+                                      className="gap-2 text-white hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white"
+                                      onSelect={() =>
+                                        requestPrivateChatLock(chat)
+                                      }
+                                    >
+                                      {chat.locked ? (
+                                        <UnlockKeyhole
+                                          size={15}
+                                          className="text-white"
+                                        />
+                                      ) : (
+                                        <LockKeyhole
+                                          size={15}
+                                          className="text-white"
+                                        />
+                                      )}
+                                      {chat.locked
+                                        ? "Unlock chat"
+                                        : "Lock chat"}
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator className="bg-white/10" />
+                                    <DropdownMenuItem
+                                      className="gap-2 text-destructive hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive"
+                                      onSelect={() =>
+                                        stableOnDelete({
+                                          id: chat.id,
+                                          title: chat.title,
+                                        })
+                                      }
+                                    >
+                                      <Trash6Icon className="size-4 shrink-0 text-destructive" />{" "}
+                                      Delete
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              )}
+                            </div>
+                          ))}
+                      </div>
+                      {privateChatEntries
+                        .filter(chat =>
+                          privateChatPanel === "locked"
+                            ? chat.locked
+                            : !chat.locked
+                        )
+                        .filter(chat =>
+                          chat.title
+                            .toLocaleLowerCase()
+                            .includes(
+                              privateChatSearch.trim().toLocaleLowerCase()
+                            )
+                        ).length === 0 && (
+                        <p className="px-3 py-8 text-center text-xs text-muted-foreground">
+                          {privateChatSearch
+                            ? "No chats match your search."
+                            : privateChatPanel === "locked"
+                              ? "No locked chats yet."
+                              : "Your Ghost Private chats will appear here."}
+                        </p>
+                      )}
+                    </div>
+                  </>
                 )}
               </div>
-            </>
-          )}
-          </div>
-          </div>
+            </div>
           )}
         </aside>
       )}
@@ -6055,27 +6464,55 @@ export default function Home({
         >
           <defs>
             <linearGradient
-              id={isSavedGhostChat ? "ghost-mode-coral-peach-gradient" : "ghost-mode-mint-ice-gradient"}
+              id={
+                isSavedGhostChat
+                  ? "ghost-mode-coral-peach-gradient"
+                  : "ghost-mode-mint-ice-gradient"
+              }
               x1="0"
               y1="0"
               x2="1440"
               y2="0"
               gradientUnits="userSpaceOnUse"
             >
-              <stop offset="0%" stopColor={isSavedGhostChat ? "#FF6B5E" : "#86EFAC"} />
-              <stop offset="35%" stopColor={isSavedGhostChat ? "#FF6B5E" : "#86EFAC"} />
-              <stop offset="50%" stopColor={isSavedGhostChat ? "#FF9A78" : "#96E7D0"} />
-              <stop offset="65%" stopColor={isSavedGhostChat ? "#FFD2B8" : "#A5D8FF"} />
-              <stop offset="100%" stopColor={isSavedGhostChat ? "#FFD2B8" : "#A5D8FF"} />
+              <stop
+                offset="0%"
+                stopColor={isSavedGhostChat ? "#FF6B5E" : "#86EFAC"}
+              />
+              <stop
+                offset="35%"
+                stopColor={isSavedGhostChat ? "#FF6B5E" : "#86EFAC"}
+              />
+              <stop
+                offset="50%"
+                stopColor={isSavedGhostChat ? "#FF9A78" : "#96E7D0"}
+              />
+              <stop
+                offset="65%"
+                stopColor={isSavedGhostChat ? "#FFD2B8" : "#A5D8FF"}
+              />
+              <stop
+                offset="100%"
+                stopColor={isSavedGhostChat ? "#FFD2B8" : "#A5D8FF"}
+              />
             </linearGradient>
           </defs>
           <path
-            fill={isSavedGhostChat ? "url(#ghost-mode-coral-peach-gradient)" : "url(#ghost-mode-mint-ice-gradient)"}
+            fill={
+              isSavedGhostChat
+                ? "url(#ghost-mode-coral-peach-gradient)"
+                : "url(#ghost-mode-mint-ice-gradient)"
+            }
             d="M0 0H1440V24A48 16 0 0 0 1392 8H48A48 16 0 0 0 0 24Z"
           />
         </svg>
       )}
-      <main className={cn("relative flex min-w-0 flex-1 flex-col lg:flex-row", isGhostMode && "temp-chat-main z-[1]") }>
+      <main
+        className={cn(
+          "relative flex min-w-0 flex-1 flex-col lg:flex-row",
+          isGhostMode && "temp-chat-main z-[1]"
+        )}
+      >
         {composerTag === "bot" && !guestMode && !isGhostMode && (
           <div
             aria-hidden="true"
@@ -6205,7 +6642,7 @@ export default function Home({
               </>
             )}
 
-              {!guestMode &&
+            {!guestMode &&
               !isGhostMode &&
               composerTag !== "bot" &&
               !activeConversationId &&
@@ -6220,40 +6657,90 @@ export default function Home({
                         aria-label="Choose Ghost mode"
                         className="ksemo-temp-toggle size-10 rounded-xl text-foreground transition-colors hover:bg-accent"
                       >
-                        <span className="ksemo-temp-toggle-ghosts" aria-hidden="true">
-                          <Ghost3 className="ksemo-temp-toggle-icon ksemo-temp-toggle-ghost ksemo-temp-toggle-ghost-outline" size={22} />
-                          <Ghost3 className="ksemo-temp-toggle-icon ksemo-temp-toggle-ghost ksemo-temp-toggle-ghost-filled" size={22} weight="Filled" />
+                        <span
+                          className="ksemo-temp-toggle-ghosts"
+                          aria-hidden="true"
+                        >
+                          <Ghost3
+                            className="ksemo-temp-toggle-icon ksemo-temp-toggle-ghost ksemo-temp-toggle-ghost-outline"
+                            size={22}
+                          />
+                          <Ghost3
+                            className="ksemo-temp-toggle-icon ksemo-temp-toggle-ghost ksemo-temp-toggle-ghost-filled"
+                            size={22}
+                            weight="Filled"
+                          />
                         </span>
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" sideOffset={8} className="w-80 rounded-xl p-1.5">
-                      <DropdownMenuItem className="items-center gap-2.5 rounded-lg px-2.5 py-2" onSelect={() => {
-                        voice.cancel();
-                        isSavedGhostChatRef.current = false;
-                        setIsSavedGhostChat(false);
-                        isTemporaryChatRef.current = true;
-                        setIsTemporaryChat(true);
-                        setIsTemporaryChatClosing(false);
-                        temporaryConversationIdsRef.current = new Set();
-                        writeStoredTemporaryChat(user?.id, { active: true, savedPalette: false, activeConversationId: null, ids: [] });
-                        setGreetingAnimationKey(current => current + 1);
-                      }}>
-                        <span className="ghost-mode-option-icon"><GhostModeIcon size={24} splitColors /></span>
-                        <span className="flex min-w-0 flex-col gap-0.5"><span className="text-sm font-semibold leading-5">Quick chat</span><span className="whitespace-nowrap text-xs leading-4 text-muted-foreground">Temporary chat for now.</span></span>
+                    <DropdownMenuContent
+                      align="end"
+                      sideOffset={8}
+                      className="w-80 rounded-xl p-1.5"
+                    >
+                      <DropdownMenuItem
+                        className="items-center gap-2.5 rounded-lg px-2.5 py-2"
+                        onSelect={() => {
+                          voice.cancel();
+                          isSavedGhostChatRef.current = false;
+                          setIsSavedGhostChat(false);
+                          isTemporaryChatRef.current = true;
+                          setIsTemporaryChat(true);
+                          setIsTemporaryChatClosing(false);
+                          temporaryConversationIdsRef.current = new Set();
+                          writeStoredTemporaryChat(user?.id, {
+                            active: true,
+                            savedPalette: false,
+                            activeConversationId: null,
+                            ids: [],
+                          });
+                          setGreetingAnimationKey(current => current + 1);
+                        }}
+                      >
+                        <span className="ghost-mode-option-icon">
+                          <GhostModeIcon size={24} splitColors />
+                        </span>
+                        <span className="flex min-w-0 flex-col gap-0.5">
+                          <span className="text-sm font-semibold leading-5">
+                            Quick chat
+                          </span>
+                          <span className="whitespace-nowrap text-xs leading-4 text-muted-foreground">
+                            Temporary chat for now.
+                          </span>
+                        </span>
                       </DropdownMenuItem>
-                      <DropdownMenuItem className="mt-1 items-center gap-2.5 rounded-lg px-2.5 py-2" onSelect={() => {
-                        voice.cancel();
-                        isSavedGhostChatRef.current = true;
-                        setIsSavedGhostChat(true);
-                        isTemporaryChatRef.current = true;
-                        setIsTemporaryChat(true);
-                        setIsTemporaryChatClosing(false);
-                        temporaryConversationIdsRef.current = new Set(privateChatEntries.map(chat => chat.id));
-                        writeStoredTemporaryChat(user?.id, { active: true, savedPalette: true, activeConversationId: null, ids: [] });
-                        setGreetingAnimationKey(current => current + 1);
-                      }}>
-                        <span className="ghost-mode-option-icon ghost-mode-option-icon-saved"><GhostModeIcon savedPalette size={24} splitColors /></span>
-                        <span className="flex min-w-0 flex-col gap-0.5"><span className="text-sm font-semibold leading-5">Ghost Private</span><span className="whitespace-nowrap text-xs leading-4 text-muted-foreground">A private space for personal conversations.</span></span>
+                      <DropdownMenuItem
+                        className="mt-1 items-center gap-2.5 rounded-lg px-2.5 py-2"
+                        onSelect={() => {
+                          voice.cancel();
+                          isSavedGhostChatRef.current = true;
+                          setIsSavedGhostChat(true);
+                          isTemporaryChatRef.current = true;
+                          setIsTemporaryChat(true);
+                          setIsTemporaryChatClosing(false);
+                          temporaryConversationIdsRef.current = new Set(
+                            privateChatEntries.map(chat => chat.id)
+                          );
+                          writeStoredTemporaryChat(user?.id, {
+                            active: true,
+                            savedPalette: true,
+                            activeConversationId: null,
+                            ids: [],
+                          });
+                          setGreetingAnimationKey(current => current + 1);
+                        }}
+                      >
+                        <span className="ghost-mode-option-icon ghost-mode-option-icon-saved">
+                          <GhostModeIcon savedPalette size={24} splitColors />
+                        </span>
+                        <span className="flex min-w-0 flex-col gap-0.5">
+                          <span className="text-sm font-semibold leading-5">
+                            Ghost Private
+                          </span>
+                          <span className="whitespace-nowrap text-xs leading-4 text-muted-foreground">
+                            A private space for personal conversations.
+                          </span>
+                        </span>
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
@@ -6316,457 +6803,495 @@ export default function Home({
                   )}
                   {!isGhostMode && (
                     <ShareConversationDialog
-                    open={false}
-                    onOpenChange={stableShareOnOpenChange}
-                    title={
-                      shareTarget?.title ??
-                      (activeConversation?.title || "your conversation")
-                    }
-                    conversationId={shareTarget?.id ?? activeConversation?.id}
-                    shareUrl={
-                      shareTarget?.shareToken
-                        ? conversationShareUrl(shareTarget.shareToken)
-                        : activeConversation?.shareToken
-                          ? conversationShareUrl(activeConversation.shareToken)
-                          : ""
-                    }
-                    email={shareEmail}
-                    onEmailChange={setShareEmail}
-                    onCopy={stableShareOnCopy}
-                    onEmail={stableShareOnEmail}
-                    onSetPublic={stableShareOnSetPublic}
-                    enabled={
-                      Boolean(shareTarget || activeConversation) &&
-                      !publicShareMutation.isPending
-                    }
-                    isPublic={Boolean(
-                      shareTarget?.isPublic ?? activeConversation?.isPublic
-                    )}
-                    messages={shareDialogMessages}
-                    sideOffset={6}
-                    anchor={
-                      <div className="contents">
-                        <div className="pointer-events-auto absolute left-14 right-24 top-2 hidden lg:block lg:left-4">
-                          <div className="inline-flex min-h-9 max-w-full items-center gap-1">
-                            {isActiveBranchConversation && (
-                              <BranchSplitIcon className="size-4 shrink-0 text-foreground" />
-                            )}
-                            <span className="min-w-0 max-w-[calc(100%-2rem)] whitespace-normal break-words text-sm font-semibold leading-4 text-foreground">
-                              {mobileConversationTitle}
-                            </span>
-                            <DropdownMenu
-                              open={desktopConversationMenuOpen}
-                              onOpenChange={setDesktopConversationMenuOpen}
-                            >
-                              <DropdownMenuTrigger asChild>
-                                <button
-                                  type="button"
-                                  className={cn(
-                                    "flex size-7 shrink-0 items-center justify-center rounded-md text-foreground transition-colors hover:bg-accent/70 data-[state=open]:bg-accent/70 active:bg-accent focus-visible:outline-none",
-                                    isDocumentOpen
-                                      ? "focus-visible:ring-0"
-                                      : "focus-visible:ring-2 focus-visible:ring-ring"
-                                  )}
-                                  aria-label={`Conversation options for ${activeConversation?.title || "New Chat"}`}
-                                >
-                                  <ChevronDown className="size-4" />
-                                </button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent
-                                align="end"
-                                sideOffset={6}
-                                className="w-48 rounded-xl"
+                      open={false}
+                      onOpenChange={stableShareOnOpenChange}
+                      title={
+                        shareTarget?.title ??
+                        (activeConversation?.title || "your conversation")
+                      }
+                      conversationId={shareTarget?.id ?? activeConversation?.id}
+                      shareUrl={
+                        shareTarget?.shareToken
+                          ? conversationShareUrl(shareTarget.shareToken)
+                          : activeConversation?.shareToken
+                            ? conversationShareUrl(
+                                activeConversation.shareToken
+                              )
+                            : ""
+                      }
+                      email={shareEmail}
+                      onEmailChange={setShareEmail}
+                      onCopy={stableShareOnCopy}
+                      onEmail={stableShareOnEmail}
+                      onSetPublic={stableShareOnSetPublic}
+                      enabled={
+                        Boolean(shareTarget || activeConversation) &&
+                        !publicShareMutation.isPending
+                      }
+                      isPublic={Boolean(
+                        shareTarget?.isPublic ?? activeConversation?.isPublic
+                      )}
+                      messages={shareDialogMessages}
+                      sideOffset={6}
+                      anchor={
+                        <div className="contents">
+                          <div className="pointer-events-auto absolute left-14 right-24 top-2 hidden lg:block lg:left-4">
+                            <div className="inline-flex min-h-9 max-w-full items-center gap-1">
+                              {isActiveBranchConversation && (
+                                <BranchSplitIcon className="size-4 shrink-0 text-foreground" />
+                              )}
+                              <span className="min-w-0 max-w-[calc(100%-2rem)] whitespace-normal break-words text-sm font-semibold leading-4 text-foreground">
+                                {mobileConversationTitle}
+                              </span>
+                              <DropdownMenu
+                                open={desktopConversationMenuOpen}
+                                onOpenChange={setDesktopConversationMenuOpen}
                               >
-                                {/* Frequent actions first; chat management and deletion last. */}
-                                <DropdownMenuItem
-                                  disabled={!activeConversationId}
-                                  onSelect={() => {
-                                    if (activeConversationId) {
-                                      const pinned =
-                                        activeConversation?.isPinned ?? false;
-                                      stableOnPin({
-                                        id: activeConversationId,
-                                        isPinned: pinned,
-                                      });
-                                    }
-                                  }}
-                                >
-                                  {activeConversation?.isPinned ? (
-                                    <UnpinTackIcon className="mr-2 size-4" />
-                                  ) : (
-                                    <PinTackIcon className="mr-2 size-4" />
-                                  )}
-                                  {activeConversation?.isPinned
-                                    ? "Unpin"
-                                    : "Pin"}
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-
-                                <DropdownMenuItem
-                                  disabled={
-                                    !activeConversationId ||
-                                    sharingConversationId ===
-                                      activeConversationId
-                                  }
-                                  onSelect={event => {
-                                    event.preventDefault();
-                                    if (activeConversationId) {
-                                      stableOnShareConversation(
-                                        activeConversation
-                                          ? {
-                                              id: activeConversationId,
-                                              title: activeConversation.title,
-                                              isPublic:
-                                                activeConversation.isPublic,
-                                              shareToken:
-                                                activeConversation.shareToken,
-                                            }
-                                          : {
-                                              id: activeConversationId,
-                                              title: "this conversation",
-                                            }
-                                      );
-                                    }
-                                  }}
-                                >
-                                  {sharingConversationId ===
-                                  activeConversationId ? (
-                                    <span
-                                      className="loader loader-xs mr-2 text-current"
-                                      role="status"
-                                      aria-label="Creating share link"
-                                    />
-                                  ) : (
-                                    <ShareIcon className="mr-2 size-[17px]" />
-                                  )}
-                                  Share
-                                </DropdownMenuItem>
-
-                                <DropdownMenuSub>
-                                  <DropdownMenuSubTrigger
-                                    disabled={!activeConversationId}
+                                <DropdownMenuTrigger asChild>
+                                  <button
+                                    type="button"
+                                    className={cn(
+                                      "flex size-7 shrink-0 items-center justify-center rounded-md text-foreground transition-colors hover:bg-accent/70 data-[state=open]:bg-accent/70 active:bg-accent focus-visible:outline-none",
+                                      isDocumentOpen
+                                        ? "focus-visible:ring-0"
+                                        : "focus-visible:ring-2 focus-visible:ring-ring"
+                                    )}
+                                    aria-label={`Conversation options for ${activeConversation?.title || "New Chat"}`}
                                   >
-                                    <Download className="mr-2 size-4" />
-                                    Export
-                                  </DropdownMenuSubTrigger>
-                                  <DropdownMenuSubContent
-                                    sideOffset={6}
-                                    collisionPadding={12}
-                                    className="w-28 min-w-0 rounded-xl p-1"
-                                  >
-                                    <DropdownMenuItem
-                                      onSelect={() => {
-                                        if (activeConversationId) {
-                                          void exportConversation(
-                                            activeConversationId,
-                                            "pdf"
-                                          );
-                                        }
-                                      }}
-                                    >
-                                      <CreateFileModeIcon
-                                        mode="pdf"
-                                        colored={false}
-                                        className="mr-2 size-5 shrink-0"
-                                      />
-                                      <span>PDF</span>
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem
-                                      onSelect={() => {
-                                        if (activeConversationId) {
-                                          void exportConversation(
-                                            activeConversationId,
-                                            "word"
-                                          );
-                                        }
-                                      }}
-                                    >
-                                      <CreateFileModeIcon
-                                        mode="docx"
-                                        colored={false}
-                                        className="mr-2 size-5 shrink-0"
-                                      />
-                                      <span>Word</span>
-                                    </DropdownMenuItem>
-                                  </DropdownMenuSubContent>
-                                </DropdownMenuSub>
-
-                                <DropdownMenuItem
-                                  onSelect={() => setChatFilesOpen(true)}
+                                    <ChevronDown className="size-4" />
+                                  </button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent
+                                  align="end"
+                                  sideOffset={6}
+                                  className="w-48 rounded-xl"
                                 >
-                                  <WinrarIcon className="mr-2 size-4" />
-                                  View files
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-
-                                <DropdownMenuItem
-                                  disabled={!activeConversationId}
-                                  onSelect={() => {
-                                    if (activeConversationId) {
-                                      stableOnArchive({
-                                        id: activeConversationId,
-                                      });
-                                      newChat();
-                                      toast.success("Chat archived");
-                                    }
-                                  }}
-                                >
-                                  <Archive className="mr-2 size-4" />
-                                  Archive
-                                </DropdownMenuItem>
-                                {!isGhostMode && !isActiveBranchConversation && activeConversationId && (
+                                  {/* Frequent actions first; chat management and deletion last. */}
                                   <DropdownMenuItem
-                                    disabled={movingToPrivateId === activeConversationId}
-                                    className="whitespace-nowrap"
-                                    onSelect={event => {
-                                      event.preventDefault();
-                                      stableOnMoveToPrivate({
-                                        id: activeConversationId,
-                                        title: activeConversationTitle,
-                                      });
+                                    disabled={!activeConversationId}
+                                    onSelect={() => {
+                                      if (activeConversationId) {
+                                        const pinned =
+                                          activeConversation?.isPinned ?? false;
+                                        stableOnPin({
+                                          id: activeConversationId,
+                                          isPinned: pinned,
+                                        });
+                                      }
                                     }}
                                   >
-                                    {movingToPrivateId === activeConversationId ? (
-                                      <span className="loader loader-xs mr-2 text-current" role="status" aria-label="Moving to Private" />
+                                    {activeConversation?.isPinned ? (
+                                      <UnpinTackIcon className="mr-2 size-4" />
                                     ) : (
-                                      <Ghost3 className="mr-2 size-4" />
+                                      <PinTackIcon className="mr-2 size-4" />
                                     )}
-                                    <span>{movingToPrivateId === activeConversationId ? "Moving to Private…" : "Move to Private"}</span>
+                                    {activeConversation?.isPinned
+                                      ? "Unpin"
+                                      : "Pin"}
                                   </DropdownMenuItem>
-                                )}
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                  disabled={!activeConversationId}
-                                  variant="destructive"
-                                  onSelect={() => {
-                                    if (activeConversationId)
-                                      stableOnDelete({
-                                        id: activeConversationId,
-                                        title:
-                                          activeConversation?.title ??
-                                          "this conversation",
-                                      });
-                                  }}
-                                >
-                                  <Trash6Icon className="mr-2 size-4" />
-                                  Delete
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
+                                  <DropdownMenuSeparator />
+
+                                  <DropdownMenuItem
+                                    disabled={
+                                      !activeConversationId ||
+                                      sharingConversationId ===
+                                        activeConversationId
+                                    }
+                                    onSelect={event => {
+                                      event.preventDefault();
+                                      if (activeConversationId) {
+                                        stableOnShareConversation(
+                                          activeConversation
+                                            ? {
+                                                id: activeConversationId,
+                                                title: activeConversation.title,
+                                                isPublic:
+                                                  activeConversation.isPublic,
+                                                shareToken:
+                                                  activeConversation.shareToken,
+                                              }
+                                            : {
+                                                id: activeConversationId,
+                                                title: "this conversation",
+                                              }
+                                        );
+                                      }
+                                    }}
+                                  >
+                                    {sharingConversationId ===
+                                    activeConversationId ? (
+                                      <span
+                                        className="loader loader-xs mr-2 text-current"
+                                        role="status"
+                                        aria-label="Creating share link"
+                                      />
+                                    ) : (
+                                      <ShareIcon className="mr-2 size-[17px]" />
+                                    )}
+                                    Share
+                                  </DropdownMenuItem>
+
+                                  <DropdownMenuSub>
+                                    <DropdownMenuSubTrigger
+                                      disabled={!activeConversationId}
+                                    >
+                                      <Download className="mr-2 size-4" />
+                                      Export
+                                    </DropdownMenuSubTrigger>
+                                    <DropdownMenuSubContent
+                                      sideOffset={6}
+                                      collisionPadding={12}
+                                      className="w-28 min-w-0 rounded-xl p-1"
+                                    >
+                                      <DropdownMenuItem
+                                        onSelect={() => {
+                                          if (activeConversationId) {
+                                            void exportConversation(
+                                              activeConversationId,
+                                              "pdf"
+                                            );
+                                          }
+                                        }}
+                                      >
+                                        <CreateFileModeIcon
+                                          mode="pdf"
+                                          colored={false}
+                                          className="mr-2 size-5 shrink-0"
+                                        />
+                                        <span>PDF</span>
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem
+                                        onSelect={() => {
+                                          if (activeConversationId) {
+                                            void exportConversation(
+                                              activeConversationId,
+                                              "word"
+                                            );
+                                          }
+                                        }}
+                                      >
+                                        <CreateFileModeIcon
+                                          mode="docx"
+                                          colored={false}
+                                          className="mr-2 size-5 shrink-0"
+                                        />
+                                        <span>Word</span>
+                                      </DropdownMenuItem>
+                                    </DropdownMenuSubContent>
+                                  </DropdownMenuSub>
+
+                                  <DropdownMenuItem
+                                    onSelect={() => setChatFilesOpen(true)}
+                                  >
+                                    <WinrarIcon className="mr-2 size-4" />
+                                    View files
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+
+                                  <DropdownMenuItem
+                                    disabled={!activeConversationId}
+                                    onSelect={() => {
+                                      if (activeConversationId) {
+                                        stableOnArchive({
+                                          id: activeConversationId,
+                                        });
+                                        newChat();
+                                        toast.success("Chat archived");
+                                      }
+                                    }}
+                                  >
+                                    <Archive className="mr-2 size-4" />
+                                    Archive
+                                  </DropdownMenuItem>
+                                  {!isGhostMode &&
+                                    !isActiveBranchConversation &&
+                                    activeConversationId && (
+                                      <DropdownMenuItem
+                                        disabled={
+                                          movingToPrivateId ===
+                                          activeConversationId
+                                        }
+                                        className="whitespace-nowrap"
+                                        onSelect={event => {
+                                          event.preventDefault();
+                                          stableOnMoveToPrivate({
+                                            id: activeConversationId,
+                                            title: activeConversationTitle,
+                                          });
+                                        }}
+                                      >
+                                        {movingToPrivateId ===
+                                        activeConversationId ? (
+                                          <span
+                                            className="loader loader-xs mr-2 text-current"
+                                            role="status"
+                                            aria-label="Moving to Private"
+                                          />
+                                        ) : (
+                                          <Ghost3 className="mr-2 size-4" />
+                                        )}
+                                        <span>
+                                          {movingToPrivateId ===
+                                          activeConversationId
+                                            ? "Moving to Private…"
+                                            : "Move to Private"}
+                                        </span>
+                                      </DropdownMenuItem>
+                                    )}
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    disabled={!activeConversationId}
+                                    variant="destructive"
+                                    onSelect={() => {
+                                      if (activeConversationId)
+                                        stableOnDelete({
+                                          id: activeConversationId,
+                                          title:
+                                            activeConversation?.title ??
+                                            "this conversation",
+                                        });
+                                    }}
+                                  >
+                                    <Trash6Icon className="mr-2 size-4" />
+                                    Delete
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
                           </div>
+                          {!chatFilesOpen && (
+                            <div className="pointer-events-auto absolute left-[4.5rem] right-2 top-2 flex h-10 min-w-0 items-center justify-end gap-1.5 lg:hidden">
+                              {isActiveBranchConversation && (
+                                <BranchSplitIcon className="size-4 shrink-0 text-foreground" />
+                              )}
+                              <span
+                                ref={mobileConversationTitleRef}
+                                className="min-w-0 max-w-[calc(100%-2.5rem)] truncate text-right text-sm font-semibold text-foreground"
+                              >
+                                {mobileConversationTitle}
+                              </span>
+                              <DropdownMenu
+                                open={mobileConversationMenuOpen}
+                                onOpenChange={setMobileConversationMenuOpen}
+                              >
+                                <DropdownMenuTrigger asChild>
+                                  <button
+                                    type="button"
+                                    className="flex size-8 shrink-0 items-center justify-center rounded-md text-foreground transition-colors hover:bg-accent/70 active:bg-accent data-[state=open]:bg-accent/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                    aria-label={`Conversation options for ${activeConversation?.title || "New Chat"}`}
+                                  >
+                                    <ChevronDown className="size-4" />
+                                  </button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent
+                                  align="end"
+                                  sideOffset={6}
+                                  className="w-fit min-w-48 max-w-[calc(100vw-1rem)] rounded-xl lg:hidden"
+                                >
+                                  {mobileConversationTitleOverflows && (
+                                    <>
+                                      <DropdownMenuLabel className="max-w-44 whitespace-normal break-words text-foreground">
+                                        {mobileConversationTitle}
+                                      </DropdownMenuLabel>
+                                    </>
+                                  )}
+                                  <DropdownMenuItem
+                                    disabled={!activeConversationId}
+                                    onSelect={() => {
+                                      if (activeConversationId) {
+                                        stableOnPin({
+                                          id: activeConversationId,
+                                          isPinned:
+                                            activeConversation?.isPinned ??
+                                            false,
+                                        });
+                                      }
+                                    }}
+                                  >
+                                    {activeConversation?.isPinned ? (
+                                      <UnpinTackIcon className="mr-2 size-4" />
+                                    ) : (
+                                      <PinTackIcon className="mr-2 size-4" />
+                                    )}
+                                    {activeConversation?.isPinned
+                                      ? "Unpin"
+                                      : "Pin"}
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    disabled={
+                                      !activeConversationId ||
+                                      sharingConversationId ===
+                                        activeConversationId
+                                    }
+                                    onSelect={event => {
+                                      event.preventDefault();
+                                      if (activeConversationId) {
+                                        stableOnShareConversation(
+                                          activeConversation
+                                            ? {
+                                                id: activeConversationId,
+                                                title: activeConversation.title,
+                                                isPublic:
+                                                  activeConversation.isPublic,
+                                                shareToken:
+                                                  activeConversation.shareToken,
+                                              }
+                                            : {
+                                                id: activeConversationId,
+                                                title: "this conversation",
+                                              }
+                                        );
+                                      }
+                                    }}
+                                  >
+                                    {sharingConversationId ===
+                                    activeConversationId ? (
+                                      <span
+                                        className="loader loader-xs mr-2 text-current"
+                                        role="status"
+                                        aria-label="Creating share link"
+                                      />
+                                    ) : (
+                                      <ShareIcon className="mr-2 size-[17px]" />
+                                    )}
+                                    Share
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSub>
+                                    <DropdownMenuSubTrigger
+                                      disabled={!activeConversationId}
+                                    >
+                                      <Download className="mr-2 size-4" />
+                                      Export
+                                    </DropdownMenuSubTrigger>
+                                    <DropdownMenuSubContent
+                                      sideOffset={6}
+                                      collisionPadding={12}
+                                      className="w-28 min-w-0 rounded-xl p-1"
+                                    >
+                                      <DropdownMenuItem
+                                        onSelect={() => {
+                                          if (activeConversationId)
+                                            void exportConversation(
+                                              activeConversationId,
+                                              "pdf"
+                                            );
+                                        }}
+                                      >
+                                        <CreateFileModeIcon
+                                          mode="pdf"
+                                          colored={false}
+                                          className="mr-2 size-5 shrink-0"
+                                        />
+                                        <span>PDF</span>
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem
+                                        onSelect={() => {
+                                          if (activeConversationId)
+                                            void exportConversation(
+                                              activeConversationId,
+                                              "word"
+                                            );
+                                        }}
+                                      >
+                                        <CreateFileModeIcon
+                                          mode="docx"
+                                          colored={false}
+                                          className="mr-2 size-5 shrink-0"
+                                        />
+                                        <span>Word</span>
+                                      </DropdownMenuItem>
+                                    </DropdownMenuSubContent>
+                                  </DropdownMenuSub>
+                                  <DropdownMenuItem
+                                    onSelect={() => setChatFilesOpen(true)}
+                                  >
+                                    <WinrarIcon className="mr-2 size-4" />
+                                    View files
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    disabled={!activeConversationId}
+                                    onSelect={() => {
+                                      if (activeConversationId) {
+                                        stableOnArchive({
+                                          id: activeConversationId,
+                                        });
+                                        newChat();
+                                        toast.success("Chat archived");
+                                      }
+                                    }}
+                                  >
+                                    <Archive className="mr-2 size-4" />
+                                    Archive
+                                  </DropdownMenuItem>
+                                  {!isGhostMode &&
+                                    !isActiveBranchConversation &&
+                                    activeConversationId && (
+                                      <DropdownMenuItem
+                                        disabled={
+                                          movingToPrivateId ===
+                                          activeConversationId
+                                        }
+                                        className="whitespace-nowrap"
+                                        onSelect={event => {
+                                          event.preventDefault();
+                                          stableOnMoveToPrivate({
+                                            id: activeConversationId,
+                                            title: activeConversationTitle,
+                                          });
+                                        }}
+                                      >
+                                        {movingToPrivateId ===
+                                        activeConversationId ? (
+                                          <span
+                                            className="loader loader-xs mr-2 text-current"
+                                            role="status"
+                                            aria-label="Moving to Private"
+                                          />
+                                        ) : (
+                                          <Ghost3 className="mr-2 size-4" />
+                                        )}
+                                        <span>
+                                          {movingToPrivateId ===
+                                          activeConversationId
+                                            ? "Moving to Private…"
+                                            : "Move to Private"}
+                                        </span>
+                                      </DropdownMenuItem>
+                                    )}
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    disabled={!activeConversationId}
+                                    variant="destructive"
+                                    onSelect={() => {
+                                      if (activeConversationId)
+                                        stableOnDelete({
+                                          id: activeConversationId,
+                                          title:
+                                            activeConversation?.title ??
+                                            "this conversation",
+                                        });
+                                    }}
+                                  >
+                                    <Trash6Icon className="mr-2 size-4" />
+                                    Delete
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
+                          )}
                         </div>
-                        {!chatFilesOpen && (
-                          <div className="pointer-events-auto absolute left-[4.5rem] right-2 top-2 flex h-10 min-w-0 items-center justify-end gap-1.5 lg:hidden">
-                            {isActiveBranchConversation && (
-                              <BranchSplitIcon className="size-4 shrink-0 text-foreground" />
-                            )}
-                            <span
-                              ref={mobileConversationTitleRef}
-                              className="min-w-0 max-w-[calc(100%-2.5rem)] truncate text-right text-sm font-semibold text-foreground"
-                            >
-                              {mobileConversationTitle}
-                            </span>
-                            <DropdownMenu
-                              open={mobileConversationMenuOpen}
-                              onOpenChange={setMobileConversationMenuOpen}
-                            >
-                              <DropdownMenuTrigger asChild>
-                                <button
-                                  type="button"
-                                  className="flex size-8 shrink-0 items-center justify-center rounded-md text-foreground transition-colors hover:bg-accent/70 active:bg-accent data-[state=open]:bg-accent/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                  aria-label={`Conversation options for ${activeConversation?.title || "New Chat"}`}
-                                >
-                                  <ChevronDown className="size-4" />
-                                </button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent
-                                align="end"
-                                sideOffset={6}
-                                className="w-fit min-w-48 max-w-[calc(100vw-1rem)] rounded-xl lg:hidden"
-                              >
-                                {mobileConversationTitleOverflows && (
-                                  <>
-                                    <DropdownMenuLabel className="max-w-44 whitespace-normal break-words text-foreground">
-                                      {mobileConversationTitle}
-                                    </DropdownMenuLabel>
-                                  </>
-                                )}
-                                <DropdownMenuItem
-                                  disabled={!activeConversationId}
-                                  onSelect={() => {
-                                    if (activeConversationId) {
-                                      stableOnPin({
-                                        id: activeConversationId,
-                                        isPinned:
-                                          activeConversation?.isPinned ?? false,
-                                      });
-                                    }
-                                  }}
-                                >
-                                  {activeConversation?.isPinned ? (
-                                    <UnpinTackIcon className="mr-2 size-4" />
-                                  ) : (
-                                    <PinTackIcon className="mr-2 size-4" />
-                                  )}
-                                  {activeConversation?.isPinned
-                                    ? "Unpin"
-                                    : "Pin"}
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                  disabled={
-                                    !activeConversationId ||
-                                    sharingConversationId ===
-                                      activeConversationId
-                                  }
-                                  onSelect={event => {
-                                    event.preventDefault();
-                                    if (activeConversationId) {
-                                      stableOnShareConversation(
-                                        activeConversation
-                                          ? {
-                                              id: activeConversationId,
-                                              title: activeConversation.title,
-                                              isPublic:
-                                                activeConversation.isPublic,
-                                              shareToken:
-                                                activeConversation.shareToken,
-                                            }
-                                          : {
-                                              id: activeConversationId,
-                                              title: "this conversation",
-                                            }
-                                      );
-                                    }
-                                  }}
-                                >
-                                  {sharingConversationId ===
-                                  activeConversationId ? (
-                                    <span
-                                      className="loader loader-xs mr-2 text-current"
-                                      role="status"
-                                      aria-label="Creating share link"
-                                    />
-                                  ) : (
-                                    <ShareIcon className="mr-2 size-[17px]" />
-                                  )}
-                                  Share
-                                </DropdownMenuItem>
-                                <DropdownMenuSub>
-                                  <DropdownMenuSubTrigger
-                                    disabled={!activeConversationId}
-                                  >
-                                    <Download className="mr-2 size-4" />
-                                    Export
-                                  </DropdownMenuSubTrigger>
-                                  <DropdownMenuSubContent
-                                    sideOffset={6}
-                                    collisionPadding={12}
-                                    className="w-28 min-w-0 rounded-xl p-1"
-                                  >
-                                    <DropdownMenuItem
-                                      onSelect={() => {
-                                        if (activeConversationId)
-                                          void exportConversation(
-                                            activeConversationId,
-                                            "pdf"
-                                          );
-                                      }}
-                                    >
-                                      <CreateFileModeIcon
-                                        mode="pdf"
-                                        colored={false}
-                                        className="mr-2 size-5 shrink-0"
-                                      />
-                                      <span>PDF</span>
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem
-                                      onSelect={() => {
-                                        if (activeConversationId)
-                                          void exportConversation(
-                                            activeConversationId,
-                                            "word"
-                                          );
-                                      }}
-                                    >
-                                      <CreateFileModeIcon
-                                        mode="docx"
-                                        colored={false}
-                                        className="mr-2 size-5 shrink-0"
-                                      />
-                                      <span>Word</span>
-                                    </DropdownMenuItem>
-                                  </DropdownMenuSubContent>
-                                </DropdownMenuSub>
-                                <DropdownMenuItem
-                                  onSelect={() => setChatFilesOpen(true)}
-                                >
-                                  <WinrarIcon className="mr-2 size-4" />
-                                  View files
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                  disabled={!activeConversationId}
-                                  onSelect={() => {
-                                    if (activeConversationId) {
-                                      stableOnArchive({
-                                        id: activeConversationId,
-                                      });
-                                      newChat();
-                                      toast.success("Chat archived");
-                                    }
-                                  }}
-                                >
-                                  <Archive className="mr-2 size-4" />
-                                  Archive
-                                </DropdownMenuItem>
-                                {!isGhostMode && !isActiveBranchConversation && activeConversationId && (
-                                  <DropdownMenuItem
-                                    disabled={movingToPrivateId === activeConversationId}
-                                    className="whitespace-nowrap"
-                                    onSelect={event => {
-                                      event.preventDefault();
-                                      stableOnMoveToPrivate({
-                                        id: activeConversationId,
-                                        title: activeConversationTitle,
-                                      });
-                                    }}
-                                  >
-                                    {movingToPrivateId === activeConversationId ? (
-                                      <span className="loader loader-xs mr-2 text-current" role="status" aria-label="Moving to Private" />
-                                    ) : (
-                                      <Ghost3 className="mr-2 size-4" />
-                                    )}
-                                    <span>{movingToPrivateId === activeConversationId ? "Moving to Private…" : "Move to Private"}</span>
-                                  </DropdownMenuItem>
-                                )}
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                  disabled={!activeConversationId}
-                                  variant="destructive"
-                                  onSelect={() => {
-                                    if (activeConversationId)
-                                      stableOnDelete({
-                                        id: activeConversationId,
-                                        title:
-                                          activeConversation?.title ??
-                                          "this conversation",
-                                      });
-                                  }}
-                                >
-                                  <Trash6Icon className="mr-2 size-4" />
-                                  Delete
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
-                        )}
-                      </div>
-                    }
+                      }
                     />
                   )}
                 </div>
               )}
+            {!isMobile && upgradeEntry && (
+              <div className="pointer-events-none absolute inset-x-0 top-4 z-30 flex justify-center">
+                <div className="pointer-events-auto">{upgradeEntry}</div>
+              </div>
+            )}
             <section
               ref={messagesContainerRef}
               onScroll={handleMessagesScroll}
@@ -6784,9 +7309,7 @@ export default function Home({
                   className={cn(
                     cn(
                       "mx-auto max-w-3xl space-y-5 px-4 sm:px-6",
-                      isTemporaryChat
-                        ? "pt-16 lg:pt-16"
-                        : "pt-16 lg:pt-16"
+                      isTemporaryChat ? "pt-16 lg:pt-16" : "pt-16 lg:pt-16"
                     ),
                     composerTag === "bot" && !guestMode && !isTemporaryChat
                       ? "pb-[16rem]"
@@ -6825,7 +7348,7 @@ export default function Home({
                         "",
                     }));
                     const localAnswerVersions = responseVersionId
-                      ? assistantAnswerVersions[responseVersionId] ?? []
+                      ? (assistantAnswerVersions[responseVersionId] ?? [])
                       : [];
                     const answerVersions = [
                       ...persistedAnswerVersions,
@@ -6838,8 +7361,8 @@ export default function Home({
                       ),
                     ];
                     const answerVersionIndex = responseVersionId
-                      ? assistantAnswerVersionIndex[responseVersionId] ??
-                        answerVersions.length
+                      ? (assistantAnswerVersionIndex[responseVersionId] ??
+                        answerVersions.length)
                       : 0;
                     const historicalVersion =
                       answerVersionIndex < answerVersions.length
@@ -6966,7 +7489,11 @@ export default function Home({
                               : stableBranchFromMessage
                           }
                           onDelete={guestMode ? undefined : stableDeleteMessage}
-                          onFeedback={guestMode || isTemporaryChat ? undefined : stableOnFeedback}
+                          onFeedback={
+                            guestMode || isTemporaryChat
+                              ? undefined
+                              : stableOnFeedback
+                          }
                           feedback={messageFeedback[message.id] ?? null}
                           sharedAnswerPreview={
                             isSharedAnswerPage &&
@@ -7014,7 +7541,9 @@ export default function Home({
                               className="min-w-0 max-w-[55%] truncate text-left font-medium text-blue-600 underline decoration-dotted decoration-blue-500 underline-offset-4 transition-colors hover:text-blue-700 dark:text-blue-400 dark:decoration-blue-400 dark:hover:text-blue-300"
                               aria-label={`Open branched chat: ${link.title}`}
                             >
-                              <span className="block truncate">{link.title}</span>
+                              <span className="block truncate">
+                                {link.title}
+                              </span>
                             </button>
                             <span className="h-px min-w-3 flex-1 bg-foreground/30" />
                           </div>
@@ -7024,7 +7553,9 @@ export default function Home({
                             <div className="flex min-w-0 items-center gap-1 py-0 text-sm">
                               <span className="h-px min-w-3 flex-1 bg-foreground/30" />
                               <BranchSplitIcon className="size-4 shrink-0 text-foreground" />
-                              <span className="shrink-0 text-foreground">Branched to</span>
+                              <span className="shrink-0 text-foreground">
+                                Branched to
+                              </span>
                               <button
                                 type="button"
                                 onClick={() =>
@@ -7033,7 +7564,9 @@ export default function Home({
                                   )
                                 }
                                 className="shrink-0 font-medium text-blue-600 underline decoration-dotted decoration-blue-500 underline-offset-4 transition-colors hover:text-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:text-blue-400 dark:decoration-blue-400 dark:hover:text-blue-300"
-                                aria-expanded={expandedBranchMessageId === message.id}
+                                aria-expanded={
+                                  expandedBranchMessageId === message.id
+                                }
                                 aria-controls={`branch-list-${message.id}`}
                               >
                                 {message.branchTargets!.length} chats
@@ -7047,90 +7580,111 @@ export default function Home({
                                 aria-label="Choose a branched chat"
                                 className="mx-auto mt-2 flex w-fit max-w-full animate-in fade-in slide-in-from-top-1 flex-row items-center overflow-x-auto overflow-y-hidden overscroll-x-contain rounded-xl border border-border/70 bg-muted/25 p-1 duration-150 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                               >
-                                {message.branchTargets!.map((target, targetIndex) => (
-                                  <button
-                                    key={`${target.conversationId}-${targetIndex}`}
-                                    type="button"
-                                    onClick={() => selectConversation(target.conversationId)}
-                                    className="group inline-flex min-w-0 shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-accent/70 focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:max-w-48"
-                                    aria-label={`Open branch ${targetIndex + 1}: ${target.title.replace(/^Branch:\s*/, "")}`}
-                                    onMouseEnter={event => {
-                                      const viewport = event.currentTarget.querySelector<HTMLElement>(
-                                        "[data-branch-title]"
-                                      );
-                                      const title = viewport?.querySelector<HTMLElement>(
-                                        "[data-branch-title-text]"
-                                      );
-                                      const distance =
-                                        title && viewport
-                                          ? title.scrollWidth - viewport.clientWidth
-                                          : 0;
-                                      setScrollingBranchTitle(
-                                        distance > 1
-                                          ? {
-                                              id: `${message.id}:${target.conversationId}`,
-                                              distance,
-                                            }
-                                          : null
-                                      );
-                                    }}
-                                    onMouseLeave={() => setScrollingBranchTitle(null)}
-                                    onFocus={event => {
-                                      const viewport = event.currentTarget.querySelector<HTMLElement>(
-                                        "[data-branch-title]"
-                                      );
-                                      const title = viewport?.querySelector<HTMLElement>(
-                                        "[data-branch-title-text]"
-                                      );
-                                      const distance =
-                                        title && viewport
-                                          ? title.scrollWidth - viewport.clientWidth
-                                          : 0;
-                                      setScrollingBranchTitle(
-                                        distance > 1
-                                          ? {
-                                              id: `${message.id}:${target.conversationId}`,
-                                              distance,
-                                            }
-                                          : null
-                                      );
-                                    }}
-                                    onBlur={() => setScrollingBranchTitle(null)}
-                                  >
-                                    <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-background/70 text-[10px] font-semibold text-muted-foreground transition-colors group-hover:text-blue-500">
-                                      {targetIndex + 1}
-                                    </span>
-                                    <span
-                                      data-branch-title
-                                      className={cn(
-                                        "branch-title-window block min-w-0 overflow-hidden font-medium text-foreground",
-                                        scrollingBranchTitle?.id ===
-                                          `${message.id}:${target.conversationId}` &&
-                                          "branch-title-window-active"
-                                      )}
+                                {message.branchTargets!.map(
+                                  (target, targetIndex) => (
+                                    <button
+                                      key={`${target.conversationId}-${targetIndex}`}
+                                      type="button"
+                                      onClick={() =>
+                                        selectConversation(
+                                          target.conversationId
+                                        )
+                                      }
+                                      className="group inline-flex min-w-0 shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-accent/70 focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:max-w-48"
+                                      aria-label={`Open branch ${targetIndex + 1}: ${target.title.replace(/^Branch:\s*/, "")}`}
+                                      onMouseEnter={event => {
+                                        const viewport =
+                                          event.currentTarget.querySelector<HTMLElement>(
+                                            "[data-branch-title]"
+                                          );
+                                        const title =
+                                          viewport?.querySelector<HTMLElement>(
+                                            "[data-branch-title-text]"
+                                          );
+                                        const distance =
+                                          title && viewport
+                                            ? title.scrollWidth -
+                                              viewport.clientWidth
+                                            : 0;
+                                        setScrollingBranchTitle(
+                                          distance > 1
+                                            ? {
+                                                id: `${message.id}:${target.conversationId}`,
+                                                distance,
+                                              }
+                                            : null
+                                        );
+                                      }}
+                                      onMouseLeave={() =>
+                                        setScrollingBranchTitle(null)
+                                      }
+                                      onFocus={event => {
+                                        const viewport =
+                                          event.currentTarget.querySelector<HTMLElement>(
+                                            "[data-branch-title]"
+                                          );
+                                        const title =
+                                          viewport?.querySelector<HTMLElement>(
+                                            "[data-branch-title-text]"
+                                          );
+                                        const distance =
+                                          title && viewport
+                                            ? title.scrollWidth -
+                                              viewport.clientWidth
+                                            : 0;
+                                        setScrollingBranchTitle(
+                                          distance > 1
+                                            ? {
+                                                id: `${message.id}:${target.conversationId}`,
+                                                distance,
+                                              }
+                                            : null
+                                        );
+                                      }}
+                                      onBlur={() =>
+                                        setScrollingBranchTitle(null)
+                                      }
                                     >
+                                      <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-background/70 text-[10px] font-semibold text-muted-foreground transition-colors group-hover:text-blue-500">
+                                        {targetIndex + 1}
+                                      </span>
                                       <span
-                                        data-branch-title-text
-                                        style={
-                                          scrollingBranchTitle?.id ===
-                                          `${message.id}:${target.conversationId}`
-                                            ? ({
-                                                "--branch-title-offset": `-${scrollingBranchTitle.distance}px`,
-                                              } as CSSProperties)
-                                            : undefined
-                                        }
+                                        data-branch-title
                                         className={cn(
-                                          "inline-flex w-max whitespace-nowrap",
+                                          "branch-title-window block min-w-0 overflow-hidden font-medium text-foreground",
                                           scrollingBranchTitle?.id ===
                                             `${message.id}:${target.conversationId}` &&
-                                            "animate-[ksemo-branch-title-marquee_5s_linear_infinite]"
+                                            "branch-title-window-active"
                                         )}
                                       >
-                                        <span>{target.title.replace(/^Branch:\s*/, "")}</span>
+                                        <span
+                                          data-branch-title-text
+                                          style={
+                                            scrollingBranchTitle?.id ===
+                                            `${message.id}:${target.conversationId}`
+                                              ? ({
+                                                  "--branch-title-offset": `-${scrollingBranchTitle.distance}px`,
+                                                } as CSSProperties)
+                                              : undefined
+                                          }
+                                          className={cn(
+                                            "inline-flex w-max whitespace-nowrap",
+                                            scrollingBranchTitle?.id ===
+                                              `${message.id}:${target.conversationId}` &&
+                                              "animate-[ksemo-branch-title-marquee_5s_linear_infinite]"
+                                          )}
+                                        >
+                                          <span>
+                                            {target.title.replace(
+                                              /^Branch:\s*/,
+                                              ""
+                                            )}
+                                          </span>
+                                        </span>
                                       </span>
-                                    </span>
-                                  </button>
-                                ))}
+                                    </button>
+                                  )
+                                )}
                               </div>
                             )}
                           </div>
@@ -7143,19 +7697,19 @@ export default function Home({
                                   item.role === "assistant" &&
                                   item.content === sharedAnswer
                               ))) && (
-                            <div
-                              role="note"
-                              className="!mt-0.5 flex items-center gap-2 py-0.5 text-center text-sm text-muted-foreground"
-                            >
-                              <span className="h-px flex-1 bg-border/70" />
-                              <ChatLine
-                                className="size-4 shrink-0"
-                                aria-hidden="true"
-                              />
-                              <span>This answer was shared by KSEMO</span>
-                              <span className="h-px flex-1 bg-border/70" />
-                            </div>
-                          )}
+                          <div
+                            role="note"
+                            className="!mt-0.5 flex items-center gap-2 py-0.5 text-center text-sm text-muted-foreground"
+                          >
+                            <span className="h-px flex-1 bg-border/70" />
+                            <ChatLine
+                              className="size-4 shrink-0"
+                              aria-hidden="true"
+                            />
+                            <span>This answer was shared by KSEMO</span>
+                            <span className="h-px flex-1 bg-border/70" />
+                          </div>
+                        )}
                       </Fragment>
                     );
                   })}
@@ -7295,7 +7849,12 @@ export default function Home({
                       </Button>
                     </div>
                   ) : (
-                    composerElement
+                    <>
+                      {isMobile && visibleMessages.length === 0 && (
+                        <div className="pb-2">{upgradeEntry}</div>
+                      )}
+                      {composerElement}
+                    </>
                   )}
                 </div>
               </div>
@@ -7399,9 +7958,14 @@ export default function Home({
 function timeGreeting(temporary = false) {
   const now = new Date();
   const hour = now.getHours();
-  const partOfDay = hour >= 5 && hour < 12 ? "morning" :
-    hour >= 12 && hour < 17 ? "afternoon" :
-      hour >= 17 && hour < 21 ? "evening" : "late";
+  const partOfDay =
+    hour >= 5 && hour < 12
+      ? "morning"
+      : hour >= 12 && hour < 17
+        ? "afternoon"
+        : hour >= 17 && hour < 21
+          ? "evening"
+          : "late";
   const normalGreetings: Record<string, string[]> = {
     morning: [
       "Morning! What’s on your mind?",
@@ -7520,7 +8084,10 @@ const EmptyState = memo(function EmptyState({
   }, [showPrivateInfo]);
   return (
     <div className="relative isolate mx-auto flex h-full w-full max-w-3xl flex-col justify-center gap-4 px-0 pb-16 sm:px-5 sm:pb-4 lg:gap-3 lg:pb-0">
-      <div aria-hidden="true" className="empty-chat-new-accent pointer-events-none absolute left-1/2 top-1/2 z-0 h-[min(30rem,72vh)] w-full -translate-x-1/2 -translate-y-1/2 sm:w-[calc(100%+12rem)]" />
+      <div
+        aria-hidden="true"
+        className="empty-chat-new-accent pointer-events-none absolute left-1/2 top-1/2 z-0 h-[min(30rem,72vh)] w-full -translate-x-1/2 -translate-y-1/2 sm:w-[calc(100%+12rem)]"
+      />
       <div className="relative z-10">
         <div className="px-5 text-center sm:px-0">
           <div
@@ -7530,7 +8097,9 @@ const EmptyState = memo(function EmptyState({
             <p
               className={cn(
                 "ksemo-greeting-rise text-[clamp(1.25rem,6vw,1.5rem)] font-normal tracking-[-0.04em] text-foreground md:text-[clamp(1rem,6.1vw,1.75rem)] md:tracking-[-0.025em]",
-                isMobile ? "max-w-full whitespace-normal text-balance" : "whitespace-nowrap",
+                isMobile
+                  ? "max-w-full whitespace-normal text-balance"
+                  : "whitespace-nowrap",
                 ghostMode && "temp-ghost-greeting"
               )}
             >
@@ -7542,11 +8111,16 @@ const EmptyState = memo(function EmptyState({
       <div className="relative z-10 mx-auto w-full max-w-3xl">
         {composer}
         {temporary && (
-          <div ref={privateInfoRef} className="pointer-events-auto absolute inset-x-0 top-full mt-[-8px] px-5 text-center text-[13px] font-medium leading-snug text-muted-foreground sm:px-0 animate-in fade-in duration-200">
+          <div
+            ref={privateInfoRef}
+            className="pointer-events-auto absolute inset-x-0 top-full mt-[-8px] px-5 text-center text-[13px] font-medium leading-snug text-muted-foreground sm:px-0 animate-in fade-in duration-200"
+          >
             <div className="relative">
               {privateMode ? (
                 <>
-                  <span>Private chats stay separate from your regular history. </span>
+                  <span>
+                    Private chats stay separate from your regular history.{" "}
+                  </span>
                   <span className="inline-block">
                     <button
                       type="button"
@@ -7559,7 +8133,8 @@ const EmptyState = memo(function EmptyState({
                   </span>
                   {showPrivateInfo && (
                     <div className="absolute left-1/2 top-full z-50 mt-3 w-[min(19rem,calc(100vw-2rem))] -translate-x-1/2 rounded-xl border border-border bg-popover px-4 py-3.5 text-left text-[13px] font-normal leading-5 text-popover-foreground shadow-lg">
-                      Ghost Private chats stay separate from your regular history and remain saved until you delete them.
+                      Ghost Private chats stay separate from your regular
+                      history and remain saved until you delete them.
                     </div>
                   )}
                 </>

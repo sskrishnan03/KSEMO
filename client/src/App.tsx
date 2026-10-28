@@ -12,20 +12,28 @@ import ChangePassword from "@/pages/ChangePassword";
 import SharedConversation from "./pages/SharedConversation";
 import SharedAnswer from "./pages/SharedAnswer";
 import { PrivacyPage, TermsPage } from "./pages/SupportPage";
+import UpgradePage from "./pages/UpgradePage";
 
 function Router() {
   // make sure to consider if you need authentication for certain routes
   return (
     <Switch>
       <Route path={"/"} component={Home} />
+      <Route path={"/upgrade"} component={UpgradePage} />
       <Route path={"/c/:id"} component={Home} />
       <Route path={"/share-answer/:token"} component={SharedAnswer} />
       <Route path={"/share-answer"} component={SharedAnswer} />
       <Route path={"/share/:token"} component={SharedConversation} />
       <Route path={"/support/privacy"} component={PrivacyPage} />
       <Route path={"/support/terms"} component={TermsPage} />
-      <Route path={"/signin"} component={() => <AuthStage initial="signin" />} />
-      <Route path={"/signup"} component={() => <AuthStage initial="signup" />} />
+      <Route
+        path={"/signin"}
+        component={() => <AuthStage initial="signin" />}
+      />
+      <Route
+        path={"/signup"}
+        component={() => <AuthStage initial="signup" />}
+      />
       <Route
         path={"/forgot-password"}
         component={() => <AuthStage initial="forgot" />}
