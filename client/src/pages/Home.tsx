@@ -5879,6 +5879,7 @@ export default function Home({
   const composerElement = renderComposer();
   const showUpgradeEntry =
     !guestMode &&
+    composerTag !== "bot" &&
     !isGhostMode &&
     !activeConversationId &&
     visibleMessages.length === 0 &&

@@ -25,6 +25,19 @@ export type BotVoiceState = "idle" | "listening" | "transcribing";
 // The live mic meter below keeps extending this while the user is speaking.
 const SILENCE_MS = 700;
 const FINAL_SILENCE_MS = 500;
+const MOBILE_SILENCE_MS = 1400;
+const MOBILE_FINAL_SILENCE_MS = 1100;
+
+function isMobileVoiceBrowser() {
+  if (typeof navigator === "undefined") return false;
+  return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) ||
+    (/Macintosh/i.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+}
+
+function silenceDelay(isFinal = false) {
+  if (!isMobileVoiceBrowser()) return isFinal ? FINAL_SILENCE_MS : SILENCE_MS;
+  return isFinal ? MOBILE_FINAL_SILENCE_MS : MOBILE_SILENCE_MS;
+}
 
 /** Above this the mic is considered open, which drives the wave. */
 const LISTENING_LEVEL_THRESHOLD = 0.02;
@@ -202,7 +215,7 @@ export function useBotVoice({
 
   /** Every new word pushes the auto-send further out. */
   const armSilenceTimer = useCallback(
-    (delay = SILENCE_MS) => {
+    (delay?: number) => {
       if (pausedRef.current) return;
       clearSilenceTimer();
       silenceTimerRef.current = window.setTimeout(() => {
@@ -223,7 +236,7 @@ export function useBotVoice({
           .trim();
         // Auto-send once user stops speaking
         if (spoken && !pausedRef.current) finishTurn();
-      }, delay);
+      }, delay ?? silenceDelay());
     },
     [clearSilenceTimer, finishTurn]
   );
@@ -381,7 +394,7 @@ export function useBotVoice({
       if (pausedRef.current) return;
       interimRef.current = interim;
       publishDraft();
-      armSilenceTimer(hasFinal ? FINAL_SILENCE_MS : SILENCE_MS);
+      armSilenceTimer(silenceDelay(hasFinal));
     };
 
     // Browsers stop recognition on their own every so often; restart with a fresh instance
