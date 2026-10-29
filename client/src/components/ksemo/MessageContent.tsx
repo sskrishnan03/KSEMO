@@ -1145,7 +1145,10 @@ export const MessageContent = memo(function MessageContent({
                   <div className="relative inline-flex shrink-0">
                     <DropdownMenu
                       open={actionsOpen}
-                      onOpenChange={setActionsOpen}
+                      onOpenChange={open => {
+                        if (open && branching) return;
+                        setActionsOpen(open);
+                      }}
                     >
                       <Tooltip>
                         <TooltipTrigger asChild>
@@ -1159,15 +1162,26 @@ export const MessageContent = memo(function MessageContent({
                                 actionsOpen &&
                                   "bg-accent/70 text-foreground hover:bg-accent/70 hover:text-foreground"
                               )}
-                              aria-label={actionsMenuLabel}
+                              aria-label={
+                                branching ? "Branching in new chat" : actionsMenuLabel
+                              }
+                              aria-busy={branching}
                               aria-live="polite"
                             >
-                              <MoreHorizontal className="size-4 shrink-0" />
+                              {branching ? (
+                                <span
+                                  className="loader loader-xs text-current"
+                                  role="status"
+                                  aria-label="Branching in new chat"
+                                />
+                              ) : (
+                                <MoreHorizontal className="size-4 shrink-0" />
+                              )}
                             </Button>
                           </DropdownMenuTrigger>
                         </TooltipTrigger>
                         <TooltipContent side="bottom">
-                          More actions
+                          {branching ? "Branching…" : "More actions"}
                         </TooltipContent>
                       </Tooltip>
                       <DropdownMenuContent
@@ -1223,11 +1237,7 @@ export const MessageContent = memo(function MessageContent({
                           {canBranch ? (
                             <DropdownMenuItem
                               className="group/branch gap-2.5 whitespace-nowrap rounded-lg py-2 pl-2.5 pr-8"
-                              disabled={branching}
-                              onSelect={event => {
-                                // Keep the menu open while the branch is being
-                                // created so progress is visible to the user.
-                                event.preventDefault();
+                              onSelect={() => {
                                 if (branching) return;
                                 setBranching(true);
                                 void Promise.resolve(onBranch?.(message)).finally(
@@ -1236,14 +1246,7 @@ export const MessageContent = memo(function MessageContent({
                               }}
                               aria-label="Branch in new chat"
                             >
-                              {branching ? (
-                                <span
-                                  className="loader loader-xs text-current"
-                                  aria-hidden="true"
-                                />
-                              ) : (
-                                <BranchSplitIcon className="size-4 text-muted-foreground transition-colors group-hover/branch:text-muted-foreground" />
-                              )}
+                              <BranchSplitIcon className="size-4 text-muted-foreground transition-colors group-hover/branch:text-muted-foreground" />
                               <span>Branch in new chat</span>
                             </DropdownMenuItem>
                           ) : null}

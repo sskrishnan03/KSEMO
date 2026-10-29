@@ -1098,6 +1098,9 @@ export default function Home({
   const [sharingConversationId, setSharingConversationId] = useState<
     string | null
   >(null);
+  const isSharingActiveConversation = Boolean(
+    activeConversationId && sharingConversationId === activeConversationId
+  );
   const [desktopConversationMenuOpen, setDesktopConversationMenuOpen] =
     useState(false);
   const [mobileConversationMenuOpen, setMobileConversationMenuOpen] =
@@ -6846,7 +6849,10 @@ export default function Home({
                               </span>
                               <DropdownMenu
                                 open={desktopConversationMenuOpen}
-                                onOpenChange={setDesktopConversationMenuOpen}
+                                onOpenChange={open => {
+                                  if (open && isSharingActiveConversation) return;
+                                  setDesktopConversationMenuOpen(open);
+                                }}
                               >
                                 <DropdownMenuTrigger asChild>
                                   <button
@@ -6858,8 +6864,17 @@ export default function Home({
                                         : "focus-visible:ring-2 focus-visible:ring-ring"
                                     )}
                                     aria-label={`Conversation options for ${activeConversation?.title || "New Chat"}`}
+                                    aria-busy={isSharingActiveConversation}
                                   >
-                                    <ChevronDown className="size-4" />
+                                    {isSharingActiveConversation ? (
+                                      <span
+                                        className="loader loader-xs text-current"
+                                        role="status"
+                                        aria-label="Creating share link"
+                                      />
+                                    ) : (
+                                      <ChevronDown className="size-4" />
+                                    )}
                                   </button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent
@@ -6893,14 +6908,13 @@ export default function Home({
                                   <DropdownMenuSeparator />
 
                                   <DropdownMenuItem
-                                    disabled={
-                                      !activeConversationId ||
-                                      sharingConversationId ===
-                                        activeConversationId
-                                    }
-                                    onSelect={event => {
-                                      event.preventDefault();
-                                      if (activeConversationId) {
+                                    disabled={!activeConversationId}
+                                    onSelect={() => {
+                                      if (
+                                        activeConversationId &&
+                                        sharingConversationId !==
+                                          activeConversationId
+                                      ) {
                                         stableOnShareConversation(
                                           activeConversation
                                             ? {
@@ -6919,16 +6933,7 @@ export default function Home({
                                       }
                                     }}
                                   >
-                                    {sharingConversationId ===
-                                    activeConversationId ? (
-                                      <span
-                                        className="loader loader-xs mr-2 text-current"
-                                        role="status"
-                                        aria-label="Creating share link"
-                                      />
-                                    ) : (
-                                      <ShareIcon className="mr-2 size-[17px]" />
-                                    )}
+                                    <ShareIcon className="mr-2 size-[17px]" />
                                     Share
                                   </DropdownMenuItem>
 
@@ -7073,15 +7078,27 @@ export default function Home({
                               </span>
                               <DropdownMenu
                                 open={mobileConversationMenuOpen}
-                                onOpenChange={setMobileConversationMenuOpen}
+                                onOpenChange={open => {
+                                  if (open && isSharingActiveConversation) return;
+                                  setMobileConversationMenuOpen(open);
+                                }}
                               >
                                 <DropdownMenuTrigger asChild>
                                   <button
                                     type="button"
                                     className="flex size-8 shrink-0 items-center justify-center rounded-md text-foreground transition-colors hover:bg-accent/70 active:bg-accent data-[state=open]:bg-accent/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                     aria-label={`Conversation options for ${activeConversation?.title || "New Chat"}`}
+                                    aria-busy={isSharingActiveConversation}
                                   >
-                                    <ChevronDown className="size-4" />
+                                    {isSharingActiveConversation ? (
+                                      <span
+                                        className="loader loader-xs text-current"
+                                        role="status"
+                                        aria-label="Creating share link"
+                                      />
+                                    ) : (
+                                      <ChevronDown className="size-4" />
+                                    )}
                                   </button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent
@@ -7120,14 +7137,13 @@ export default function Home({
                                   </DropdownMenuItem>
                                   <DropdownMenuSeparator />
                                   <DropdownMenuItem
-                                    disabled={
-                                      !activeConversationId ||
-                                      sharingConversationId ===
-                                        activeConversationId
-                                    }
-                                    onSelect={event => {
-                                      event.preventDefault();
-                                      if (activeConversationId) {
+                                    disabled={!activeConversationId}
+                                    onSelect={() => {
+                                      if (
+                                        activeConversationId &&
+                                        sharingConversationId !==
+                                          activeConversationId
+                                      ) {
                                         stableOnShareConversation(
                                           activeConversation
                                             ? {
@@ -7146,16 +7162,7 @@ export default function Home({
                                       }
                                     }}
                                   >
-                                    {sharingConversationId ===
-                                    activeConversationId ? (
-                                      <span
-                                        className="loader loader-xs mr-2 text-current"
-                                        role="status"
-                                        aria-label="Creating share link"
-                                      />
-                                    ) : (
-                                      <ShareIcon className="mr-2 size-[17px]" />
-                                    )}
+                                    <ShareIcon className="mr-2 size-[17px]" />
                                     Share
                                   </DropdownMenuItem>
                                   <DropdownMenuSub>
