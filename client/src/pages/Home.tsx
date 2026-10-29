@@ -2022,7 +2022,7 @@ export default function Home({
         isTtsSpeakingRef.current = false;
         setIsBotSpeakingAloud(false);
         if (botVoiceOpenRef.current) {
-          botVoice.pauseListening();
+          botVoice.resumeListening();
         }
       }
       return;

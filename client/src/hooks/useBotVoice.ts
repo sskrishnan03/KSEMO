@@ -129,6 +129,7 @@ export function useBotVoice({
   /** The composer text as it was before listening started. */
   const baseRef = useRef("");
   const silenceTimerRef = useRef<number | null>(null);
+  const speechActivityTimerRef = useRef<number | null>(null);
 
   // --- waveform metering -------------------------------------------------
   const streamRef = useRef<MediaStream | null>(null);
@@ -144,6 +145,24 @@ export function useBotVoice({
     if (silenceTimerRef.current !== null) {
       clearTimeout(silenceTimerRef.current);
       silenceTimerRef.current = null;
+    }
+  }, []);
+
+  const stopRecognition = useCallback(() => {
+    wantListeningRef.current = false;
+    if (speechActivityTimerRef.current !== null) {
+      window.clearTimeout(speechActivityTimerRef.current);
+      speechActivityTimerRef.current = null;
+    }
+    levelRef.current = 0;
+    const recognition = recognitionRef.current;
+    recognitionRef.current = null;
+    if (!recognition) return;
+    recognition.onend = null;
+    try {
+      recognition.stop();
+    } catch {
+      // Already stopped.
     }
   }, []);
 
@@ -172,13 +191,14 @@ export function useBotVoice({
     interimRef.current = "";
     committedRef.current = "";
     baseRef.current = "";
+    stopRecognition();
     if (voiceText) {
       pausedRef.current = true;
       onSend(spoken);
     } else {
       onDraft(baseText);
     }
-  }, [clearSilenceTimer, onDraft, onSend]);
+  }, [clearSilenceTimer, onDraft, onSend, stopRecognition]);
 
   /** Every new word pushes the auto-send further out. */
   const armSilenceTimer = useCallback(
@@ -328,6 +348,14 @@ export function useBotVoice({
 
     recognition.onresult = event => {
       if (pausedRef.current) return;
+      levelRef.current = 0.45;
+      if (speechActivityTimerRef.current !== null) {
+        window.clearTimeout(speechActivityTimerRef.current);
+      }
+      speechActivityTimerRef.current = window.setTimeout(() => {
+        levelRef.current = LISTENING_LEVEL_THRESHOLD;
+        speechActivityTimerRef.current = null;
+      }, 220);
       if (!committedRef.current && !interimRef.current) {
         baseRef.current = getCurrentText?.() ?? "";
       }
@@ -396,19 +424,6 @@ export function useBotVoice({
     return true;
   }, [armSilenceTimer, onError, publishDraft, setStateBoth, stopMetering]);
 
-  const stopRecognition = useCallback(() => {
-    wantListeningRef.current = false;
-    const recognition = recognitionRef.current;
-    recognitionRef.current = null;
-    if (!recognition) return;
-    recognition.onend = null;
-    try {
-      recognition.stop();
-    } catch {
-      // Already stopped.
-    }
-  }, []);
-
   // --- MediaRecorder fallback -------------------------------------------
   // Only reached where SpeechRecognition is missing (Firefox, older Safari).
   // There is no interim text to show, so the wave runs off the same analyser and
@@ -418,7 +433,7 @@ export function useBotVoice({
     const mimeType = chooseRecorderType();
     let recorder: MediaRecorder;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
+      const stream = streamRef.current ?? await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
@@ -429,6 +444,7 @@ export function useBotVoice({
         stream.getTracks().forEach(track => track.stop());
         return false;
       }
+      streamRef.current = stream;
       recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
     } catch {
       setMicDenied(true);
@@ -507,10 +523,11 @@ export function useBotVoice({
   const pauseListening = useCallback(() => {
     pausedRef.current = true;
     clearSilenceTimer();
+    stopRecognition();
     interimRef.current = "";
     committedRef.current = "";
     baseRef.current = "";
-  }, [clearSilenceTimer]);
+  }, [clearSilenceTimer, stopRecognition]);
 
   const resumeListening = useCallback(() => {
     pausedRef.current = false;
@@ -566,21 +583,21 @@ export function useBotVoice({
     setStateBoth("listening");
     playBotVoiceStart();
 
-    const meteringOk = await startMetering();
-    if (runId !== voiceRunIdRef.current) {
-      stopMetering();
-      return;
-    }
-    if (meteringOk === false) {
-      return;
-    }
-
+    // Let native speech recognition own the microphone on browsers that have
+    // it. Android Chrome's Google recognizer cannot start reliably while a
+    // second getUserMedia stream is open for the orb meter.
     if (startRecognition()) {
       wantListeningRef.current = true;
       return;
     }
 
     // No SpeechRecognition — record, then transcribe when stopped.
+    const meteringOk = await startMetering();
+    if (runId !== voiceRunIdRef.current) {
+      stopMetering();
+      return;
+    }
+    if (meteringOk === false) return;
     const started = await startRecordingFallback();
     if (runId !== voiceRunIdRef.current) {
       stopRecordingFallback();

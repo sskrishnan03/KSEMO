@@ -68,7 +68,7 @@ export default function UpgradePage() {
   const selected = plans.find(plan => plan.name === selectedPlan) ?? plans[1];
   const PlanCard = ({ plan }: { plan: (typeof plans)[number] }) => (
     <article
-      className={`relative flex h-full min-h-max flex-col rounded-3xl border p-5 md:min-h-0 md:p-6 lg:p-8 ${plan.featured ? "border-foreground/40 bg-card shadow-xl shadow-black/10 ring-1 ring-foreground/10" : "border-border bg-card/70"}`}
+      className={`relative flex h-auto min-h-0 flex-col rounded-3xl border p-5 md:h-full md:p-6 lg:p-8 ${plan.featured ? "border-foreground/40 bg-card shadow-xl shadow-black/10 ring-1 ring-foreground/10" : "border-border bg-card/70"}`}
     >
       {plan.featured && (
         <span className="absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-foreground px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-background">
@@ -96,7 +96,7 @@ export default function UpgradePage() {
       <p className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
         Plan includes
       </p>
-      <ul className="flex flex-1 flex-col justify-center gap-3 text-sm leading-5 md:gap-4 lg:gap-5">
+      <ul className="flex flex-col justify-start gap-4 text-sm leading-5 md:flex-1 md:justify-center md:gap-4 lg:gap-5">
         {plan.features.map(([Icon, label]) => (
           <li
             key={label}
@@ -154,9 +154,9 @@ export default function UpgradePage() {
         </div>
         <section
           aria-label="Choose a plan"
-          className="mx-auto mt-3 grid min-h-0 w-full max-w-6xl flex-1 grid-cols-1 md:mt-8 md:grid-cols-3 md:gap-5"
+          className="mx-auto mt-3 grid min-h-0 w-full max-w-6xl grid-cols-1 md:mt-8 md:flex-1 md:grid-cols-3 md:gap-5"
         >
-          <div className="mx-auto h-full w-full max-w-md min-h-0 md:hidden">
+          <div className="mx-auto w-full max-w-md min-h-0 md:hidden">
             <PlanCard plan={selected} />
           </div>
           {plans.map(plan => (
