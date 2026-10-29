@@ -22,6 +22,8 @@ services:
         value: https://ksemo.onrender.com/api/auth/google/callback
       - key: GEMINI_API_KEY
         sync: false
+      - key: OLLAMA_API_KEY
+        sync: false
       - key: BUILT_IN_FORGE_API_KEY
         sync: false
       - key: BUILT_IN_FORGE_API_URL

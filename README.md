@@ -254,6 +254,9 @@ SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
 # AI / LLM Configuration
 LLM_BASE_URL=https://generativelanguage.googleapis.com
 GEMINI_API_KEY=your-gemini-api-key
+# Optional: when set, Ollama Cloud is selected and free-plan Gemma 4 31B is the default.
+# Kimi K2.6 is available from Ollama but requires paid credits or a paid plan.
+OLLAMA_API_KEY=your-ollama-api-key
 
 # Google OAuth (Optional)
 GOOGLE_CLIENT_ID=your-google-client-id

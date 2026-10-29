@@ -15,7 +15,12 @@ import {
   updateMessage,
   DatabaseUnavailableError,
 } from "./supabase-db";
-import { streamLLM, type Message } from "./_core/llm";
+import {
+  getQuotaFallbackModel,
+  resolveModelName,
+  streamLLM,
+  type Message,
+} from "./_core/llm";
 import { sdk, SessionLookupError } from "./_core/sdk";
 import { storageDownload } from "./storage";
 import { buildUserMemoryContextWithSources } from "./memory/retrieval";
@@ -113,8 +118,9 @@ const MAX_ATTACHMENTS_PER_MESSAGE = 100;
 // instead of blowing past the model's vision/input limits.
 const MAX_IMAGES_IN_MODEL_CONTEXT = 20;
 
-// Separate free-tier quota bucket; used when the selected model's daily limit is hit.
-const QUOTA_FALLBACK_MODEL = "models/gemini-3.5-flash-lite";
+// Provider fallback model; omitted for Ollama because the configured free
+// model is already the best available option on that account.
+const QUOTA_FALLBACK_MODEL = getQuotaFallbackModel();
 
 // Hard cap for a single response generation. Without it a stalled provider
 // (or its retry ladder) would hold the SSE connection open in silence while
@@ -928,6 +934,7 @@ export function registerChatStream(app: Express) {
           generationError &&
           !controller.signal.aborted &&
           !responseText &&
+          QUOTA_FALLBACK_MODEL &&
           isRetryableProviderError(generationError)
         ) {
           console.warn(
@@ -1020,8 +1027,8 @@ export function registerChatStream(app: Express) {
               ? cancelledContent
               : responseText || "I’m sorry, I couldn’t generate a response.",
             model: usedFallbackModel
-              ? QUOTA_FALLBACK_MODEL
-              : (preferences?.selectedModel ?? null),
+              ? (QUOTA_FALLBACK_MODEL ?? null)
+              : resolveModelName(preferences?.selectedModel ?? undefined),
             status: cancelled ? "cancelled" : "completed",
             metadata: assistantMetadata,
           } as const;

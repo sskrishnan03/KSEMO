@@ -38,7 +38,7 @@ setMessageFeedbackForUser,
   createFileForUser,
 } from "../supabase-db";
 import { storagePut } from "../storage";
-import { listLLMModels } from "../_core/llm";
+import { listLLMModels, resolveModelName } from "../_core/llm";
 import type { Message } from "../_core/llm";
 import { transcribeAudio } from "../_core/voiceTranscription";
 import { isMailerConfigured, sendFeedbackEmail } from "../_core/mailer";
@@ -835,9 +835,14 @@ export const conversationRouter = router({
 });
 
 export const preferenceRouter = router({
-  get: protectedProcedure.query(
-    async ({ ctx }) => (await getUserPreferences(ctx.user.id)) ?? null
-  ),
+  get: protectedProcedure.query(async ({ ctx }) => {
+    const preferences = await getUserPreferences(ctx.user.id);
+    if (!preferences) return null;
+    return {
+      ...preferences,
+      selectedModel: resolveModelName(preferences.selectedModel ?? undefined),
+    };
+  }),
   update: protectedProcedure
     .input(preferenceInput)
     .mutation(({ ctx, input }) => upsertUserPreferences(ctx.user.id, input)),
@@ -851,7 +856,9 @@ export const preferenceRouter = router({
         }))
         .filter(
           model =>
-            /^gemini-/.test(model.id) &&
+            /^(?:models\/)?(?:gemini-|kimi-|glm-|gemma|deepseek-|gpt-oss|minimax-|mistral-|nemotron-)/i.test(
+              model.id
+            ) &&
             !/tts|image|embedding|veo|lyria|robotics|aqa|native-audio|computer-use|live/.test(
               model.id
             )
