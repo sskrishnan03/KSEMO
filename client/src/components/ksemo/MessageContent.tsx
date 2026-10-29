@@ -330,6 +330,7 @@ export const MessageContent = memo(function MessageContent({
   isCurrentGeneration = false,
   isFileGenerating = false,
   hideTypingIndicator = false,
+  isVoiceChat = false,
   hideActions = false,
   onEdit,
   onRegenerate,
@@ -368,6 +369,7 @@ export const MessageContent = memo(function MessageContent({
   isCurrentGeneration?: boolean;
   isFileGenerating?: boolean;
   hideTypingIndicator?: boolean;
+  isVoiceChat?: boolean;
   hideActions?: boolean;
   onEdit?: (message: KsemoMessage) => void;
   onRegenerate?: (message: KsemoMessage) => void;
@@ -830,8 +832,9 @@ export const MessageContent = memo(function MessageContent({
                       >
                         <ThinkingIndicator size={24} />
                         <span className="text-sm font-medium text-muted-foreground">
-                          Working for{" "}
-                          {formatShortResponseDuration(responseDurationMs ?? 0)}
+                          {isVoiceChat
+                            ? "Thinking"
+                            : `Working for ${formatShortResponseDuration(responseDurationMs ?? 0)}`}
                         </span>
                       </div>
                     )}

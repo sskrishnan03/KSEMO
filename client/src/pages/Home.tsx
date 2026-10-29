@@ -7469,6 +7469,7 @@ export default function Home({
                               (activeMode !== "chat" ||
                                 Boolean(fileGeneration)))
                           )}
+                          isVoiceChat={composerTag === "bot"}
                           hideActions={composerTag === "bot"}
                           onEdit={guestMode ? undefined : stableEditMessage}
                           isEditing={editingMessage?.id === message.id}
