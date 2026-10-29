@@ -986,11 +986,6 @@ export const MessageContent = memo(function MessageContent({
               role="group"
               aria-label="Message options"
             >
-              {messageTimestamp && (
-                <time className="mr-1 flex items-center px-1 text-[12.5px] leading-4 tabular-nums text-muted-foreground/80">
-                  {messageTimestamp}
-                </time>
-              )}
               {onEdit &&
                 !isEditing &&
                 action("Edit message", <Pencil className="size-4" />, () =>

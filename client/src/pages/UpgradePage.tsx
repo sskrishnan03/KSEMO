@@ -68,7 +68,7 @@ export default function UpgradePage() {
   const selected = plans.find(plan => plan.name === selectedPlan) ?? plans[1];
   const PlanCard = ({ plan }: { plan: (typeof plans)[number] }) => (
     <article
-      className={`relative flex h-full min-h-0 flex-col rounded-3xl border p-6 sm:p-8 ${plan.featured ? "border-foreground/40 bg-card shadow-xl shadow-black/10 ring-1 ring-foreground/10" : "border-border bg-card/70"}`}
+      className={`relative flex h-auto min-h-0 flex-col rounded-3xl border p-5 md:h-full md:p-6 lg:p-8 ${plan.featured ? "border-foreground/40 bg-card shadow-xl shadow-black/10 ring-1 ring-foreground/10" : "border-border bg-card/70"}`}
     >
       {plan.featured && (
         <span className="absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-foreground px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-background">
@@ -76,10 +76,10 @@ export default function UpgradePage() {
         </span>
       )}
       <h2 className="text-2xl font-semibold tracking-tight">{plan.name}</h2>
-      <p className="mt-2 min-h-10 text-sm leading-5 text-muted-foreground">
+      <p className="mt-2 text-sm leading-5 text-muted-foreground md:min-h-10">
         {plan.summary}
       </p>
-      <div className="mt-5 flex items-baseline gap-2">
+      <div className="mt-4 flex items-baseline gap-2 md:mt-5">
         <span className="text-4xl font-semibold tracking-[-0.05em]">
           {plan.price}
         </span>
@@ -88,22 +88,22 @@ export default function UpgradePage() {
       <button
         type="button"
         disabled={plan.current}
-        className={`mt-4 flex h-12 shrink-0 items-center justify-center rounded-xl px-4 text-sm font-semibold transition ${plan.featured ? "bg-foreground text-background hover:bg-foreground/90" : plan.current ? "border border-border bg-background text-muted-foreground" : "border border-border bg-background hover:bg-accent"}`}
+        className={`mt-4 flex h-11 w-full shrink-0 items-center justify-center rounded-xl px-4 text-sm font-semibold transition md:h-12 ${plan.featured ? "bg-foreground text-background hover:bg-foreground/90" : plan.current ? "border border-border bg-background text-muted-foreground" : "border border-border bg-background hover:bg-accent"}`}
       >
         {plan.action}
       </button>
-      <div className="my-5 h-px shrink-0 bg-border" />
+      <div className="my-4 h-px shrink-0 bg-border md:my-5" />
       <p className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
         Plan includes
       </p>
-      <ul className="flex flex-1 flex-col justify-center gap-4 text-xs sm:gap-5 sm:text-sm">
+      <ul className="flex flex-col justify-start gap-3 text-sm leading-5 md:flex-1 md:justify-center md:gap-4 lg:gap-5">
         {plan.features.map(([Icon, label]) => (
           <li
             key={label}
-            className="flex items-center gap-2 whitespace-nowrap leading-5 sm:gap-3"
+            className="flex items-start gap-2 leading-5 sm:gap-3"
           >
             <Icon
-              className="size-4 shrink-0 text-muted-foreground sm:size-[18px]"
+              className="mt-0.5 size-4 shrink-0 text-muted-foreground sm:size-[18px]"
               aria-hidden="true"
             />
             <span>{label}</span>
@@ -113,8 +113,8 @@ export default function UpgradePage() {
     </article>
   );
   return (
-    <main className="flex h-dvh flex-col overflow-hidden bg-background px-4 py-3 text-foreground sm:px-8 sm:py-5">
-      <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col">
+    <main className="flex h-dvh flex-col overflow-y-auto bg-background px-4 py-3 text-foreground sm:px-8 sm:py-5 md:overflow-hidden">
+      <div className="mx-auto flex min-h-full w-full max-w-7xl flex-1 flex-col md:min-h-0">
         <div className="flex shrink-0 justify-end">
           <button
             type="button"
@@ -135,7 +135,7 @@ export default function UpgradePage() {
           </h1>
         </header>
         <div
-          className="mx-auto mt-3 grid w-full max-w-6xl grid-cols-3 gap-1 rounded-xl border border-border bg-muted/40 p-1 md:hidden"
+          className="mx-auto mt-3 grid w-fit grid-cols-3 gap-1 rounded-xl border border-border bg-muted/40 p-1 md:hidden"
           role="tablist"
           aria-label="Plan options"
         >
@@ -146,7 +146,7 @@ export default function UpgradePage() {
               role="tab"
               aria-selected={selectedPlan === plan.name}
               onClick={() => setSelectedPlan(plan.name)}
-              className={`h-11 rounded-lg px-2 text-sm font-semibold transition ${selectedPlan === plan.name ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+              className={`h-10 min-w-[5.25rem] rounded-lg px-3 text-sm font-semibold transition ${selectedPlan === plan.name ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
             >
               {plan.name}
             </button>
@@ -154,9 +154,9 @@ export default function UpgradePage() {
         </div>
         <section
           aria-label="Choose a plan"
-          className="mx-auto mt-3 grid min-h-0 w-full max-w-6xl flex-1 grid-cols-1 md:mt-8 md:grid-cols-3 md:gap-5"
+          className="mx-auto mt-3 grid min-h-0 w-full max-w-6xl grid-cols-1 md:mt-8 md:flex-1 md:grid-cols-3 md:gap-5"
         >
-          <div className="min-h-0 md:hidden">
+          <div className="mx-auto w-full max-w-md min-h-0 md:hidden">
             <PlanCard plan={selected} />
           </div>
           {plans.map(plan => (

@@ -1,12 +1,15 @@
-import { useTheme } from "@/contexts/ThemeContext";
+import { useOptionalTheme } from "@/contexts/ThemeContext";
 import { Toaster as Sonner, type ToasterProps } from "sonner";
 
 const Toaster = ({ ...props }: ToasterProps) => {
-  const { resolvedTheme } = useTheme();
+  const theme = useOptionalTheme()?.resolvedTheme ??
+    (typeof document !== "undefined" && document.documentElement.classList.contains("dark")
+      ? "dark"
+      : "light");
 
   return (
     <Sonner
-      theme={resolvedTheme}
+      theme={theme}
       className="toaster group"
       style={
         {
