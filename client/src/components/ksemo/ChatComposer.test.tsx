@@ -44,9 +44,10 @@ describe("ChatComposer", () => {
         onCancel: () => undefined,
       })
     );
-    expect(markup).toContain("Search your files and images");
+    expect(markup).toContain('aria-label="Search Library"');
     expect(markup).toContain("Interview.docx");
-    expect(markup).toContain("Cancel");
+    expect(markup).toContain('aria-label="Close Browse Library"');
+    expect(markup).toContain("<svg");
   });
 
   it("shows a clear cancel action for a selected chat upload notice", () => {
@@ -89,7 +90,7 @@ describe("ChatComposer", () => {
     expect(librarySubmenuClass).not.toContain("bottom-[calc(100%+0.5rem)]");
     expect(librarySubmenuClass).toContain("left-1/2");
     expect(librarySubmenuClass).toContain("-translate-x-1/2");
-    expect(librarySubmenuClass).toContain("max-h-[calc(100dvh-6rem)]");
+    expect(librarySubmenuClass).toContain("max-h-[calc(100dvh-2rem)]");
   });
 
   it("does not render the stale safety/disclaimer note in any composer variant", () => {

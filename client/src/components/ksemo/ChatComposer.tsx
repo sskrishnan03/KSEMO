@@ -38,7 +38,9 @@ import {
   ChevronDown,
   ChevronRight,
   FileText,
+  Grid2X2,
   Image as ImageIcon,
+  List,
   Loader2,
   Maximize2,
   Mic,
@@ -47,6 +49,7 @@ import {
   Monitor,
   Paperclip,
   Plus,
+  Search,
   Square,
   X,
 } from "lucide-react";
@@ -67,7 +70,7 @@ import { FileResultCard } from "./FileResultCard";
 import { LibraryFileIcon } from "./LibraryFileIcon";
 
 export const getLibrarySubmenuClass = (isCentered: boolean) =>
-  `absolute left-1/2 -translate-x-1/2 z-50 max-h-[calc(100dvh-${isCentered ? "12rem" : "6rem"})] w-full max-w-3xl rounded-xl border border-border bg-popover p-0 text-popover-foreground shadow-xl`;
+  `absolute left-1/2 -translate-x-1/2 z-50 max-h-[calc(100dvh-${isCentered ? "2.5rem" : "2rem"})] w-full max-w-3xl overflow-y-auto overscroll-contain rounded-xl border border-border bg-popover p-0 text-popover-foreground shadow-xl`;
 
 /** Bot mode: a black circle floats just above the chat box's top-left corner.
     The box is pushed down by that same room so the circle always has space and
@@ -325,6 +328,7 @@ export const ChatComposer = memo(function ChatComposer({
     mimeType?: string;
     url?: string;
     uploading?: boolean;
+    pending?: boolean;
   }>;
   onClearAttachment?: (fileId?: string) => void;
   libraryFiles?: Array<{
@@ -373,6 +377,8 @@ export const ChatComposer = memo(function ChatComposer({
   const isMobile = useIsMobile();
   const [libraryOpen, setLibraryOpen] = useState(initialLibraryOpen);
   const [toolsOpen, setToolsOpen] = useState(initialToolsOpen);
+  const [attachTooltipOpen, setAttachTooltipOpen] = useState(false);
+  const attachTooltipSuppressedRef = useRef(false);
   const [mobileToolsOpen, setMobileToolsOpen] = useState(false);
   const [mobileToolsPage, setMobileToolsPage] = useState<"main" | "create">(
     "main"
@@ -384,6 +390,11 @@ export const ChatComposer = memo(function ChatComposer({
   const [activeTag, setActiveTag] = useState<ComposerTag>(
     () => propActiveTag ?? "chat"
   );
+
+  const suppressAttachTooltipForAction = () => {
+    attachTooltipSuppressedRef.current = true;
+    setAttachTooltipOpen(false);
+  };
 
   useEffect(() => {
     if (propActiveTag && propActiveTag !== activeTag) {
@@ -663,6 +674,38 @@ export const ChatComposer = memo(function ChatComposer({
     return () => document.removeEventListener("pointerdown", closeOutsidePanel);
   }, [libraryOpen]);
 
+  useLayoutEffect(() => {
+    const panel = libraryPanelRef.current;
+    if (!libraryOpen || !panel) return;
+    const updateAvailableHeight = () => {
+      const opensBelow = !isMobile && menuPlacement === "below";
+      if (!opensBelow) {
+        panel.style.top = "";
+        panel.style.bottom = "";
+        panel.style.maxHeight = `calc(100dvh - ${isCentered ? "2.5rem" : "2rem"})`;
+        return;
+      }
+      const shellBottom = panel.parentElement?.getBoundingClientRect().bottom ?? 0;
+      const availableHeight = window.innerHeight - shellBottom - 18;
+      if (availableHeight < 220) {
+        panel.style.top = "auto";
+        panel.style.bottom = "calc(100% + 2px)";
+        panel.style.maxHeight = `calc(100dvh - ${isCentered ? "2.5rem" : "2rem"})`;
+      } else {
+        panel.style.top = "";
+        panel.style.bottom = "";
+        panel.style.maxHeight = `${availableHeight}px`;
+      }
+    };
+    updateAvailableHeight();
+    window.addEventListener("resize", updateAvailableHeight);
+    window.addEventListener("scroll", updateAvailableHeight, true);
+    return () => {
+      window.removeEventListener("resize", updateAvailableHeight);
+      window.removeEventListener("scroll", updateAvailableHeight, true);
+    };
+  }, [libraryOpen, isCentered, isMobile, menuPlacement]);
+
   function submit() {
     if (isEditingMessage) {
       if (value.trim() && !isRecording && !isTranscribing) {
@@ -804,8 +847,8 @@ export const ChatComposer = memo(function ChatComposer({
               className={cn(
                 getLibrarySubmenuClass(isCentered),
                 isMobile || menuPlacement !== "below"
-                  ? "bottom-[calc(100%+0.5rem)]"
-                  : "top-[calc(100%+0.5rem)]"
+                  ? "bottom-[calc(100%+2px)]"
+                  : "top-[calc(100%+2px)]"
               )}
             >
               <LibraryPickerContent
@@ -918,7 +961,9 @@ export const ChatComposer = memo(function ChatComposer({
                       <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
                         {item.uploading
                           ? "Uploading…"
-                          : `${kind.label}${item.linked ? " · linked" : " · library"}`}
+                          : item.pending
+                            ? "Ready to send"
+                            : `${kind.label}${item.linked ? " · linked" : " · library"}`}
                       </span>
                     </span>
                     {onClearAttachment && (
@@ -1334,12 +1379,24 @@ export const ChatComposer = memo(function ChatComposer({
                     open={toolsOpen && !libraryOpen}
                     onOpenChange={setToolsOpen}
                   >
-                    <Tooltip>
+                    <Tooltip
+                      open={attachTooltipOpen}
+                      onOpenChange={open => {
+                        if (open && attachTooltipSuppressedRef.current) return;
+                        setAttachTooltipOpen(open);
+                      }}
+                    >
                       <TooltipTrigger asChild>
                         <DropdownMenuTrigger asChild>
                           <Button
                             variant="ghost"
                             size="icon"
+                            onPointerEnter={() => {
+                              attachTooltipSuppressedRef.current = false;
+                            }}
+                            onPointerLeave={() => {
+                              attachTooltipSuppressedRef.current = false;
+                            }}
                             className="ksemo-composer-attach size-10 shrink-0 rounded-full bg-transparent text-muted-foreground transition-colors hover:bg-accent hover:text-foreground data-[state=open]:bg-accent data-[state=open]:text-foreground aria-expanded:bg-accent aria-expanded:text-foreground"
                             aria-label={
                               toolsOpen && !libraryOpen
@@ -1369,13 +1426,16 @@ export const ChatComposer = memo(function ChatComposer({
                             ? "bottom"
                             : "top"
                       }
-                      sideOffset={9}
+                      sideOffset={11}
                       alignOffset={-8}
                       collisionPadding={12}
                       className="ksemo-tools-menu w-48 rounded-xl max-h-[16rem] overflow-y-auto"
                     >
                       <DropdownMenuItem
-                        onClick={() => fileInputRef.current?.click()}
+                        onClick={() => {
+                          suppressAttachTooltipForAction();
+                          fileInputRef.current?.click();
+                        }}
                       >
                         <Paperclip className="mr-2 size-4 -rotate-45 -scale-x-100 text-muted-foreground" />{" "}
                         Upload files
@@ -1384,6 +1444,7 @@ export const ChatComposer = memo(function ChatComposer({
                         ? !guestMode && (
                             <DropdownMenuItem
                               onSelect={() => {
+                                suppressAttachTooltipForAction();
                                 setToolsOpen(false);
                                 cameraInputRef.current?.click();
                               }}
@@ -1395,6 +1456,7 @@ export const ChatComposer = memo(function ChatComposer({
                         : onTakeScreenshot && (
                             <DropdownMenuItem
                               onSelect={() => {
+                                suppressAttachTooltipForAction();
                                 setToolsOpen(false);
                                 onTakeScreenshot();
                               }}
@@ -1405,6 +1467,7 @@ export const ChatComposer = memo(function ChatComposer({
                           )}
                       <DropdownMenuItem
                         onSelect={() => {
+                          suppressAttachTooltipForAction();
                           setLibraryOpen(true);
                           setToolsOpen(false);
                         }}
@@ -1439,6 +1502,7 @@ export const ChatComposer = memo(function ChatComposer({
                                 <DropdownMenuItem
                                   key={option.mode}
                                   onSelect={() => {
+                                    suppressAttachTooltipForAction();
                                     if (isActive) {
                                       onModeChange?.(null);
                                     } else {
@@ -1863,8 +1927,41 @@ export function LibraryPickerContent({
   onCancel?: () => void;
   visibleCount?: number;
 }) {
-  const isMobile = useIsMobile();
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
+  const [view, setView] = useState<"grid" | "list">("grid");
+  const viewToggleRef = useRef<HTMLDivElement>(null);
+  const [viewThumb, setViewThumb] = useState<{ left: number; width: number } | null>(null);
+  const [searchOpen, setSearchOpen] = useState(Boolean(query));
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  const measureViewThumb = useCallback(() => {
+    const track = viewToggleRef.current;
+    if (!track) return;
+    const selected = Array.from(track.children).find(
+      child =>
+        child instanceof HTMLElement && child.dataset.value === view
+    ) as HTMLElement | undefined;
+    if (!selected) return;
+    const trackRect = track.getBoundingClientRect();
+    const selectedRect = selected.getBoundingClientRect();
+    setViewThumb({
+      left: selectedRect.left - trackRect.left - track.clientLeft,
+      width: selectedRect.width,
+    });
+  }, [view]);
+
+  useLayoutEffect(() => {
+    measureViewThumb();
+  }, [measureViewThumb]);
+
+  useEffect(() => {
+    window.addEventListener("resize", measureViewThumb);
+    return () => window.removeEventListener("resize", measureViewThumb);
+  }, [measureViewThumb]);
+
+  useEffect(() => {
+    if (searchOpen) searchInputRef.current?.focus();
+  }, [searchOpen]);
 
   const toggleFileSelection = (fileId: string) => {
     setSelectedFiles(prev => {
@@ -1887,41 +1984,121 @@ export function LibraryPickerContent({
   };
 
   const listMaxHeightStyle =
-    files.length > visibleCount
-      ? { maxHeight: `${visibleCount * 68 - 4}px` }
-      : undefined;
+    view === "grid"
+      ? { maxHeight: "min(40vh, 280px)" }
+      : files.length > visibleCount
+        ? { maxHeight: `${visibleCount * 68 - 4}px` }
+        : undefined;
 
   return (
     <div className="space-y-2 p-2">
-      <div className="flex items-center gap-2 px-1">
-        <Library aria-hidden="true" className="size-4 text-foreground" />
-        <p className="flex-1 text-sm font-medium">Browse Library</p>
-        {onCancel && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onCancel}
-            className="h-6 rounded-lg px-2 text-[11px]"
-          >
-            Cancel
-          </Button>
-        )}
-      </div>
-      <div className="flex items-center gap-2">
-        <Input
-          autoFocus={!isMobile}
-          value={query}
-          onChange={event => onQueryChange(event.target.value)}
-          placeholder="Search your files and images"
-          className="h-8 flex-1 rounded-lg bg-background text-sm"
+      <div className="flex min-w-0 items-center gap-1 px-1">
+        <Library
+          aria-hidden="true"
+          className="size-4 shrink-0 text-foreground"
         />
+        <p className="min-w-0 flex-1 truncate text-sm font-medium">
+          Browse Library
+        </p>
+        <div
+          className={cn(
+            "flex min-w-0 shrink-0 items-center gap-2",
+            searchOpen && "min-w-[5rem] flex-1"
+          )}
+        >
+          {searchOpen && (
+            <Input
+              ref={searchInputRef}
+              value={query}
+              onChange={event => onQueryChange(event.target.value)}
+              placeholder="Search Browse Library"
+              aria-label="Search Browse Library"
+              className="h-9 min-w-0 flex-1 rounded-xl bg-background text-sm"
+            />
+          )}
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            onClick={() => {
+              if (searchOpen) onQueryChange("");
+              setSearchOpen(open => !open);
+            }}
+            className="size-9 shrink-0 rounded-full text-foreground transition-colors hover:border-neutral-700 hover:bg-neutral-800 active:bg-neutral-700"
+            aria-label={searchOpen ? "Close Library search" : "Search Library"}
+            aria-expanded={searchOpen}
+          >
+            <Search className="size-4" aria-hidden="true" />
+          </Button>
+        </div>
+        <div
+          ref={viewToggleRef}
+          className="relative flex shrink-0 items-center gap-0.5 rounded-xl border border-border bg-card p-0.5"
+          role="group"
+          aria-label="Library view"
+        >
+          <span
+            aria-hidden="true"
+            className={cn(
+              "absolute bottom-0.5 top-0.5 rounded-lg bg-foreground transition-[left,width] duration-300 ease-out",
+              viewThumb ? "opacity-100" : "opacity-0"
+            )}
+            style={viewThumb ?? undefined}
+          />
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            className={cn(
+              "relative z-10 size-7 rounded-lg transition-colors",
+              view === "grid"
+                ? "text-background hover:bg-transparent hover:text-background"
+                : "text-foreground"
+            )}
+            onClick={() => setView("grid")}
+            data-value="grid"
+            aria-label="Grid view"
+            aria-pressed={view === "grid"}
+          >
+            <Grid2X2 className="size-4" aria-hidden="true" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            className={cn(
+              "relative z-10 size-7 rounded-lg transition-colors",
+              view === "list"
+                ? "text-background hover:bg-transparent hover:text-background"
+                : "text-foreground"
+            )}
+            onClick={() => setView("list")}
+            data-value="list"
+            aria-label="List view"
+            aria-pressed={view === "list"}
+          >
+            <List className="size-4" aria-hidden="true" />
+          </Button>
+        </div>
         {selectedFiles.size > 0 && (
           <Button
             onClick={handleConfirm}
-            className="h-8 rounded-xl bg-foreground text-background hover:bg-foreground/90 text-sm px-4"
+            className="h-8 shrink-0 rounded-lg bg-foreground px-2 text-xs text-background hover:bg-foreground/90 sm:px-3 sm:text-sm"
             size="sm"
           >
-            Add to chat
+            <span className="sm:hidden">Add</span>
+            <span className="hidden sm:inline">Add to chat</span>
+          </Button>
+        )}
+        {onCancel && (
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={onCancel}
+            className="shrink-0 rounded-md text-muted-foreground hover:text-foreground"
+            aria-label="Close Browse Library"
+          >
+            <X className="size-4" aria-hidden="true" />
           </Button>
         )}
       </div>
@@ -1931,7 +2108,13 @@ export function LibraryPickerContent({
             {query ? "No files match your search" : "No files in library"}
           </div>
         ) : (
-          <div className="space-y-1">
+          <div
+            className={
+              view === "grid"
+                ? "grid grid-cols-3 gap-1.5 sm:grid-cols-4"
+                : "space-y-1"
+            }
+          >
             {files.map(file => {
               const isImage =
                 (file.url || file.mimeType) &&
@@ -1944,37 +2127,82 @@ export function LibraryPickerContent({
                   key={file.id}
                   onClick={() => toggleFileSelection(file.id)}
                   className={cn(
-                    "flex w-full items-center gap-2 rounded-lg p-2 text-left transition-colors",
+                    view === "grid"
+                      ? "group relative flex aspect-square min-w-0 flex-col overflow-hidden rounded-xl border bg-card text-left transition-colors"
+                      : "flex w-full items-center gap-2 rounded-lg p-2 text-left transition-colors",
                     isSelected
-                      ? "bg-muted/50 hover:bg-accent"
-                      : "hover:bg-accent"
+                      ? view === "grid"
+                        ? "border-muted-foreground/50 hover:bg-accent"
+                        : "bg-muted/50 hover:bg-accent"
+                      : view === "grid"
+                        ? "border-border hover:bg-accent"
+                        : "hover:bg-accent"
                   )}
                 >
-                  {isImage && file.url ? (
-                    <img
-                      src={file.url}
-                      alt={file.filename}
-                      className="size-11 shrink-0 rounded-lg object-cover"
-                    />
+                  {view === "grid" ? (
+                    <>
+                      <div className="relative flex min-h-0 w-full flex-1 items-center justify-center bg-muted">
+                        {isImage && file.url ? (
+                          <img
+                            src={file.url}
+                            alt={file.filename}
+                            className="size-full object-cover"
+                          />
+                        ) : (
+                          <div className="grid size-full place-items-center">
+                            <ComposerFileIcon
+                              name={file.filename}
+                              mimeType={file.mimeType}
+                              className="size-7 text-foreground"
+                            />
+                          </div>
+                        )}
+                        {!isImage && (
+                          <span className="absolute left-1 top-1 rounded bg-background/90 px-1.5 py-0.5 text-[10px] font-medium leading-3 text-foreground shadow-sm">
+                            {kind.label}
+                          </span>
+                        )}
+                        {isSelected && (
+                          <span className="absolute right-2 top-2 flex size-5 items-center justify-center rounded-full bg-foreground text-background shadow-sm">
+                            <Check className="size-3" />
+                          </span>
+                        )}
+                      </div>
+                      <div className="w-full min-w-0 shrink-0 px-1.5 py-1">
+                        <span className="block truncate text-[11px] font-medium text-foreground">
+                          {file.filename}
+                        </span>
+                      </div>
+                    </>
                   ) : (
-                    <ComposerFileIcon
-                      name={file.filename}
-                      mimeType={file.mimeType}
-                      className="size-7 shrink-0 text-foreground"
-                    />
-                  )}
-                  <div className="flex min-w-0 flex-1 flex-col">
-                    <span className="truncate text-sm font-medium text-foreground">
-                      {file.filename}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      {kind.label}
-                    </span>
-                  </div>
-                  {isSelected && (
-                    <div className="flex size-5 items-center justify-center rounded-full bg-foreground text-background">
-                      <Check className="size-3" />
-                    </div>
+                    <>
+                      {isImage && file.url ? (
+                        <img
+                          src={file.url}
+                          alt={file.filename}
+                          className="size-11 shrink-0 rounded-lg object-cover"
+                        />
+                      ) : (
+                        <ComposerFileIcon
+                          name={file.filename}
+                          mimeType={file.mimeType}
+                          className="size-7 shrink-0 text-foreground"
+                        />
+                      )}
+                      <div className="flex min-w-0 flex-1 flex-col">
+                        <span className="truncate text-sm font-medium text-foreground">
+                          {file.filename}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {kind.label}
+                        </span>
+                      </div>
+                      {isSelected && (
+                        <span className="flex size-5 items-center justify-center rounded-full bg-foreground text-background">
+                          <Check className="size-3" />
+                        </span>
+                      )}
+                    </>
                   )}
                 </button>
               );

@@ -226,6 +226,7 @@ type SelectedAttachment = {
   url: string;
   linked: boolean;
   uploading?: boolean;
+  pending?: boolean;
 };
 
 // Returns true when an attachment with the same filename is already selected,
@@ -995,8 +996,13 @@ export default function Home({
   const [attachmentNotices, setAttachmentNotices] = useState<
     SelectedAttachment[]
   >([]);
-  const pendingComposerUploadsRef = useRef(new Set<string>());
+  const pendingComposerFilesRef = useRef(new Map<string, File>());
+  const composerAttachmentUploadInProgressRef = useRef(false);
   const attachmentPreviewUrlsRef = useRef(new Set<string>());
+  function clearComposerAttachments() {
+    pendingComposerFilesRef.current.clear();
+    setAttachmentNotices([]);
+  }
 
   useEffect(() => {
     const activePreviewUrls = new Set(
@@ -1429,7 +1435,7 @@ export default function Home({
     );
     setActiveConversationId(null);
     activeConversationIdRef.current = null;
-    setAttachmentNotices([]);
+    clearComposerAttachments();
     isTemporaryChatRef.current = false;
     setIsTemporaryChat(false);
     isSavedGhostChatRef.current = false;
@@ -1676,7 +1682,7 @@ export default function Home({
     setActiveConversationId(entry.id);
     activeConversationIdRef.current = entry.id;
     setComposerValue("");
-    setAttachmentNotices([]);
+    clearComposerAttachments();
     setEditingMessage(null);
     savedComposerDraftRef.current = "";
     setPrivateChatMenuOpen(false);
@@ -1752,7 +1758,7 @@ export default function Home({
     setActiveConversationId(null);
     activeConversationIdRef.current = null;
     setComposerValue("");
-    setAttachmentNotices([]);
+    clearComposerAttachments();
     setEditingMessage(null);
     savedComposerDraftRef.current = "";
     setPrivateChatOptionsOpenId(null);
@@ -3092,7 +3098,72 @@ export default function Home({
     const knownMessages = chatMessages;
     const isRegeneration = Boolean(options.regenerateAssistantMessageId);
     const draftNow = Date.now();
-    const selectedAttachments = !isRegeneration ? attachmentNotices : [];
+    const selectedAttachments = !isRegeneration ? [...attachmentNotices] : [];
+    const pendingAttachments = selectedAttachments.filter(attachment =>
+      pendingComposerFilesRef.current.has(attachment.fileId)
+    );
+    if (pendingAttachments.length) {
+      if (composerAttachmentUploadInProgressRef.current) return;
+      composerAttachmentUploadInProgressRef.current = true;
+      setAttachmentNotices(current =>
+        current.map(attachment =>
+          pendingComposerFilesRef.current.has(attachment.fileId)
+            ? { ...attachment, uploading: true }
+            : attachment
+        )
+      );
+      try {
+        for (const attachment of pendingAttachments) {
+          const pendingFileId = attachment.fileId;
+          const file = pendingComposerFilesRef.current.get(pendingFileId);
+          if (!file) continue;
+          const bytes = new Uint8Array(await file.arrayBuffer());
+          let binary = "";
+          const chunkSize = 0x8000;
+          for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+            binary += String.fromCharCode.apply(
+              null,
+              bytes.subarray(offset, offset + chunkSize) as unknown as number[]
+            );
+          }
+          const uploaded = await composerFileUpload.mutateAsync({
+            filename: file.name,
+            mimeType: attachment.mimeType ?? resolveMimeType(file),
+            dataBase64: window.btoa(binary),
+          });
+          if (conversationId) {
+            await composerFileAttach.mutateAsync({
+              fileId: uploaded.id,
+              conversationId,
+            });
+          }
+          pendingComposerFilesRef.current.delete(pendingFileId);
+          attachment.fileId = uploaded.id;
+          attachment.url = uploaded.url;
+          attachment.pending = false;
+          attachment.uploading = false;
+          attachment.linked = Boolean(conversationId);
+          setAttachmentNotices(current =>
+            current.map(currentAttachment =>
+              currentAttachment.fileId === pendingFileId
+                ? attachment
+                : currentAttachment
+            )
+          );
+        }
+        composerAttachmentUploadInProgressRef.current = false;
+        utils.workspace.files.list.invalidate();
+      } catch (err) {
+        composerAttachmentUploadInProgressRef.current = false;
+        utils.workspace.files.list.invalidate();
+        console.error("[sendMessage] attachment upload failed:", err);
+        setAttachmentNotices(current =>
+          current.map(attachment => ({ ...attachment, uploading: false }))
+        );
+        toast.error("Failed to upload an attachment. Please try sending again.");
+        return;
+      }
+    }
     const drafts = buildStreamingDrafts(knownMessages, content, {
       isRegeneration,
       replaceUserMessageId: options.replaceUserMessageId,
@@ -3141,7 +3212,7 @@ export default function Home({
     // The selected format is intentionally NOT cleared here: it persists in the
     // chat input so the user can create multiple files in a row. It only clears
     // when the user presses Cancel on the format chip (onDocumentFormatChange(null)).
-    if (selectedAttachments.length) setAttachmentNotices([]);
+    if (selectedAttachments.length) clearComposerAttachments();
     const controller = new AbortController();
     const turnSequence = ++generationSequenceRef.current;
     const streamEntry = {
@@ -4448,7 +4519,7 @@ export default function Home({
       pendingOpenScrollRef.current = true;
       setActiveMode("chat");
       setComposerValue("");
-      setAttachmentNotices([]);
+      clearComposerAttachments();
       requestComposerFocus();
       return;
     }
@@ -4510,7 +4581,7 @@ export default function Home({
         next.pathname + (next.search ? next.search : "")
       );
     }
-    setAttachmentNotices([]);
+    clearComposerAttachments();
     setActiveMode("chat");
     setEditingMessage(null);
     setComposerValue("");
@@ -4895,7 +4966,7 @@ export default function Home({
     return mimeMap[ext] || "application/octet-stream";
   }
 
-  async function attachFromComposer(file: File) {
+  function attachFromComposer(file: File) {
     if (!user) {
       toast.info("Sign in to attach files.");
       return;
@@ -4908,16 +4979,18 @@ export default function Home({
     const resolvedMime = resolveMimeType(file);
     if (
       hasDuplicateAttachment(attachmentNotices, file.name) ||
-      pendingComposerUploadsRef.current.has(nameKey)
+      Array.from(pendingComposerFilesRef.current.values()).some(
+        pendingFile => pendingFile.name.trim().toLowerCase() === nameKey
+      )
     ) {
       return;
     }
-    pendingComposerUploadsRef.current.add(nameKey);
     const pendingFileId = `uploading:${
       typeof crypto !== "undefined" && "randomUUID" in crypto
         ? crypto.randomUUID()
         : `${Date.now()}-${Math.random().toString(36).slice(2)}`
     }`;
+    pendingComposerFilesRef.current.set(pendingFileId, file);
     const previewUrl = resolvedMime.startsWith("image/")
       ? URL.createObjectURL(file)
       : "";
@@ -4930,56 +5003,9 @@ export default function Home({
         mimeType: resolvedMime,
         url: previewUrl,
         linked: false,
-        uploading: true,
+        pending: true,
       },
     ]);
-    try {
-      const bytes = new Uint8Array(await file.arrayBuffer());
-      let binary = "";
-      const CHUNK_SIZE = 0x8000;
-      for (let offset = 0; offset < bytes.length; offset += CHUNK_SIZE)
-        binary += String.fromCharCode.apply(
-          null,
-          bytes.subarray(offset, offset + CHUNK_SIZE) as unknown as number[]
-        );
-      const uploaded = await composerFileUpload.mutateAsync({
-        filename: file.name,
-        mimeType: resolvedMime,
-        dataBase64: window.btoa(binary),
-      });
-      const linked = Boolean(activeConversationId);
-      if (activeConversationId) {
-        await composerFileAttach.mutateAsync({
-          fileId: uploaded.id,
-          conversationId: activeConversationId,
-        });
-      }
-      setAttachmentNotices(current =>
-        current.map(attachment =>
-          attachment.fileId === pendingFileId
-            ? {
-                ...attachment,
-                fileId: uploaded.id,
-                url: previewUrl || uploaded.url,
-                linked,
-                uploading: false,
-              }
-            : attachment
-        )
-      );
-    } catch (err) {
-      console.error("[attachFromComposer] upload failed:", err);
-      setAttachmentNotices(current =>
-        current.filter(attachment => attachment.fileId !== pendingFileId)
-      );
-      if (previewUrl) {
-        URL.revokeObjectURL(previewUrl);
-        attachmentPreviewUrlsRef.current.delete(previewUrl);
-      }
-      toast.error(`Failed to upload "${file.name}". Please try again.`);
-    } finally {
-      pendingComposerUploadsRef.current.delete(nameKey);
-    }
   }
 
   async function captureScreenshot() {
@@ -5194,7 +5220,7 @@ export default function Home({
     setActiveConversationId(id);
     activeConversationIdRef.current = id;
     if (user?.id) storeActiveConversationId(user.id, id);
-    setAttachmentNotices([]);
+    clearComposerAttachments();
     setEditingMessage(null);
     savedComposerDraftRef.current = "";
     requestComposerFocus();
@@ -5569,11 +5595,17 @@ export default function Home({
       });
     }
   );
-  const stableOnClearAttachment = usePersistFn((fileId?: string) =>
-    setAttachmentNotices(current =>
-      fileId ? current.filter(file => file.fileId !== fileId) : []
-    )
-  );
+  const stableOnClearAttachment = usePersistFn((fileId?: string) => {
+    if (fileId) {
+      pendingComposerFilesRef.current.delete(fileId);
+      setAttachmentNotices(current =>
+        current.filter(file => file.fileId !== fileId)
+      );
+    } else {
+      pendingComposerFilesRef.current.clear();
+      setAttachmentNotices([]);
+    }
+  });
   const stableOnCloseSidebar = usePersistFn(() => setSidebarOpen(false));
   const stableOnToggleCollapsed = usePersistFn(() =>
     setSidebarCollapsed(current => !current)
