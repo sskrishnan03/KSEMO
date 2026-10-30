@@ -678,19 +678,33 @@ export const ChatComposer = memo(function ChatComposer({
     const panel = libraryPanelRef.current;
     if (!libraryOpen || !panel) return;
     const updateAvailableHeight = () => {
+      const visualViewport = window.visualViewport;
+      const viewportTop = visualViewport?.offsetTop ?? 0;
+      const viewportBottom =
+        viewportTop + (visualViewport?.height ?? window.innerHeight);
       const opensBelow = !isMobile && menuPlacement === "below";
+      const shellRect = panel.parentElement?.getBoundingClientRect();
       if (!opensBelow) {
         panel.style.top = "";
         panel.style.bottom = "";
-        panel.style.maxHeight = `calc(100dvh - ${isCentered ? "2.5rem" : "2rem"})`;
+        const availableAbove =
+          (shellRect?.top ?? viewportBottom) - viewportTop - 18;
+        panel.style.maxHeight = `${Math.max(
+          0,
+          Math.min(availableAbove, viewportBottom - viewportTop - 32)
+        )}px`;
         return;
       }
-      const shellBottom = panel.parentElement?.getBoundingClientRect().bottom ?? 0;
-      const availableHeight = window.innerHeight - shellBottom - 18;
+      const availableHeight = viewportBottom - (shellRect?.bottom ?? 0) - 18;
       if (availableHeight < 220) {
         panel.style.top = "auto";
         panel.style.bottom = "calc(100% + 2px)";
-        panel.style.maxHeight = `calc(100dvh - ${isCentered ? "2.5rem" : "2rem"})`;
+        const availableAbove =
+          (shellRect?.top ?? viewportBottom) - viewportTop - 18;
+        panel.style.maxHeight = `${Math.max(
+          0,
+          Math.min(availableAbove, viewportBottom - viewportTop - 32)
+        )}px`;
       } else {
         panel.style.top = "";
         panel.style.bottom = "";
@@ -700,11 +714,15 @@ export const ChatComposer = memo(function ChatComposer({
     updateAvailableHeight();
     window.addEventListener("resize", updateAvailableHeight);
     window.addEventListener("scroll", updateAvailableHeight, true);
+    window.visualViewport?.addEventListener("resize", updateAvailableHeight);
+    window.visualViewport?.addEventListener("scroll", updateAvailableHeight);
     return () => {
       window.removeEventListener("resize", updateAvailableHeight);
       window.removeEventListener("scroll", updateAvailableHeight, true);
+      window.visualViewport?.removeEventListener("resize", updateAvailableHeight);
+      window.visualViewport?.removeEventListener("scroll", updateAvailableHeight);
     };
-  }, [libraryOpen, isCentered, isMobile, menuPlacement]);
+  }, [libraryOpen, isMobile, menuPlacement]);
 
   function submit() {
     if (isEditingMessage) {
@@ -1927,6 +1945,7 @@ export function LibraryPickerContent({
   onCancel?: () => void;
   visibleCount?: number;
 }) {
+  const isMobile = useIsMobile();
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
   const [view, setView] = useState<"grid" | "list">("grid");
   const viewToggleRef = useRef<HTMLDivElement>(null);
@@ -1997,7 +2016,12 @@ export function LibraryPickerContent({
           aria-hidden="true"
           className="size-4 shrink-0 text-foreground"
         />
-        <p className="min-w-0 flex-1 truncate text-sm font-medium">
+        <p
+          className={cn(
+            "min-w-0 flex-1 truncate text-sm font-medium",
+            isMobile && searchOpen && "hidden"
+          )}
+        >
           Browse Library
         </p>
         <div
