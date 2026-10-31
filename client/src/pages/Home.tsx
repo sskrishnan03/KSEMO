@@ -6839,7 +6839,8 @@ export default function Home({
             {composerTag !== "bot" && (
               <>
                 {/* Shared chat navbar */}
-                {!isGhostMode && (
+                {!isGhostMode &&
+                  (Boolean(activeConversationId) || visibleMessages.length > 0) && (
                   <>
                     <div
                       aria-hidden="true"
