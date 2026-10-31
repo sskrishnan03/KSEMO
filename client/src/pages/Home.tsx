@@ -774,6 +774,15 @@ export default function Home({
       return false;
     }
   });
+  const [sidebarWidth, setSidebarWidth] = useState(() => {
+    try {
+      const storedWidth = Number(localStorage.getItem("ksemo-sidebar-width"));
+      if (Number.isFinite(storedWidth) && storedWidth > 0) {
+        return Math.max(240, Math.min(420, storedWidth));
+      }
+    } catch {}
+    return 276;
+  });
   const [activeConversationId, setActiveConversationId] = useState<
     string | null
   >(null);
@@ -1498,6 +1507,12 @@ export default function Home({
       localStorage.setItem("ksemo-sidebar-collapsed", String(sidebarCollapsed));
     } catch {}
   }, [sidebarCollapsed]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("ksemo-sidebar-width", String(sidebarWidth));
+    } catch {}
+  }, [sidebarWidth]);
 
   // When the session ends, forget the previous session's chat state so nothing
   // leaks into the next one.
@@ -6233,6 +6248,8 @@ export default function Home({
           onLogout={stableHandleSignOut}
           user={user ?? {}}
           locked={guestMode}
+          width={sidebarWidth}
+          onWidthChange={setSidebarWidth}
         />
       )}
       {isGhostMode && (
@@ -6826,11 +6843,7 @@ export default function Home({
                   <>
                     <div
                       aria-hidden="true"
-                      className="pointer-events-none absolute inset-x-0 top-0 z-[15] h-12 bg-background backdrop-blur-md"
-                    />
-                    <div
-                      aria-hidden="true"
-                      className="pointer-events-none absolute inset-x-0 top-12 z-[15] h-3 bg-gradient-to-b from-background to-transparent"
+                      className="pointer-events-none absolute inset-x-0 top-0 z-[15] h-12 border-b border-border/60 bg-background"
                     />
                   </>
                 )}

@@ -101,6 +101,8 @@ export const ConversationSidebar = memo(function ConversationSidebar({
   onSupport,
   onLogout,
   user,
+  width = 276,
+  onWidthChange = () => {},
   previewSupportOpen = false,
   locked = false,
 }: {
@@ -127,6 +129,8 @@ export const ConversationSidebar = memo(function ConversationSidebar({
   onSupport: (topic: "faq" | "privacy" | "terms") => void;
   onLogout: () => void;
   user: { id?: string | number; name?: string | null; email?: string | null };
+  width?: number;
+  onWidthChange?: (width: number) => void;
   previewSupportOpen?: boolean;
   /** Signed-out guest mode: nothing in the sidebar is usable until sign-in. */
   locked?: boolean;
@@ -141,6 +145,30 @@ export const ConversationSidebar = memo(function ConversationSidebar({
   );
   const compact = collapsed;
   const isMobile = useIsMobile(960);
+  const [isResizing, setIsResizing] = useState(false);
+  const minSidebarWidth = 240;
+  const maxSidebarWidth = 420;
+  const asideRef = useRef<HTMLElement>(null);
+
+  const resizeFromPointer = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!isResizing || !asideRef.current) return;
+    const nextWidth = Math.round(
+      event.clientX - asideRef.current.getBoundingClientRect().left
+    );
+    onWidthChange(Math.max(minSidebarWidth, Math.min(maxSidebarWidth, nextWidth)));
+  };
+
+  const resizeFromKeyboard = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    const step = event.shiftKey ? 32 : 16;
+    let nextWidth: number | null = null;
+    if (event.key === "ArrowLeft") nextWidth = width - step;
+    if (event.key === "ArrowRight") nextWidth = width + step;
+    if (event.key === "Home") nextWidth = minSidebarWidth;
+    if (event.key === "End") nextWidth = maxSidebarWidth;
+    if (nextWidth === null) return;
+    event.preventDefault();
+    onWidthChange(Math.max(minSidebarWidth, Math.min(maxSidebarWidth, nextWidth)));
+  };
 
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
@@ -166,7 +194,6 @@ export const ConversationSidebar = memo(function ConversationSidebar({
     setRenameValue("");
   };
 
-  const asideRef = useRef<HTMLElement>(null);
   const navRef = useRef<HTMLElement>(null);
 
   const iconMotion = (label: string) =>
@@ -260,13 +287,51 @@ export const ConversationSidebar = memo(function ConversationSidebar({
           onToggleCollapsed();
         }}
         className={cn(
-          "group/sidebar fixed inset-y-0 left-0 z-50 flex flex-col border-r border-border bg-sidebar px-3 pb-1 pt-3 transition-[width,transform] duration-200 lg:static lg:translate-x-0",
+          "group/sidebar fixed inset-y-0 left-0 z-50 flex shrink-0 flex-col border-r border-border bg-sidebar px-3 pb-1 pt-3 lg:static lg:translate-x-0",
           compact
             ? "w-16 lg:cursor-ew-resize lg:[&_button]:cursor-pointer lg:[&_a]:cursor-pointer"
-            : "w-[17.25rem]",
+            : "",
+          isResizing
+            ? "transition-transform duration-200"
+            : "transition-[width,transform] duration-200",
           open ? "translate-x-0" : "-translate-x-full"
         )}
+        style={compact ? undefined : { width }}
       >
+        {!compact && !isMobile && (
+          <div
+            role="separator"
+            aria-label="Resize sidebar"
+            aria-orientation="vertical"
+            aria-valuemin={minSidebarWidth}
+            aria-valuemax={maxSidebarWidth}
+            aria-valuenow={width}
+            aria-valuetext={`${width} pixels`}
+            aria-keyshortcuts="ArrowLeft ArrowRight Home End"
+            tabIndex={0}
+            className={cn(
+              "group/sidebar-resize absolute -right-2 top-0 z-[60] hidden h-full w-4 cursor-col-resize touch-none outline-none lg:block",
+              isResizing && "z-[70]"
+            )}
+            onPointerDown={event => {
+              if (event.button !== 0) return;
+              event.preventDefault();
+              event.currentTarget.setPointerCapture(event.pointerId);
+              setIsResizing(true);
+            }}
+            onPointerMove={resizeFromPointer}
+            onPointerUp={event => {
+              if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+                event.currentTarget.releasePointerCapture(event.pointerId);
+              }
+              setIsResizing(false);
+            }}
+            onPointerCancel={() => setIsResizing(false)}
+            onKeyDown={resizeFromKeyboard}
+          >
+            <span className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-border/45 transition-colors group-hover/sidebar-resize:bg-primary/70 group-focus-visible/sidebar-resize:bg-primary" />
+          </div>
+        )}
         <div
           className={cn(
             "relative flex items-center pb-4 pt-1",
