@@ -327,6 +327,34 @@ export async function listConversationsForUser(
   return (data || []).map((row: any) => dbToConversation(row));
 }
 
+/** Private chats stay out of the normal history list, but must be recoverable
+ * from the server if the browser's local private-chat index is cleared. */
+export async function listPrivateConversationsForUser(
+  userId: number
+): Promise<Conversation[]> {
+  if (useMemoryFallback()) {
+    return Array.from(inMemoryStore.conversations.values())
+      .filter(
+        conversation =>
+          conversation.userId === userId &&
+          isEphemeralConversationTitle(conversation.title) &&
+          conversation.deletedAt === null &&
+          !conversation.isArchived
+      )
+      .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+  }
+  const { data, error } = await supabase
+    .from("conversations")
+    .select("*")
+    .eq("user_id", userId)
+    .like("title", `${EPHEMERAL_TITLE_PREFIX}%`)
+    .is("deleted_at", null)
+    .eq("is_archived", false)
+    .order("updated_at", { ascending: false });
+  if (error) throwDb("listPrivateConversationsForUser", error);
+  return (data || []).map((row: any) => dbToConversation(row));
+}
+
 export async function getConversationForUser(
   id: string,
   userId: number

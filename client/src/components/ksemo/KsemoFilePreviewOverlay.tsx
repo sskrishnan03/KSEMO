@@ -90,14 +90,14 @@ export const KsemoFilePreviewOverlay = memo(function KsemoFilePreviewOverlay({
 
   return (
     <div
-      className="fixed inset-0 z-[110] flex items-center justify-center bg-black/80 p-4"
+      className="fixed inset-0 z-[110] flex items-center justify-center bg-black/80 p-0 sm:p-4"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
       aria-label={`Preview ${file.filename}`}
     >
       <div
-        className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-border bg-background shadow-2xl"
+        className="flex h-[100dvh] max-h-[100dvh] w-full max-w-none flex-col overflow-hidden rounded-none border-0 bg-background shadow-2xl sm:h-auto sm:max-h-[90vh] sm:max-w-3xl sm:rounded-2xl sm:border"
         onClick={event => event.stopPropagation()}
       >
         <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
@@ -168,19 +168,19 @@ export const KsemoFilePreviewOverlay = memo(function KsemoFilePreviewOverlay({
             <img
               src={file.url}
               alt={file.filename}
-              className="mx-auto h-full max-h-[70vh] w-auto object-contain"
+              className="mx-auto h-full max-h-full w-auto object-contain"
             />
           ) : isPdfDoc ? (
             <iframe
               src={file.url}
               title={file.filename}
-              className="h-[70vh] w-full"
+              className="h-full min-h-0 w-full"
             />
           ) : showInline ? (
             <iframe
               src={file.url}
               title={file.filename}
-              className="h-[70vh] w-full bg-background"
+              className="h-full min-h-0 w-full bg-background"
             />
           ) : (
             <div className="flex h-[50vh] flex-col items-center justify-center gap-3 p-6 text-center">

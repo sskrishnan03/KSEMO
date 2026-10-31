@@ -3753,7 +3753,7 @@ export const PdfDrawer = memo(function PdfDrawer({
       aria-modal="true"
       data-testid="pdf-drawer"
       className={cn(
-        "z-40 flex flex-col bg-background text-foreground overflow-hidden",
+        "z-40 flex flex-col overflow-hidden bg-background text-foreground max-md:fixed max-md:inset-0 max-md:z-[110] max-md:h-[100dvh] max-md:w-full max-md:rounded-none max-md:border-0 max-md:shadow-none",
         isFullWorkspace
           ? "absolute inset-0 rounded-none border-0 shadow-none"
           : cn(

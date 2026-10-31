@@ -26,7 +26,7 @@ export async function memorizeConversation(
 
     const { candidates } = extractMemoryCandidates(
       [{ id: conversation.id, title: conversation.title, messages }],
-      { includeSensitive: settings.sensitiveMemoryEnabled }
+      { includeSensitive: settings?.sensitiveMemoryEnabled ?? false }
     );
 
     const facts: MemoryFactToSave[] = candidates.map(candidate => ({

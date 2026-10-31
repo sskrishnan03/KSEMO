@@ -24,6 +24,7 @@ import {
   attachFileToMessageForUser,
   getUserPreferences,
   listConversationsForUser,
+  listPrivateConversationsForUser,
   listMessageFeedbackForUser,
   listMessagesForConversation,
   moveConversationToTrash,
@@ -200,6 +201,9 @@ export const conversationRouter = router({
     .query(({ ctx, input }) =>
       listConversationsForUser(ctx.user.id, input?.scope ?? "active")
     ),
+  privateList: protectedProcedure.query(({ ctx }) =>
+    listPrivateConversationsForUser(ctx.user.id)
+  ),
   create: protectedProcedure
     .input(
       z.object({

@@ -103,7 +103,7 @@ export function ImageLightbox({
           role="dialog"
           aria-modal="true"
           aria-label={title ?? "Image viewer"}
-          className="fixed inset-0 z-[95] flex items-center justify-center bg-black/90 p-4"
+          className="fixed inset-0 z-[95] flex items-center justify-center bg-black/90 p-0 sm:p-4"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -195,8 +195,8 @@ export function ImageLightbox({
           <div
             className={
               zoom > 1
-                ? "max-h-[85vh] max-w-[90vw] cursor-grab overflow-auto"
-                : "max-h-[85vh] max-w-[90vw] overflow-hidden"
+                ? "max-h-[100dvh] max-w-[100vw] cursor-grab overflow-auto sm:max-h-[85vh] sm:max-w-[90vw]"
+                : "max-h-[100dvh] max-w-[100vw] overflow-hidden sm:max-h-[85vh] sm:max-w-[90vw]"
             }
             onClick={event => event.stopPropagation()}
           >
@@ -209,7 +209,7 @@ export function ImageLightbox({
               animate={{ opacity: 1, scale: zoom }}
               exit={{ opacity: 0 }}
               transition={{ duration: zoom > 1 ? 0.18 : 0.2, ease: "easeOut" }}
-              className="mx-auto max-h-[85vh] max-w-[90vw] rounded-lg object-contain shadow-2xl"
+              className="mx-auto max-h-[100dvh] max-w-[100vw] rounded-none object-contain shadow-2xl sm:max-h-[85vh] sm:max-w-[90vw] sm:rounded-lg"
               onClick={() => setZoom(z => (z > 1 ? 1 : 2))}
             />
           </div>

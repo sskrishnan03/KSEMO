@@ -179,8 +179,9 @@ export async function buildUserMemoryContextWithSources(
   if (settings?.memoryEnabled === false) return null;
 
   const allMemories = await listUserMemories(userId);
+  const sensitiveMemoryEnabled = settings?.sensitiveMemoryEnabled ?? false;
   const eligible = allMemories.filter(
-    memory => !memory.isSensitive || settings.sensitiveMemoryEnabled
+    memory => !memory.isSensitive || sensitiveMemoryEnabled
   );
   const relevant = retrieveRelevantMemories(eligible, query);
   let pastMessages: Awaited<ReturnType<typeof searchConversationMessages>> = [];
@@ -195,7 +196,7 @@ export async function buildUserMemoryContextWithSources(
     .filter(message => message.role === "user")
     .filter(message => message.conversationId !== excludeConversationId)
     .filter(message => {
-      if (settings.sensitiveMemoryEnabled) return true;
+      if (sensitiveMemoryEnabled) return true;
       const sensitivity = extractMemoryCandidates(
         [
           {

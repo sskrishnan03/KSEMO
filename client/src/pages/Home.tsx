@@ -1280,10 +1280,73 @@ export default function Home({
         previousData && user ? previousData : undefined,
     }
   );
+  const privateConversationsQuery = trpc.conversation.privateList.useQuery(
+    undefined,
+    { enabled: Boolean(user?.id) }
+  );
+  useEffect(() => {
+    if (user?.id == null || !privateConversationsQuery.data) return;
+    setPrivateChatEntries(current => {
+      const currentById = new Map(current.map(entry => [entry.id, entry]));
+      const serverEntries = privateConversationsQuery.data.map(conversation => ({
+        id: conversation.id,
+        title: privateChatTitleForDisplay(conversation.title),
+        locked: currentById.get(conversation.id)?.locked ?? false,
+        updatedAt: new Date(conversation.updatedAt).getTime(),
+      }));
+      const serverIds = new Set(serverEntries.map(entry => entry.id));
+      const next = [
+        ...serverEntries,
+        ...current.filter(entry => !serverIds.has(entry.id)),
+      ].sort((a, b) => b.updatedAt - a.updatedAt);
+      writePrivateChatEntries(user.id, next);
+      return next;
+    });
+  }, [privateConversationsQuery.data, user?.id]);
   const activeQuery = trpc.conversation.get.useQuery(
     { id: activeConversationId ?? "unselected" },
-    { enabled: Boolean(activeConversationId) }
+    {
+      enabled: Boolean(activeConversationId),
+      // A missing conversation is handled below by returning the composer to
+      // a new chat. Retrying a 404 only repeats the same stale-ID request.
+      retry: false,
+    }
   );
+  useEffect(() => {
+    if (
+      !activeConversationId ||
+      activeQuery.error?.data?.code !== "NOT_FOUND"
+    ) {
+      return;
+    }
+    setActiveConversationId(null);
+    activeConversationIdRef.current = null;
+    setChatMessages([]);
+    if (user?.id != null) {
+      if (isTemporaryChatRef.current) {
+        if (isSavedGhostChatRef.current) {
+          const survivingEntries = privateChatEntries.filter(
+            entry => entry.id !== activeConversationId
+          );
+          setPrivateChatEntries(survivingEntries);
+          writePrivateChatEntries(user.id, survivingEntries);
+        }
+        writeStoredTemporaryChat(user.id, {
+          active: true,
+          savedPalette: isSavedGhostChatRef.current,
+          activeConversationId: null,
+          ids: Array.from(temporaryConversationIdsRef.current),
+        });
+      } else {
+        rememberNewChatIntent(user.id);
+      }
+    }
+  }, [
+    activeConversationId,
+    activeQuery.error,
+    privateChatEntries,
+    user?.id,
+  ]);
   const shareTargetMessagesQuery = trpc.conversation.get.useQuery(
     { id: shareTarget?.id ?? "unselected" },
     {
@@ -1718,6 +1781,7 @@ export default function Home({
       ];
       setPrivateChatEntries(nextEntries);
       writePrivateChatEntries(user.id, nextEntries);
+      void utils.conversation.privateList.invalidate();
       setMovingToPrivateId(null);
       openPrivateChat(entry, nextEntries);
       showPrivateMoveNotice("success", "Chat moved to Private.");
@@ -3382,6 +3446,7 @@ export default function Home({
                   writePrivateChatEntries(user.id, next);
                   return next;
                 });
+                void utils.conversation.privateList.invalidate();
               }
             }
             if (wasViewing) {
@@ -8017,6 +8082,20 @@ function timeGreeting(temporary = false) {
       "Got a fresh idea to explore?",
       "What can I make easier today?",
       "Tell me what you’re curious about.",
+      "What would you like to get started on?",
+      "Is there something you’ve been meaning to explore?",
+      "What’s one thing you’d like to make progress on?",
+      "Ready to turn a thought into a plan?",
+      "What would make today a little brighter?",
+      "Where should we begin?",
+      "What idea has been following you around?",
+      "What can we figure out this morning?",
+      "What would you like to learn today?",
+      "Bring me a question, big or small.",
+      "What’s something you want to make time for?",
+      "What could use a fresh perspective?",
+      "What are you hoping to accomplish today?",
+      "What’s a good place to start?",
     ],
     afternoon: [
       "How’s your day going so far?",
@@ -8025,6 +8104,25 @@ function timeGreeting(temporary = false) {
       "Want to untangle something together?",
       "What can I help with right now?",
       "What are you excited to work on?",
+      "What would you like to make progress on this afternoon?",
+      "What’s a question you’d like answered?",
+      "Where could a second perspective help?",
+      "What’s something you’d like to get unstuck on?",
+      "What would you like to create or improve?",
+      "What’s worth giving your attention to right now?",
+      "Want to turn that thought into a next step?",
+      "What are you working through today?",
+      "What can we make clearer together?",
+      "What would you like to explore next?",
+      "Is there a task I can help lighten?",
+      "What’s been on your mind lately?",
+      "What would you like to have figured out by tonight?",
+      "What’s one thing you’re curious about?",
+      "How can I help you move something forward?",
+      "What deserves a closer look?",
+      "What are you hoping to solve?",
+      "What could use a little momentum?",
+      "What would you like to make easier?",
     ],
     evening: [
       "How did today treat you?",
@@ -8033,6 +8131,25 @@ function timeGreeting(temporary = false) {
       "What would you like to figure out?",
       "Anything you’d like to talk through?",
       "What’s one thing I can help with?",
+      "What would you like to wrap up today?",
+      "What’s something you’d like to understand better?",
+      "Want to make a plan for what comes next?",
+      "What are you still curious about today?",
+      "What would feel satisfying to finish?",
+      "Is there something you’d like to put into words?",
+      "What can we make progress on tonight?",
+      "What would you like to carry into tomorrow?",
+      "What’s a thought you’d like to follow?",
+      "What could use a little more clarity?",
+      "Want to talk through how today went?",
+      "What’s on your list for tomorrow?",
+      "What would you like to make room for?",
+      "What’s one thing you’d like to solve before you rest?",
+      "What can I help you think through?",
+      "What would you like to leave feeling clearer about?",
+      "What’s something you’d like to do differently tomorrow?",
+      "What idea should we explore before the day ends?",
+      "What would help you close out the day?",
     ],
     late: [
       "Late-night thought? I’m listening.",
@@ -8041,6 +8158,25 @@ function timeGreeting(temporary = false) {
       "What would help you unwind a bit?",
       "Anything you want to get off your mind?",
       "What can we make sense of tonight?",
+      "What’s wandering through your mind tonight?",
+      "Want to put a tricky thought into words?",
+      "What would you like to understand before calling it a night?",
+      "Is there a question keeping you curious?",
+      "What can we gently untangle?",
+      "What would help you settle your thoughts?",
+      "Want to sketch out an idea for tomorrow?",
+      "What’s one thing you’d like to get off your list?",
+      "What would you like to talk about while it’s quiet?",
+      "Is there something you’d like to see from a new angle?",
+      "What’s on your mind after hours?",
+      "Want to make sense of a thought together?",
+      "What would feel useful to figure out tonight?",
+      "What idea would you like to follow a little further?",
+      "What can I help you put into perspective?",
+      "What would you like to wake up knowing?",
+      "Anything you’d like to plan for tomorrow?",
+      "What’s a small thing we can make clearer?",
+      "What would help you end the day on your terms?",
     ],
   };
   const temporaryGreetings: Record<string, string[]> = {

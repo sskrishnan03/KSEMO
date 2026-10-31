@@ -1,4 +1,5 @@
 import { defineConfig } from "vitest/config";
+import react from "@vitejs/plugin-react";
 import { config as loadDotEnv } from "dotenv";
 import path from "path";
 
@@ -6,6 +7,7 @@ const templateRoot = path.resolve(import.meta.dirname);
 const dotenvResult = loadDotEnv({ path: path.resolve(templateRoot, ".env") });
 
 export default defineConfig({
+  plugins: [react()],
   root: templateRoot,
   resolve: {
     alias: {

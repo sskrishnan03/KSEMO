@@ -2177,7 +2177,7 @@ export function LibraryPickerContent({
                             <ComposerFileIcon
                               name={file.filename}
                               mimeType={file.mimeType}
-                              className="size-7 text-foreground"
+                              className="size-7"
                             />
                           </div>
                         )}
@@ -2210,7 +2210,7 @@ export function LibraryPickerContent({
                         <ComposerFileIcon
                           name={file.filename}
                           mimeType={file.mimeType}
-                          className="size-7 shrink-0 text-foreground"
+                          className="size-7 shrink-0"
                         />
                       )}
                       <div className="flex min-w-0 flex-1 flex-col">

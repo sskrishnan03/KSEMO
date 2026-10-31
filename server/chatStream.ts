@@ -14,6 +14,8 @@ import {
   updateConversationForUser,
   updateMessage,
   DatabaseUnavailableError,
+  type Conversation,
+  type Message as StoredMessage,
 } from "./supabase-db";
 import {
   getQuotaFallbackModel,
@@ -328,7 +330,7 @@ export function registerChatStream(app: Express) {
     }
     if (!content) content = "";
 
-    let conversation;
+    let conversation: Conversation | undefined;
     try {
       if (body.conversationId) {
         conversation = await getConversationForUser(
@@ -372,6 +374,7 @@ export function registerChatStream(app: Express) {
       }
 
       if (!conversation) throw new Error("Conversation creation failed");
+      const resolvedConversationId = conversation.id;
       const ephemeralConversation =
         temporary || isEphemeralConversationTitle(conversation.title);
       if (conversation.title === "New conversation" && content) {
@@ -383,7 +386,7 @@ export function registerChatStream(app: Express) {
       let userMessageId: string = crypto.randomUUID();
       assistantMessageId =
         body.regenerateAssistantMessageId ?? crypto.randomUUID();
-      let historyForContext;
+      let historyForContext: StoredMessage[];
       if (body.regenerateAssistantMessageId) {
         const requestedEditedContent = content;
         const existingMessages = await listMessagesForConversation(
@@ -418,7 +421,8 @@ export function registerChatStream(app: Express) {
           });
           return;
         }
-        content = requestedEditedContent || sourceUser.content;
+        const editedContent = requestedEditedContent || sourceUser.content || "";
+        content = editedContent;
         if (content !== sourceUser.content) {
           await updateMessage(sourceUser.id, { content });
         }
@@ -435,7 +439,9 @@ export function registerChatStream(app: Express) {
         historyForContext = existingMessages
           .slice(0, assistantIndex)
           .map(message =>
-            message.id === sourceUser.id ? { ...message, content } : message
+            message.id === sourceUser.id
+              ? { ...message, content: editedContent }
+              : message
           );
         await removeFollowingAssistantDuplicatesForUser(
           body.regenerateAssistantMessageId,
@@ -543,7 +549,7 @@ export function registerChatStream(app: Express) {
           buildUserMemoryContextWithSources(
             user.id,
             content ?? "",
-            conversation.id
+            resolvedConversationId
           )
         );
         const memoryUses = [

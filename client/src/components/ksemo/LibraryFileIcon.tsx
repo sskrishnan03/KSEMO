@@ -2,6 +2,15 @@ import { getFileKind } from "@/lib/fileKinds";
 import { getCapabilityOption } from "@/lib/capabilities";
 import { cn } from "@/lib/utils";
 import type { CreateMode } from "@shared/capabilities";
+import {
+  Archive,
+  AudioLines,
+  Code2,
+  File,
+  Image,
+  Video,
+} from "lucide-react";
+import React from "react";
 
 export function CreateFileModeIcon({
   mode,
@@ -15,16 +24,16 @@ export function CreateFileModeIcon({
   const option = getCapabilityOption(mode);
   const Icon = option.icon;
   return (
-    <Icon
-      className={cn(
-        className,
-        colored && option.iconColor,
-        mode === "xlsx" && "stroke-[1.5]",
-        mode === "txt" && "stroke-[1.5]"
-      )}
-      style={colored ? { color: option.iconHex } : undefined}
-      aria-hidden="true"
-    />
+    <span style={colored ? { color: option.iconHex } : undefined}>
+      <Icon
+        className={cn(
+          className,
+          colored && option.iconColor,
+          "stroke-[1.5]"
+        )}
+        aria-hidden="true"
+      />
+    </span>
   );
 }
 
@@ -53,10 +62,44 @@ export function LibraryFileIcon({
               : null;
 
   if (mode) {
-    return <CreateFileModeIcon mode={mode} className={className} />;
+    const option = getCapabilityOption(mode);
+    return (
+      <span style={{ color: option.iconHex }}>
+        <CreateFileModeIcon mode={mode} className={className} colored={false} />
+      </span>
+    );
   }
 
+  const SimpleIcon =
+    kind.label === "Archive"
+      ? Archive
+      : kind.label === "Image"
+        ? Image
+        : kind.label === "Audio"
+          ? AudioLines
+          : kind.label === "Video"
+            ? Video
+            : kind.label === "Code"
+              ? Code2
+              : File;
+  const color =
+    kind.label === "Archive"
+      ? "#d97706"
+      : kind.label === "Image"
+        ? "#0284c7"
+        : kind.label === "Audio"
+          ? "#db2777"
+          : kind.label === "Video"
+            ? "#7c3aed"
+            : kind.label === "Code"
+              ? "#7c3aed"
+              : "#64748b";
+
   return (
-    <kind.icon className={cn(className, kind.colorClass)} aria-hidden="true" />
+    <SimpleIcon
+      className={cn(className, "stroke-[1.5]")}
+      style={{ color }}
+      aria-hidden="true"
+    />
   );
 }
