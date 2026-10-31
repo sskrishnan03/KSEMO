@@ -6,6 +6,7 @@ import { MessageCircle, Sparkles, LogIn, UserPlus } from "lucide-react";
 import { useLocation, useRoute } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { toast } from "sonner";
+import { PinEntryCard } from "@/components/ksemo/PinEntryCard";
 import {
   MessageContent,
   type KsemoMessage,
@@ -26,37 +27,69 @@ export default function SharedConversation() {
     null
   );
   const [speechState, setSpeechState] = useState<SpeechVisualizerState>("idle");
+  const [passcode, setPasscode] = useState("");
+  const [submittedPasscode, setSubmittedPasscode] = useState("");
+  const [passcodeError, setPasscodeError] = useState("");
+  const [passcodeDigits, setPasscodeDigits] = useState<4 | 6>(4);
   const cancelPrepareRef = useRef<(() => void) | null>(null);
 
   const shared = trpc.conversation.getPublic.useQuery(
-    { token },
+    { token, passcode: submittedPasscode || undefined },
     { enabled: token.length >= 16, retry: 1 }
   );
 
+  useEffect(() => {
+    if (
+      shared.data?.passcodeRequired &&
+      (shared.data.passcodeDigits === 4 || shared.data.passcodeDigits === 6)
+    ) {
+      setPasscodeDigits(shared.data.passcodeDigits);
+    }
+    if (shared.data?.passcodeRequired && shared.data.invalidPasscode) {
+      setPasscodeError("That passcode is incorrect. Try again.");
+      setPasscode("");
+      setSubmittedPasscode("");
+    }
+  }, [
+    shared.data?.passcodeRequired,
+    shared.data?.passcodeDigits,
+    shared.data?.invalidPasscode,
+  ]);
+
   const forkMutation = trpc.conversation.forkShared.useMutation({
     onSuccess: data => {
-      toast.success("Conversation added to your chats");
-      setLocation(`/c/${encodeURIComponent(data.conversationId)}`);
+      toast.success(data.isPrivate ? "Chat added to Ghost Private" : "Conversation added to your chats");
+      setLocation(
+        `/c/${encodeURIComponent(data.conversationId)}${data.isPrivate ? "?ghostPrivate=1" : ""}`
+      );
     },
     onError: () => {
       toast.error("Could not continue this conversation. Please try again.");
     },
   });
 
-  // If the logged-in user is the owner of this conversation, seamlessly open it in their workspace!
+  // Open the actual owner conversation in its workspace after the share gate.
   useEffect(() => {
-    if (shared.data?.conversation.isOwner && shared.data.conversation.id) {
-      setLocation(`/c/${encodeURIComponent(shared.data.conversation.id)}`);
+    if (
+      shared.data?.conversation.isOwner &&
+      shared.data.conversation.id
+    ) {
+      setLocation(
+        `/c/${encodeURIComponent(shared.data.conversation.id)}${
+          shared.data.isPrivateShare ? "?ghostPrivate=1" : ""
+        }`
+      );
     }
   }, [
     shared.data?.conversation.isOwner,
+    shared.data?.isPrivateShare,
     shared.data?.conversation.id,
     setLocation,
   ]);
 
   const handleContinueChat = () => {
     if (user) {
-      forkMutation.mutate({ token });
+      forkMutation.mutate({ token, passcode: submittedPasscode || undefined });
     } else {
       setLocation(
         `/signin?redirect=${encodeURIComponent(window.location.pathname)}`
@@ -137,16 +170,33 @@ export default function SharedConversation() {
     return <Loading fullScreen />;
   }
 
-  // If the user is the owner and redirect is happening, show brief transition
-  if (shared.data?.conversation.isOwner) {
+  if (submittedPasscode && shared.isFetching) {
+    return <Loading fullScreen />;
+  }
+
+  if (shared.data?.passcodeRequired) {
     return (
       <main className="grid min-h-screen place-items-center bg-background px-5">
-        <div className="flex flex-col items-center gap-3 text-center">
-          <Loading />
-          <p className="text-sm text-muted-foreground">Opening your chat…</p>
-        </div>
+        <PinEntryCard
+          title="Enter passcode"
+          description="Enter your Ghost Private passcode to open this chat."
+          value={passcode}
+          length={passcodeDigits}
+          onChange={value => {
+            setPasscode(value);
+            setPasscodeError("");
+          }}
+          onComplete={setSubmittedPasscode}
+          onClose={() => setLocation("/")}
+          ariaLabel="Ghost Private passcode"
+          error={passcodeError}
+        />
       </main>
     );
+  }
+
+  if (shared.data?.conversation.isOwner) {
+    return <Loading fullScreen />;
   }
 
   if (shared.isError || !shared.data) {
@@ -176,6 +226,70 @@ export default function SharedConversation() {
   }
 
   const { conversation, messages } = shared.data;
+
+  if (shared.data.isPrivateShare) {
+    return (
+      <main className="dark relative flex h-dvh flex-col overflow-hidden bg-[#242424] text-white">
+        <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-white/10 bg-[#303030] px-4 sm:px-6">
+          <div className="flex min-w-0 items-center gap-2 text-sm font-medium">
+            <MessageCircle className="size-[18px] shrink-0 text-white/75" />
+            <span className="truncate">Ghost Private chats</span>
+          </div>
+          {user && !conversation.isOwner && (
+            <Button
+              onClick={handleContinueChat}
+              disabled={forkMutation.isPending}
+              className="h-9 shrink-0 rounded-lg bg-[#383838] px-3 text-white hover:bg-[#414141]"
+            >
+              {forkMutation.isPending ? "Opening…" : "Add to Ghost Private"}
+            </Button>
+          )}
+        </header>
+        <section
+          className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6"
+          aria-label="Shared Ghost Private chat"
+        >
+          <div className="mx-auto max-w-3xl space-y-6">
+            <div className="border-b border-white/10 pb-4">
+              <h1 className="text-xl font-semibold text-white sm:text-2xl">
+                {conversation.title}
+              </h1>
+              <p className="mt-1 text-xs text-white/55">
+                {messages.length} {messages.length === 1 ? "message" : "messages"}
+              </p>
+            </div>
+            <div className="space-y-5">
+              {messages.map((message: any) => {
+                const ksemoMessage: KsemoMessage = {
+                  id: message.id,
+                  role: message.role as "user" | "assistant",
+                  content: message.content,
+                  status: "completed",
+                  createdAt: message.createdAt,
+                };
+                return (
+                  <MessageContent
+                    key={message.id}
+                    message={ksemoMessage}
+                    onSpeak={handleSpeak}
+                    onPause={handlePause}
+                    onResume={handleResume}
+                    onStop={handleStop}
+                    isSpeaking={speakingMessageId === message.id}
+                    speechState={speechState}
+                    isPreparingSpeech={
+                      speakingMessageId === message.id &&
+                      speechState === "buffering"
+                    }
+                  />
+                );
+              })}
+            </div>
+          </div>
+        </section>
+      </main>
+    );
+  }
 
   return (
     <div className="relative flex h-screen flex-col overflow-hidden bg-background text-foreground">

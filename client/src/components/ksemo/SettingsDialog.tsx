@@ -968,9 +968,19 @@ function SecuritySection({ user }: { user: User }) {
 
   useEffect(() => {
     if (user.id == null) return;
-    const record = readPrivatePinRecord(user.id);
-    setPinConfigured(Boolean(record));
-    if (record) setCurrentPinDigits(record.digits);
+    const syncPinState = () => {
+      const record = readPrivatePinRecord(user.id!);
+      setPinConfigured(Boolean(record));
+      if (record) setCurrentPinDigits(record.digits);
+      else setCurrentPinDigits(4);
+    };
+    syncPinState();
+    window.addEventListener("ksemo:private-chat-lock-updated", syncPinState);
+    return () =>
+      window.removeEventListener(
+        "ksemo:private-chat-lock-updated",
+        syncPinState
+      );
   }, [user.id]);
 
   const submitPinDialog = async (enteredPin = pinEntry) => {
@@ -985,6 +995,7 @@ function SecuritySection({ user }: { user: User }) {
       await setPrivatePin(user.id, enteredPin, 4);
       setPinConfigured(true);
       setCurrentPinDigits(4);
+      window.dispatchEvent(new Event("ksemo:private-chat-lock-updated"));
     } else {
       if (!(await verifyPrivatePin(user.id, enteredPin))) {
         setPinError("That PIN is incorrect.");
@@ -1052,9 +1063,9 @@ function SecuritySection({ user }: { user: User }) {
         <div className="border-t border-border px-4 py-4">
           <div className="flex items-center gap-3">
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium">Locked chats</p>
+              <p className="text-sm font-medium">Ghost Private passcode</p>
               <p className="mt-0.5 text-xs text-muted-foreground">
-                {pinConfigured ? "Manage your 4-digit lock PIN." : "Create a 4-digit PIN to lock chats."}
+                {pinConfigured ? "Manage the passcode required to enter Ghost Private." : "Create a passcode for Ghost Private."}
               </p>
             </div>
             <Button
@@ -1066,7 +1077,7 @@ function SecuritySection({ user }: { user: User }) {
                 setPinError("");
               }}
             >
-              {pinConfigured ? "Reset PIN" : "Create PIN"}
+              {pinConfigured ? "Reset passcode" : "Create passcode"}
             </Button>
           </div>
         </div>
@@ -1082,12 +1093,12 @@ function SecuritySection({ user }: { user: User }) {
         >
           <DialogContent showCloseButton={false} overlayClassName="z-[85]" className="z-[90] w-auto max-w-none border-0 bg-transparent p-0 shadow-none">
             <DialogHeader className="sr-only">
-              <DialogTitle>{pinDialog === "reset" ? "Reset PIN" : "Create PIN"}</DialogTitle>
-              <DialogDescription>Enter the PIN for locked chats.</DialogDescription>
+              <DialogTitle>{pinDialog === "reset" ? "Reset passcode" : "Create passcode"}</DialogTitle>
+              <DialogDescription>Manage the passcode required to enter Ghost Private.</DialogDescription>
             </DialogHeader>
             <PinEntryCard
-              title={pinDialog === "reset" ? "Enter PIN" : "Create PIN"}
-              description={pinDialog === "reset" ? "Enter your current PIN to reset chat locks." : "Choose a 4-digit PIN for locked chats."}
+              title={pinDialog === "reset" ? "Enter passcode" : "Create passcode"}
+              description={pinDialog === "reset" ? "Enter your current passcode to reset it." : "Choose a 4-digit passcode for Ghost Private."}
               value={pinEntry}
               length={pinDialog === "reset" ? currentPinDigits : 4}
               onChange={setPinEntry}

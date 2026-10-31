@@ -40,10 +40,11 @@ import {
 import {
   Archive,
   ArrowDown,
+  CircleCheck,
   ChevronDown,
   Download,
-  LockKeyhole,
   LogIn,
+  ListChecks,
   Mic,
   MicOff,
   MoreHorizontal,
@@ -53,7 +54,6 @@ import {
   Play,
   Plus,
   Search,
-  UnlockKeyhole,
   UserPlus,
   X,
 } from "lucide-react";
@@ -61,7 +61,6 @@ import { BranchSplitIcon } from "@/components/ksemo/BranchSplitIcon";
 import { Sidebar2 } from "reicon-react/icons/Sidebar2";
 import { ChatLine } from "reicon-react/icons/ChatLine";
 import { Ghost3 } from "reicon-react/icons/Ghost3";
-import { Lock2 } from "reicon-react/icons/Lock2";
 import {
   ShareIcon,
   PinTackIcon,
@@ -85,6 +84,7 @@ import React, {
   useRef,
   useState,
 } from "react";
+import { createPortal } from "react-dom";
 import { memo } from "react";
 import { useLocation, useRoute } from "wouter";
 import { ChatComposer } from "../components/ksemo/ChatComposer";
@@ -747,6 +747,7 @@ export default function Home({
   const isProfileSupportPreview =
     import.meta.env.DEV && searchParams.has("profileSupportPreview");
   const sharedConversationId = searchParams.get("conversation");
+  const enterGhostPrivateFromShare = searchParams.get("ghostPrivate") === "1";
   const targetConversationId = cParams?.id || sharedConversationId;
   const answerFromRoute = useMemo(() => {
     if (!isSharedAnswerRoute || typeof window === "undefined") return "";
@@ -782,8 +783,17 @@ export default function Home({
     PrivateChatEntry[]
   >([]);
   const [privateChatPanel, setPrivateChatPanel] = useState<
-    "chats" | "locked" | null
+    "chats" | null
   >(null);
+  const [privateSelectionMode, setPrivateSelectionMode] = useState(false);
+  const [privateSharePendingId, setPrivateSharePendingId] = useState<string | null>(null);
+  const [privateSelectedIds, setPrivateSelectedIds] = useState<Set<string>>(
+    () => new Set()
+  );
+  const [privateDeleteSelectedOpen, setPrivateDeleteSelectedOpen] =
+    useState(false);
+  const [privateDeleteSelectedError, setPrivateDeleteSelectedError] =
+    useState<string | null>(null);
   const [privateChatMenuOpen, setPrivateChatMenuOpen] = useState(false);
   const privateChatPanelRef = useRef<HTMLElement | null>(null);
   const privateChatMenuTriggerRef = useRef<HTMLButtonElement | null>(null);
@@ -805,8 +815,7 @@ export default function Home({
   );
   const [privateChatRenameValue, setPrivateChatRenameValue] = useState("");
   const [privatePinDialog, setPrivatePinDialog] = useState<{
-    chatId: string;
-    action: "lock" | "unlock";
+    action: "setup" | "verify";
   } | null>(null);
   const [privatePinDigits, setPrivatePinDigits] = useState<4 | 6>(4);
   const [privatePinValue, setPrivatePinValue] = useState("");
@@ -834,7 +843,8 @@ export default function Home({
       if (
         event.target instanceof Element &&
         (event.target.closest("[data-private-chat-actions]") ||
-          event.target.closest("[data-private-panel-toggle]"))
+          event.target.closest("[data-private-panel-toggle]") ||
+          event.target.closest("[data-private-pin-dialog]"))
       )
         return;
       if (
@@ -880,13 +890,20 @@ export default function Home({
   const temporaryChatCloseTimerRef = useRef<number | null>(null);
   const temporaryConversationIdsRef = useRef<Set<string>>(new Set());
   useEffect(() => {
-    if (user?.id == null) return;
-    setPrivateChatEntries(readPrivateChatEntries(user.id));
-  }, [user?.id]);
+    if (user?.id == null || !isSavedGhostChat) {
+      setPrivateChatEntries([]);
+      return;
+    }
+    setPrivateChatEntries(
+      readPrivateChatEntries(user.id).map(chat => ({ ...chat, locked: false }))
+    );
+  }, [user?.id, isSavedGhostChat]);
   useEffect(() => {
-    if (user?.id == null) return;
+    if (user?.id == null || !isSavedGhostChat) return;
     const syncPrivateChats = () =>
-      setPrivateChatEntries(readPrivateChatEntries(user.id));
+      setPrivateChatEntries(
+        readPrivateChatEntries(user.id).map(chat => ({ ...chat, locked: false }))
+      );
     window.addEventListener(
       "ksemo:private-chat-lock-updated",
       syncPrivateChats
@@ -896,7 +913,7 @@ export default function Home({
         "ksemo:private-chat-lock-updated",
         syncPrivateChats
       );
-  }, [user?.id]);
+  }, [user?.id, isSavedGhostChat]);
   const [chatMessages, setChatMessages] = useState<KsemoMessage[]>(() =>
     sharedAnswer
       ? [
@@ -1282,16 +1299,21 @@ export default function Home({
   );
   const privateConversationsQuery = trpc.conversation.privateList.useQuery(
     undefined,
-    { enabled: Boolean(user?.id) }
+    { enabled: Boolean(user?.id && isSavedGhostChat) }
   );
   useEffect(() => {
-    if (user?.id == null || !privateConversationsQuery.data) return;
+    if (
+      user?.id == null ||
+      !isSavedGhostChat ||
+      !privateConversationsQuery.data
+    ) {
+      return;
+    }
     setPrivateChatEntries(current => {
-      const currentById = new Map(current.map(entry => [entry.id, entry]));
       const serverEntries = privateConversationsQuery.data.map(conversation => ({
         id: conversation.id,
         title: privateChatTitleForDisplay(conversation.title),
-        locked: currentById.get(conversation.id)?.locked ?? false,
+        locked: false,
         updatedAt: new Date(conversation.updatedAt).getTime(),
       }));
       const serverIds = new Set(serverEntries.map(entry => entry.id));
@@ -1302,7 +1324,7 @@ export default function Home({
       writePrivateChatEntries(user.id, next);
       return next;
     });
-  }, [privateConversationsQuery.data, user?.id]);
+  }, [privateConversationsQuery.data, user?.id, isSavedGhostChat]);
   const activeQuery = trpc.conversation.get.useQuery(
     { id: activeConversationId ?? "unselected" },
     {
@@ -1380,9 +1402,12 @@ export default function Home({
   // to call setChatMessages. Show a small loader instead of the empty "new
   // chat" greeting so nothing flashes.
   const isPendingSeed = Boolean(
-    activeConversationId &&
-    seededConversationId !== activeConversationId &&
-    !activeQuery.isError
+    (enterGhostPrivateFromShare &&
+      (!activeConversationId ||
+        activeQuery.data?.conversation.id !== targetConversationId)) ||
+      (activeConversationId &&
+        seededConversationId !== activeConversationId &&
+        !activeQuery.isError)
   );
   const activeConversation = useMemo(() => {
     if (!activeConversationId) return null;
@@ -1609,12 +1634,17 @@ export default function Home({
       },
       onError: () => {},
     });
+  const privateShareMutation =
+    trpc.conversation.configurePrivateShare.useMutation();
   const sharedAnswerMutation =
     trpc.conversation.createSharedAnswer.useMutation();
   const branchConversationMutation = trpc.conversation.branch.useMutation();
   const permanentDeleteMutation = trpc.conversation.remove.useMutation({
     onSuccess: async () => {
-      const invalidations = [utils.conversation.list.invalidate()];
+      const invalidations = [
+        utils.conversation.list.invalidate(),
+        utils.conversation.privateList.invalidate(),
+      ];
       if (activeConversationId) {
         invalidations.push(
           utils.conversation.get.invalidate({ id: activeConversationId })
@@ -1623,6 +1653,8 @@ export default function Home({
       await Promise.all(invalidations);
     },
   });
+  const removePrivateChatsMutation =
+    trpc.conversation.removePrivateChats.useMutation();
   // Hard-delete every conversation created during the temporary session. These
   // are already hidden from all listings on the server; this removes the rows.
   // Uses the vanilla client so it is also safe to call from an unmount cleanup.
@@ -1724,13 +1756,6 @@ export default function Home({
     entry: PrivateChatEntry,
     entries: PrivateChatEntry[] = privateChatEntries
   ) => {
-    if (entry.locked) {
-      setPrivatePinDialog({ chatId: entry.id, action: "unlock" });
-      setPrivatePinDigits(readPrivatePinRecord(user!.id!)?.digits ?? 4);
-      setPrivatePinValue("");
-      setPrivatePinError("");
-      return;
-    }
     isTemporaryChatRef.current = true;
     setIsTemporaryChat(true);
     isSavedGhostChatRef.current = true;
@@ -1783,8 +1808,8 @@ export default function Home({
       writePrivateChatEntries(user.id, nextEntries);
       void utils.conversation.privateList.invalidate();
       setMovingToPrivateId(null);
-      openPrivateChat(entry, nextEntries);
       showPrivateMoveNotice("success", "Chat moved to Private.");
+      requestGhostPrivateAccess();
     } catch {
       setMovingToPrivateId(null);
       showPrivateMoveNotice("error", "Could not move this chat to Private.");
@@ -1837,63 +1862,49 @@ export default function Home({
       ids: Array.from(temporaryConversationIdsRef.current),
     });
   };
-  const requestPrivateChatLock = (entry: PrivateChatEntry) => {
-    if (entry.locked) {
-      setPrivatePinDialog({ chatId: entry.id, action: "unlock" });
-      setPrivatePinDigits(readPrivatePinRecord(user!.id!)?.digits ?? 4);
-      setPrivatePinValue("");
-      setPrivatePinError("");
+  const requestGhostPrivateAccess = () => {
+    if (user?.id == null) {
+      toast.error("Sign in to enter Ghost Private.");
       return;
     }
-    if (!readPrivatePinRecord(user!.id!)) {
-      setPrivatePinDialog({ chatId: entry.id, action: "lock" });
-      setPrivatePinDigits(4);
-      setPrivatePinValue("");
-      setPrivatePinError("");
-      return;
-    }
-    const next = privateChatEntries.map(chat =>
-      chat.id === entry.id ? { ...chat, locked: true } : chat
-    );
-    setPrivateChatEntries(next);
-    writePrivateChatEntries(user!.id!, next);
-    if (activeConversationId === entry.id) startNewPrivateChat(true);
+    const pin = readPrivatePinRecord(user.id);
+    setPrivatePinDialog({ action: pin ? "verify" : "setup" });
+    setPrivatePinDigits(pin?.digits ?? 4);
+    setPrivatePinValue("");
+    setPrivatePinError("");
+    setPrivateChatMenuOpen(false);
+    setPrivateChatPanel(null);
   };
   const submitPrivatePin = async (enteredPin = privatePinValue) => {
     if (!privatePinDialog || user?.id == null) return;
-    const entry = privateChatEntries.find(
-      chat => chat.id === privatePinDialog.chatId
-    );
-    if (!entry) return;
     setPrivatePinError("");
-    if (privatePinDialog.action === "lock") {
-      if (!/^\d+$/.test(enteredPin) || enteredPin.length !== privatePinDigits) {
-        setPrivatePinError(`Enter a ${privatePinDigits}-digit PIN.`);
-        return;
-      }
-      if (!readPrivatePinRecord(user.id)) {
+    try {
+      if (privatePinDialog.action === "setup") {
+        if (!/^\d+$/.test(enteredPin) || enteredPin.length !== privatePinDigits) {
+          setPrivatePinError(`Enter a ${privatePinDigits}-digit passcode.`);
+          return;
+        }
         await setPrivatePin(user.id, enteredPin, privatePinDigits);
-      }
-      const next = privateChatEntries.map(chat =>
-        chat.id === entry.id ? { ...chat, locked: true } : chat
-      );
-      setPrivateChatEntries(next);
-      writePrivateChatEntries(user.id, next);
-      if (activeConversationId === entry.id) startNewPrivateChat(true);
-    } else {
-      if (!(await verifyPrivatePin(user.id, enteredPin))) {
-        setPrivatePinError("That PIN is incorrect.");
+        window.dispatchEvent(new Event("ksemo:private-chat-lock-updated"));
+      } else if (!(await verifyPrivatePin(user.id, enteredPin))) {
+        setPrivatePinError("That passcode is incorrect.");
         return;
       }
-      const next = privateChatEntries.map(chat =>
-        chat.id === entry.id ? { ...chat, locked: false } : chat
-      );
-      setPrivateChatEntries(next);
-      writePrivateChatEntries(user.id, next);
-      openPrivateChat({ ...entry, locked: false });
+    } catch {
+      setPrivatePinError("Could not verify or save the passcode. Try again.");
+      return;
     }
     setPrivatePinDialog(null);
     setPrivatePinValue("");
+    startNewPrivateChat(true);
+    setPrivateSelectionMode(false);
+    setPrivateSelectedIds(new Set());
+  };
+  const cancelPrivateAccessPrompt = () => {
+    setPrivatePinDialog(null);
+    setPrivatePinValue("");
+    setPrivatePinError("");
+    if (!isSavedGhostChatRef.current) setPrivateChatEntries([]);
   };
   const exitTemporaryChat = () => {
     if (
@@ -1922,6 +1933,11 @@ export default function Home({
         purgeTemporaryConversations({ preserveStreaming: true });
       }
       temporaryConversationIdsRef.current.clear();
+      if (endingSavedPrivate) {
+        setPrivateChatEntries([]);
+        setPrivateSelectedIds(new Set());
+        setPrivateSelectionMode(false);
+      }
       setChatMessages([]);
       setActiveConversationId(null);
       activeConversationIdRef.current = null;
@@ -2806,28 +2822,34 @@ export default function Home({
     return files;
   }, [chatMessages]);
 
-  // Restore the temporary ("incognito") session across a same-tab refresh so a
-  // reload reopens the same thread instead of silently bouncing the user back
-  // into a normal chat. Only a genuine reload (F5 / back-forward) restores it;
-  // a fresh open has the stored flag cleared by whichever branch runs below
-  // while "New Chat" and saved-conversation selection already clear it.
+  // Restore Quick Chat across same-tab refreshes. Ghost Private always asks for
+  // its passcode again after a reload, so its saved mode marker is cleared.
   useEffect(() => {
     if (user?.id == null) return;
     const userId = user.id;
     if (isSameTabReload()) {
       const stored = readStoredTemporaryChat(userId);
-      isTemporaryChatRef.current = stored.active;
-      setIsTemporaryChat(stored.active);
-      isSavedGhostChatRef.current =
-        stored.active && stored.savedPalette === true;
-      setIsSavedGhostChat(stored.active && stored.savedPalette === true);
-      temporaryConversationIdsRef.current = new Set(stored.ids);
-      if (stored.active && stored.activeConversationId) {
+      const restoreSession = stored.active && stored.savedPalette !== true;
+      isTemporaryChatRef.current = restoreSession;
+      setIsTemporaryChat(restoreSession);
+      isSavedGhostChatRef.current = false;
+      setIsSavedGhostChat(false);
+      temporaryConversationIdsRef.current = new Set(
+        restoreSession ? stored.ids : []
+      );
+      if (restoreSession && stored.activeConversationId) {
         seededConversationIdRef.current = null;
         setSeededConversationId(null);
         setChatMessages([]);
         setActiveConversationId(stored.activeConversationId);
         activeConversationIdRef.current = stored.activeConversationId;
+      }
+      if (stored.active && stored.savedPalette === true) {
+        writeStoredTemporaryChat(userId, {
+          active: false,
+          activeConversationId: null,
+          ids: [],
+        });
       }
     } else {
       isTemporaryChatRef.current = false;
@@ -2867,6 +2889,17 @@ export default function Home({
             return;
           }
           loadedTargetConversationIdRef.current = targetConversationId;
+          if (enterGhostPrivateFromShare) {
+            isSavedGhostChatRef.current = true;
+            setIsSavedGhostChat(true);
+            isTemporaryChatRef.current = false;
+            setIsTemporaryChat(false);
+            temporaryConversationIdsRef.current.add(targetConversationId);
+            setSidebarOpen(false);
+            setPrivateChatMenuOpen(false);
+            setPrivateChatPanel(null);
+            setPrivateChatOptionsOpenId(null);
+          }
           setActiveConversationId(targetConversationId);
           activeConversationIdRef.current = targetConversationId;
           if (user?.id) {
@@ -2888,6 +2921,7 @@ export default function Home({
     };
   }, [
     targetConversationId,
+    enterGhostPrivateFromShare,
     user?.id,
     utils.conversation.get,
     utils.conversation.list,
@@ -4792,6 +4826,57 @@ export default function Home({
     }
   }
 
+  function sharePrivateChat(chat: { id: string; title: string }) {
+    if (user?.id == null || privateSharePendingId) return;
+    const passcode = readPrivatePinRecord(user.id);
+    if (!passcode) {
+      setPrivateChatOptionsOpenId(null);
+      showShareNotice("error", "Enter Ghost Private once before sharing this chat.");
+      return;
+    }
+    if (!passcode.shareVerifier) {
+      setPrivateChatOptionsOpenId(null);
+      showShareNotice("error", "Re-enter Ghost Private once to enable protected sharing.");
+      return;
+    }
+    dismissShareNotice();
+    setPrivateSharePendingId(chat.id);
+    void (async () => {
+      try {
+        const result = await privateShareMutation.mutateAsync({
+          id: chat.id,
+          shareVerifier: passcode.shareVerifier!,
+          digits: passcode.digits,
+        });
+        const url = conversationShareUrl(result.shareToken);
+        try {
+          await navigator.clipboard.writeText(url);
+        } catch {
+          const field = document.createElement("textarea");
+          field.value = url;
+          field.style.position = "fixed";
+          field.style.opacity = "0";
+          document.body.appendChild(field);
+          field.select();
+          document.execCommand("copy");
+          field.remove();
+        }
+        setPrivateChatOptionsOpenId(null);
+        showShareNotice("success", "Ghost Private chat link copied.", url);
+      } catch (error) {
+        setPrivateChatOptionsOpenId(null);
+        showShareNotice(
+          "error",
+          error instanceof Error
+            ? `Couldn't share ${chat.title}: ${error.message}`
+            : `Couldn't share ${chat.title}. Please try again.`
+        );
+      } finally {
+        setPrivateSharePendingId(null);
+      }
+    })();
+  }
+
   async function shareMessage(_message: KsemoMessage) {
     const answer = _message.content.trim();
     if (!answer) return;
@@ -5714,6 +5799,75 @@ export default function Home({
         title: conversation.title,
       })
   );
+  const stableDeleteSelectedPrivateChats = usePersistFn(async () => {
+    if (
+      user?.id == null ||
+      privateSelectedIds.size === 0 ||
+      removePrivateChatsMutation.isPending
+    ) {
+      return;
+    }
+    try {
+      const result = await removePrivateChatsMutation.mutateAsync({
+        ids: Array.from(privateSelectedIds),
+      });
+      const deletedIds = new Set(result.removedIds);
+      const remainingEntries = privateChatEntries.filter(
+        entry => !deletedIds.has(entry.id)
+      );
+      setPrivateChatEntries(remainingEntries);
+      writePrivateChatEntries(user.id, remainingEntries);
+      temporaryConversationIdsRef.current = new Set(
+        Array.from(temporaryConversationIdsRef.current).filter(
+          id => !deletedIds.has(id)
+        )
+      );
+      const activeWasDeleted = Boolean(
+        activeConversationId && deletedIds.has(activeConversationId)
+      );
+      if (activeWasDeleted) {
+        setActiveConversationId(null);
+        activeConversationIdRef.current = null;
+        setChatMessages([]);
+        setSeededConversationId(null);
+        seededConversationIdRef.current = null;
+      }
+      writeStoredTemporaryChat(user.id, {
+        active: true,
+        savedPalette: true,
+        activeConversationId: activeWasDeleted
+          ? null
+          : activeConversationIdRef.current,
+        ids: Array.from(temporaryConversationIdsRef.current),
+      });
+      setPrivateSelectedIds(new Set());
+      setPrivateSelectionMode(false);
+      setPrivateDeleteSelectedOpen(false);
+      void utils.conversation.privateList.invalidate();
+      toast.success(
+        result.removed === 1
+          ? "Deleted 1 Ghost Private chat."
+          : `Deleted ${result.removed} Ghost Private chats.`
+      );
+    } catch {
+      setPrivateDeleteSelectedError(
+        "Could not delete the selected Ghost Private chats. Please try again."
+      );
+    }
+  });
+  const togglePrivateChatSelection = (id: string) => {
+    setPrivateSelectedIds(current => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+  const exitPrivateSelectionMode = () => {
+    setPrivateSelectionMode(false);
+    setPrivateSelectedIds(new Set());
+    setPrivateChatOptionsOpenId(null);
+  };
   const stableOnMoveToPrivate = usePersistFn(
     (conversation: { id: string; title: string }) =>
       void moveConversationToPrivate(conversation)
@@ -6115,7 +6269,7 @@ export default function Home({
                     setPrivateChatMenuOpen(false);
                     setPrivateChatPanel(null);
                   } else {
-                    setPrivateChatPanel(null);
+                    setPrivateChatPanel("chats");
                     setPrivateChatMenuOpen(true);
                   }
                 }}
@@ -6159,105 +6313,20 @@ export default function Home({
           }}
           aria-label="Ghost Private chat options"
         >
-          <nav
-            className="ghost-private-options-enter flex w-[min(293px,calc(100vw-1rem))] shrink-0 flex-row gap-0 overflow-hidden rounded-xl border border-white/10 bg-[#303030] p-1 text-white shadow-lg"
-            aria-label="Ghost Private sections"
-          >
-            <button
-              type="button"
-              onMouseEnter={() => {
-                setPrivateChatOptionsOpenId(null);
-                setPrivatePinDialog(null);
-                setPrivateChatPanel("chats");
-                setPrivateChatSearch("");
-              }}
-              onFocus={() => {
-                setPrivateChatOptionsOpenId(null);
-                setPrivatePinDialog(null);
-                setPrivateChatPanel("chats");
-                setPrivateChatSearch("");
-              }}
-              onClick={() => {
-                setPrivateChatOptionsOpenId(null);
-                setPrivatePinDialog(null);
-                setPrivateChatPanel("chats");
-                setPrivateChatSearch("");
-              }}
-              className={cn(
-                "flex h-9 flex-1 items-center justify-center gap-1.5 rounded-l-lg px-2 text-sm font-medium transition-colors",
-                privateChatPanel === "chats"
-                  ? "bg-[#3b3b3b] text-white"
-                  : "bg-[#303030] text-white hover:bg-[#3b3b3b]"
-              )}
-            >
-              <ChatLine aria-hidden="true" className="size-[18px]" /> Chats
-            </button>
-            <button
-              type="button"
-              onMouseEnter={() => {
-                setPrivateChatOptionsOpenId(null);
-                setPrivatePinDialog(null);
-                setPrivateChatPanel("locked");
-                setPrivateChatSearch("");
-              }}
-              onFocus={() => {
-                setPrivateChatOptionsOpenId(null);
-                setPrivatePinDialog(null);
-                setPrivateChatPanel("locked");
-                setPrivateChatSearch("");
-              }}
-              onClick={() => {
-                setPrivateChatOptionsOpenId(null);
-                setPrivatePinDialog(null);
-                setPrivateChatPanel("locked");
-                setPrivateChatSearch("");
-              }}
-              className={cn(
-                "flex h-9 flex-1 items-center justify-center gap-1.5 rounded-r-lg px-2 text-sm font-medium transition-colors",
-                privateChatPanel === "locked"
-                  ? "bg-[#3b3b3b] text-white"
-                  : "bg-[#303030] text-white hover:bg-[#3b3b3b]"
-              )}
-            >
-              <Lock2 aria-hidden="true" className="size-[18px]" /> Locked chats
-            </button>
-          </nav>
+          <div className="ghost-private-options-enter flex w-[min(293px,calc(100vw-1rem))] shrink-0 items-center justify-between rounded-xl border border-white/10 bg-[#303030] px-3 py-2 text-white shadow-lg">
+            <span className="flex items-center gap-2 text-sm font-medium">
+              <ChatLine aria-hidden="true" className="size-[18px]" />
+              Ghost Private chats
+            </span>
+          </div>
           {privateChatPanel && (
-            <div className="flex h-[min(30rem,calc(100dvh-7rem))] w-[min(293px,calc(100vw-1rem))] min-w-0 flex-col overflow-hidden rounded-xl border border-white/10 bg-[#303030] text-white shadow-lg">
+            <div className="relative flex h-[min(30rem,calc(100dvh-7rem))] w-[min(293px,calc(100vw-1rem))] min-w-0 flex-col overflow-hidden rounded-xl border border-white/10 bg-[#303030] text-white shadow-lg">
               <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-transparent">
-                {privatePinDialog ? (
-                  <div className="grid min-h-0 flex-1 place-items-center p-4">
-                    <PinEntryCard
-                      title={
-                        privatePinDialog.action === "unlock"
-                          ? "Enter PIN"
-                          : "Create PIN"
-                      }
-                      description={
-                        privatePinDialog.action === "unlock"
-                          ? "Enter your PIN to open this chat."
-                          : "Choose a 4-digit PIN to lock this chat."
-                      }
-                      value={privatePinValue}
-                      length={privatePinDigits}
-                      onChange={setPrivatePinValue}
-                      onComplete={value => void submitPrivatePin(value)}
-                      ariaLabel="Ghost Private PIN"
-                      onClose={() => {
-                        setPrivatePinDialog(null);
-                        setPrivatePinValue("");
-                        setPrivatePinError("");
-                      }}
-                      error={privatePinError}
-                    />
-                  </div>
-                ) : (
-                  <>
-                    <div className="flex h-14 shrink-0 items-center gap-2 border-b border-white/10 px-3">
+                <div className="flex h-14 shrink-0 items-center gap-2 border-b border-white/10 px-3">
                       <div className="relative min-w-0 flex-1">
                         <Search
                           size={15}
-                          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/60"
+                                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
                         />
                         <input
                           type="search"
@@ -6265,57 +6334,40 @@ export default function Home({
                           onChange={event =>
                             setPrivateChatSearch(event.target.value)
                           }
-                          placeholder={
-                            privateChatPanel === "locked"
-                              ? "Search locked chats"
-                              : "Search chats"
-                          }
-                          aria-label={
-                            privateChatPanel === "locked"
-                              ? "Search locked chats"
-                              : "Search Ghost Private chats"
-                          }
-                          title={
-                            privateChatPanel === "locked"
-                              ? "Search locked chats"
-                              : "Search Ghost Private chats"
-                          }
+                          placeholder="Search chats"
+                          aria-label="Search Ghost Private chats"
+                          title="Search Ghost Private chats"
                           className="h-9 w-full min-w-0 rounded-lg bg-[#383838] pl-9 pr-2 text-sm text-white outline-none placeholder:text-white/60 focus:bg-[#414141]"
                         />
                       </div>
-                      {privateChatPanel === "chats" && (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="size-9 shrink-0 rounded-lg bg-[#383838] text-white hover:bg-[#414141] hover:text-white"
-                              aria-label="New Ghost Private chat"
-                              onClick={() => {
-                                setPrivateChatOptionsOpenId(null);
-                                setPrivateChatPanel(null);
-                                setPrivateChatMenuOpen(false);
-                                startNewPrivateChat(true);
-                              }}
-                            >
-                              <Plus size={17} />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent side="bottom">
-                            Start a new Ghost Private chat
-                          </TooltipContent>
-                        </Tooltip>
-                      )}
+                          {privateChatPanel === "chats" && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="size-9 shrink-0 rounded-lg bg-[#383838] text-white hover:bg-[#414141] hover:text-white"
+                                  aria-label="New Ghost Private chat"
+                                  onClick={() => {
+                                    setPrivateChatOptionsOpenId(null);
+                                    setPrivateChatPanel(null);
+                                    setPrivateChatMenuOpen(false);
+                                    startNewPrivateChat(true);
+                                  }}
+                                >
+                                  <Plus size={17} />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent side="bottom">
+                                Start a new Ghost Private chat
+                              </TooltipContent>
+                            </Tooltip>
+                          )}
                     </div>
-                    <div className="min-h-0 flex-1 overflow-y-auto p-2">
+                    <div className={cn("min-h-0 flex-1 overflow-y-auto p-2", privateSelectionMode && "pb-56")}>
                       <div className="space-y-0.5">
                         {privateChatEntries
-                          .filter(chat =>
-                            privateChatPanel === "locked"
-                              ? chat.locked
-                              : !chat.locked
-                          )
                           .filter(chat =>
                             chat.title
                               .toLocaleLowerCase()
@@ -6403,22 +6455,33 @@ export default function Home({
                                   className="flex h-10 min-w-0 flex-1 items-center gap-2.5 px-1 text-left"
                                   onClick={event => {
                                     event.stopPropagation();
-                                    openPrivateChat(chat);
+                                    if (privateSelectionMode) {
+                                      togglePrivateChatSelection(chat.id);
+                                    } else {
+                                      openPrivateChat(chat);
+                                    }
                                   }}
                                 >
-                                  <span className="relative flex size-8 shrink-0 items-center justify-center rounded-lg bg-[#383838] text-white">
-                                    <ChatLine
+                                  {privateSelectionMode ? (
+                                    <span
                                       aria-hidden="true"
-                                      className="size-[22px]"
-                                    />
-                                    {chat.locked ? (
-                                      <span className="absolute -bottom-1 -right-1 flex size-5 items-center justify-center rounded-full border border-white/20 bg-[#242424] text-white shadow-sm">
-                                        <Lock2
-                                          aria-hidden="true"
-                                          className="size-3.5"
-                                        />
-                                      </span>
-                                    ) : (
+                                      className={cn(
+                                        "flex size-5 shrink-0 items-center justify-center rounded-md border",
+                                        privateSelectedIds.has(chat.id)
+                                          ? "border-white bg-white text-[#303030]"
+                                          : "border-white/45 bg-transparent"
+                                      )}
+                                    >
+                                      {privateSelectedIds.has(chat.id) && (
+                                        <Check size={14} strokeWidth={2.5} />
+                                      )}
+                                    </span>
+                                  ) : (
+                                    <span className="relative flex size-8 shrink-0 items-center justify-center rounded-lg bg-[#383838] text-white">
+                                      <ChatLine
+                                        aria-hidden="true"
+                                        className="size-[22px]"
+                                      />
                                       <span className="absolute -bottom-1 -right-1 flex size-5 items-center justify-center rounded-full border border-white/20 bg-[#242424] shadow-sm">
                                         <GhostModeIcon
                                           savedPalette
@@ -6428,12 +6491,13 @@ export default function Home({
                                           showWave={false}
                                         />
                                       </span>
-                                    )}
-                                  </span>
+                                    </span>
+                                  )}
                                   <GhostPrivateChatTitle title={chat.title} />
                                 </button>
                               )}
-                              {privateChatRenameId !== chat.id && (
+                              {!privateSelectionMode &&
+                                privateChatRenameId !== chat.id && (
                                 <DropdownMenu
                                   open={privateChatOptionsOpenId === chat.id}
                                   onOpenChange={open => {
@@ -6460,7 +6524,7 @@ export default function Home({
                                           ? "opacity-0"
                                           : "opacity-0 group-hover:text-white/85 group-hover:opacity-100 group-focus-within:opacity-100 max-lg:opacity-100"
                                       )}
-                                      aria-label={`Chat options for ${chat.locked ? "locked chat" : chat.title}`}
+                                      aria-label={`Chat options for ${chat.title}`}
                                       title="Chat options"
                                       onClick={event => event.stopPropagation()}
                                     >
@@ -6472,41 +6536,42 @@ export default function Home({
                                     align="end"
                                     className="w-36 rounded-xl border border-white/10 bg-[#303030] p-1 text-white shadow-xl"
                                   >
-                                    {!chat.locked && (
-                                      <DropdownMenuItem
-                                        className="gap-2 text-white hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white"
-                                        onSelect={() => {
-                                          setPrivateChatRenameId(chat.id);
-                                          setPrivateChatRenameValue(chat.title);
-                                        }}
-                                      >
-                                        <Pencil
-                                          size={15}
-                                          className="text-white"
-                                        />{" "}
-                                        Rename
-                                      </DropdownMenuItem>
-                                    )}
                                     <DropdownMenuItem
                                       className="gap-2 text-white hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white"
-                                      onSelect={() =>
-                                        requestPrivateChatLock(chat)
-                                      }
+                                      disabled={Boolean(privateSharePendingId)}
+                                      onSelect={event => {
+                                        event.preventDefault();
+                                        sharePrivateChat(chat);
+                                      }}
                                     >
-                                      {chat.locked ? (
-                                        <UnlockKeyhole
-                                          size={15}
-                                          className="text-white"
-                                        />
+                                      {privateSharePendingId === chat.id ? (
+                                        <span className="loader loader-xs text-current" aria-hidden="true" />
                                       ) : (
-                                        <LockKeyhole
-                                          size={15}
-                                          className="text-white"
-                                        />
+                                        <ShareIcon className="size-[17px] shrink-0 text-white/65" />
                                       )}
-                                      {chat.locked
-                                        ? "Unlock chat"
-                                        : "Lock chat"}
+                                      {privateSharePendingId === chat.id ? "Sharing…" : "Share"}
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      className="gap-2 text-white hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white"
+                                      onSelect={() => {
+                                        setPrivateChatRenameId(chat.id);
+                                        setPrivateChatRenameValue(chat.title);
+                                      }}
+                                    >
+                                      <Pencil size={15} className="text-white/65" /> Rename
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      className="gap-2 text-white hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white"
+                                      onSelect={() => {
+                                        setPrivateSelectedIds(current =>
+                                          new Set(current).add(chat.id)
+                                        );
+                                        setPrivateChatRenameId(null);
+                                        setPrivateSelectionMode(true);
+                                      }}
+                                    >
+                                      <Check size={15} className="text-white/65" />
+                                      Select chat
                                     </DropdownMenuItem>
                                     <DropdownMenuSeparator className="bg-white/10" />
                                     <DropdownMenuItem
@@ -6518,7 +6583,7 @@ export default function Home({
                                         })
                                       }
                                     >
-                                      <Trash6Icon className="size-4 shrink-0 text-destructive" />{" "}
+                                      <Trash6Icon className="size-4 shrink-0 text-destructive/75" />
                                       Delete
                                     </DropdownMenuItem>
                                   </DropdownMenuContent>
@@ -6527,31 +6592,72 @@ export default function Home({
                             </div>
                           ))}
                       </div>
-                      {privateChatEntries
-                        .filter(chat =>
-                          privateChatPanel === "locked"
-                            ? chat.locked
-                            : !chat.locked
-                        )
-                        .filter(chat =>
-                          chat.title
-                            .toLocaleLowerCase()
-                            .includes(
-                              privateChatSearch.trim().toLocaleLowerCase()
-                            )
-                        ).length === 0 && (
+                      {privateChatEntries.filter(chat =>
+                        chat.title
+                          .toLocaleLowerCase()
+                          .includes(
+                            privateChatSearch.trim().toLocaleLowerCase()
+                          )
+                      ).length === 0 && (
                         <p className="px-3 py-8 text-center text-xs text-muted-foreground">
                           {privateChatSearch
                             ? "No chats match your search."
-                            : privateChatPanel === "locked"
-                              ? "No locked chats yet."
-                              : "Your Ghost Private chats will appear here."}
+                            : "Your Ghost Private chats will appear here."}
                         </p>
                       )}
                     </div>
-                  </>
-                )}
               </div>
+          {privateSelectionMode && (
+            <div className="absolute bottom-2 right-2 z-10 flex flex-col items-center gap-1 rounded-2xl border border-white/10 bg-[#303030] p-1.5 shadow-lg">
+                    <div
+                      className="flex h-11 w-11 flex-col items-center justify-center rounded-xl border border-white/10 bg-[#383838] text-white"
+                      aria-label={`${privateSelectedIds.size} chats selected`}
+                    >
+                      <CircleCheck size={19} strokeWidth={1.9} />
+                      <span className="text-[10px] leading-3">{privateSelectedIds.size}</span>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="size-11 rounded-xl border border-white/10 bg-[#383838] text-white hover:bg-[#414141] hover:text-white"
+                      aria-label={privateSelectedIds.size === privateChatEntries.length ? "Deselect all chats" : "Select all chats"}
+                      onClick={() =>
+                        setPrivateSelectedIds(current =>
+                          current.size === privateChatEntries.length
+                            ? new Set()
+                            : new Set(privateChatEntries.map(chat => chat.id))
+                        )
+                      }
+                    >
+                      <ListChecks size={20} strokeWidth={2} />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="size-11 rounded-xl border border-white/10 bg-[#383838] text-white hover:bg-[#414141] hover:text-white"
+                      aria-label="Cancel chat selection"
+                      onClick={exitPrivateSelectionMode}
+                    >
+                      <X size={20} strokeWidth={2} />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      disabled={privateSelectedIds.size === 0}
+                      className="group size-11 rounded-xl border border-white/10 bg-[#383838] text-red-400 hover:bg-red-500/15 hover:text-red-300"
+                      aria-label="Delete selected chats"
+                      onClick={() => {
+                        setPrivateDeleteSelectedError(null);
+                        setPrivateDeleteSelectedOpen(true);
+                      }}
+                    >
+                      <Trash6Icon className="size-5 shrink-0 text-red-400 group-hover:text-red-300" />
+                    </Button>
+            </div>
+          )}
             </div>
           )}
         </aside>
@@ -6814,21 +6920,7 @@ export default function Home({
                         className="mt-1 items-center gap-2.5 rounded-lg px-2.5 py-2"
                         onSelect={() => {
                           voice.cancel();
-                          isSavedGhostChatRef.current = true;
-                          setIsSavedGhostChat(true);
-                          isTemporaryChatRef.current = true;
-                          setIsTemporaryChat(true);
-                          setIsTemporaryChatClosing(false);
-                          temporaryConversationIdsRef.current = new Set(
-                            privateChatEntries.map(chat => chat.id)
-                          );
-                          writeStoredTemporaryChat(user?.id, {
-                            active: true,
-                            savedPalette: true,
-                            activeConversationId: null,
-                            ids: [],
-                          });
-                          setGreetingAnimationKey(current => current + 1);
+                          requestGhostPrivateAccess();
                         }}
                       >
                         <span className="ghost-mode-option-icon ghost-mode-option-icon-saved">
@@ -6889,18 +6981,22 @@ export default function Home({
                 Boolean(shareNotice)) && (
                 <div className="pointer-events-none absolute inset-x-0 top-0 z-20 h-13">
                   {shareNotice && (
-                    <div className="pointer-events-auto fixed right-3 top-[max(env(safe-area-inset-top),0.75rem)] z-[100] animate-in fade-in slide-in-from-top-1 duration-200">
-                      <ActionNotice
-                        message={shareNoticeText}
-                        href={
-                          shareNotice === "success"
-                            ? (shareNoticeUrl ?? undefined)
-                            : undefined
-                        }
-                        status={shareNotice}
-                        onDismiss={dismissShareNotice}
-                      />
-                    </div>
+                    typeof document !== "undefined" &&
+                    createPortal(
+                      <div className="pointer-events-auto fixed right-3 top-[max(env(safe-area-inset-top),0.75rem)] z-[9999] animate-in fade-in slide-in-from-top-1 duration-200">
+                        <ActionNotice
+                          message={shareNoticeText}
+                          href={
+                            shareNotice === "success"
+                              ? (shareNoticeUrl ?? undefined)
+                              : undefined
+                          }
+                          status={shareNotice}
+                          onDismiss={dismissShareNotice}
+                        />
+                      </div>,
+                      document.body
+                    )
                   )}
                   {!isGhostMode && (
                     <ShareConversationDialog
@@ -7596,7 +7692,7 @@ export default function Home({
                           }
                           onDelete={guestMode ? undefined : stableDeleteMessage}
                           onFeedback={
-                            guestMode || isTemporaryChat
+                            guestMode || isGhostMode
                               ? undefined
                               : stableOnFeedback
                           }
@@ -8050,6 +8146,63 @@ export default function Home({
         confirmLabel="Delete"
         onConfirm={stableDeleteAction}
       />
+      <ConfirmDeleteDialog
+        open={privateDeleteSelectedOpen}
+        onOpenChange={open => {
+          setPrivateDeleteSelectedOpen(open);
+          if (!open) setPrivateDeleteSelectedError(null);
+        }}
+        title={`Delete ${privateSelectedIds.size} selected ${privateSelectedIds.size === 1 ? "chat" : "chats"}?`}
+        description="This permanently deletes the selected Ghost Private chats and their messages. This cannot be undone."
+        confirmLabel="Delete selected"
+        busy={removePrivateChatsMutation.isPending}
+        busyLabel="Deleting chats…"
+        error={privateDeleteSelectedError}
+        onConfirm={stableDeleteSelectedPrivateChats}
+      />
+      <Dialog
+        open={Boolean(privatePinDialog)}
+        onOpenChange={open => {
+          if (!open) cancelPrivateAccessPrompt();
+        }}
+      >
+        <DialogContent
+          data-private-pin-dialog
+          showCloseButton={false}
+          overlayClassName="z-[115]"
+          className="z-[120] w-auto max-w-none border-0 bg-transparent p-0 shadow-none"
+        >
+          <DialogHeader className="sr-only">
+            <DialogTitle>Ghost Private passcode</DialogTitle>
+            <DialogDescription>
+              {privatePinDialog?.action === "verify"
+                ? "Enter your passcode to enter Ghost Private."
+                : "Create a passcode to protect Ghost Private."}
+            </DialogDescription>
+          </DialogHeader>
+          {privatePinDialog && (
+            <PinEntryCard
+              title={
+                privatePinDialog.action === "verify"
+                  ? "Enter passcode"
+                  : "Create a passcode"
+              }
+              description={
+                privatePinDialog.action === "verify"
+                  ? "Enter your passcode to enter Ghost Private."
+                  : `Choose a ${privatePinDigits}-digit passcode to protect Ghost Private.`
+              }
+              value={privatePinValue}
+              length={privatePinDigits}
+              onChange={setPrivatePinValue}
+              onComplete={value => void submitPrivatePin(value)}
+              ariaLabel="Ghost Private passcode"
+              onClose={cancelPrivateAccessPrompt}
+              error={privatePinError}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
 
       {guestMode && (
         <SignInPrompt

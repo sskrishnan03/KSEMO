@@ -2,6 +2,7 @@ type PrivatePinRecord = {
   digits: 4 | 6;
   salt: string;
   hash: string;
+  shareVerifier?: string;
 };
 
 export type PrivateChatEntry = {
@@ -58,6 +59,13 @@ async function derivePinHash(pin: string, salt: Uint8Array) {
   return toBase64(new Uint8Array(bits));
 }
 
+async function deriveShareVerifier(pin: string, userId: string | number) {
+  return derivePinHash(
+    pin,
+    new TextEncoder().encode(`ksemo-ghost-share:${String(userId)}`)
+  );
+}
+
 export function readPrivatePinRecord(userId: string | number): PrivatePinRecord | null {
   try {
     const value = localStorage.getItem(pinKey(userId));
@@ -80,7 +88,12 @@ export async function setPrivatePin(
   digits: 4 | 6
 ) {
   const salt = crypto.getRandomValues(new Uint8Array(16));
-  const record = { digits, salt: toBase64(salt), hash: await derivePinHash(pin, salt) };
+  const record = {
+    digits,
+    salt: toBase64(salt),
+    hash: await derivePinHash(pin, salt),
+    shareVerifier: await deriveShareVerifier(pin, userId),
+  };
   localStorage.setItem(pinKey(userId), JSON.stringify(record));
 }
 
@@ -93,7 +106,17 @@ export async function verifyPrivatePin(userId: string | number, pin: string) {
   if (actual.length !== expected.length) return false;
   let diff = 0;
   actual.forEach((byte, index) => { diff |= byte ^ expected[index]!; });
-  return diff === 0;
+  if (diff !== 0) return false;
+  if (!record.shareVerifier) {
+    localStorage.setItem(
+      pinKey(userId),
+      JSON.stringify({
+        ...record,
+        shareVerifier: await deriveShareVerifier(pin, userId),
+      })
+    );
+  }
+  return true;
 }
 
 export function readPrivateChatEntries(userId: string | number): PrivateChatEntry[] {

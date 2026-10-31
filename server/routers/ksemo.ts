@@ -1,4 +1,5 @@
 import { TRPCError } from "@trpc/server";
+import { createHmac, timingSafeEqual, webcrypto } from "node:crypto";
 import { z } from "zod";
 import {
   createConversationForUser,
@@ -49,8 +50,58 @@ import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { EPHEMERAL_TITLE_PREFIX, typeAfterVoiceSession } from "../conversationTypes";
 import type { KsemoFile } from "../../supabase-schema/04-types";
 import { setInterruptedResponseOverride } from "../interruptedResponse";
+import { ENV } from "../_core/env";
 
 const conversationId = z.string().min(8).max(36);
+const privateShareAttempts = new Map<string, { count: number; resetAt: number }>();
+function privateShareToken(
+  conversationId: string,
+  shareVerifier: string,
+  digits: 4 | 6
+) {
+  return `g${digits}${createHmac("sha256", ENV.cookieSecret)
+    .update(`${conversationId}:${shareVerifier}`)
+    .digest("base64url")}`;
+}
+
+async function verifyPrivateSharePasscode(
+  conversationId: string,
+  userId: string | number,
+  passcode: string,
+  shareToken: string
+) {
+  const key = await webcrypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(passcode),
+    "PBKDF2",
+    false,
+    ["deriveBits"]
+  );
+  const bits = await webcrypto.subtle.deriveBits(
+    {
+      name: "PBKDF2",
+      hash: "SHA-256",
+      salt: new TextEncoder().encode(`ksemo-ghost-share:${String(userId)}`),
+      iterations: 180_000,
+    },
+    key,
+    256
+  );
+  const verifier = Buffer.from(bits).toString("base64");
+  const expected = Buffer.from(
+    privateShareToken(conversationId, verifier, passcode.length as 4 | 6)
+  );
+  const actual = Buffer.from(shareToken);
+  if (actual.length === expected.length && timingSafeEqual(actual, expected)) {
+    return true;
+  }
+  const legacy = Buffer.from(
+    `g${createHmac("sha256", ENV.cookieSecret)
+      .update(`${conversationId}:${passcode}`)
+      .digest("base64url")}`
+  );
+  return actual.length === legacy.length && timingSafeEqual(actual, legacy);
+}
 const preferenceInput = z.object({
   selectedModel: z.string().max(160).nullable().optional(),
   persona: z.enum(["balanced", "concise", "creative", "analytical"]).optional(),
@@ -204,6 +255,24 @@ export const conversationRouter = router({
   privateList: protectedProcedure.query(({ ctx }) =>
     listPrivateConversationsForUser(ctx.user.id)
   ),
+  removePrivateChats: protectedProcedure
+    .input(z.object({ ids: z.array(conversationId).min(1) }))
+    .mutation(async ({ ctx, input }) => {
+      const allPrivate = await listPrivateConversationsForUser(ctx.user.id);
+      const requestedIds = new Set(input.ids);
+      const conversations = allPrivate.filter(conversation =>
+        requestedIds.has(conversation.id)
+      );
+      for (const conversation of conversations) {
+        await removeConversationBranchLinks(conversation.id, ctx.user.id);
+        await deleteConversationForUser(conversation.id, ctx.user.id);
+      }
+      return {
+        success: true,
+        removed: conversations.length,
+        removedIds: conversations.map(conversation => conversation.id),
+      } as const;
+    }),
   create: protectedProcedure
     .input(
       z.object({
@@ -653,6 +722,12 @@ export const conversationRouter = router({
     .input(z.object({ id: conversationId, isPublic: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
       const conversation = await requireConversation(input.id, ctx.user.id);
+      if (conversation.title.startsWith(EPHEMERAL_TITLE_PREFIX)) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Use protected Ghost Private sharing for this chat.",
+        });
+      }
       // Reuse a token only while a link is already active. Re-sharing after a
       // revoke gets a new token so previously copied URLs stay invalid.
       const shareToken = input.isPublic
@@ -672,13 +747,113 @@ export const conversationRouter = router({
         shareToken: updated?.shareToken ?? shareToken,
       };
     }),
+  configurePrivateShare: protectedProcedure
+    .input(
+      z.object({
+        id: conversationId,
+        shareVerifier: z.string().min(40).max(64),
+        digits: z.union([z.literal(4), z.literal(6)]),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const conversation = await requireConversation(input.id, ctx.user.id);
+      if (!conversation.title.startsWith(EPHEMERAL_TITLE_PREFIX)) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "This is not a Ghost Private chat." });
+      }
+      const shareToken = privateShareToken(
+        input.id,
+        input.shareVerifier,
+        input.digits
+      );
+      const updated = await updateConversationForUser(input.id, ctx.user.id, {
+        isPublic: false,
+        shareToken,
+      });
+      if (!updated?.shareToken) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Could not create a protected link." });
+      }
+      return { shareToken: updated.shareToken };
+    }),
   getPublic: publicProcedure
-    .input(z.object({ token: z.string().min(16).max(64) }))
+    .input(z.object({ token: z.string().min(16).max(64), passcode: z.string().regex(/^\d{4,6}$/).optional() }))
     .query(async ({ ctx, input }) => {
-      let shared = await getPublicConversationByToken(input.token);
+      let shared: any = null;
+      let isPrivateShare = false;
+      const privateCandidate = await getConversationByShareToken(input.token);
+      if (privateCandidate?.title.startsWith(EPHEMERAL_TITLE_PREFIX)) {
+        const attempts = privateShareAttempts.get(input.token);
+        const now = Date.now();
+        if (attempts && attempts.resetAt > now && attempts.count >= 5) {
+          return {
+            passcodeRequired: true,
+            invalidPasscode: true,
+            isPrivateShare: true,
+            passcodeDigits: privateCandidate.shareToken?.startsWith("g6") ? 6 : 4,
+            conversation: { id: privateCandidate.id, title: "Ghost Private chat", isOwner: false },
+            messages: [],
+          };
+        }
+        if (
+          !input.passcode ||
+          !(await verifyPrivateSharePasscode(
+            privateCandidate.id,
+            privateCandidate.userId,
+            input.passcode,
+            input.token
+          ))
+        ) {
+          const current = attempts && attempts.resetAt > now
+            ? attempts
+            : { count: 0, resetAt: now + 60_000 };
+          current.count += input.passcode ? 1 : 0;
+          privateShareAttempts.set(input.token, current);
+          return {
+            passcodeRequired: true,
+            invalidPasscode: Boolean(input.passcode),
+            isPrivateShare: true,
+            passcodeDigits: privateCandidate.shareToken?.startsWith("g6") ? 6 : 4,
+            conversation: { id: privateCandidate.id, title: "Ghost Private chat", isOwner: false },
+            messages: [],
+          };
+        }
+        privateShareAttempts.delete(input.token);
+        isPrivateShare = true;
+        const items = await listMessagesForConversation(privateCandidate.id);
+        shared = {
+          id: privateCandidate.id,
+          userId: privateCandidate.userId,
+          title: privateCandidate.title.replace(EPHEMERAL_TITLE_PREFIX, "").trim() || "Ghost Private chat",
+          conversation_type: privateCandidate.conversationType,
+          created_at: privateCandidate.createdAt.toISOString(),
+          messages: items.map(message => ({
+            id: message.id,
+            role: message.role,
+            content: message.content,
+            model: message.model,
+            created_at: message.createdAt,
+          })),
+        };
+      }
+      if (!shared && privateCandidate?.isPublic) {
+        const items = await listMessagesForConversation(privateCandidate.id);
+        shared = {
+          id: privateCandidate.id,
+          userId: privateCandidate.userId,
+          title: privateCandidate.title,
+          conversation_type: privateCandidate.conversationType,
+          created_at: privateCandidate.createdAt,
+          messages: items.map(message => ({
+            id: message.id,
+            role: message.role,
+            content: message.content,
+            model: message.model,
+            created_at: message.createdAt,
+          })),
+        };
+      }
       // If conversation is not public, but current user is authenticated owner, still allow them to access it
       if (!shared && ctx.user) {
-        const candidate = await getConversationByShareToken(input.token);
+        const candidate = privateCandidate;
         if (candidate && candidate.userId === ctx.user.id) {
           const items = await listMessagesForConversation(candidate.id);
           shared = {
@@ -702,6 +877,10 @@ export const conversationRouter = router({
       const isOwner = Boolean(userId && convUserId && userId === convUserId);
 
       return {
+        passcodeRequired: false,
+        invalidPasscode: false,
+        isPrivateShare,
+        passcodeDigits: privateCandidate?.shareToken?.startsWith("g6") ? 6 : 4,
         conversation: {
           id: shared.id,
           title: shared.title,
@@ -727,12 +906,56 @@ export const conversationRouter = router({
       z.object({
         token: z.string().min(16).max(64).optional(),
         id: conversationId.optional(),
+        passcode: z.string().regex(/^\d{4,6}$/).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
       let shared: any = null;
+      let isPrivateShare = false;
       if (input.token) {
         shared = await getPublicConversationByToken(input.token);
+        if (shared?.title?.startsWith(EPHEMERAL_TITLE_PREFIX)) shared = null;
+        if (!shared) {
+          const candidate = await getConversationByShareToken(input.token);
+          if (
+            candidate?.title.startsWith(EPHEMERAL_TITLE_PREFIX)
+          ) {
+            const now = Date.now();
+            const attempts = privateShareAttempts.get(input.token);
+            if (attempts && attempts.resetAt > now && attempts.count >= 5) {
+              throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Too many passcode attempts." });
+            }
+            const isValidPasscode = Boolean(
+              input.passcode &&
+              (await verifyPrivateSharePasscode(
+                candidate.id,
+                candidate.userId,
+                input.passcode,
+                input.token
+              ))
+            );
+            if (!isValidPasscode) {
+              if (input.passcode) {
+                const current = attempts && attempts.resetAt > now
+                  ? attempts
+                  : { count: 0, resetAt: now + 60_000 };
+                current.count += 1;
+                privateShareAttempts.set(input.token, current);
+              }
+              throw new TRPCError({ code: "FORBIDDEN", message: "Ghost Private passcode required." });
+            }
+            privateShareAttempts.delete(input.token);
+            const items = await listMessagesForConversation(candidate.id);
+            shared = {
+              id: candidate.id,
+              title: candidate.title.replace(EPHEMERAL_TITLE_PREFIX, "").trim() || "Ghost Private chat",
+              conversation_type: candidate.conversationType,
+              messages: items,
+              isPrivateShare: true,
+            };
+            isPrivateShare = true;
+          }
+        }
       } else if (input.id) {
         const candidate = await getConversationById(input.id);
         if (
@@ -759,6 +982,7 @@ export const conversationRouter = router({
         userId: ctx.user.id,
         title: shared.title || "Shared Chat",
         conversationType: shared.conversation_type || "text",
+        ephemeral: isPrivateShare || shared.isPrivateShare === true,
       });
       if (!duplicate) {
         throw new TRPCError({
@@ -780,7 +1004,7 @@ export const conversationRouter = router({
           });
         }
       }
-      return { conversationId: duplicate.id };
+      return { conversationId: duplicate.id, isPrivate: isPrivateShare || shared.isPrivateShare === true };
     }),
   search: protectedProcedure
     .input(z.object({ query: z.string().trim().min(1).max(120) }))
