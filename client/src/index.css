@@ -32,6 +32,13 @@
   animation: ghost-mode-enter 460ms cubic-bezier(.22, 1, .36, 1) both;
 }
 
+.dark .temp-mode {
+  --temp-accent: #86efac;
+  --temp-mid: #96e7d0;
+  --temp-ice: #a5d8ff;
+  --temp-spectral: #244369;
+}
+
 .temp-chat-main {
   min-height: 0;
   overflow: hidden;
@@ -298,6 +305,12 @@
 
 :is(.temp-mode, .ghost-saved-mode) .temp-ghost-greeting {
   display: inline-block;
+  color: var(--foreground);
+  background: none;
+  -webkit-text-fill-color: currentColor;
+}
+
+.dark :is(.temp-mode, .ghost-saved-mode) .temp-ghost-greeting {
   color: transparent;
   background-image: linear-gradient(
     90deg,
@@ -422,6 +435,12 @@
   --temp-ice: #ffd2b8;
   --temp-spectral: #71352e;
 }
+.dark .ghost-saved-mode {
+  --temp-accent: #ff6b5e;
+  --temp-mid: #ff9a78;
+  --temp-ice: #ffd2b8;
+  --temp-spectral: #71352e;
+}
 .ghost-saved-mode.temp-mode-closing {
   animation: ghost-mode-exit 340ms cubic-bezier(.4, 0, .8, 1) both;
 }
@@ -445,6 +464,14 @@
 .ghost-mode-option-icon .temp-ghost-icon { overflow: visible; }
 .ghost-mode-option-icon .temp-ghost-wave-overlay { overflow: visible; }
 .ghost-mode-option-icon-saved {
+  --ghost-option-left: #ff6b5e;
+  --ghost-option-right: #ffd2b8;
+}
+.dark .ghost-mode-option-icon {
+  --ghost-option-left: #86efac;
+  --ghost-option-right: #a5d8ff;
+}
+.dark .ghost-mode-option-icon-saved {
   --ghost-option-left: #ff6b5e;
   --ghost-option-right: #ffd2b8;
 }
@@ -515,7 +542,15 @@
 
 :root {
   --radius: 0.85rem;
+  --ghost-private-panel: var(--popover);
+  --ghost-private-control: var(--muted);
+  --ghost-private-hover: var(--accent);
+  --ghost-private-dot-hover: #d4d4d4;
+  --ghost-private-badge: var(--card);
+  --ghost-private-border: var(--border);
   --greeting-highlight: #b89aff;
+  --voice-ambient: rgb(26 26 26 / 12%);
+  --new-chat-ambient: rgb(26 26 26 / 16%);
   --background: #f7f7f7;
   --foreground: #1a1a1a;
   --card: #ffffff;
@@ -546,7 +581,15 @@
 }
 
 .dark {
+  --ghost-private-panel: #303030;
+  --ghost-private-control: #383838;
+  --ghost-private-hover: #3b3b3b;
+  --ghost-private-dot-hover: #4a4a4a;
+  --ghost-private-badge: #242424;
+  --ghost-private-border: rgb(255 255 255 / 10%);
   --greeting-highlight: #b89aff;
+  --voice-ambient: rgb(201 211 232 / 20%);
+  --new-chat-ambient: rgb(255 255 255 / 28%);
   --background: #1c1c1c;
   --foreground: #ededed;
   --card: #222222;
@@ -1481,11 +1524,11 @@ html.ksemo-reduce-motion .ksemo-file-writing-line {
   animation: ksemo-orb-roll 3s linear infinite;
 }
 
-/* Soft pearl bloom matched to KSEMO's charcoal and graphite palette. */
+/* Existing ambient colors invert with the active appearance. */
 .ksemo-voice-corner-glow {
   background: radial-gradient(
     ellipse 68% 78% at 50% 50%,
-    rgb(201 211 232 / 20%) 0%,
+    var(--voice-ambient) 0%,
     transparent 100%
   );
 }
@@ -1498,7 +1541,7 @@ html.ksemo-reduce-motion .ksemo-file-writing-line {
   .ksemo-voice-corner-glow {
     background: radial-gradient(
       ellipse 76% 42% at 50% 58%,
-      rgb(201 211 232 / 15%) 0%,
+      color-mix(in srgb, var(--voice-ambient) 75%, transparent) 0%,
       transparent 100%
     );
   }
@@ -1510,7 +1553,7 @@ html.ksemo-reduce-motion .ksemo-file-writing-line {
   filter: blur(36px);
   background: radial-gradient(
     ellipse 64% 54% at 50% 48%,
-    rgb(255 255 255 / 28%) 0%,
+    var(--new-chat-ambient) 0%,
     transparent 100%
   );
 }

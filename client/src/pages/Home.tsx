@@ -504,7 +504,7 @@ function GhostPrivateChatTitle({ title }: { title: string }) {
       ref={viewportRef}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      className="min-w-0 flex-1 overflow-hidden whitespace-nowrap text-sm font-medium text-white"
+      className="min-w-0 flex-1 overflow-hidden whitespace-nowrap text-sm font-semibold text-foreground"
       style={
         isHovered && overflowDistance > 0
           ? {
@@ -6330,16 +6330,16 @@ export default function Home({
           }}
           aria-label="Ghost Private chat options"
         >
-          <div className="ghost-private-options-enter flex w-[min(293px,calc(100vw-1rem))] shrink-0 items-center justify-between rounded-xl border border-white/10 bg-[#303030] px-3 py-2 text-white shadow-lg">
-            <span className="flex items-center gap-2 text-sm font-medium">
+          <div className="ghost-private-options-enter flex w-[min(293px,calc(100vw-1rem))] shrink-0 items-center justify-between rounded-xl border border-[var(--ghost-private-border)] bg-[var(--ghost-private-panel)] px-3 py-2 text-popover-foreground shadow-lg">
+            <span className="flex items-center gap-2 text-sm font-semibold">
               <ChatLine aria-hidden="true" className="size-[18px]" />
               Ghost Private chats
             </span>
           </div>
           {privateChatPanel && (
-            <div className="relative flex h-[min(30rem,calc(100dvh-7rem))] w-[min(293px,calc(100vw-1rem))] min-w-0 flex-col overflow-hidden rounded-xl border border-white/10 bg-[#303030] text-white shadow-lg">
+            <div className="relative flex h-[min(30rem,calc(100dvh-7rem))] w-[min(293px,calc(100vw-1rem))] min-w-0 flex-col overflow-hidden rounded-xl border border-[var(--ghost-private-border)] bg-[var(--ghost-private-panel)] text-popover-foreground shadow-lg">
               <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-transparent">
-                <div className="flex h-14 shrink-0 items-center gap-2 border-b border-white/10 px-3">
+                <div className="flex h-14 shrink-0 items-center gap-2 border-b border-[var(--ghost-private-border)] px-3">
                       <div className="relative min-w-0 flex-1">
                         <Search
                           size={15}
@@ -6354,7 +6354,7 @@ export default function Home({
                           placeholder="Search chats"
                           aria-label="Search Ghost Private chats"
                           title="Search Ghost Private chats"
-                          className="h-9 w-full min-w-0 rounded-lg bg-[#383838] pl-9 pr-2 text-sm text-white outline-none placeholder:text-white/60 focus:bg-[#414141]"
+                          className="h-9 w-full min-w-0 rounded-lg bg-[var(--ghost-private-control)] pl-9 pr-2 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:bg-[var(--ghost-private-hover)]"
                         />
                       </div>
                           {privateChatPanel === "chats" && (
@@ -6364,7 +6364,7 @@ export default function Home({
                                   type="button"
                                   variant="ghost"
                                   size="icon"
-                                  className="size-9 shrink-0 rounded-lg bg-[#383838] text-white hover:bg-[#414141] hover:text-white"
+                                  className="size-9 shrink-0 rounded-lg bg-[var(--ghost-private-control)] text-foreground hover:bg-[var(--ghost-private-hover)] hover:text-accent-foreground"
                                   aria-label="New Ghost Private chat"
                                   onClick={() => {
                                     setPrivateChatOptionsOpenId(null);
@@ -6401,10 +6401,10 @@ export default function Home({
                                 )
                               }
                               className={cn(
-                                "group flex items-center gap-1 rounded-lg px-1 py-0.5 text-white transition-colors",
+                                "group flex items-center gap-1 rounded-lg px-1 py-0.5 text-foreground transition-colors",
                                 privateChatOptionsOpenId === chat.id
-                                  ? "bg-[#3b3b3b]"
-                                  : "hover:bg-[#3b3b3b] focus-within:bg-[#3b3b3b]"
+                                  ? "bg-[var(--ghost-private-hover)]"
+                                  : "hover:bg-[var(--ghost-private-hover)] focus-within:bg-[var(--ghost-private-hover)]"
                               )}
                             >
                               {privateChatRenameId === chat.id ? (
@@ -6438,13 +6438,13 @@ export default function Home({
                                       }
                                     }}
                                     aria-label="Rename chat"
-                                    className="h-8 min-w-0 flex-1 bg-transparent px-2 text-sm text-white outline-none"
+                                    className="h-8 min-w-0 flex-1 bg-transparent px-2 text-sm text-foreground outline-none"
                                   />
                                   <Button
                                     type="button"
                                     variant="ghost"
                                     size="icon"
-                                    className="h-7 w-8 shrink-0 !rounded-md text-white hover:!rounded-md hover:bg-white/10 hover:text-white focus-visible:!rounded-md focus-visible:bg-white/10"
+                                    className="h-7 w-8 shrink-0 !rounded-md text-muted-foreground hover:!rounded-md hover:bg-[var(--ghost-private-hover)] hover:text-accent-foreground focus-visible:!rounded-md focus-visible:bg-[var(--ghost-private-hover)]"
                                     aria-label="Cancel rename"
                                     title="Cancel"
                                     onClick={() => {
@@ -6458,7 +6458,7 @@ export default function Home({
                                     type="button"
                                     variant="ghost"
                                     size="icon"
-                                    className="h-7 w-8 shrink-0 !rounded-md text-white hover:!rounded-md hover:bg-white/10 hover:text-white focus-visible:!rounded-md focus-visible:bg-white/10"
+                                    className="h-7 w-8 shrink-0 !rounded-md text-muted-foreground hover:!rounded-md hover:bg-[var(--ghost-private-hover)] hover:text-accent-foreground focus-visible:!rounded-md focus-visible:bg-[var(--ghost-private-hover)]"
                                     aria-label="Save chat name"
                                     title="Save"
                                     onClick={() => savePrivateChatRename(chat)}
@@ -6485,8 +6485,8 @@ export default function Home({
                                       className={cn(
                                         "flex size-5 shrink-0 items-center justify-center rounded-md border",
                                         privateSelectedIds.has(chat.id)
-                                          ? "border-white bg-white text-[#303030]"
-                                          : "border-white/45 bg-transparent"
+                                          ? "border-primary bg-primary text-primary-foreground"
+                                          : "border-input bg-transparent"
                                       )}
                                     >
                                       {privateSelectedIds.has(chat.id) && (
@@ -6494,12 +6494,12 @@ export default function Home({
                                       )}
                                     </span>
                                   ) : (
-                                    <span className="relative flex size-8 shrink-0 items-center justify-center rounded-lg bg-[#383838] text-white">
+                                    <span className="relative flex size-8 shrink-0 items-center justify-center rounded-lg bg-[var(--ghost-private-control)] text-foreground">
                                       <ChatLine
                                         aria-hidden="true"
                                         className="size-[22px]"
                                       />
-                                      <span className="absolute -bottom-1 -right-1 flex size-5 items-center justify-center rounded-full border border-white/20 bg-[#242424] shadow-sm">
+                                      <span className="absolute -bottom-1 -right-1 flex size-5 items-center justify-center rounded-full border border-[var(--ghost-private-border)] bg-[var(--ghost-private-badge)] shadow-sm">
                                         <GhostModeIcon
                                           savedPalette
                                           size={15}
@@ -6535,11 +6535,11 @@ export default function Home({
                                       variant="ghost"
                                       size="icon"
                                       className={cn(
-                                        "mr-1.5 size-8 shrink-0 rounded-md text-white/70 transition-[opacity,background-color,color] duration-150 hover:bg-white/10 hover:text-white focus-visible:bg-white/10 focus-visible:text-white data-[state=open]:bg-white/10 data-[state=open]:opacity-100",
+                                        "mr-1.5 size-8 shrink-0 rounded-md text-muted-foreground transition-[opacity,background-color,color] duration-150 group-hover:text-foreground hover:bg-[var(--ghost-private-dot-hover)] hover:text-foreground focus-visible:bg-[var(--ghost-private-dot-hover)] focus-visible:text-foreground data-[state=open]:bg-[var(--ghost-private-dot-hover)] data-[state=open]:opacity-100",
                                         privateChatDismissedOptionsId ===
                                           chat.id
                                           ? "opacity-0"
-                                          : "opacity-0 group-hover:text-white/85 group-hover:opacity-100 group-focus-within:opacity-100 max-lg:opacity-100"
+                                          : "opacity-0 group-hover:text-foreground group-hover:opacity-100 group-focus-within:opacity-100 max-lg:opacity-100"
                                       )}
                                       aria-label={`Chat options for ${chat.title}`}
                                       title="Chat options"
@@ -6551,10 +6551,10 @@ export default function Home({
                                   <DropdownMenuContent
                                     data-private-chat-actions
                                     align="end"
-                                    className="w-36 rounded-xl border border-white/10 bg-[#303030] p-1 text-white shadow-xl"
+                                    className="w-36 rounded-xl border border-[var(--ghost-private-border)] bg-[var(--ghost-private-panel)] p-1 text-popover-foreground shadow-xl"
                                   >
                                     <DropdownMenuItem
-                                      className="gap-2 text-white hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white"
+                                      className="gap-2 text-foreground hover:bg-[var(--ghost-private-hover)] hover:text-accent-foreground focus:bg-[var(--ghost-private-hover)] focus:text-accent-foreground"
                                       disabled={Boolean(privateSharePendingId)}
                                       onSelect={event => {
                                         event.preventDefault();
@@ -6564,21 +6564,21 @@ export default function Home({
                                       {privateSharePendingId === chat.id ? (
                                         <span className="loader loader-xs text-current" aria-hidden="true" />
                                       ) : (
-                                        <ShareIcon className="size-[17px] shrink-0 text-white/65" />
+                                        <ShareIcon className="size-[17px] shrink-0 text-muted-foreground" />
                                       )}
                                       {privateSharePendingId === chat.id ? "Sharing…" : "Share"}
                                     </DropdownMenuItem>
                                     <DropdownMenuItem
-                                      className="gap-2 text-white hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white"
+                                      className="gap-2 text-foreground hover:bg-[var(--ghost-private-hover)] hover:text-accent-foreground focus:bg-[var(--ghost-private-hover)] focus:text-accent-foreground"
                                       onSelect={() => {
                                         setPrivateChatRenameId(chat.id);
                                         setPrivateChatRenameValue(chat.title);
                                       }}
                                     >
-                                      <Pencil size={15} className="text-white/65" /> Rename
+                                      <Pencil size={15} className="text-muted-foreground" /> Rename
                                     </DropdownMenuItem>
                                     <DropdownMenuItem
-                                      className="gap-2 text-white hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white"
+                                      className="gap-2 text-foreground hover:bg-[var(--ghost-private-hover)] hover:text-accent-foreground focus:bg-[var(--ghost-private-hover)] focus:text-accent-foreground"
                                       onSelect={() => {
                                         setPrivateSelectedIds(current =>
                                           new Set(current).add(chat.id)
@@ -6587,10 +6587,10 @@ export default function Home({
                                         setPrivateSelectionMode(true);
                                       }}
                                     >
-                                      <Check size={15} className="text-white/65" />
+                                      <Check size={15} className="text-muted-foreground" />
                                       Select chat
                                     </DropdownMenuItem>
-                                    <DropdownMenuSeparator className="bg-white/10" />
+                                    <DropdownMenuSeparator className="bg-[var(--ghost-private-border)]" />
                                     <DropdownMenuItem
                                       className="gap-2 text-destructive hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive"
                                       onSelect={() =>
@@ -6625,9 +6625,9 @@ export default function Home({
                     </div>
               </div>
           {privateSelectionMode && (
-            <div className="absolute bottom-2 right-2 z-10 flex flex-col items-center gap-1 rounded-2xl border border-white/10 bg-[#303030] p-1.5 shadow-lg">
+            <div className="absolute bottom-2 right-2 z-10 flex flex-col items-center gap-1 rounded-2xl border border-[var(--ghost-private-border)] bg-[var(--ghost-private-panel)] p-1.5 text-popover-foreground shadow-lg">
                     <div
-                      className="flex h-11 w-11 flex-col items-center justify-center rounded-xl border border-white/10 bg-[#383838] text-white"
+                      className="flex h-11 w-11 flex-col items-center justify-center rounded-xl border border-[var(--ghost-private-border)] bg-[var(--ghost-private-control)] text-foreground"
                       aria-label={`${privateSelectedIds.size} chats selected`}
                     >
                       <CircleCheck size={19} strokeWidth={1.9} />
@@ -6637,7 +6637,7 @@ export default function Home({
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="size-11 rounded-xl border border-white/10 bg-[#383838] text-white hover:bg-[#414141] hover:text-white"
+                      className="size-11 rounded-xl border border-[var(--ghost-private-border)] bg-[var(--ghost-private-control)] text-foreground hover:bg-[var(--ghost-private-hover)] hover:text-accent-foreground"
                       aria-label={privateSelectedIds.size === privateChatEntries.length ? "Deselect all chats" : "Select all chats"}
                       onClick={() =>
                         setPrivateSelectedIds(current =>
@@ -6653,7 +6653,7 @@ export default function Home({
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="size-11 rounded-xl border border-white/10 bg-[#383838] text-white hover:bg-[#414141] hover:text-white"
+                      className="size-11 rounded-xl border border-[var(--ghost-private-border)] bg-[var(--ghost-private-control)] text-foreground hover:bg-[var(--ghost-private-hover)] hover:text-accent-foreground"
                       aria-label="Cancel chat selection"
                       onClick={exitPrivateSelectionMode}
                     >
@@ -6664,14 +6664,14 @@ export default function Home({
                       variant="ghost"
                       size="icon"
                       disabled={privateSelectedIds.size === 0}
-                      className="group size-11 rounded-xl border border-white/10 bg-[#383838] text-red-400 hover:bg-red-500/15 hover:text-red-300"
+                      className="group size-11 rounded-xl border border-[var(--ghost-private-border)] bg-[var(--ghost-private-control)] text-destructive hover:bg-destructive/10 hover:text-destructive"
                       aria-label="Delete selected chats"
                       onClick={() => {
                         setPrivateDeleteSelectedError(null);
                         setPrivateDeleteSelectedOpen(true);
                       }}
                     >
-                      <Trash6Icon className="size-5 shrink-0 text-red-400 group-hover:text-red-300" />
+                      <Trash6Icon className="size-5 shrink-0 text-destructive" />
                     </Button>
             </div>
           )}
