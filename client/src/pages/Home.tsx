@@ -620,8 +620,12 @@ function GhostModeIcon({
         flexBasis: size,
         ...(splitColors
           ? ({
-              "--ghost-option-left": savedPalette ? "#ff6b5e" : "#86efac",
-              "--ghost-option-right": savedPalette ? "#ffd2b8" : "#a5d8ff",
+              "--ghost-option-left": savedPalette
+                ? "var(--ghost-private-icon-left)"
+                : "var(--quick-chat-icon-left)",
+              "--ghost-option-right": savedPalette
+                ? "var(--ghost-private-icon-right)"
+                : "var(--quick-chat-icon-right)",
             } as React.CSSProperties)
           : {}),
       }}
@@ -668,23 +672,23 @@ function GhostModeIcon({
             >
               <stop
                 offset="0%"
-                stopColor={savedPalette ? "#FF6B5E" : "#86EFAC"}
+                stopColor={savedPalette ? "var(--ghost-private-icon-left)" : "var(--quick-chat-icon-left)"}
               />
               <stop
                 offset="35%"
-                stopColor={savedPalette ? "#FF6B5E" : "#86EFAC"}
+                stopColor={savedPalette ? "var(--ghost-private-icon-left)" : "var(--quick-chat-icon-left)"}
               />
               <stop
                 offset="50%"
-                stopColor={savedPalette ? "#FF9A78" : "#96E7D0"}
+                stopColor={savedPalette ? "var(--ghost-private-icon-mid)" : "var(--quick-chat-icon-mid)"}
               />
               <stop
                 offset="65%"
-                stopColor={savedPalette ? "#FFD2B8" : "#A5D8FF"}
+                stopColor={savedPalette ? "var(--ghost-private-icon-right)" : "var(--quick-chat-icon-right)"}
               />
               <stop
                 offset="100%"
-                stopColor={savedPalette ? "#FFD2B8" : "#A5D8FF"}
+                stopColor={savedPalette ? "var(--ghost-private-icon-right)" : "var(--quick-chat-icon-right)"}
               />
             </linearGradient>
           </defs>
@@ -6701,23 +6705,23 @@ export default function Home({
             >
               <stop
                 offset="0%"
-                stopColor={isSavedGhostChat ? "#FF6B5E" : "#86EFAC"}
+                stopColor={isSavedGhostChat ? "var(--ghost-private-icon-left)" : "var(--quick-chat-icon-left)"}
               />
               <stop
                 offset="35%"
-                stopColor={isSavedGhostChat ? "#FF6B5E" : "#86EFAC"}
+                stopColor={isSavedGhostChat ? "var(--ghost-private-icon-left)" : "var(--quick-chat-icon-left)"}
               />
               <stop
                 offset="50%"
-                stopColor={isSavedGhostChat ? "#FF9A78" : "#96E7D0"}
+                stopColor={isSavedGhostChat ? "var(--ghost-private-icon-mid)" : "var(--quick-chat-icon-mid)"}
               />
               <stop
                 offset="65%"
-                stopColor={isSavedGhostChat ? "#FFD2B8" : "#A5D8FF"}
+                stopColor={isSavedGhostChat ? "var(--ghost-private-icon-right)" : "var(--quick-chat-icon-right)"}
               />
               <stop
                 offset="100%"
-                stopColor={isSavedGhostChat ? "#FFD2B8" : "#A5D8FF"}
+                stopColor={isSavedGhostChat ? "var(--ghost-private-icon-right)" : "var(--quick-chat-icon-right)"}
               />
             </linearGradient>
           </defs>

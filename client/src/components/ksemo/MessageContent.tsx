@@ -982,7 +982,7 @@ export const MessageContent = memo(function MessageContent({
           {!hideActions && isUser && message.content && !isEditing && (
             <div
               className={cn(
-                "mt-1.5 flex items-center justify-end gap-1 transition-opacity duration-150",
+                "mt-1.5 flex items-center justify-end gap-0 transition-opacity duration-150",
                 !isMobile &&
                   "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
               )}
@@ -1013,14 +1013,14 @@ export const MessageContent = memo(function MessageContent({
               message.status === "failed" ||
               message.status === "cancelled" ||
               Boolean(fileCreationNode)) && (
-              <div className="-ml-1 mt-1.5 flex items-center gap-1">
+              <div className="-ml-1 mt-1.5 flex items-center gap-0">
                 {!sharedAnswerPreview &&
                   responseVersionCount > 1 &&
                   onResponseVersionChange && (
                     <div
                       role="group"
                       aria-label="Response versions"
-                      className="inline-flex shrink-0 items-center gap-1.5"
+                      className="inline-flex shrink-0 items-center gap-0"
                     >
                       <Tooltip>
                         <TooltipTrigger asChild>

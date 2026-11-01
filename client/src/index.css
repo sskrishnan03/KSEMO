@@ -23,10 +23,10 @@
 
 /* Ghost mode splits ectoplasmic green and pale Ghost Blue across its accents. */
 :is(.temp-mode, .ghost-saved-mode) {
-  --temp-accent: #86efac;
-  --temp-mid: #96e7d0;
-  --temp-ice: #a5d8ff;
-  --temp-spectral: #244369;
+  --temp-accent: #009b70;
+  --temp-mid: #0489a1;
+  --temp-ice: #0878d1;
+  --temp-spectral: #ffffff;
   padding: 32px 12px 0;
   background: var(--background);
   animation: ghost-mode-enter 460ms cubic-bezier(.22, 1, .36, 1) both;
@@ -37,6 +37,24 @@
   --temp-mid: #96e7d0;
   --temp-ice: #a5d8ff;
   --temp-spectral: #244369;
+}
+
+:root {
+  --quick-chat-icon-left: #009b70;
+  --quick-chat-icon-mid: #0489a1;
+  --quick-chat-icon-right: #0878d1;
+  --ghost-private-icon-left: #e32624;
+  --ghost-private-icon-mid: #ea5926;
+  --ghost-private-icon-right: #f28c28;
+}
+
+.dark {
+  --quick-chat-icon-left: #86efac;
+  --quick-chat-icon-mid: #96e7d0;
+  --quick-chat-icon-right: #a5d8ff;
+  --ghost-private-icon-left: #ff6b5e;
+  --ghost-private-icon-mid: #ff9a78;
+  --ghost-private-icon-right: #ffd2b8;
 }
 
 .temp-chat-main {
@@ -310,7 +328,7 @@
   -webkit-text-fill-color: currentColor;
 }
 
-.dark :is(.temp-mode, .ghost-saved-mode) .temp-ghost-greeting {
+:is(.temp-mode, .ghost-saved-mode) .temp-ghost-greeting {
   color: transparent;
   background-image: linear-gradient(
     90deg,
@@ -430,10 +448,10 @@
 
 /* Saved ghost mode reuses the exact ghost layout with a coral and peach palette. */
 .ghost-saved-mode {
-  --temp-accent: #ff6b5e;
-  --temp-mid: #ff9a78;
-  --temp-ice: #ffd2b8;
-  --temp-spectral: #71352e;
+  --temp-accent: #e32624;
+  --temp-mid: #ea5926;
+  --temp-ice: #f28c28;
+  --temp-spectral: #ffffff;
 }
 .dark .ghost-saved-mode {
   --temp-accent: #ff6b5e;
@@ -458,22 +476,14 @@
   flex: 0 0 32px;
   align-items: center;
   justify-content: center;
-  --ghost-option-left: #86efac;
-  --ghost-option-right: #a5d8ff;
+  --ghost-option-left: var(--quick-chat-icon-left);
+  --ghost-option-right: var(--quick-chat-icon-right);
 }
 .ghost-mode-option-icon .temp-ghost-icon { overflow: visible; }
 .ghost-mode-option-icon .temp-ghost-wave-overlay { overflow: visible; }
 .ghost-mode-option-icon-saved {
-  --ghost-option-left: #ff6b5e;
-  --ghost-option-right: #ffd2b8;
-}
-.dark .ghost-mode-option-icon {
-  --ghost-option-left: #86efac;
-  --ghost-option-right: #a5d8ff;
-}
-.dark .ghost-mode-option-icon-saved {
-  --ghost-option-left: #ff6b5e;
-  --ghost-option-right: #ffd2b8;
+  --ghost-option-left: var(--ghost-private-icon-left);
+  --ghost-option-right: var(--ghost-private-icon-right);
 }
 
 @keyframes ksemo-greeting-rise {
