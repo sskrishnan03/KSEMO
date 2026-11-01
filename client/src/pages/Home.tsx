@@ -1824,7 +1824,7 @@ export default function Home({
       void utils.conversation.privateList.invalidate();
       setMovingToPrivateId(null);
       showPrivateMoveNotice("success", "Chat moved to Private.");
-      requestGhostPrivateAccess();
+      openPrivateChat(entry, nextEntries);
     } catch {
       setMovingToPrivateId(null);
       showPrivateMoveNotice("error", "Could not move this chat to Private.");
