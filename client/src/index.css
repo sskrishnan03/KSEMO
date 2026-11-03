@@ -66,6 +66,25 @@
   box-shadow: none;
 }
 
+/* Expanded file previews in Quick Chat and Ghost Private fill the viewport
+   below the mode bar, escaping the chat area's horizontal padding. */
+[data-ghost-expanded="true"] {
+  position: fixed !important;
+  inset: 32px 0 0 !important;
+  z-index: 110 !important;
+  width: 100% !important;
+  height: auto !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+@media (max-width: 640px) {
+  [data-ghost-expanded="true"] {
+    top: 30px !important;
+  }
+}
+
 .temp-chat-curve {
   position: absolute;
   z-index: 2;

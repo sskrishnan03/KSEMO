@@ -1936,6 +1936,7 @@ export default function Home({
     setPrivateChatMenuOpen(false);
     setPrivateChatPanel(null);
     setPrivateChatOptionsOpenId(null);
+    closePdf();
     voice.cancel();
     setIsTemporaryChatClosing(true);
     writeStoredTemporaryChat(user?.id, {
@@ -8085,6 +8086,7 @@ export default function Home({
         )}
         <PdfDrawer
           layout={activePrimaryWorkspace === "library" ? "library" : "chat"}
+          ghostMode={isGhostMode}
         />
         <FaqHelpDrawer
           open={helpDrawerOpen}

@@ -2897,8 +2897,10 @@ const WordPageViewer = memo(function WordPageViewer({
 
 export const PdfDrawer = memo(function PdfDrawer({
   layout = "library",
+  ghostMode = false,
 }: {
   layout?: "chat" | "library";
+  ghostMode?: boolean;
 }) {
   const { currentPdf, isOpen, closePdf } = usePdfViewer();
   const [isExpanded, setIsExpanded] = useState(false);
@@ -3752,6 +3754,7 @@ export const PdfDrawer = memo(function PdfDrawer({
       aria-label={`Document Viewer: ${currentPdf.filename}`}
       aria-modal="true"
       data-testid="pdf-drawer"
+      data-ghost-expanded={ghostMode && isExpanded ? "true" : undefined}
       className={cn(
         "z-40 flex flex-col overflow-hidden bg-background text-foreground max-md:fixed max-md:inset-0 max-md:z-[110] max-md:h-[100dvh] max-md:w-full max-md:rounded-none max-md:border-0 max-md:shadow-none",
         isFullWorkspace
