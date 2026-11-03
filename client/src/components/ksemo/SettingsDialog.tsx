@@ -31,12 +31,9 @@ import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
 import { createPublicConversationUrl } from "@/lib/ksemoInteraction";
 import {
-  clearPrivatePin,
-  readPrivateChatEntries,
   readPrivatePinRecord,
   setPrivatePin,
   verifyPrivatePin,
-  writePrivateChatEntries,
 } from "@/lib/privateChatLock";
 import { ConfirmDeleteDialog } from "./ConfirmDeleteDialog";
 import {
@@ -963,7 +960,9 @@ function SecuritySection({ user }: { user: User }) {
     user.id == null ? 4 : readPrivatePinRecord(user.id)?.digits ?? 4
   );
   const [pinDialog, setPinDialog] = useState<"create" | "reset" | null>(null);
+  const [pinStep, setPinStep] = useState<"current" | "new" | "confirm">("new");
   const [pinEntry, setPinEntry] = useState("");
+  const [newPin, setNewPin] = useState("");
   const [pinError, setPinError] = useState("");
 
   useEffect(() => {
@@ -986,33 +985,43 @@ function SecuritySection({ user }: { user: User }) {
   const submitPinDialog = async (enteredPin = pinEntry) => {
     if (user.id == null || !pinDialog) return;
     setPinError("");
-    const expectedDigits = pinDialog === "create" ? 4 : currentPinDigits;
+    const expectedDigits = pinDialog === "reset" && pinStep === "current" ? currentPinDigits : 4;
     if (!/^\d+$/.test(enteredPin) || enteredPin.length !== expectedDigits) {
       setPinError(`Enter all ${expectedDigits} digits.`);
       return;
     }
-    if (pinDialog === "create") {
+    if (pinDialog === "reset" && pinStep === "current") {
+      if (!(await verifyPrivatePin(user.id, enteredPin))) {
+        setPinError("That passcode is incorrect.");
+        return;
+      }
+      setPinStep("new");
+      setPinEntry("");
+      return;
+    }
+    if (pinStep === "new") {
+      setNewPin(enteredPin);
+      setPinStep("confirm");
+      setPinEntry("");
+      return;
+    }
+    if (enteredPin !== newPin) {
+      setPinError("Passcodes do not match. Try again.");
+      setPinEntry("");
+      setPinStep("new");
+      setNewPin("");
+      return;
+    }
+    {
       await setPrivatePin(user.id, enteredPin, 4);
       setPinConfigured(true);
       setCurrentPinDigits(4);
       window.dispatchEvent(new Event("ksemo:private-chat-lock-updated"));
-    } else {
-      if (!(await verifyPrivatePin(user.id, enteredPin))) {
-        setPinError("That PIN is incorrect.");
-        return;
-      }
-      clearPrivatePin(user.id);
-      const unlocked = readPrivateChatEntries(user.id).map(chat => ({
-        ...chat,
-        locked: false,
-      }));
-      writePrivateChatEntries(user.id, unlocked);
-      window.dispatchEvent(new Event("ksemo:private-chat-lock-updated"));
-      setPinConfigured(false);
-      setCurrentPinDigits(4);
     }
     setPinDialog(null);
     setPinEntry("");
+    setNewPin("");
+    setPinStep("new");
     setPinError("");
   };
 
@@ -1073,7 +1082,9 @@ function SecuritySection({ user }: { user: User }) {
               className="inline-flex h-7 min-w-[6rem] shrink-0 items-center justify-center rounded-lg bg-foreground px-2.5 text-center text-[11px] font-semibold text-background transition-opacity hover:opacity-90"
               onClick={() => {
                 setPinDialog(pinConfigured ? "reset" : "create");
+                setPinStep(pinConfigured ? "current" : "new");
                 setPinEntry("");
+                setNewPin("");
                 setPinError("");
               }}
             >
@@ -1087,6 +1098,7 @@ function SecuritySection({ user }: { user: User }) {
             if (!open) {
               setPinDialog(null);
               setPinEntry("");
+              setNewPin("");
               setPinError("");
             }
           }}
@@ -1097,13 +1109,13 @@ function SecuritySection({ user }: { user: User }) {
               <DialogDescription>Manage the passcode required to enter Ghost Private.</DialogDescription>
             </DialogHeader>
             <PinEntryCard
-              title={pinDialog === "reset" ? "Enter passcode" : "Create passcode"}
-              description={pinDialog === "reset" ? "Enter your current passcode to reset it." : "Choose a 4-digit passcode for Ghost Private."}
+              title={pinStep === "current" ? "Enter current passcode" : pinStep === "confirm" ? "Confirm new passcode" : "Create new passcode"}
+              description={pinStep === "current" ? "Verify your current passcode before choosing a new one." : pinStep === "confirm" ? "Enter the new 4-digit passcode again." : "Choose a new 4-digit passcode for Ghost Private."}
               value={pinEntry}
-              length={pinDialog === "reset" ? currentPinDigits : 4}
+              length={pinStep === "current" ? currentPinDigits : 4}
               onChange={setPinEntry}
               onComplete={value => void submitPinDialog(value)}
-              ariaLabel={pinDialog === "reset" ? "Current PIN" : "New PIN"}
+              ariaLabel={pinStep === "current" ? "Current passcode" : pinStep === "confirm" ? "Confirm new passcode" : "New passcode"}
               onClose={() => {
                 setPinDialog(null);
                 setPinEntry("");

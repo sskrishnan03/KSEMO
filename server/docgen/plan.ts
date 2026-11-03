@@ -154,7 +154,7 @@ export function compactDocumentHistory(history: Message[]): Message[] {
 }
 
 const DIVERSE_ARCHITECTURE_GUIDE = `
-Choose a structure that directly fits the user's requested artifact, audience, and topic. Start with the requested deliverable, then organize only the information needed to make it useful. Prefer clear headings and concise, specific bullets when they improve scanning. Do not force an executive-summary/report template onto letters, checklists, simple answers, forms, or other short requests. Never invent names, events, statistics, citations, or results. Mark assumptions clearly; use blank input fields or formulas where the user has not supplied data. Treat earlier conversation as source context only when the latest request refers to it.
+Treat the user's request as the specification: answer its actual question, cover every explicitly requested part, and include the relevant explanation, evidence, steps, or examples needed to make the deliverable useful. Be concise at the sentence level without omitting requested substance. Do not reduce a multi-part or complex request to a one-page summary; let document formats flow across as many pages as the content needs, without artificial page breaks. Choose a structure that directly fits the requested artifact, audience, and topic. Do not force an executive-summary/report template onto letters, checklists, simple answers, forms, or other short requests. Never invent names, events, statistics, citations, or results. Mark assumptions clearly; use blank input fields or formulas where the user has not supplied data. Treat earlier conversation as source context only when the latest request refers to it.
 `;
 
 const FORMAT_INSTRUCTIONS = `
@@ -213,6 +213,7 @@ Rules:
 COMPLETENESS & DIVERSITY REQUIREMENT (most important rule): Produce a complete artifact at the scope the user requested; never use a generic stub or filler.
 - Respect any user-requested page count (e.g., "10 pages", "5 pages"), slide count ("12 slides"), or sheet count ("5 sheets").
 - Match the requested topic, audience, and depth. Keep simple deliverables concise; expand only when the request needs detail.
+- For a question or multi-part request, answer each part directly and include enough explanation to be complete. Do not default to a one-page summary when the request calls for a full answer.
 - Adapt the structure dynamically to the topic: use technical guides for code, scientific abstracts for research, financial balance sheets for business, SOPs for workflows, etc. Do not force every document into a corporate Executive Summary template.
 - Respect explicit page, slide, or sheet counts as approximate targets without padding. Do not invent numbers, facts, or results; label assumptions and leave unknown spreadsheet inputs blank. Let document pages flow naturally without forced page breaks.
 `;

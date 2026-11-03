@@ -810,10 +810,6 @@ export default function Home({
   const [privateChatMenuOpen, setPrivateChatMenuOpen] = useState(false);
   const privateChatPanelRef = useRef<HTMLElement | null>(null);
   const privateChatMenuTriggerRef = useRef<HTMLButtonElement | null>(null);
-  const [privateChatMenuPosition, setPrivateChatMenuPosition] = useState({
-    left: 8,
-    top: 40,
-  });
   const [privateChatSearch, setPrivateChatSearch] = useState("");
   const [privateChatOptionsOpenId, setPrivateChatOptionsOpenId] = useState<
     string | null
@@ -832,24 +828,9 @@ export default function Home({
   } | null>(null);
   const [privatePinDigits, setPrivatePinDigits] = useState<4 | 6>(4);
   const [privatePinValue, setPrivatePinValue] = useState("");
+  const [privatePinStep, setPrivatePinStep] = useState<"new" | "confirm">("new");
+  const [privatePinDraft, setPrivatePinDraft] = useState("");
   const [privatePinError, setPrivatePinError] = useState("");
-  useLayoutEffect(() => {
-    if (!privateChatMenuOpen) return;
-    const updatePosition = () => {
-      const rect = privateChatMenuTriggerRef.current?.getBoundingClientRect();
-      if (rect) {
-        const menuWidth = Math.min(293, window.innerWidth - 16);
-        const left = Math.max(
-          8,
-          Math.min(rect.left, window.innerWidth - menuWidth - 8)
-        );
-        setPrivateChatMenuPosition({ left, top: rect.bottom + 12 });
-      }
-    };
-    updatePosition();
-    window.addEventListener("resize", updatePosition);
-    return () => window.removeEventListener("resize", updatePosition);
-  }, [privateChatMenuOpen]);
   useEffect(() => {
     if (!privateChatMenuOpen) return;
     const dismissOnOutsideClick = (event: PointerEvent) => {
@@ -1890,6 +1871,8 @@ export default function Home({
     setPrivatePinDialog({ action: pin ? "verify" : "setup" });
     setPrivatePinDigits(pin?.digits ?? 4);
     setPrivatePinValue("");
+    setPrivatePinStep("new");
+    setPrivatePinDraft("");
     setPrivatePinError("");
     setPrivateChatMenuOpen(false);
     setPrivateChatPanel(null);
@@ -1901,6 +1884,19 @@ export default function Home({
       if (privatePinDialog.action === "setup") {
         if (!/^\d+$/.test(enteredPin) || enteredPin.length !== privatePinDigits) {
           setPrivatePinError(`Enter a ${privatePinDigits}-digit passcode.`);
+          return;
+        }
+        if (privatePinStep === "new") {
+          setPrivatePinDraft(enteredPin);
+          setPrivatePinStep("confirm");
+          setPrivatePinValue("");
+          return;
+        }
+        if (enteredPin !== privatePinDraft) {
+          setPrivatePinError("Passcodes do not match. Enter a new passcode and try again.");
+          setPrivatePinStep("new");
+          setPrivatePinDraft("");
+          setPrivatePinValue("");
           return;
         }
         await setPrivatePin(user.id, enteredPin, privatePinDigits);
@@ -1915,6 +1911,7 @@ export default function Home({
     }
     setPrivatePinDialog(null);
     setPrivatePinValue("");
+    setPrivatePinDraft("");
     startNewPrivateChat(true);
     setPrivateSelectionMode(false);
     setPrivateSelectedIds(new Set());
@@ -1922,6 +1919,7 @@ export default function Home({
   const cancelPrivateAccessPrompt = () => {
     setPrivatePinDialog(null);
     setPrivatePinValue("");
+    setPrivatePinDraft("");
     setPrivatePinError("");
     if (!isSavedGhostChatRef.current) setPrivateChatEntries([]);
   };
@@ -6057,8 +6055,8 @@ export default function Home({
         ? "What would you like to discuss privately?"
         : isTemporaryChat
           ? "What’s on your mind?"
-          : timeGreeting(),
-    [greetingHour, isSavedGhostChat, isTemporaryChat]
+          : timeGreeting(false, user?.name),
+    [greetingHour, isSavedGhostChat, isTemporaryChat, user?.name]
   );
 
   useEffect(() => {
@@ -6281,7 +6279,7 @@ export default function Home({
                 type="button"
                 data-private-panel-toggle
                 className="temp-chat-menu-trigger"
-                aria-label="Open Ghost Private chats"
+                aria-label={privateChatMenuOpen ? "Close Ghost Private chats" : "Open Ghost Private chats"}
                 aria-expanded={privateChatMenuOpen}
                 onClick={() => {
                   setPrivatePinDialog(null);
@@ -6296,7 +6294,11 @@ export default function Home({
                   }
                 }}
               >
-                <ChevronDown size={18} strokeWidth={2.5} />
+                <ChevronDown
+                  size={18}
+                  strokeWidth={2.5}
+                  className={cn("transition-transform", privateChatMenuOpen && "rotate-180")}
+                />
               </button>
             ) : null}
           </div>
@@ -6328,11 +6330,7 @@ export default function Home({
       {isSavedGhostChat && privateChatMenuOpen && (
         <aside
           ref={privateChatPanelRef}
-          className="ghost-private-menu-enter fixed z-40 flex max-h-[calc(100dvh-3rem)] w-fit max-w-[calc(100vw-1rem)] flex-col gap-2"
-          style={{
-            left: privateChatMenuPosition.left,
-            top: privateChatMenuPosition.top,
-          }}
+          className="ghost-private-menu-enter fixed bottom-3 left-3 top-12 z-40 flex w-fit max-w-[calc(100vw-1.5rem)] flex-col gap-2"
           aria-label="Ghost Private chat options"
         >
           <div className="ghost-private-options-enter flex w-[min(293px,calc(100vw-1rem))] shrink-0 items-center justify-between rounded-xl border border-[var(--ghost-private-border)] bg-[var(--ghost-private-panel)] px-3 py-2 text-popover-foreground shadow-lg">
@@ -6342,7 +6340,7 @@ export default function Home({
             </span>
           </div>
           {privateChatPanel && (
-            <div className="relative flex h-[min(30rem,calc(100dvh-7rem))] w-[min(293px,calc(100vw-1rem))] min-w-0 flex-col overflow-hidden rounded-xl border border-[var(--ghost-private-border)] bg-[var(--ghost-private-panel)] text-popover-foreground shadow-lg">
+            <div className="relative flex min-h-0 w-[min(293px,calc(100vw-1rem))] min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-[var(--ghost-private-border)] bg-[var(--ghost-private-panel)] text-popover-foreground shadow-lg">
               <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-transparent">
                 <div className="flex h-14 shrink-0 items-center gap-2 border-b border-[var(--ghost-private-border)] px-3">
                       <div className="relative min-w-0 flex-1">
@@ -8197,7 +8195,9 @@ export default function Home({
             <DialogDescription>
               {privatePinDialog?.action === "verify"
                 ? "Enter your passcode to enter Ghost Private."
-                : "Create a passcode to protect Ghost Private."}
+                : privatePinStep === "confirm"
+                  ? "Confirm your new passcode to protect Ghost Private."
+                  : "Create a passcode to protect Ghost Private."}
             </DialogDescription>
           </DialogHeader>
           {privatePinDialog && (
@@ -8205,18 +8205,22 @@ export default function Home({
               title={
                 privatePinDialog.action === "verify"
                   ? "Enter passcode"
-                  : "Create a passcode"
+                  : privatePinStep === "confirm"
+                    ? "Confirm passcode"
+                    : "Create a passcode"
               }
               description={
                 privatePinDialog.action === "verify"
                   ? "Enter your passcode to enter Ghost Private."
-                  : `Choose a ${privatePinDigits}-digit passcode to protect Ghost Private.`
+                  : privatePinStep === "confirm"
+                    ? `Enter the ${privatePinDigits}-digit passcode again.`
+                    : `Choose a ${privatePinDigits}-digit passcode to protect Ghost Private.`
               }
               value={privatePinValue}
               length={privatePinDigits}
               onChange={setPrivatePinValue}
               onComplete={value => void submitPrivatePin(value)}
-              ariaLabel="Ghost Private passcode"
+              ariaLabel={privatePinDialog.action === "verify" ? "Ghost Private passcode" : privatePinStep === "confirm" ? "Confirm Ghost Private passcode" : "New Ghost Private passcode"}
               onClose={cancelPrivateAccessPrompt}
               error={privatePinError}
             />
@@ -8236,7 +8240,7 @@ export default function Home({
   );
 }
 
-function timeGreeting(temporary = false) {
+function timeGreeting(temporary = false, accountName?: string | null) {
   const now = new Date();
   const hour = now.getHours();
   const partOfDay =
@@ -8393,7 +8397,17 @@ function timeGreeting(temporary = false) {
     new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() /
       86_400_000
   );
-  return options[(dayOffset + hour) % options.length];
+  const message = options[(dayOffset + hour) % options.length];
+  const firstName = accountName?.trim().split(/\s+/)[0];
+
+  // Personalize occasionally, keeping the greeting stable for the day while
+  // avoiding a name on every visit. A daily index guarantees a new choice on
+  // consecutive days within each time-of-day group.
+  if (!temporary && firstName && dayOffset % 3 === 0) {
+    const withoutLeadingMorning = message.replace(/^Morning!\s*/i, "");
+    return `Hi, ${firstName}. ${withoutLeadingMorning}`;
+  }
+  return message;
 }
 
 const EmptyState = memo(function EmptyState({
