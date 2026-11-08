@@ -654,7 +654,7 @@ export const MessageContent = memo(function MessageContent({
                 "text-[15px] leading-6",
                 isUser
                   ? cn(
-                      "ksemo-user-message-bubble flex flex-col items-end rounded-2xl rounded-tr-md border border-border bg-muted px-3.5 py-2.5 text-[15px] leading-6 text-foreground shadow-sm",
+                      "ksemo-user-message-bubble min-w-0 max-w-full flex flex-col items-end rounded-2xl rounded-tr-md border border-border bg-muted px-3.5 py-2.5 text-[15px] leading-6 text-foreground shadow-sm [overflow-wrap:anywhere]",
                       isMobile && "ksemo-mobile-user-message",
                       isEditing && "w-full",
                       isEditing && "ring-1 ring-primary/40 border-primary/40"
@@ -713,7 +713,7 @@ export const MessageContent = memo(function MessageContent({
                   >
                     <p
                       ref={userTextRef}
-                      className="w-full whitespace-pre-wrap text-left line-clamp-8"
+                      className="w-full whitespace-pre-wrap break-words text-left line-clamp-8 [overflow-wrap:anywhere]"
                     >
                       {message.content}
                     </p>
@@ -734,7 +734,7 @@ export const MessageContent = memo(function MessageContent({
                   <div className="relative w-full pb-9">
                     <p
                       ref={userTextRef}
-                      className="w-full whitespace-pre-wrap text-left"
+                      className="w-full whitespace-pre-wrap break-words text-left [overflow-wrap:anywhere]"
                     >
                       {message.content}
                     </p>

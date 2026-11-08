@@ -769,7 +769,7 @@ DECLARE
     tsq TEXT;
 BEGIN
     terms := array_remove(
-        split(regexp_replace(lower(trim(p_query)), '[^[:alnum:]_]+', ' ', 'g'), ' '),
+        string_to_array(regexp_replace(lower(trim(p_query)), '[^[:alnum:]_]+', ' ', 'g'), ' '),
         ''
     );
     SELECT string_agg(quote_literal(t) || ':*', ' & ')
@@ -818,7 +818,7 @@ DECLARE
     tsq TEXT;
 BEGIN
     terms := array_remove(
-        split(regexp_replace(lower(trim(p_query)), '[^[:alnum:]_]+', ' ', 'g'), ' '),
+        string_to_array(regexp_replace(lower(trim(p_query)), '[^[:alnum:]_]+', ' ', 'g'), ' '),
         ''
     );
     SELECT string_agg(quote_literal(t) || ':*', ' & ')

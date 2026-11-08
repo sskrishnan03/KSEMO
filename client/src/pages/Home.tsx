@@ -6682,58 +6682,6 @@ export default function Home({
           )}
         </aside>
       )}
-      {isGhostMode && (
-        <svg
-          className="temp-chat-curve"
-          viewBox="0 0 1440 24"
-          preserveAspectRatio="none"
-          aria-hidden="true"
-        >
-          <defs>
-            <linearGradient
-              id={
-                isSavedGhostChat
-                  ? "ghost-mode-coral-peach-gradient"
-                  : "ghost-mode-mint-ice-gradient"
-              }
-              x1="0"
-              y1="0"
-              x2="1440"
-              y2="0"
-              gradientUnits="userSpaceOnUse"
-            >
-              <stop
-                offset="0%"
-                stopColor={isSavedGhostChat ? "var(--ghost-private-icon-left)" : "var(--quick-chat-icon-left)"}
-              />
-              <stop
-                offset="35%"
-                stopColor={isSavedGhostChat ? "var(--ghost-private-icon-left)" : "var(--quick-chat-icon-left)"}
-              />
-              <stop
-                offset="50%"
-                stopColor={isSavedGhostChat ? "var(--ghost-private-icon-mid)" : "var(--quick-chat-icon-mid)"}
-              />
-              <stop
-                offset="65%"
-                stopColor={isSavedGhostChat ? "var(--ghost-private-icon-right)" : "var(--quick-chat-icon-right)"}
-              />
-              <stop
-                offset="100%"
-                stopColor={isSavedGhostChat ? "var(--ghost-private-icon-right)" : "var(--quick-chat-icon-right)"}
-              />
-            </linearGradient>
-          </defs>
-          <path
-            fill={
-              isSavedGhostChat
-                ? "url(#ghost-mode-coral-peach-gradient)"
-                : "url(#ghost-mode-mint-ice-gradient)"
-            }
-            d="M0 0H1440V24A48 16 0 0 0 1392 8H48A48 16 0 0 0 0 24Z"
-          />
-        </svg>
-      )}
       <main
         className={cn(
           "relative flex min-w-0 flex-1 flex-col lg:flex-row",
@@ -8454,18 +8402,18 @@ const EmptyState = memo(function EmptyState({
         aria-hidden="true"
         className="empty-chat-new-accent pointer-events-none absolute left-1/2 top-1/2 z-0 h-[min(30rem,72vh)] w-full -translate-x-1/2 -translate-y-1/2 sm:w-[calc(100%+12rem)]"
       />
-      <div className="relative z-10">
+      <div className="relative z-10 mx-auto w-full max-w-3xl">
         <div className="px-5 text-center sm:px-0">
           <div
             key={`${ghostMode ? "ghost" : "normal"}-${animationKey}`}
-            className="relative mx-auto w-fit"
+            className="relative mx-auto w-full min-w-0"
           >
             <p
               className={cn(
                 "ksemo-greeting-rise text-[clamp(1.25rem,6vw,1.5rem)] font-normal tracking-[-0.04em] text-foreground md:text-[clamp(1rem,6.1vw,1.75rem)] md:tracking-[-0.025em]",
                 isMobile
                   ? "max-w-full whitespace-normal text-balance"
-                  : "whitespace-nowrap",
+                  : "max-w-full whitespace-normal text-balance",
                 ghostMode && "temp-ghost-greeting"
               )}
             >

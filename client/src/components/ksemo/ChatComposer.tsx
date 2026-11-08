@@ -85,6 +85,8 @@ const PRIVATE_PLACEHOLDER = "Write a private message";
 const COMPACT_INPUT_MAX_HEIGHT = 192;
 const EXPANDED_INPUT_MAX_HEIGHT = 512;
 const MIN_INPUT_HEIGHT = 40;
+const INPUT_LINE_HEIGHT = 24;
+const EXPAND_CONTROL_AFTER_LINES = 7;
 
 const MENU_TITLE = "Add files and more";
 
@@ -369,6 +371,9 @@ export const ChatComposer = memo(function ChatComposer({
   /** Signed-out guest mode: disables attachments, voice, and create-file tools. */
   guestMode?: boolean;
 }) {
+  const composerShellRef = useRef<HTMLDivElement>(null);
+  const shellAnimationRef = useRef<Animation | null>(null);
+  const previousShellHeightRef = useRef<number | null>(null);
   const editorRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -387,6 +392,7 @@ export const ChatComposer = memo(function ChatComposer({
   const [isDragActive, setIsDragActive] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [canExpand, setCanExpand] = useState(false);
+  const [hasMultilineInput, setHasMultilineInput] = useState(false);
   const [activeTag, setActiveTag] = useState<ComposerTag>(
     () => propActiveTag ?? "chat"
   );
@@ -454,6 +460,45 @@ export const ChatComposer = memo(function ChatComposer({
       (attachmentNotice
         ? [{ fileId: attachmentNotice.name, ...attachmentNotice }]
         : []));
+  const hasComposerAttachments = visibleAttachmentNotices.length > 0;
+  const isExpandedComposer = hasComposerAttachments || hasMultilineInput;
+
+  useLayoutEffect(() => {
+    const shell = composerShellRef.current;
+    if (!shell) return;
+    const animatedHeight = shell.getBoundingClientRect().height;
+    const wasAnimating = shellAnimationRef.current !== null;
+    shellAnimationRef.current?.cancel();
+    shellAnimationRef.current = null;
+    const nextHeight = shell.getBoundingClientRect().height;
+    const previousHeight = previousShellHeightRef.current;
+    previousShellHeightRef.current = nextHeight;
+    const currentHeight = wasAnimating
+      ? animatedHeight
+      : (previousHeight ?? nextHeight);
+    if (Math.abs(currentHeight - nextHeight) < 1) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    const animation = shell.animate(
+      [{ height: `${currentHeight}px` }, { height: `${nextHeight}px` }],
+      { duration: 300, easing: "cubic-bezier(0.22, 1, 0.36, 1)" }
+    );
+    shellAnimationRef.current = animation;
+    animation.onfinish = () => {
+      if (shellAnimationRef.current === animation) {
+        animation.cancel();
+        shellAnimationRef.current = null;
+      }
+    };
+  }, [isExpandedComposer, value, expanded]);
+
+  useEffect(() => {
+    if (value.trim()) return;
+    setHasMultilineInput(false);
+    if (!hasComposerAttachments && composerShellRef.current) {
+      composerShellRef.current.style.minHeight = "";
+    }
+  }, [value, hasComposerAttachments]);
   const hasUploadingAttachments = visibleAttachmentNotices.some(
     attachment => attachment.uploading
   );
@@ -590,7 +635,12 @@ export const ChatComposer = memo(function ChatComposer({
       MIN_INPUT_HEIGHT
     );
     editor.style.height = `${height}px`;
-    setCanExpand(editor.scrollHeight > COMPACT_INPUT_MAX_HEIGHT);
+    if (height > MIN_INPUT_HEIGHT + 2) {
+      setHasMultilineInput(true);
+    }
+    const sevenLineHeight =
+      MIN_INPUT_HEIGHT + (EXPAND_CONTROL_AFTER_LINES - 1) * INPUT_LINE_HEIGHT;
+    setCanExpand(editor.scrollHeight > sevenLineHeight);
   }, [expanded]);
 
   function handleEditorInput() {
@@ -613,6 +663,11 @@ export const ChatComposer = memo(function ChatComposer({
     lastSyncedValueRef.current = typed;
     if (nextMode === "chat" && mode !== "chat") {
       onModeChange?.(null);
+    }
+    if (!typed.trim()) {
+      setHasMultilineInput(false);
+      setExpanded(false);
+      setCanExpand(false);
     }
     syncEditorHeight();
     onValueChange(typed);
@@ -776,6 +831,9 @@ export const ChatComposer = memo(function ChatComposer({
     const text = event.clipboardData?.getData("text/plain");
     if (text) {
       event.preventDefault();
+      // Pasted content is appended consistently; do not let a stale caret from
+      // rapid typing insert it into the middle of the draft.
+      placeCaretAtEnd();
       document.execCommand("insertText", false, text);
     }
   }
@@ -831,9 +889,11 @@ export const ChatComposer = memo(function ChatComposer({
   return (
     <div
       className={cn(
-        "mx-auto w-full px-4 pt-2",
+        "mx-auto w-full px-4 pt-2 transition-[max-width] duration-300 ease-out",
         isMobile && "px-3.5",
-        isCentered ? "max-w-2xl" : "max-w-3xl",
+        isCentered && !value.trim() && !hasComposerAttachments
+          ? "max-w-2xl"
+          : "max-w-3xl",
         compactBottomSpacing ? "pb-5" : "pb-4"
       )}
     >
@@ -847,8 +907,16 @@ export const ChatComposer = memo(function ChatComposer({
       <div className="relative">
         <div
           className={cn(
-            "ksemo-composer-shell relative rounded-[20px] border border-border bg-popover px-2 py-[9px] shadow-sm text-popover-foreground transition-all duration-200"
+            "ksemo-composer-shell relative flex flex-col border border-border bg-popover px-2 shadow-sm text-popover-foreground transition-colors duration-200",
+            isExpandedComposer
+              ? hasComposerAttachments
+                ? "min-h-[110px]"
+                : "min-h-[110px]"
+              : "min-h-[56px]",
+            isExpandedComposer ? "pt-1 pb-2" : "py-1",
+            "rounded-[26px]"
           )}
+          ref={composerShellRef}
         >
           {isDragActive && (
             <div className="pointer-events-none fixed inset-0 z-[100] flex items-center justify-center bg-card/80 backdrop-blur-sm">
@@ -910,7 +978,7 @@ export const ChatComposer = memo(function ChatComposer({
             aria-label="Choose photos"
           />
           {visibleAttachmentNotices.length > 0 && (
-            <div className="mx-1 mb-0.5 flex items-center gap-2 overflow-x-auto px-2 pt-2 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div className="mb-0.5 flex items-center gap-2 overflow-x-auto px-2 pt-2 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {visibleAttachmentNotices.map(item => {
                 const isImage =
                   (item.url || item.mimeType) &&
@@ -940,10 +1008,10 @@ export const ChatComposer = memo(function ChatComposer({
                       <button
                         type="button"
                         onClick={() => onClearAttachment(item.fileId)}
-                        className="absolute -right-1.5 -top-1.5 z-10 flex size-5 items-center justify-center rounded-full bg-white text-black shadow-md border border-neutral-300/80 outline-none max-md:opacity-100 max-md:scale-100 md:opacity-0 md:scale-90 transition-all duration-150 group-hover:opacity-100 group-hover:scale-100 group-focus-within:opacity-100 group-focus-within:scale-100 focus-visible:opacity-100 focus-visible:scale-100 hover:scale-110 hover:bg-neutral-100 focus-visible:ring-2 focus-visible:ring-primary"
+                        className="absolute -right-1 -top-0.5 z-10 flex size-4 scale-90 items-center justify-center rounded-full border border-neutral-300/80 bg-white text-black opacity-0 shadow-md outline-none transition-[opacity,transform,background-color] duration-150 group-hover:scale-100 group-hover:opacity-100 group-focus-within:scale-100 group-focus-within:opacity-100 hover:scale-110 hover:bg-neutral-100 focus-visible:ring-2 focus-visible:ring-primary max-md:scale-100 max-md:opacity-100"
                         aria-label="Remove screenshot"
                       >
-                        <X className="size-3 stroke-[2.5]" />
+                        <X className="size-2.5 stroke-[2.5]" />
                       </button>
                     )}
                   </div>
@@ -1001,11 +1069,23 @@ export const ChatComposer = memo(function ChatComposer({
           )}
 
           {/* Main Composer Content */}
-          <div className="flex flex-col">
+          <div
+            className={cn(
+              "flex items-center",
+              isExpandedComposer
+                ? "flex-1 flex-col items-stretch"
+                : "min-h-10 my-auto"
+            )}
+          >
             {/* Text Input Area — Bot mode is voice-only, so it has no typing box */}
             {!botActive ? (
               <div
-                className="relative flex flex-1 items-start cursor-text"
+                className={cn(
+                  "relative flex min-w-0 flex-1 cursor-text",
+                  isExpandedComposer
+                    ? "order-none items-start"
+                    : "order-2 items-center"
+                )}
                 onClick={event => {
                   const editor = editorRef.current;
                   if (!editor || isEditorDisabled) return;
@@ -1081,7 +1161,7 @@ export const ChatComposer = memo(function ChatComposer({
                     }
                   }}
                   className={cn(
-                    "min-h-10 min-w-0 flex-1 overflow-y-auto whitespace-pre-wrap break-words border-0 !bg-transparent pl-2.5 py-1 text-[15px] leading-6 md:text-[15px] shadow-none focus-visible:ring-0 outline-none dark:!bg-transparent",
+                    "min-h-10 min-w-0 flex-1 overflow-y-auto whitespace-pre-wrap break-words border-0 !bg-transparent pl-2.5 py-2 text-[15px] leading-6 md:text-[15px] shadow-none focus-visible:ring-0 outline-none dark:!bg-transparent",
                     expanded
                       ? "max-h-[min(calc(100dvh-18rem),32rem)]"
                       : "max-h-48",
@@ -1091,7 +1171,7 @@ export const ChatComposer = memo(function ChatComposer({
                 />
                 {canExpand && (
                   <div
-                    className="ksemo-composer-fade pointer-events-none absolute inset-x-0 -bottom-1 h-9 bg-gradient-to-t from-popover to-transparent"
+                    className="ksemo-composer-fade pointer-events-none absolute inset-x-0 bottom-0 h-6 bg-gradient-to-t from-popover to-transparent"
                     aria-hidden="true"
                   />
                 )}
@@ -1130,7 +1210,12 @@ export const ChatComposer = memo(function ChatComposer({
                               ? activeMode
                               : "chat"
                     }
-                    className="ksemo-composer-placeholder pointer-events-none absolute left-2.5 top-[7px] text-[15px] leading-6 text-muted-foreground animate-[ksemo-placeholder-rise_800ms_ease-out]"
+                    className={cn(
+                      "ksemo-composer-placeholder pointer-events-none absolute left-2.5 text-[15px] leading-6 text-muted-foreground",
+                      isExpandedComposer
+                        ? "top-2 animate-[ksemo-placeholder-rise_800ms_ease-out]"
+                        : "top-1/2 -translate-y-1/2"
+                    )}
                     aria-hidden="true"
                   >
                     {isEditingMessage
@@ -1164,13 +1249,22 @@ export const ChatComposer = memo(function ChatComposer({
                 between its cancel and microphone controls. */}
             <div
               className={cn(
-                "flex w-full flex-wrap items-center justify-between gap-x-1.5 gap-y-1.5 pt-1",
+                botActive
+                  ? "ml-0 flex w-auto shrink-0 flex-nowrap items-center gap-x-1.5"
+                  : isExpandedComposer
+                    ? "mt-auto flex w-full flex-nowrap items-center justify-between gap-x-1.5"
+                    : "contents",
                 isRecording && "flex-nowrap",
                 botActive && "relative h-10 flex-nowrap py-0"
               )}
             >
               {/* Left Side Controls */}
-              <div className="flex items-center gap-2">
+              <div
+                className={cn(
+                  "flex items-center gap-2",
+                  isExpandedComposer ? "order-none" : "order-1"
+                )}
+              >
                 {!isEditingMessage && !guestMode && !botActive && isMobile && (
                   <>
                     <Button
@@ -1181,7 +1275,7 @@ export const ChatComposer = memo(function ChatComposer({
                         setMobileToolsPage("main");
                         setMobileToolsOpen(true);
                       }}
-                      className="ksemo-composer-attach size-10 shrink-0 rounded-full bg-transparent text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                      className="ksemo-composer-attach size-10 shrink-0 rounded-full bg-muted/50 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                       aria-label="Add to chat"
                     >
                       <Plus className="size-5" />
@@ -1415,7 +1509,7 @@ export const ChatComposer = memo(function ChatComposer({
                             onPointerLeave={() => {
                               attachTooltipSuppressedRef.current = false;
                             }}
-                            className="ksemo-composer-attach size-10 shrink-0 rounded-full bg-transparent text-muted-foreground transition-colors hover:bg-accent hover:text-foreground data-[state=open]:bg-accent data-[state=open]:text-foreground aria-expanded:bg-accent aria-expanded:text-foreground"
+                            className="ksemo-composer-attach size-10 shrink-0 rounded-full bg-muted/50 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground data-[state=open]:bg-accent data-[state=open]:text-foreground aria-expanded:bg-accent aria-expanded:text-foreground"
                             aria-label={
                               toolsOpen && !libraryOpen
                                 ? "Close attachment options"
@@ -1594,7 +1688,9 @@ export const ChatComposer = memo(function ChatComposer({
 
               <div
                 className={cn(
-                  "ml-auto flex items-center gap-1.5",
+                  isExpandedComposer
+                    ? "order-none ml-auto flex items-center gap-1.5"
+                    : "order-3 ml-auto flex items-center gap-1.5",
                   botActive && "ml-0"
                 )}
               >
@@ -1619,10 +1715,10 @@ export const ChatComposer = memo(function ChatComposer({
                                 size="icon"
                                 onClick={onVoice}
                                 disabled={isTranscribing}
-                                className="ksemo-composer-dictate size-10 rounded-full bg-transparent text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+                                className="ksemo-composer-dictate size-10 rounded-full bg-muted/50 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
                                 aria-label="Dictate"
                               >
-                                <Mic className="size-4.5" />
+                                <Mic className="size-5" />
                               </Button>
                             </TooltipTrigger>
                             <TooltipContent side="bottom">
@@ -1692,10 +1788,10 @@ export const ChatComposer = memo(function ChatComposer({
                                 size="icon"
                                 onClick={onVoice}
                                 disabled={isTranscribing}
-                                className="ksemo-composer-dictate size-10 rounded-full bg-transparent text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+                                className="ksemo-composer-dictate size-10 rounded-full bg-muted/50 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
                                 aria-label="Dictate"
                               >
-                                <Mic className="size-4.5" />
+                                <Mic className="size-5" />
                               </Button>
                             </TooltipTrigger>
                             <TooltipContent side="bottom">
