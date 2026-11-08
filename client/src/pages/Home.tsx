@@ -6148,7 +6148,11 @@ export default function Home({
       guestMode={guestMode}
     />
   );
-  const composerElement = renderComposer();
+  const composerElement = renderComposer({
+    isCentered: isMobile && visibleMessages.length === 0,
+    compactBottomSpacing: isMobile,
+    menuPlacement: isMobile ? "above" : "below",
+  });
   const showUpgradeEntry =
     !guestMode &&
     composerTag !== "bot" &&
