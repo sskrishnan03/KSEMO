@@ -3771,7 +3771,10 @@ export const PdfDrawer = memo(function PdfDrawer({
           ? isExpanded
             ? "animate-in fade-in-0 zoom-in-95 duration-200 ease-out"
             : "animate-in fade-in-0 zoom-in-95 duration-200 ease-out lg:slide-in-from-right lg:duration-300"
-          : "animate-in fade-in-0 zoom-in-95 duration-200 ease-out"
+          : "animate-in fade-in-0 zoom-in-95 duration-200 ease-out",
+        ghostMode &&
+          isExpanded &&
+          "max-md:absolute max-md:inset-0 max-md:h-full max-md:w-full max-md:rounded-none max-md:border-0 max-md:shadow-none"
       )}
     >
       {/* Top Header */}
