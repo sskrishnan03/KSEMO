@@ -1,5 +1,3 @@
-import { ENV } from "./env";
-
 export type Role = "system" | "user" | "assistant" | "tool" | "function";
 
 export type TextContent = {
@@ -288,21 +286,12 @@ const normalizeToolChoice = (
   return toolChoice;
 };
 
-const resolveApiUrl = () => {
-  if (process.env.OLLAMA_API_KEY?.trim()) return "https://ollama.com/v1";
-  // Generic OpenAI-compatible base URL override (e.g. Gemini's compatibility
-  // endpoint at https://generativelanguage.googleapis.com/v1beta/openai).
-  const baseUrl = process.env.LLM_BASE_URL?.trim();
-  if (baseUrl) return `${baseUrl.replace(/\/$/, "")}/chat/completions`;
-  return "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
-};
+const GEMINI_OPENAI_URL =
+  "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
+const GEMINI_MODELS_URL =
+  "https://generativelanguage.googleapis.com/v1beta/openai/models";
 
-const resolveApiKey = (): string =>
-  process.env.OLLAMA_API_KEY?.trim() ||
-  ENV.forgeApiKey ||
-  process.env.OPENAI_API_KEY?.trim() ||
-  process.env.GEMINI_API_KEY?.trim() ||
-  "";
+const resolveApiKey = (): string => process.env.GEMINI_API_KEY?.trim() || "";
 
 type RequestTarget = {
   name: string;
@@ -311,72 +300,24 @@ type RequestTarget = {
   model?: string;
 };
 
-// Secondary OpenAI-compatible provider (AIML API, https://aimlapi.com — 1000+ models).
-// Used automatically when the primary provider request fails, e.g. free-tier quota exhaustion.
 const buildRequestTargets = (): RequestTarget[] => {
-  const targets: RequestTarget[] = [];
-
-  // Prefer Ollama Cloud whenever its key is configured. Keep this target
-  // isolated: Gemini/AIML model names and credentials are not valid fallbacks
-  // for an Ollama request.
-  const ollamaKey = process.env.OLLAMA_API_KEY?.trim();
-  if (ollamaKey) {
-    return [
-      {
-        name: "Ollama Cloud",
-        url: "https://ollama.com/v1/chat/completions",
-        apiKey: ollamaKey,
-      },
-    ];
-  }
-
-  const primaryUrl = resolveApiUrl();
-
-  // Try every distinct credential against the primary URL so one expired or
-  // invalid key cannot take down every request.
-  const primaryKeys: Array<{ name: string; apiKey: string }> = [];
-  if (ENV.forgeApiKey)
-    primaryKeys.push({ name: "primary-forge", apiKey: ENV.forgeApiKey });
-  const openAiKey = process.env.OPENAI_API_KEY?.trim();
-  if (openAiKey)
-    primaryKeys.push({ name: "primary-openai", apiKey: openAiKey });
-  const geminiKey = process.env.GEMINI_API_KEY?.trim();
-  if (geminiKey && !primaryKeys.some(entry => entry.apiKey === geminiKey)) {
-    primaryKeys.push({ name: "primary-gemini", apiKey: geminiKey });
-  }
-
-  for (let index = 0; index < primaryKeys.length; index++) {
-    const entry = primaryKeys[index];
-    targets.push({ name: entry.name, url: primaryUrl, apiKey: entry.apiKey });
-    if (index === primaryKeys.length - 1) {
-      targets.push({
-        name: `${entry.name}-free`,
-        url: primaryUrl,
-        apiKey: entry.apiKey,
-        model: PRIMARY_FREE_FALLBACK_MODEL,
-      });
-    }
-  }
-
-  const aimlKey = process.env.AIML_API_KEY?.trim();
-  if (aimlKey) {
-    const baseUrl =
-      process.env.AIML_BASE_URL?.trim() || "https://api.aimlapi.com/v1";
-    targets.push({
-      name: "AIML",
-      url: `${baseUrl.replace(/\/$/, "")}/chat/completions`,
-      apiKey: aimlKey,
-      model: process.env.AIML_MODEL?.trim() || "openai/gpt-4o-mini",
-    });
-  }
-
-  return targets;
+  const apiKey = resolveApiKey();
+  if (!apiKey) return [];
+  return [
+    { name: "Gemini", url: GEMINI_OPENAI_URL, apiKey },
+    {
+      name: "Gemini quota fallback",
+      url: GEMINI_OPENAI_URL,
+      apiKey,
+      model: PRIMARY_FREE_FALLBACK_MODEL,
+    },
+  ];
 };
 
 const assertApiKey = () => {
   if (!buildRequestTargets().length) {
     throw new Error(
-      "No LLM API key configured. Set GEMINI_API_KEY, BUILT_IN_FORGE_API_KEY, or AIML_API_KEY."
+      "No Gemini API key configured. Set GEMINI_API_KEY to use Gemini."
     );
   }
 };
@@ -511,24 +452,19 @@ const fetchWithBackoff = async (
     : new Error("LLM request failed after exhausting retries");
 };
 
-export const DEFAULT_LLM_MODEL = process.env.OLLAMA_API_KEY?.trim()
-  ? "gemma4:31b-cloud"
-  : "models/gemini-2.5-flash";
-
-const isOllamaCloudConfigured = () =>
-  Boolean(process.env.OLLAMA_API_KEY?.trim());
+export const DEFAULT_LLM_MODEL = "models/gemini-2.5-flash";
 
 export const getQuotaFallbackModel = () =>
-  isOllamaCloudConfigured() ? undefined : PRIMARY_FREE_FALLBACK_MODEL;
+  PRIMARY_FREE_FALLBACK_MODEL;
 
 export const resolveModelName = (model?: string) => {
   const selected = model?.trim();
-  if (!isOllamaCloudConfigured()) return selected || DEFAULT_LLM_MODEL;
-  // Existing accounts may have a Gemini model saved as their preference.
-  // Keep those accounts working after switching the configured provider.
-  if (!selected || /^(models\/)?gemini-/i.test(selected))
-    return "gemma4:31b-cloud";
-  return selected;
+  // Ignore old saved Ollama/OpenAI model selections after switching providers.
+  return selected && /^(models\/)?gemini-/i.test(selected)
+    ? selected.startsWith("models/")
+      ? selected
+      : `models/${selected}`
+    : DEFAULT_LLM_MODEL;
 };
 
 // Separate free-tier quota bucket on the primary provider; used automatically
@@ -890,6 +826,14 @@ export async function* streamLLM(
       lastError = error;
       // Never restart a partially streamed answer on another provider; text would duplicate.
       if (yieldedDelta || signal?.aborted) throw error;
+      // Billing rejection is account-wide and cannot be fixed by changing
+      // Gemini models or switching from the compatibility API to native API.
+      if (
+        error instanceof Error &&
+        /\b402\b|payment required|billing/i.test(error.message)
+      ) {
+        throw error;
+      }
       const geminiKey = process.env.GEMINI_API_KEY?.trim();
       const requestedModel =
         target.model || params.model || DEFAULT_LLM_MODEL;
@@ -939,34 +883,7 @@ export type ModelsResponse = {
 export async function listLLMModels(): Promise<ModelsResponse> {
   assertApiKey();
 
-  if (isOllamaCloudConfigured()) {
-    const response = await fetchWithBackoff("https://ollama.com/api/tags", {
-      headers: { authorization: `Bearer ${resolveApiKey()}` },
-    });
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(
-        `List Ollama Cloud models failed: ${response.status} ${response.statusText} – ${errorText}`
-      );
-    }
-    const catalog = (await response.json()) as {
-      models?: Array<{ name?: string; model?: string }>;
-    };
-    return {
-      object: "list",
-      data: (catalog.models ?? [])
-        .map(model => model.model || model.name || "")
-        .filter(Boolean)
-        .map(id => ({ id, object: "model", created: 0, owned_by: "ollama" })),
-    };
-  }
-
-  const baseUrl = process.env.LLM_BASE_URL?.trim();
-  const url = baseUrl
-    ? `${baseUrl.replace(/\/$/, "")}/models`
-    : "https://generativelanguage.googleapis.com/v1beta/openai/models";
-
-  const response = await fetchWithBackoff(url, {
+  const response = await fetchWithBackoff(GEMINI_MODELS_URL, {
     headers: { authorization: `Bearer ${resolveApiKey()}` },
   });
 

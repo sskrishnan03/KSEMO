@@ -179,6 +179,10 @@ const isQuotaError = (error: unknown) =>
   error instanceof Error &&
   /\b429\b|resource_exhausted|quota/i.test(error.message);
 
+const isBillingError = (error: unknown) =>
+  error instanceof Error &&
+  /\b402\b|payment required|add usage credits|billing/i.test(error.message);
+
 // Provider-level availability problems that are worth retrying against a
 // different model: quota exhaustion (429), model-specific high-demand 503s
 // ("This model is currently experiencing high demand"), transient 5xx, and
@@ -1002,6 +1006,8 @@ export function registerChatStream(app: Express) {
               ? "KSEMO stopped waiting because this response took too long. Please try again."
               : isQuotaError(generationError)
                 ? "KSEMO reached today's free limit for this model. It resets in about 24 hours — switch models in Settings for a separate limit, or add billing to your Gemini API key."
+                : isBillingError(generationError)
+                  ? "Gemini rejected this request because billing or usage credits are required. Check billing for the Google project connected to GEMINI_API_KEY."
                 : "KSEMO could not complete this response. Please try again.",
           });
         } else {
