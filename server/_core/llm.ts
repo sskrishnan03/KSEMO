@@ -455,10 +455,11 @@ const computeBackoffDelay = (
   return Math.min(Math.max(jittered, retryAfterMs ?? 0), RETRY_MAX_DELAY_MS);
 };
 
-// Statuses that cannot succeed on retry (bad key, bad request, or missing
-// model). Transient 5xx responses retry with backoff; 429 retries once, then
-// surfaces quickly because daily quota limits will not recover within seconds.
-const NON_RETRYABLE_STATUSES = new Set([400, 401, 403, 404]);
+// Statuses that cannot succeed on retry (bad key, bad request, missing model,
+// or exhausted billing credits). Transient 5xx responses retry with backoff;
+// 429 retries once, then surfaces quickly because quota limits will not recover
+// within seconds.
+const NON_RETRYABLE_STATUSES = new Set([400, 401, 402, 403, 404]);
 
 // Retries non-2xx responses and network errors with exponential backoff, then
 // returns the final Response so callers keep their existing error handling.
